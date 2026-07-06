@@ -79,33 +79,42 @@ if os.getenv("OKX_API_KEY"):
     _NETWORK = "eip155:196"  # X Layer mainnet
     _server.register(_NETWORK, ExactEvmScheme())
 
+    _scan_route = RouteConfig(
+        accepts=[
+            PaymentOption(
+                scheme="exact",
+                price="$0.01",
+                network=_NETWORK,
+                pay_to=_pay_to,
+                max_timeout_seconds=300,
+            )
+        ],
+        description="Warden payload security scan",
+        mime_type="application/json",
+    )
+    _audit_route = RouteConfig(
+        accepts=[
+            PaymentOption(
+                scheme="exact",
+                price="$15",
+                network=_NETWORK,
+                pay_to=_pay_to,
+                max_timeout_seconds=300,
+            )
+        ],
+        description="Warden agent endpoint security audit",
+        mime_type="application/json",
+    )
+    # Challenge unpaid GET as well as POST: OKX's x402-check probes with GET and
+    # expects a 402 payment challenge; a POST-only paywall returns 405 and reads
+    # as an invalid x402 service. GET is not left unpaywalled — the paid handlers
+    # remain POST-only, so a paid GET simply 405s after settlement (no real
+    # caller does this; buyers POST). OPTIONS is deliberately left free for CORS.
     _paid_routes = {
-        "POST /scan": RouteConfig(
-            accepts=[
-                PaymentOption(
-                    scheme="exact",
-                    price="$0.01",
-                    network=_NETWORK,
-                    pay_to=_pay_to,
-                    max_timeout_seconds=300,
-                )
-            ],
-            description="Warden payload security scan",
-            mime_type="application/json",
-        ),
-        "POST /audit": RouteConfig(
-            accepts=[
-                PaymentOption(
-                    scheme="exact",
-                    price="$15",
-                    network=_NETWORK,
-                    pay_to=_pay_to,
-                    max_timeout_seconds=300,
-                )
-            ],
-            description="Warden agent endpoint security audit",
-            mime_type="application/json",
-        ),
+        "POST /scan": _scan_route,
+        "GET /scan": _scan_route,
+        "POST /audit": _audit_route,
+        "GET /audit": _audit_route,
     }
     app.add_middleware(PaymentMiddlewareASGI, routes=_paid_routes, server=_server)
 

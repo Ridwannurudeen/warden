@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta
       name="description"
-      content="Warden is a deterministic payload firewall and pre-listing auditor for A2MCP agents."
+      content="Warden is a runtime payload firewall for the agent economy — a deterministic ALLOW/SANITIZE/BLOCK verdict on every untrusted payload, in your agent loop, per call."
     >
-    <title>Warden - Payload Firewall for Agents</title>
+    <title>Warden - Runtime Payload Firewall for Agents</title>
     <link rel="icon" href="assets/warden-avatar.png">
     <link rel="stylesheet" href="styles.css">
   </head>
@@ -32,12 +32,13 @@
     <main id="main">
       <section class="hero tab-panel is-active" id="overview" data-tab-panel="overview" tabindex="-1">
         <div class="hero-copy">
-          <p class="eyebrow">A2MCP security service</p>
-          <h1>Payload firewall for agents before they move money.</h1>
+          <p class="eyebrow">Runtime security for the agent economy</p>
+          <h1>The runtime firewall for every payload your agent ingests.</h1>
           <p class="hero-text">
-            Warden scans untrusted agent responses, tool outputs, and payment instructions
-            before execution. It returns a deterministic ALLOW, SANITIZE, or BLOCK verdict
-            with machine-readable threat classes.
+            Not a one-off audit — Warden sits in your agent loop and screens every untrusted
+            response, tool output, and payment instruction, per call, before it acts. Each call
+            returns a deterministic ALLOW, SANITIZE, or BLOCK verdict with machine-readable
+            threat classes, in sub-millisecond compute.
           </p>
           <div class="hero-actions">
             <a class="button primary" href="#demo" data-link-tab="demo">View verdict demo</a>
@@ -45,12 +46,12 @@
           </div>
           <dl class="hero-stats" aria-label="Warden proof points">
             <div>
-              <dt>Attack corpus</dt>
-              <dd>88</dd>
+              <dt>Median verdict</dt>
+              <dd>0.13 ms</dd>
             </div>
             <div>
-              <dt>Benign guards</dt>
-              <dd>30</dd>
+              <dt>Attack corpus</dt>
+              <dd>88</dd>
             </div>
             <div>
               <dt>False positives</dt>

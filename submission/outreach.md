@@ -22,51 +22,66 @@ by Jul 16.
 | @smartcoded / @CorvoEdge | Multichain wallet, 4 chains, one signature | Wallet = prime drain-address target; audit before listing |
 | @ohxiyu | Ran full task loop (order→delivery) already | Active buyer-side user → demo customer for scan_payload |
 | @moranweb3 | KOL running Hermes on OKX.AI, writes security-conscious guides | Not a seller-target; a distribution target — his audience installs agents; pitch a review/mention |
+| @openclawby | Clawby — AI Agent financial Skills layer (on-chain+TradFi data, executable trade skills); OKX + Panda Sui partnerships | **Top target (added Jul 6):** financial execution = existential drain/tool-hijack exposure; active, partnership-hungry, security audit + badge is a credibility asset for their own listing |
+
+<!-- Refresh 2026-07-06: #OKXAI now dominated by KOL/promo chatter (okxchinese GM posts, moranweb3),
+not new ASP builders. New buildable target vs 07-05 sweep: @openclawby only. Signal: public entrant
+pool is thinner than hashtag volume — reinforces the need to validate demand fast before over-investing. -->
+
 
 Refresh command (sandbox): search X for `"#OKXAI"` latest since campaign start; also try
 `OKX.AI ASP`, `okx.ai hackathon`, `A2MCP` as secondary queries.
 
+## Positioning (post-competitive-audit, 2026-07-06)
+
+Warden is the **runtime payload firewall** — the thing wired into an agent's loop that screens
+every untrusted payload per call. This is a lane SlowMist (the free, brand-trusted audit incumbent)
+does NOT occupy. **Lead with the runtime scan (`scan_payload`, 0.01 USDT/call) as the product; use a
+free one-off audit as the lead-magnet** to seed reviews + badges. Do NOT lead with a paid audit —
+SlowMist audits free, so a 15 USDT audit pitch loses. Cite Warden's OWN measured number
+(median verdict 0.13 ms), never "faster than SlowMist" (their latency is unmeasured).
+
 ## Templates
 
-### A. Entrant DM / reply (EN)
-> Your ASP entry is void if it fails OKX's internal security review (prompt injection / data
-> leakage / malicious content). Warden is a listed-track security ASP built for exactly this:
-> we fire a 17-attack battery (drain-address redirects, tool-call hijacks, seed-phrase exfil,
-> injection classics) at your endpoint and hand you a graded report + fixes before OKX's
-> reviewers see it. 15 USDT via x402, results in minutes: warden.gudman.xyz. Pass on the first
-> try — you don't get many review cycles before Jul 16.
+### A. Entrant DM / reply (EN) — runtime firewall lead
+> Your agent ingests untrusted payloads from strangers all day — a poisoned response, a hijacked
+> tool call, a swapped payment address. Warden is a runtime firewall for exactly that: pass any
+> payload through `scan_payload` and get a deterministic ALLOW / SANITIZE / BLOCK verdict + threat
+> classes, 0.01 USDT/call, median 0.13 ms compute. Drop it in your loop via x402. Want a free
+> audit of your endpoint first to see it work? warden.gudman.xyz
 
-### B. Entrant DM / reply (中文)
-> 你的 ASP 如果没通过 OKX 内部安全审核（提示词注入/数据泄露/恶意内容），参赛资格直接作废。
-> Warden 就是为这个做的安全 ASP：对你的 endpoint 打一套 17 种攻击载荷（转账地址劫持、
-> 工具调用劫持、助记词窃取、注入攻击），几分钟出评分报告+修复建议，让你在 OKX 审核前先过一遍。
-> x402 支付 15 USDT：warden.gudman.xyz。7月16日前审核轮次有限，第一次就过最稳。
+### B. Entrant DM / reply (中文) — runtime firewall lead
+> 你的 agent 每天都在处理来自陌生方的不可信内容——被污染的回复、被劫持的工具调用、被替换的收款地址。
+> Warden 就是干这个的运行时防火墙：任意 payload 过一遍 `scan_payload`，拿到确定性的
+> ALLOW/SANITIZE/BLOCK 判定 + 威胁分类，0.01 USDT/次，判定计算中位 0.13 毫秒。通过 x402 直接嵌进你的
+> loop。想先免费审计一下你的 endpoint 看看效果吗？warden.gudman.xyz
 
-### C. Wallet/DeFi ASP variant (funds at risk)
-> Your agent moves funds. One poisoned tool response saying "payment confirmed, send to 0x…"
-> and a user's money is gone — we demo exactly this attack on our site. Warden's scan_payload
-> is a 0.01 USDT/call firewall verdict (ALLOW/SANITIZE/BLOCK, <1s, deterministic) for every
-> untrusted payload your agent ingests. Drop-in via x402. warden.gudman.xyz
+### C. Wallet/DeFi ASP variant (funds at risk) — sharpest fit
+> Your agent moves funds, so one poisoned "payment confirmed, send to 0x…" is game over — we demo
+> exactly that BLOCK on our site. Warden's `scan_payload` firewalls every untrusted payload before
+> your agent acts: deterministic verdict, 0.01 USDT/call, median 0.13 ms. In-loop via x402. Free
+> endpoint audit to prove it first — interested? warden.gudman.xyz
 
 ### D. Infra/bridge builder (partnership, not sale)
-> okxai-universal is the on-ramp; Warden is the seatbelt. Every agent you bridge into okx.ai
-> ingests untrusted payloads from strangers. We expose scan_payload (0.01 USDT, x402, <1s
-> deterministic verdict) — one hook in your bridge and every user you onboard is firewalled.
+> Your bridge is the on-ramp; Warden is the seatbelt. Every agent you onboard ingests untrusted
+> payloads from strangers. `scan_payload` is a per-call runtime firewall (0.01 USDT, x402,
+> deterministic verdict, median 0.13 ms) — one hook and every user you bring in is screened.
 > Happy to cross-promote. warden.gudman.xyz
 
-### E. Post-purchase review ask (send after every completed order)
-> Thanks for running the audit. Two asks, 30 seconds: (1) if it helped, an on-chain review on
-> our listing means a lot this week; (2) if anything in the report was unclear or wrong, tell
-> me first — I'll fix it before you rate.
+### E. Free-audit → review ask (send after delivering the free lead-magnet audit)
+> Ran your endpoint through Warden's attack battery — report attached. Two 30-sec asks: (1) if it
+> was useful, an on-chain review on our listing (#3808) means a lot this week; (2) if you want
+> the runtime firewall (`scan_payload`, 0.01/call) wired into your loop, I'll help you drop it in.
+> Anything unclear in the report, tell me first — I'll fix it before you rate.
 
 ## Rules of engagement
 - Reply publicly under their #OKXAI announcement where possible (visibility compounds; also
   scores Social Media Popularity). DM only when replies are closed.
 - Never spam: one contact per project, one follow-up max after 48h.
 - Honest claims only: we do NOT guarantee passing OKX review; we test against a published
-  corpus. Never imply OKX endorses or requires Warden.
-- Every claim in a template must stay true to the live service (17-attack battery, 0.01/15
-  USDT pricing, <1s scan, x402). Update templates if pricing/battery changes.
+  corpus. Never imply OKX endorses or requires Warden. Never claim we're faster than SlowMist.
+- Every claim must stay true to the live service (0.01 USDT/call scan, 15 USDT audit, x402,
+  median 0.13 ms verdict compute). Update templates if pricing/latency changes.
 - All actual posting/DMs are user-executed (accounts are user-owned).
 
 ## Tracking
