@@ -45,9 +45,7 @@ class AgentAuditor:
     async def audit(
         self, target_url: str, sample_prompts: list[str] | None = None
     ) -> AuditResponse:
-        connect_url, host_header, parsed_target = await self._validate_public_http_url(
-            target_url
-        )
+        connect_url, host_header, parsed_target = await self._validate_public_http_url(target_url)
         issued_at = date.today().isoformat()
         attacks = self._load_representative_attacks()
         for index, prompt in enumerate(sample_prompts or [], start=1):
@@ -63,7 +61,7 @@ class AgentAuditor:
             timeout=AUDIT_TIMEOUT_SECONDS, follow_redirects=False
         ) as client:
             consent_verified = await self._verify_target_consent(
-                client, host_header, parsed_target
+                client, host_header, parsed_target, connect_url
             )
             results = []
             for attack in attacks:
@@ -188,9 +186,7 @@ class AgentAuditor:
             chunks.append(chunk)
         return b"".join(chunks).decode("utf-8", errors="ignore")
 
-    async def _validate_public_http_url(
-        self, target_url: str
-    ) -> tuple[str, str, ParseResult]:
+    async def _validate_public_http_url(self, target_url: str) -> tuple[str, str, ParseResult]:
         """
         Validate target_url and pin it to one resolved IP.
 
@@ -262,11 +258,12 @@ class AgentAuditor:
         return "F"
 
     @staticmethod
-    def _build_consent_url(target: ParseResult) -> str:
-        host = target.hostname or ""
-        if target.port:
-            host = f"{host}:{target.port}"
-        return f"{target.scheme}://{host}/.well-known/warden-consent"
+    def _build_consent_url(connect_url: str) -> str:
+        # Reuse the SSRF-validated, IP-pinned origin from connect_url so the
+        # consent GET cannot trigger a fresh DNS resolution (rebinding). The
+        # hostname is carried separately via the Host header and TLS SNI.
+        parts = urlparse(connect_url)
+        return f"{parts.scheme}://{parts.netloc}/.well-known/warden-consent"
 
     @staticmethod
     def _require_consent() -> bool:
@@ -282,12 +279,13 @@ class AgentAuditor:
         client: httpx.AsyncClient,
         host_header: str,
         parsed_target: ParseResult,
+        connect_url: str,
     ) -> bool:
         require_consent = self._require_consent()
         host_header_with_port = host_header
         if parsed_target.port and f":{parsed_target.port}" not in host_header_with_port:
             host_header_with_port = f"{host_header_with_port}:{parsed_target.port}"
-        consent_url = self._build_consent_url(parsed_target)
+        consent_url = self._build_consent_url(connect_url)
         try:
             response = await client.get(
                 consent_url,

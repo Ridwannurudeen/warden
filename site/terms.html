@@ -22,6 +22,10 @@
           <ul>
             <li><strong>Service scope:</strong> /scan, /audit, and /badge/{audit_id}.</li>
             <li><strong>Scope of service:</strong> Warden evaluates the payloads you send and does not guarantee perfect safety.</li>
+            <li><strong>Consent:</strong> By default, /audit proceeds without explicit target consent and returns a best-effort
+              consent flag. Set <code>WARDEN_REQUIRE_CONSENT=true</code> to require
+              a reachable <code>/.well-known/warden-consent</code> response containing
+              <code>warden-audit-allowed</code> before an audit runs.</li>
             <li><strong>Use limits:</strong> rate limits are configured by operator policy.</li>
             <li><strong>No misuse:</strong> you may not use this site to probe internal or unauthorized systems.</li>
           </ul>

@@ -20,6 +20,10 @@ Use `certbot certonly --webroot`, not `certbot --nginx`.
 - Nginx symlink: `/etc/nginx/sites-enabled/warden.gudman.xyz.conf`
 - TLS webroot: existing `/etc/nginx/snippets/acme-challenge.conf` and certbot webroot defaults
 - Secrets: `/opt/warden/.env`, owned by `warden`, mode `600`; never copy it from local
+- Runtime feature flags (set in `/opt/warden/.env`):
+  - `WARDEN_RATE_LIMIT_PER_MIN=60` (set to `0` to disable)
+  - `WARDEN_REQUIRE_CONSENT=false` (set to `true` for hard consent enforcement)
+  - `WARDEN_BADGE_SECRET=<hmac-secret>` (optional dev default is safe but predictable)
 
 ## First Deploy
 
@@ -94,6 +98,8 @@ The production vhost serves the landing page from `/opt/warden-site` and proxies
 - `POST /audit`: proxy to `http://127.0.0.1:8031`.
 - `GET /health`: proxy to `http://127.0.0.1:8031`.
 - `GET /badge/{audit_id}`: proxy to `http://127.0.0.1:8031`.
+
+Also serve `/.well-known/warden-consent` from `/opt/warden-site` when running in hard-consent mode. It should return HTTP 200 with body `warden-audit-allowed` and can be left absent when `WARDEN_REQUIRE_CONSENT=false`.
 
 This keeps the FastAPI root JSON stub untouched while making the public root a landing page.
 

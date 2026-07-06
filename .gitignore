@@ -2,6 +2,9 @@
 .env
 .env.*
 
+# Runtime state — issued audit badges (regenerated at runtime)
+badges/
+
 # Python
 __pycache__/
 *.py[cod]
