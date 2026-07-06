@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="Warden audit badge verifier for public endpoint security attestations."
+    >
+    <title>Warden Badge</title>
+    <link rel="icon" href="assets/warden-avatar.png">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+      .badge-layout {
+        width: min(1180px, calc(100% - 32px));
+        margin: 32px auto 0;
+      }
+
+      .badge-console {
+        min-height: 320px;
+        padding: 18px;
+        background:
+          linear-gradient(180deg, rgba(21, 34, 54, 0.92), rgba(10, 17, 27, 0.94)),
+          var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .badge-console pre {
+        margin-top: 12px;
+      }
+    </style>
+  </head>
+  <body class="badge-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <main id="main" class="badge-layout">
+      <header class="site-header" style="position: static">
+        <a class="brand" href="index.html" aria-label="Back to overview">
+          <img src="assets/warden-avatar.png" alt="" width="36" height="36">
+          <span>Warden</span>
+        </a>
+      </header>
+
+      <section class="hero">
+        <div class="section-heading">
+          <p class="eyebrow">Warden audit badge</p>
+          <h1>Verify a public Warden audit badge</h1>
+          <p class="note">
+            Supply an audit id in the URL and this page loads the signed badge record
+            from <code>GET /badge/{audit_id}</code>.
+          </p>
+          <p id="badge-status" class="console-label" aria-live="polite">Loading badge…</p>
+        </div>
+
+        <aside class="verdict-console badge-console">
+          <pre id="badge-output">Awaiting badge id…</pre>
+        </aside>
+      </section>
+    </main>
+
+    <script src="badge.js" defer></script>
+  </body>
+</html>

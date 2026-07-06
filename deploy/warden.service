@@ -1,0 +1,23 @@
+[Unit]
+Description=Warden A2MCP payload firewall
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/warden
+Environment=PYTHONUNBUFFERED=1
+Environment=WARDEN_CORS_ORIGINS=https://warden.gudman.xyz
+EnvironmentFile=/opt/warden/.env
+ExecStart=/opt/warden/.venv/bin/uvicorn warden.api:app --host 127.0.0.1 --port 8031
+Restart=always
+RestartSec=5
+User=warden
+Group=warden
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/warden
+
+[Install]
+WantedBy=multi-user.target
