@@ -11,18 +11,20 @@ by Jul 16.
 
 ## Target list (from #OKXAI sweep, 2026-07-05 — refresh every 1–2 days)
 
-| Handle | What they're building | Angle |
-|---|---|---|
-| @jch47643085 | Food-safety photo agent (live, high engagement) | Consumer ASP → payload firewall for inbound user content + pre-review audit |
-| @0xleff | okxai-universal (open MCP bridge) + Bounty Hunter task scanner; 20k views | Infra builder → integrate Warden scan into his bridge; co-marketing; his users = our users |
-| @itseywacc | Web3 Agent Kit — 8-chain DeFi swaps, 986 tests, XLayer entry | Handles funds → drain-address/tool-hijack scan is existential; pre-review audit |
-| @ai2humannetwork | AI2Human — ASP layer for real-world execution, entering hackathon | Execution layer → every inbound task payload is untrusted; audit + runtime scan |
-| @Urex_ai | UREX — runtime layer for agent execution | Same as above; runtime = highest injection exposure |
-| @COAGENTICDEV | Exchange OS — custom trading venues on X Layer | Financial ASP → strongest security-need story |
-| @smartcoded / @CorvoEdge | Multichain wallet, 4 chains, one signature | Wallet = prime drain-address target; audit before listing |
-| @ohxiyu | Ran full task loop (order→delivery) already | Active buyer-side user → demo customer for scan_payload |
-| @moranweb3 | KOL running Hermes on OKX.AI, writes security-conscious guides | Not a seller-target; a distribution target — his audience installs agents; pitch a review/mention |
-| @openclawby | Clawby — AI Agent financial Skills layer (on-chain+TradFi data, executable trade skills); OKX + Panda Sui partnerships | **Top target (added Jul 6):** financial execution = existential drain/tool-hijack exposure; active, partnership-hungry, security audit + badge is a credibility asset for their own listing |
+**Send order = table order (strongest/freshest first).**
+
+| # | Handle | What they're building | Angle |
+|---|---|---|---|
+| 1 | @openclawby | Clawby — AI Agent financial Skills layer (on-chain+TradFi data, executable trade skills); OKX + Panda Sui partnerships | **Top target:** financial execution = existential drain/tool-hijack exposure; active, partnership-hungry, security audit + badge is a credibility asset for their own listing |
+| 2 | @itseywacc | Web3 Agent Kit — 8-chain DeFi swaps, 986 tests, XLayer entry | Handles funds → drain-address/tool-hijack scan is existential; pre-review audit |
+| 3 | @ai2humannetwork | AI2Human — ASP layer for real-world execution, entering hackathon | Execution layer → every inbound task payload is untrusted; audit + runtime scan |
+| 4 | @0xleff | okxai-universal (open MCP bridge) + Bounty Hunter task scanner; 20k views | Infra builder → integrate Warden scan into his bridge; co-marketing; his users = our users |
+| 5 | @smartcoded / @CorvoEdge | Multichain wallet, 4 chains, one signature | Wallet = prime drain-address target; audit before listing |
+| 6 | @Urex_ai | UREX — runtime layer for agent execution | Same as #3; runtime = highest injection exposure |
+| 7 | @COAGENTICDEV | Exchange OS — custom trading venues on X Layer | Financial ASP → strongest security-need story |
+| 8 | @jch47643085 | Food-safety photo agent (live, high engagement) | Consumer ASP → payload firewall for inbound user content + pre-review audit |
+| 9 | @ohxiyu | Ran full task loop (order→delivery) already | Active buyer-side user → demo customer for scan_payload |
+| 10 | @moranweb3 | KOL running Hermes on OKX.AI, writes security-conscious guides | Not a seller-target; a distribution target — his audience installs agents; pitch a review/mention |
 
 <!-- Refresh 2026-07-06: #OKXAI now dominated by KOL/promo chatter (okxchinese GM posts, moranweb3),
 not new ASP builders. New buildable target vs 07-05 sweep: @openclawby only. Signal: public entrant
@@ -31,6 +33,15 @@ pool is thinner than hashtag volume — reinforces the need to validate demand f
 
 Refresh command (sandbox): search X for `"#OKXAI"` latest since campaign start; also try
 `OKX.AI ASP`, `okx.ai hackathon`, `A2MCP` as secondary queries.
+
+## Proof point (verified live, 2026-07-07)
+
+Real end-to-end x402 payment against the live listed agent (#3808), on X Layer mainnet —
+verdict `BLOCK` / `DRAIN_ADDRESS`, server latency 46.3ms, settled tx viewable at
+`oklink.com/xlayer/tx/0xda1b7c86...721d4` (full hash in deploy notes / commit history —
+truncated here). (Self-pay — proves the rail, not external demand; listing is live and
+sellable to real buyers now.) Use as a credibility anchor if an entrant asks "does this
+actually work" — don't overstate it as a sale.
 
 ## Positioning (post-competitive-audit, 2026-07-06)
 
