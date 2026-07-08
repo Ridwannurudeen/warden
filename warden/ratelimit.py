@@ -17,11 +17,9 @@ _STATE_LOCK = threading.Lock()
 
 def _client_ip(request: object) -> str:
     headers = request.headers
-    forwarded_for = headers.get("x-forwarded-for", "")
-    if forwarded_for:
-        first = forwarded_for.split(",")[0].strip()
-        if first:
-            return first
+    real_ip = headers.get("x-real-ip", "").strip()
+    if real_ip:
+        return real_ip
 
     request_client = request.client
     if request_client and request_client.host:
@@ -43,6 +41,10 @@ def check_rate_limit(request: object, limit_per_minute: int) -> bool:
     client = _client_ip(request)
     window_id = _window_id(_time_now())
     with _STATE_LOCK:
+        for known_client, (start, _) in list(_STATE.items()):
+            if start < window_id:
+                del _STATE[known_client]
+
         start, count = _STATE.get(client, (window_id, 0))
         if start != window_id:
             start = window_id
