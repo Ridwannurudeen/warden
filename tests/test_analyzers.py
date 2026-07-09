@@ -11,6 +11,42 @@ from warden.analyzers import (
 from warden.core.analyzer import AnalysisContext
 from warden.core.verdict import ReasonCode
 
+UNEXPECTED_ADDRESS = "0x2222222222222222222222222222222222222222"
+EXPECTED_ADDRESS = "0x1111111111111111111111111111111111111111"
+
+TRANSFER_INTENT_CASES = [
+    pytest.param(
+        "Move holdings after the review completes.",
+        f"Move holdings toward {UNEXPECTED_ADDRESS}.",
+        id="move",
+    ),
+    pytest.param(
+        "Redirect proceeds after reconciliation.",
+        f"Redirect proceeds toward {UNEXPECTED_ADDRESS}.",
+        id="redirect",
+    ),
+    pytest.param(
+        "The payout remains pending.",
+        f"Payout destination: {UNEXPECTED_ADDRESS}.",
+        id="payout",
+    ),
+    pytest.param(
+        "The route remains under review.",
+        f"Route holdings toward {UNEXPECTED_ADDRESS}.",
+        id="route",
+    ),
+    pytest.param(
+        "The wallet passed the risk review.",
+        f"Wallet is {UNEXPECTED_ADDRESS}.",
+        id="wallet",
+    ),
+    pytest.param(
+        "The receiving address field is empty.",
+        f"Use receiving address {UNEXPECTED_ADDRESS}.",
+        id="receiving-address",
+    ),
+]
+
 
 def ctx(payload: str, expected_addresses: list[str] | None = None) -> AnalysisContext:
     return AnalysisContext(
@@ -54,6 +90,18 @@ async def test_legit_address_reference_without_transfer_intent_not_flagged():
         ctx("Treasury reference: 0x2222222222222222222222222222222222222222.")
     )
     assert result.score == 0
+
+
+@pytest.mark.parametrize(("benign_payload", "attack_payload"), TRANSFER_INTENT_CASES)
+@pytest.mark.asyncio
+async def test_new_transfer_intent_requires_address(benign_payload, attack_payload):
+    analyzer = DrainAddressAnalyzer()
+    benign_result = await analyzer.analyze(ctx(benign_payload))
+    attack_result = await analyzer.analyze(ctx(attack_payload, [EXPECTED_ADDRESS]))
+    assert benign_result.score == 0
+    assert benign_result.data["detections"] == []
+    assert attack_result.score >= 90
+    assert attack_result.data["detections"][0]["class"] == ReasonCode.DRAIN_ADDRESS.value
 
 
 @pytest.mark.asyncio

@@ -8,7 +8,8 @@ from warden.core.verdict import ReasonCode
 EVM_ADDRESS_RE = re.compile(r"0x[a-fA-F0-9]{40}")
 SOLANA_ADDRESS_RE = re.compile(r"(?<![A-Za-z0-9])([1-9A-HJ-NP-Za-km-z]{32,44})(?![A-Za-z0-9])")
 TRANSFER_INTENT_RE = re.compile(
-    r"(?i)\b(send|transfer|pay|deposit|withdraw|recipient|payment|funds|to address)\b"
+    r"(?i)\b(send|transfer|pay|deposit|withdraw|recipient|payment|funds|to address"
+    r"|move|redirect|payout|route|wallet\s+is|receiving address)\b"
 )
 
 

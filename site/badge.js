@@ -59,6 +59,7 @@
         line("Grade", badge.grade || "unknown"),
         line("Score", badge.score ?? "unknown"),
         line("Blocked", `${badge.blocked ?? 0}/${badge.total ?? 0}`),
+        line("Consent verified", badge.consent_verified ?? "unknown"),
         line("Issued", badge.issued_at || "unknown"),
         "",
         JSON.stringify(payload, null, 2),
