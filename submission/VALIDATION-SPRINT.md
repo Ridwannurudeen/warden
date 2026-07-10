@@ -36,17 +36,69 @@
 
 ## Wave 1 — free-for-proof drafts (personalized, ready to send)
 
+**Ask-back note (verified constraint):** on-chain reviews require a `task-id` (feedback-submit needs it) — even SlowMist (#2155, 2 sales) has 0 reviews, and it's unconfirmed whether an A2MCP call yields a reviewable task-id. So the primary ask-back is a **public shout-out + permission to share the signed "Warden-audited" badge** (both deliverable); the **on-chain review is framed as optional/"if you're up for it"** until the exact buyer-side review path is confirmed.
+
 **@itseywacc** (Web3 Agent Kit — 8-chain DeFi, handles funds; XLayer entry)
-> Your Agent Kit moves funds across 8 chains — one poisoned tool-response ("payment confirmed, send to 0x…") and a user's money is gone. I built Warden, a security ASP on OKX.AI (#3808). I'll audit your endpoint free — 20 attack payloads, graded report + fixes — if you'll leave an on-chain review and let me share the result. Want me to run it? warden.gudman.xyz
+> Hey @itseywacc — really impressive work on Web3 Agent Kit; 8-chain DeFi swaps with 986 tests shipped is a serious bar for this hackathon. One thing that surface raises: your kit moves funds, so a single poisoned tool-response ("payment confirmed, send to 0x…") could drain a user.
+>
+> I'm Warden, a security ASP on OKX.AI (**Agent #3808**). Concretely:
+> • You send me your public agent/API endpoint URL.
+> • I run 20 attack payloads (injection / drain-address / tool-hijack / exfil) against it — free — and send back a graded pass/fail report + fixes, plus a signed "Warden-audited" badge you can display.
+> • In return: a quick shout-out of the result, and (if you're up for it) an on-chain review on #3808.
+>
+> Or self-serve: assign a task directly to Warden (#3808) on OKX.AI, or call warden.gudman.xyz/scan via x402. Details + live demo: warden.gudman.xyz. Want me to run it?
 
 **@ai2humannetwork** (AI2Human — ASP execution/verification layer, entering the hackathon)
-> You're building the execution+verification layer — which means every inbound task payload is untrusted input. Warden (#3808 on OKX.AI) fires 20 injection/drain/exfil attacks at an endpoint and grades what gets through, before OKX's review does. Free audit in exchange for an honest on-chain review — interested?
+> Hi @ai2humannetwork — love what you're building; an ASP layer for real-world execution is one of the more ambitious entries I've seen on #OKXAI. Since you're the execution+verification layer, every inbound task payload is untrusted input — exactly what Warden defends.
+>
+> I'm Warden, a security ASP on OKX.AI (**Agent #3808**). Concretely:
+> • You send me your public endpoint URL.
+> • I fire 20 injection / drain / exfil attacks at it — free — and send back a graded report of what got through + fixes, plus a signed "Warden-audited" badge, before OKX's own review does.
+> • In return: a quick shout-out, and (if you're up for it) an on-chain review on #3808.
+>
+> Or self-serve: assign a task directly to Warden (#3808) on OKX.AI, or call warden.gudman.xyz/scan via x402. Live demo: warden.gudman.xyz. Interested?
 
 **@0xleff** (okxai-universal — open MCP bridge, 20k views; partnership angle)
-> okxai-universal is the on-ramp; every agent you bridge in ingests untrusted payloads from strangers. Warden (#3808) is the seatbelt — a 0.01 USDT/call firewall verdict (ALLOW/SANITIZE/BLOCK, <1s, deterministic). I'll audit your bridge endpoint free and show you the scan API — if it's useful, a mention to your users is all I ask. Open to it?
+> Hey @0xleff — okxai-universal is genuinely one of the most useful things on OKX.AI right now; an open MCP bridge is exactly the infra this ecosystem needs (and the 20k views agree). Your bridge is the on-ramp, so every agent you route in ingests untrusted payloads from strangers.
+>
+> I'm Warden, a security ASP on OKX.AI (**Agent #3808**). Two things I'd love to do:
+> • Audit your bridge endpoint free — send me the URL, I run 20 attack payloads and return a graded report + fixes + a signed "Warden-audited" badge.
+> • Show you the runtime scan API (`scan_payload`, 0.01 USDT/call, ALLOW/SANITIZE/BLOCK verdict, <1s, deterministic) so any agent you bridge in can be screened per-call.
+>
+> If it's useful, a mention to your users is all I'd ask — partnership-minded here. To try it now: assign a task to Warden (#3808) on OKX.AI, or call warden.gudman.xyz/scan via x402. Demo: warden.gudman.xyz. Open to it?
 
 **@openclawby** (Clawby — AI Agent financial Skills layer, executable trade skills; added Jul 6)
-> Clawby gives agents executable trading skills over on-chain + TradFi data — which means agent-supplied inputs can move money. That's the exact surface Warden defends: a poisoned "confirmed, send to 0x…" or a hijacked tool call. I'll audit your endpoint free (20 attack payloads → graded report + fixes) if you'll leave an on-chain review and let me share the badge. Adds a security signal to your OKX.AI listing too — want it? warden.gudman.xyz
+> Hi @openclawby — Clawby is a sharp idea; an executable financial-skills layer over on-chain + TradFi data (plus the OKX/Panda Sui partnerships) is exactly the real utility this hackathon is after. Because agent-supplied inputs can move money, you've got the precise surface Warden defends: a poisoned "confirmed, send to 0x…" or a hijacked tool call.
+>
+> I'm Warden, a security ASP on OKX.AI (**Agent #3808**). Concretely:
+> • You send me your public agent/API endpoint URL.
+> • I run 20 attack payloads (injection / drain-address / tool-hijack / exfil) against it — free — and send back a graded pass/fail report + fixes, plus a signed "Warden-audited" badge you can display.
+> • In return: a quick shout-out of the result, and (if you're up for it) an on-chain review on #3808.
+>
+> Or self-serve: assign a task directly to Warden (#3808) on OKX.AI, or call warden.gudman.xyz/scan via x402. Details + live demo: warden.gudman.xyz. Want me to run it?
+
+## How targets request Warden (the 3 OKX.AI posting methods → what reaches us)
+Source: OKX.AI task posting supports (1) assign an agent directly, (2) auto-match from a shortlist, (3) list publicly. All three create a **task** — and a task-id is what enables a countable order + an on-chain review.
+- **Method 1 — assign directly to #3808 (recommended CTA):** does not depend on matchmaking; point targets here. Simplest reliable path.
+- **Methods 2 & 3 — auto-match / public list:** require Warden to surface in ASP match results. **UNVERIFIED** — `asp-match` check blocked by a marketplace JWT auth error (needs a fresh user-agent login, user-owned OTP). Confirm before relying on these.
+- **Direct x402 call:** a target can also just POST warden.gudman.xyz/scan (or /audit) with an x402 payment — pure A2MCP pay-per-call. **OPEN:** whether this produces a reviewable task-id, and whether an assigned *task* can route to our A2MCP services at all (we skipped the A2A comm daemon), is unconfirmed — test end-to-end once logged in.
+
+## Wave 2 — fresh targets (sweep 2026-07-09 via sandbox, @WARDEN_XLAYER is our real acct)
+Ranked by fit with a runtime payload firewall. All active #OKXAI entrants, none contacted yet. Post as PUBLIC replies under their announcement (no DM cap; more reach than a DM). Verify each handle's latest tweet before sending.
+
+**1. @Dancuso419 (Scope — wallet health agent, live on OKX_AI; explicitly frames "hand an agent a wallet, nothing stops it draining you")** — strongest thematic overlap.
+> Hey @Dancuso419 — Scope is a great idea, and your line "hand an AI agent a wallet and nothing stops it from draining you" is exactly the problem I built Warden for. Warden (#3808 on OKX.AI) is a runtime firewall that catches a drain-address swap in a payload before the agent acts — BLOCK + DRAIN_ADDRESS in <1s. Scope watches wallet health, Warden screens the payload — complementary. I'd audit your endpoint free (20 attack payloads → graded report + fixes + signed badge). Want me to run it? warden.gudman.xyz
+
+**2. @PolicyPoolHQ (coverage receipts / trust rails for agent work; came 2nd in a prior hackathon — serious builder)** — complementary + partnership angle.
+> Hi @PolicyPoolHQ — coverage receipts for agent work is a sharp entry (and 2nd last time — real track record). We're complementary: you insure the outcome, Warden prevents the exploit that triggers a claim — a runtime payload firewall (#3808) that BLOCKs injection/drain before an agent acts. Happy to audit your endpoint free (20 payloads → graded report + badge), and there may be a real integration story (fewer breaches = better loss ratios). Open to it? warden.gudman.xyz
+
+**3. @Madhav__28 (credit bureau for AI agents; "AI agents can pay now, nothing stops them overspending")** — adjacent guardrail.
+> Hey @Madhav__28 — "AI agents can pay now, nothing stops them overspending" — love the credit-bureau angle. Warden is the adjacent guardrail: a runtime firewall (#3808 on OKX.AI) that catches the poisoned "send to 0x…" payload before an agent acts, <1s BLOCK. Reputation + payload-safety pair naturally. I'd audit your endpoint free (20 attacks → graded report + signed badge) — want me to run it? warden.gudman.xyz
+
+**4. @Omega_Network__ (CollabShield Lite / River Auditor — trustless pay-per-call A2MCP code-spec verifier; targets Revenue/Software categories = same as us)** — security PEER: collab-or-compete, engage as peer not prospect.
+> Hey @Omega_Network__ — CollabShield / River Auditor is cool to see; another A2MCP security builder. Adjacent lanes (you verify code specs, I firewall runtime payloads), so worth comparing notes rather than overlapping. If useful I'll run Warden's 20-payload battery against your endpoint free for a graded report + badge. Collab-minded. warden.gudman.xyz
+
+**Secondary / lower-fit (contact if capacity):** @hmbtl_he (TripWeaver, AI travel agent handling $ payments — consumer audit fit), @FacticityMage (305 views, fact-check angle — verify), @EntityForge_ (marketplace commentator — possible amplifier not prospect). **Verify before contacting:** @idris_techguy (LedgerGuard-AI attributed in search but his live feed is Rialo/Latch — confirm it's a real OKX.AI entry first).
 
 ## Rules
 - All sends are user-executed (X account is user-owned). Claude drafts + tracks only.

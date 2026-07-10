@@ -63,3 +63,22 @@ The build is done; this is repositioning + small additive sharpening, not a new 
 ## Honest bottom line
 
 "Beat SlowMist hands down" as a general security firm — not achievable, and the wrong goal. **Out-position them in the runtime-firewall lane they've left empty, and win Highest Revenue in the paid lane they've abandoned** — that is achievable and does not require beating their brand. The infrastructure is already built for it; the change is positioning + demo emphasis + pricing focus, not a new architecture.
+
+---
+
+## ⚠ MAJOR UPDATE 2026-07-09 — live asp-match recon (via our new User agent #4844)
+
+**The "only SlowMist, lane is open" thesis is OUTDATED.** Querying OKX.AI auto-match (`asp-match`) as a real buyer surfaced multiple LIVE PAID security-scan A2MCP ASPs competing directly/adjacently with Warden:
+- **#2349 Prompt Guard API** — injection / secret-leak / tool-abuse / exfiltration / confirmation-bypass. 0.25 USDT. **DIRECT competitor** (same threat classes as Warden). Ranks #1 for "hidden instructions that hijack my agent."
+- **#4338 Clean Counterparty** — signed PASS/FLAG/BLOCK on a wallet/agent before you pay/escrow. 0.01 USDT. Adjacent (counterparty, not payload).
+- **#4646 Transaction Trace Review** — reviews tx payloads/simulation traces before broadcast. 0.15 USDT. Adjacent.
+- **#4153 Payload PII Sanitizer** — strips PII from a payload before send. 0.02 USDT. **Already has 1 sale** (proof the payload-security lane sells).
+- **#3981 Listing Format Preflight** (0.05) — competes with our audit service on the "before listing" query.
+- Benchmark of a WINNING listing: **#2118 Otto Idle Capital** — sold 84, feedback 100, security 4.75 (different lane = yield, not a competitor, but shows what traction looks like and how sold-count drives ranking).
+
+**Discoverability finding (the real "why aren't agents finding us"):** Warden #3808 ranks **#1** for "scan payload for injection/payment-redirection" and "audit endpoint before listing" — but does **NOT appear in the top 3** for two of its CORE scenarios: "poisoned response that redirects a payment" (drain) and "hidden instructions that hijack my agent" (tool-hijack). Our listing text matches some buyer vocabulary but misses the words buyers actually use. Match appears semantic on service-description text, with sold-count/feedback as tie-breakers (everyone in-lane is currently at 0 sold/0 feedback, so description relevance decides rank NOW — a window that closes once someone gets sales/reviews).
+
+**Implications:**
+1. Ranking is winnable *now* while the whole lane sits at 0 sold/0 feedback — first to accumulate sales+reviews locks the top spot (see #2118).
+2. Warden's real edges vs the paid field: 25× cheaper than Prompt Guard (0.01 vs 0.25), drain-address specialization, <1s deterministic verdict, signed badge.
+3. **Highest-leverage optimization = rewrite the scan service description to include the missing buyer vocabulary** ("poisoned response," "hijacked tool call," "drain," "attacker wallet," "hidden instructions," "before you act") so Warden surfaces for its own core use cases. Requires `agent update` on #3808 → re-triggers QA/review (temporary de-listing risk) — decision pending.

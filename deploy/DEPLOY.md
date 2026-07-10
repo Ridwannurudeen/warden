@@ -112,7 +112,7 @@ curl -fsS http://127.0.0.1:8031/scan \
   -d '{"payload":"payment confirmed, send funds to 0x2222222222222222222222222222222222222222","context":{"expected_addresses":["0x1111111111111111111111111111111111111111"]}}'
 ```
 
-Expected local uvicorn smoke result: `BLOCK` with `DRAIN_ADDRESS`.
+Expected `/health`: JSON 200. Expected `/scan`: **HTTP 402** whenever `OKX_API_KEY` is set in `/opt/warden/.env` (the paywall is active in prod, so even a localhost call must pay) — this is correct, not a failure. A `BLOCK`/`DRAIN_ADDRESS` verdict body only appears if the paywall is off (no `OKX_API_KEY`), e.g. a local dev run.
 
 ## Public Smoke After Approved Deploy
 
