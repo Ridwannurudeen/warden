@@ -30,6 +30,27 @@ by Jul 16.
 not new ASP builders. New buildable target vs 07-05 sweep: @openclawby only. Signal: public entrant
 pool is thinner than hashtag volume — reinforces the need to validate demand fast before over-investing. -->
 
+## Refresh 2026-07-13 — new targets (deadline is 4 days out, send order = strongest first)
+
+| # | Handle | What they're building | Angle |
+|---|---|---|---|
+| 1 | @factoronokx / @Madhav__28 | Factor — credit bureau + lending desk for AI agents (#3868, #4502), 228 agents scored, real lending capital deployed (4 financings, 0 losses) | **Top target:** they lend real capital *against* agent behavior data — a poisoned scoring input or hijacked lending-desk call is a direct funds-loss vector; active poster, security story sells itself as "audit the thing that decides who gets a loan" |
+| 2 | @AlgoCherry | Agent Escrow — agents holding funds in escrow for each other on X Layer | Escrow = literally holds other agents' funds; drain-address/tool-hijack scan is existential, same lane as the site's own demo attack |
+| 3 | @CryptoClubHQ | AdYield OS — autonomous treasury guardrail agent, realtime risk mgmt + predictive budget rebalancing | Manages treasury/budget autonomously → a poisoned instruction redirecting a rebalance is a direct loss; "guardrail agent" needs its own guardrail |
+| 4 | @PolicyPoolHQ | PolicyPool (#4674) — reserve-backed deadline coverage / insurance for agent work | Insurance payouts = funds movement on claim triggers; audit the claim-processing payload path |
+| 5 | @Ceemewell | Wallet Watcher Copilot — Ethereum wallet risk analysis ASP | Security-adjacent ASP itself; a "you scan wallets, we scan your inputs" pitch, plus partnership/co-marketing angle |
+| 6 | @cortex_memory | Cortex — memory layer for autonomous agents | Memory injection is a live attack class in Warden's own corpus; direct product fit |
+| 7 | @OpticAsp_ | Optic AI — cross-venue market/memecoin/prediction-market reader, 7 services | High-visibility live ASP (20+ likes/posts), ingests external market data feeds as untrusted input |
+
+Notably absent this sweep: @openclawby, @itseywacc, @ai2humannetwork, @0xleff, @smartcoded/@CorvoEdge,
+@Urex_ai, @COAGENTICDEV — no new posts surfaced since 07-06 refresh; likely already contacted or gone
+quiet. Re-verify contact status before re-sending (check tracking table below).
+
+<!-- Refresh 2026-07-13: hashtag volume has grown noticeably (deadline proximity) but most new posts
+are re-shares of Factor's thread or generic "we're live" announcements without technical detail.
+Financial-exposure ASPs (Factor, AlgoCherry, CryptoClubHQ, PolicyPool) are the sharpest fits this
+round — all handle real value transfer, all launched in the last 48h so likely un-pitched by
+competitors yet. -->
 
 Refresh command (sandbox): search X for `"#OKXAI"` latest since campaign start; also try
 `OKX.AI ASP`, `okx.ai hackathon`, `A2MCP` as secondary queries.
