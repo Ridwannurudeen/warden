@@ -1,0 +1,295 @@
+"""Public Gauntlet API and persistence tests."""
+
+import json
+import os
+import subprocess
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+from fastapi.routing import APIRoute
+
+from warden import ratelimit
+from warden.api import app
+from warden.models import AuditRequest, AuditResponse, ScanRequest, ScanResponse
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    ratelimit._reset_state()
+    yield
+    ratelimit._reset_state()
+
+
+def _records(path: Path) -> list[dict[str, object]]:
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+
+
+def test_gauntlet_blocks_known_attack_without_retaining_raw_payload(tmp_path, monkeypatch):
+    store_path = tmp_path / "attempts.jsonl"
+    monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", store_path)
+    attack = next(
+        json.loads(line)
+        for line in (ROOT / "corpus" / "attacks.jsonl").read_text(encoding="utf-8").splitlines()
+        if json.loads(line)["id"] == "drain-001"
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/demo/gauntlet",
+            json={
+                "intent": "drain_funds",
+                "payload": attack["payload"],
+                "context": attack["context"],
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["verdict"] == "BLOCK"
+    assert response.json()["claim_status"] == "not_candidate"
+    [record] = _records(store_path)
+    assert record["verdict"] == "BLOCK"
+    assert "payload" not in record
+    assert "intent" not in record
+    assert "context" not in record
+    assert len(record["payload_hash"]) == 64
+
+
+def test_allowed_claim_is_pending_and_never_auto_confirmed(tmp_path, monkeypatch):
+    store_path = tmp_path / "attempts.jsonl"
+    monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", store_path)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/demo/gauntlet",
+            json={
+                "intent": "hijack_tool_call",
+                "payload": "A normal weather report for Lagos.",
+                "finder": "researcher.example",
+            },
+        )
+        stats = client.get("/api/demo/gauntlet/stats")
+
+    assert response.status_code == 200
+    assert response.json()["verdict"] == "ALLOW"
+    assert response.json()["claim_status"] == "pending"
+    assert response.json()["claim_id"]
+    [record] = _records(store_path)
+    assert record["status"] == "pending"
+    assert record["payload"] == "A normal weather report for Lagos."
+    assert record["finder"] == "researcher.example"
+    assert stats.json()["attempts"] == 1
+    assert stats.json()["pending_claims"] == 1
+    assert stats.json()["confirmed_bypasses"] == 0
+    assert stats.json()["corpus_size"] >= 118
+
+
+def test_duplicate_pending_claim_is_recorded_without_duplicate_raw_payload(tmp_path, monkeypatch):
+    store_path = tmp_path / "attempts.jsonl"
+    monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", store_path)
+    request = {
+        "intent": "exfiltrate_secret",
+        "payload": "A routine account status note.",
+        "finder": "first-finder",
+    }
+
+    with TestClient(app) as client:
+        first = client.post("/api/demo/gauntlet", json=request)
+        second = client.post("/api/demo/gauntlet", json={**request, "finder": "duplicate"})
+
+    assert first.json()["claim_status"] == "pending"
+    assert second.json()["claim_status"] == "duplicate"
+    assert second.json()["claim_id"] == first.json()["claim_id"]
+    records = _records(store_path)
+    assert len(records) == 2
+    assert "payload" in records[0]
+    assert "payload" not in records[1]
+    assert "intent" not in records[1]
+    assert "context" not in records[1]
+    assert records[1]["duplicate_of"] == records[0]["attempt_id"]
+
+
+def test_gauntlet_uses_shared_demo_rate_limit(tmp_path, monkeypatch):
+    monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", tmp_path / "attempts.jsonl")
+    monkeypatch.setenv("WARDEN_DEMO_RATE_LIMIT_PER_MIN", "2")
+    monkeypatch.setenv("WARDEN_RATE_LIMIT_PER_MIN", "1")
+    ratelimit._reset_state()
+    headers = {"x-real-ip": "203.0.113.88"}
+    request = {"intent": "other", "payload": "Normal status update."}
+
+    with TestClient(app) as client:
+        assert client.get("/api/demo/examples", headers=headers).status_code == 200
+        assert client.post("/api/demo/gauntlet", json=request, headers=headers).status_code == 200
+        limited = client.post("/api/demo/gauntlet", json=request, headers=headers)
+        assert client.post("/scan", json={"payload": "clean"}, headers=headers).status_code == 200
+        paid_limited = client.post("/scan", json={"payload": "clean"}, headers=headers)
+
+    assert limited.status_code == 429
+    assert limited.headers["Retry-After"]
+    assert paid_limited.status_code == 429
+
+
+def test_gauntlet_rejects_blank_payload_and_invalid_intent(tmp_path, monkeypatch):
+    monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", tmp_path / "attempts.jsonl")
+    with TestClient(app) as client:
+        blank = client.post(
+            "/api/demo/gauntlet",
+            json={"intent": "drain_funds", "payload": "   "},
+        )
+        invalid = client.post(
+            "/api/demo/gauntlet",
+            json={"intent": "   ", "payload": "test"},
+        )
+
+    assert blank.status_code == 422
+    assert invalid.status_code == 422
+    assert not (tmp_path / "attempts.jsonl").exists()
+
+
+def test_gauntlet_truncates_candidate_to_demo_cap(tmp_path, monkeypatch):
+    store_path = tmp_path / "attempts.jsonl"
+    monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", store_path)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/demo/gauntlet",
+            json={"intent": "custom attack", "payload": "z" * 4001},
+        )
+
+    assert response.status_code == 200
+    [record] = _records(store_path)
+    assert len(record["payload"]) == 4000
+
+
+def test_concurrent_duplicate_claims_create_one_pending_raw_record(tmp_path, monkeypatch):
+    store_path = tmp_path / "attempts.jsonl"
+    monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", store_path)
+    ratelimit._reset_state()
+    request = {"intent": "custom bypass", "payload": "An ordinary calendar note."}
+
+    def submit(index):
+        with TestClient(app) as client:
+            return client.post(
+                "/api/demo/gauntlet",
+                json=request,
+                headers={"x-real-ip": f"198.51.100.{index}"},
+            ).json()
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        responses = list(executor.map(submit, range(8)))
+
+    records = _records(store_path)
+    assert len(records) == 8
+    assert sum(record["status"] == "pending" for record in records) == 1
+    assert sum("payload" in record for record in records) == 1
+    assert {response["claim_status"] for response in responses} == {"pending", "duplicate"}
+
+
+def test_gauntlet_stats_from_fresh_store_exposes_counts_only(tmp_path, monkeypatch):
+    monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", tmp_path / "attempts.jsonl")
+    with TestClient(app) as client:
+        response = client.get("/api/demo/gauntlet/stats")
+        health = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "attempts": 0,
+        "pending_claims": 0,
+        "confirmed_bypasses": 0,
+        "corpus_size": health.json()["corpus_size"],
+    }
+
+
+def test_gauntlet_stays_free_when_payment_middleware_is_enabled():
+    script = """
+import tempfile
+from pathlib import Path
+from fastapi.testclient import TestClient
+from warden.api import app
+import warden.gauntlet_store as store
+
+with tempfile.TemporaryDirectory() as directory:
+    store._STORE_PATH = Path(directory) / 'attempts.jsonl'
+    with TestClient(app) as client:
+        response = client.post(
+            '/api/demo/gauntlet',
+            json={'intent': 'test bypass', 'payload': 'normal calendar note'},
+        )
+assert response.status_code == 200, response.text
+assert 'payment-required' not in response.headers
+"""
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith("OKX_") and key != "PAY_TO_ADDRESS"
+    }
+    env.update(
+        {
+            "OKX_API_KEY": "gauntlet-test-api-key",
+            "OKX_SECRET_KEY": "gauntlet-test-secret-key",
+            "OKX_PASSPHRASE": "gauntlet-test-passphrase",
+            "OKX_BASE_URL": "http://127.0.0.1:9",
+            "PAY_TO_ADDRESS": "0x0000000000000000000000000000000000000001",
+            "WARDEN_DEMO_RATE_LIMIT_PER_MIN": "0",
+        }
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_gauntlet_page_discloses_human_review_and_retention():
+    page = (ROOT / "site" / "gauntlet.html").read_text(encoding="utf-8")
+
+    assert "data-gauntlet-form" in page
+    assert "data-gauntlet-stats" in page
+    assert "human review" in page.lower()
+    assert "pending claims retain" in page.lower()
+    assert "confirmed bypass" in page.lower()
+
+
+def test_paid_http_contract_remains_frozen():
+    assert set(ScanRequest.model_fields) == {"payload", "depth", "context"}
+    assert set(ScanResponse.model_fields) == {
+        "verdict",
+        "risk_level",
+        "threat_classes",
+        "detections",
+        "sanitized_payload",
+        "recommendation",
+        "checks",
+        "latency_ms",
+    }
+    assert set(AuditRequest.model_fields) == {"target_url", "sample_prompts"}
+    assert set(AuditResponse.model_fields) == {
+        "score",
+        "grade",
+        "results",
+        "badge",
+        "recommendations",
+        "badge_record",
+        "consent_verified",
+    }
+    paid_routes = {
+        (route.path, frozenset(route.methods or set()))
+        for route in app.routes
+        if isinstance(route, APIRoute) and route.path in {"/scan", "/audit"}
+    }
+    assert paid_routes == {
+        ("/scan", frozenset({"POST"})),
+        ("/audit", frozenset({"POST"})),
+    }

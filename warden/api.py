@@ -14,12 +14,16 @@ from warden import __version__
 from warden.auditor import AgentAuditor
 from warden.core.verdict import ReasonCode
 from warden.engine import WardenEngine
+from warden.gauntlet_store import get_stats, record_attempt
 from warden.ratelimit import check_rate_limit, retry_after_seconds
 from warden.models import (
     AuditRequest,
     AuditResponse,
     DemoExample,
     DemoScanRequest,
+    GauntletRequest,
+    GauntletResponse,
+    GauntletStats,
     HealthResponse,
     ScanRequest,
     ScanResponse,
@@ -188,6 +192,27 @@ async def demo_scan(req: DemoScanRequest) -> ScanResponse:
         context=req.context.model_dump(),
     )
     return ScanResponse.from_verdict(verdict)
+
+
+@app.post("/api/demo/gauntlet", response_model=GauntletResponse)
+async def gauntlet(req: GauntletRequest) -> GauntletResponse:
+    verdict = await engine.scan(
+        req.payload,
+        depth="fast",
+        context=req.context.model_dump(),
+    )
+    scan_response = ScanResponse.from_verdict(verdict)
+    claim_status, claim_id = record_attempt(req, scan_response)
+    return GauntletResponse(
+        **scan_response.model_dump(),
+        claim_status=claim_status,
+        claim_id=claim_id,
+    )
+
+
+@app.get("/api/demo/gauntlet/stats", response_model=GauntletStats)
+async def gauntlet_stats() -> GauntletStats:
+    return GauntletStats.model_validate(get_stats(_corpus_size()))
 
 
 @app.get("/api/demo/examples", response_model=list[DemoExample])

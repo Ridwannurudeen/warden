@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Try to get an adversarial payload past Warden's real deterministic firewall.">
+    <title>The Gauntlet | Try to Bypass Warden</title>
+    <link rel="icon" href="/assets/warden-avatar.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header page-shell">
+      <a class="brand" href="/"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="/">Home</a>
+        <a href="/playground">Playground</a>
+        <a href="/agents">Agents</a>
+        <a href="/gauntlet" aria-current="page">Gauntlet</a>
+        <a href="/hire">Hire</a>
+        <a href="/docs">Docs</a>
+      </nav>
+    </header>
+
+    <main id="main" class="page-shell">
+      <section class="index-hero">
+        <p class="eyebrow">Public adversarial arena</p>
+        <h1>Bring the payload you think gets through.</h1>
+        <p class="hero-text">Declare the attack you intend, submit it to Warden's real fast-path engine, and receive the same structured verdict an integrating agent sees.</p>
+        <p class="caveat"><strong>An ALLOW is only a candidate.</strong> Benign text paired with a malicious label is not a bypass. Every candidate goes to human review before it can be confirmed or credited.</p>
+      </section>
+
+      <section class="data-grid gauntlet-stats" data-gauntlet-stats aria-label="Gauntlet statistics">
+        <div><span>Attempts</span><strong class="num" data-stat="attempts">0</strong></div>
+        <div><span>Pending claims</span><strong class="num" data-stat="pending_claims">0</strong></div>
+        <div><span>Confirmed bypasses</span><strong class="num" data-stat="confirmed_bypasses">0</strong></div>
+        <div><span>Current corpus</span><strong class="num" data-stat="corpus_size">0</strong></div>
+      </section>
+
+      <section class="feature-panel" aria-labelledby="challenge-title">
+        <p class="eyebrow">Your challenge</p>
+        <h2 id="challenge-title">Test a declared attack</h2>
+        <form data-gauntlet-form>
+          <div class="form-grid">
+            <label>Attack intent<select name="intent" required><option value="drain_funds">Redirect or drain funds</option><option value="hijack_tool_call">Hijack a tool call</option><option value="exfiltrate_secret">Exfiltrate a secret</option><option value="override_instructions">Override instructions</option><option value="malicious_link">Smuggle a malicious link</option><option value="other">Other adversarial intent</option></select></label>
+            <label>Finder credit (optional)<input name="finder" maxlength="128" autocomplete="off" placeholder="Handle or display name"></label>
+          </div>
+          <label>Expected payment addresses (optional)<input name="expected_addresses" autocomplete="off" placeholder="Comma-separated; useful for drain attempts"></label>
+          <label>Adversarial payload<textarea name="payload" rows="10" maxlength="4000" required spellcheck="false" placeholder="Paste the exact untrusted payload Warden should inspect"></textarea></label>
+          <button class="button primary" type="submit">Run the Gauntlet</button>
+          <p data-gauntlet-status aria-live="polite"></p>
+        </form>
+        <p class="caveat"><strong>Retention:</strong> pending claims retain the submitted payload, context, intent, and optional finder credit for human review. Detected attempts retain hashes and verdict metadata only. Do not submit secrets or personal data.</p>
+      </section>
+
+      <section class="console-card" data-gauntlet-result hidden aria-live="polite">
+        <p class="eyebrow">Real Warden result</p>
+        <h2 data-gauntlet-verdict>Waiting</h2>
+        <p data-gauntlet-message></p>
+        <pre><code data-gauntlet-json>{}</code></pre>
+      </section>
+
+      <section class="feature-panel">
+        <p class="eyebrow">Confirmation policy</p>
+        <h2>A confirmed bypass becomes a regression case.</h2>
+        <p>Human reviewers reproduce the declared attack, reject mislabeled benign claims, and credit valid finders when a detection fix and corpus regression can land together. Nothing is auto-crowned.</p>
+      </section>
+    </main>
+
+    <script src="/app.js" defer></script>
+    <script src="/gauntlet.js" defer></script>
+  </body>
+</html>

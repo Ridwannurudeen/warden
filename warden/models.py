@@ -16,6 +16,7 @@ Depth = Literal["fast", "thorough"]
 VerdictLabel = Literal["ALLOW", "SANITIZE", "BLOCK"]
 RiskLabel = Literal["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
 Grade = Literal["A", "B", "C", "D", "F"]
+ClaimStatus = Literal["not_candidate", "pending", "duplicate"]
 
 
 class ScanContext(BaseModel):
@@ -58,6 +59,36 @@ class DemoExample(BaseModel):
     payload: str
 
 
+class GauntletRequest(BaseModel):
+    intent: str = Field(max_length=500)
+    payload: str
+    context: DemoScanContext = Field(default_factory=DemoScanContext)
+    finder: str | None = Field(default=None, max_length=128)
+
+    @field_validator("intent")
+    @classmethod
+    def normalize_intent(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("intent must not be blank")
+        return normalized
+
+    @field_validator("payload")
+    @classmethod
+    def validate_payload(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("payload must not be blank")
+        return value[:MAX_DEMO_PAYLOAD_LENGTH]
+
+    @field_validator("finder")
+    @classmethod
+    def normalize_finder(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
 class Detection(BaseModel):
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 
@@ -89,6 +120,18 @@ class ScanResponse(BaseModel):
             checks=verdict.checks,
             latency_ms=verdict.latency_ms,
         )
+
+
+class GauntletResponse(ScanResponse):
+    claim_status: ClaimStatus
+    claim_id: str | None = None
+
+
+class GauntletStats(BaseModel):
+    attempts: int
+    pending_claims: int
+    confirmed_bypasses: int
+    corpus_size: int
 
 
 class AuditRequest(BaseModel):

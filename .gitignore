@@ -4,6 +4,7 @@
 
 # Runtime state — issued audit badges (regenerated at runtime)
 badges/
+gauntlet/
 
 # Generated marketplace pages (rebuild with scripts/build_index.py)
 /site/agents/

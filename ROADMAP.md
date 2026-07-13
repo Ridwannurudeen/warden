@@ -13,6 +13,29 @@ Warden goes mainstream after the OKX.AI Genesis Hackathon as the **trust & paylo
 
 ---
 
+## Funded Gauntlet honeypot - design only, funding decision required
+
+The future spectacle is an isolated agent with a real, deliberately losable wallet balance: break
+its decision loop and keep the capped pot. This is **not implemented or funded** in Phase 5. A novel
+jailbreak may defeat the model rather than the deterministic firewall, so the full balance must be
+treated as marketing spend that can be lost on the first attempt.
+
+Before activation, the user must approve a fixed loss budget. The build then needs all of these
+controls together:
+
+- a dedicated agent identity, wallet, host, and model account with no access to Warden production;
+- one non-refillable pot capped at the approved loss budget, with no treasury approvals or secrets;
+- an explicit public ruleset defining a valid exploit, payout finality, finder credit, and exclusions;
+- full prompt, tool-call, firewall-verdict, and transaction capture with sensitive fields redacted;
+- a manual arming step, time-boxed campaign window, balance alarm, and immediate kill switch;
+- independent review of every apparent bypass before publishing it or adding a credited regression;
+- a detection fix and a failing-then-green corpus test shipped with each confirmed bypass.
+
+No on-chain contract, funded wallet, LLM loop, or payout automation should be built until that loss
+budget and operating rules are approved.
+
+---
+
 ## Phase 0 — Hackathon close-out (Jul 2026)
 
 - [ ] `git init` + push to public GitHub (makes README CI claims true; submission artifact)
