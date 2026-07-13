@@ -34,8 +34,13 @@ data and a deterministic engine that only we have.
 - **Do NOT deploy and do NOT touch the VPS.** Ops is user-owned. Do not run `agent update` or any
   on-chain write.
 - Run `python -m pytest -q` and `ruff check .` before calling anything done. Baseline on `master`:
-  **57 tests, ruff clean.** Do not regress either.
-- Every item ends at a **▸Claude-audit gate**. Stop there and hand off.
+  **74 tests, ruff clean.** Do not regress either, at any point.
+- **Build mode: continuous, not gated.** Items 1–5 are ordered (1 is the foundation the rest use;
+  build it first) but do NOT stop and wait after each one. Finish an item, run its tests, commit,
+  move straight to the next. The **▸Claude-audit gate N** markers below are checkpoints for
+  Claude's later review pass, not places for you to pause — keep building through all five in one
+  continuous run. Only stop for: (a) a hard blocker that makes the brief's premise wrong (say so,
+  in the handoff note, and keep going on whatever else you can), or (b) the full scope is done.
 - **No attribution, no co-author tags, anywhere.** Match existing code style exactly.
 
 ---
@@ -82,7 +87,7 @@ benign string; oversized payload is rejected/truncated; `depth=thorough` is not 
 limit triggers independently of the paid limit; the demo route stays **free while `OKX_API_KEY` is
 set** (this is the one that actually proves the paywall isn't leaking).
 
-**▸Claude-audit gate 1.**
+**Checkpoint 1 done — commit, then continue straight to Item 2.**
 
 ---
 
@@ -163,7 +168,7 @@ we actually measured, with the caveat. If an agent's public text trips a rule, p
 hit the network in tests); index module produces expected verdicts for a fixture agent; renderer
 produces valid HTML for an agent with and without a badge, and for an agent with zero services.
 
-**▸Claude-audit gate 2.**
+**Checkpoint 2 done — commit, then continue straight to Item 3.**
 
 ---
 
@@ -215,7 +220,7 @@ Do not build any flow that makes self-dealing easy or automatic.
 is fetched and rendered from a fixture; no secret/private key is ever handled by our code (3b signs
 in the user's wallet only).
 
-**▸Claude-audit gate 3.**
+**Checkpoint 3 done — commit, then continue straight to Item 4.**
 
 ---
 
@@ -245,7 +250,7 @@ funding decision.
 **Tests:** gauntlet route honours the demo rate limits; a corpus attack is correctly BLOCKED; a
 claim on an ALLOW verdict is persisted as *pending*, never as *confirmed*.
 
-**▸Claude-audit gate 4.**
+**Checkpoint 4 done — commit, then continue straight to Item 5.**
 
 ---
 
@@ -274,7 +279,7 @@ Mobile-clean. **Self-contained — no external resource requests** (this was an 
 audit requirement and the CSP/no-CDN property must hold; verify nothing you add fetches a font,
 script, or image from another host).
 
-**▸Claude-audit gate 5.**
+**Checkpoint 5 done — this is the full scope. Move to Definition of Done below.**
 
 ---
 
@@ -289,7 +294,7 @@ script, or image from another host).
 
 ## Definition of done
 
-`python -m pytest -q` green (≥57, plus your new tests), `ruff check .` clean, nothing in the frozen
+`python -m pytest -q` green (≥74, plus your new tests), `ruff check .` clean, nothing in the frozen
 contract altered, no external resource requests from the site, and a handoff note stating: what you
 built, what you verified vs. assumed, what you skipped and why, and any finding that contradicts
 this brief. **If something in this brief turns out to be wrong when you hit the code, stop and say
