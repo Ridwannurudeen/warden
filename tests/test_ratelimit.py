@@ -77,7 +77,7 @@ def test_state_evicts_stale_windows(monkeypatch):
     assert ratelimit.check_rate_limit(old_request, 10) is False
     assert ratelimit.check_rate_limit(current_request, 10) is False
     assert len(ratelimit._STATE) == 1
-    assert ratelimit._STATE["198.51.100.11"] == (1, 1)
+    assert ratelimit._STATE[("paid", "198.51.100.11")] == (1, 1)
 
 
 def test_retry_after_seconds_bounds():

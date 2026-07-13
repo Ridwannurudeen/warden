@@ -1,5 +1,6 @@
 """FastAPI application for Warden."""
 
+import json
 import os
 from pathlib import Path
 
@@ -11,9 +12,18 @@ from warden.badge_store import get_badge
 from warden.badges import verify_badge
 from warden import __version__
 from warden.auditor import AgentAuditor
+from warden.core.verdict import ReasonCode
 from warden.engine import WardenEngine
 from warden.ratelimit import check_rate_limit, retry_after_seconds
-from warden.models import AuditRequest, AuditResponse, HealthResponse, ScanRequest, ScanResponse
+from warden.models import (
+    AuditRequest,
+    AuditResponse,
+    DemoExample,
+    DemoScanRequest,
+    HealthResponse,
+    ScanRequest,
+    ScanResponse,
+)
 
 MAX_REQUEST_BODY_BYTES = 1_000_000
 
@@ -23,6 +33,13 @@ def _rate_limit_per_minute() -> int:
         return int(os.getenv("WARDEN_RATE_LIMIT_PER_MIN", "60") or "60")
     except ValueError:
         return 60
+
+
+def _demo_rate_limit_per_minute() -> int:
+    try:
+        return int(os.getenv("WARDEN_DEMO_RATE_LIMIT_PER_MIN", "20") or "20")
+    except ValueError:
+        return 20
 
 
 engine = WardenEngine()
@@ -136,12 +153,19 @@ async def request_size_limit_middleware(request: Request, call_next):
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     path = request.url.path.rstrip("/")
-    limit_per_minute = _rate_limit_per_minute()
-    if path in {"/scan", "/audit"} and limit_per_minute > 0:
-        if check_rate_limit(request, limit_per_minute):
-            response = JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"})
-            response.headers["Retry-After"] = str(retry_after_seconds())
-            return response
+    if path.startswith("/api/demo/"):
+        limit_per_minute = _demo_rate_limit_per_minute()
+        rate_limited = check_rate_limit(request, limit_per_minute, scope="demo")
+    elif path in {"/scan", "/audit"}:
+        limit_per_minute = _rate_limit_per_minute()
+        rate_limited = check_rate_limit(request, limit_per_minute)
+    else:
+        rate_limited = False
+
+    if rate_limited:
+        response = JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"})
+        response.headers["Retry-After"] = str(retry_after_seconds())
+        return response
 
     return await call_next(request)
 
@@ -154,6 +178,53 @@ async def scan(req: ScanRequest) -> ScanResponse:
         context=req.context.model_dump(),
     )
     return ScanResponse.from_verdict(verdict)
+
+
+@app.post("/api/demo/scan", response_model=ScanResponse)
+async def demo_scan(req: DemoScanRequest) -> ScanResponse:
+    verdict = await engine.scan(
+        req.payload,
+        depth="fast",
+        context=req.context.model_dump(),
+    )
+    return ScanResponse.from_verdict(verdict)
+
+
+@app.get("/api/demo/examples", response_model=list[DemoExample])
+async def demo_examples() -> list[DemoExample]:
+    root = Path(__file__).resolve().parents[1]
+    curated = {
+        "prompt-001": ("Prompt override", ReasonCode.PROMPT_INJECTION),
+        "role-001": ("Role impersonation", ReasonCode.ROLE_OVERRIDE),
+        "web3-001": ("Web3 transfer instruction", ReasonCode.WEB3_INJECTION),
+        "unicode-001": ("Hidden Unicode", ReasonCode.HIDDEN_UNICODE),
+        "encoding-001": ("Encoded instruction", ReasonCode.ENCODING_TRICK),
+        "stat-001": ("Statistical anomaly", ReasonCode.STATISTICAL_ANOMALY),
+        "drain-001": ("Drain address", ReasonCode.DRAIN_ADDRESS),
+        "tool-001": ("Tool-call hijack", ReasonCode.TOOL_HIJACK),
+        "secret-001": ("Secret exfiltration", ReasonCode.SECRET_EXFIL),
+        "link-001": ("Malicious link", ReasonCode.MALICIOUS_LINK),
+        "benign-002": ("Clean documentation link", None),
+        "benign-003": ("Clean settlement note", None),
+    }
+    entries: dict[str, dict[str, object]] = {}
+    for filename in ("attacks.jsonl", "benign.jsonl"):
+        with (root / "corpus" / filename).open(encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    entry = json.loads(line)
+                    if entry.get("id") in curated:
+                        entries[str(entry["id"])] = entry
+
+    return [
+        DemoExample(
+            id=entry_id,
+            label=label,
+            reason_code=reason_code,
+            payload=str(entries[entry_id]["payload"]),
+        )
+        for entry_id, (label, reason_code) in curated.items()
+    ]
 
 
 @app.post("/audit", response_model=AuditResponse)

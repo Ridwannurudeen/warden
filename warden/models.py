@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from warden.core.verdict import ReasonCode, Verdict
 
 MAX_PAYLOAD_LENGTH = 100_000
+MAX_DEMO_PAYLOAD_LENGTH = 4_000
+MAX_DEMO_EXPECTED_ADDRESSES = 20
 MAX_TARGET_URL_LENGTH = 2_048
 MAX_SAMPLE_PROMPTS = 20
 
@@ -30,6 +32,30 @@ class ScanRequest(BaseModel):
     @classmethod
     def truncate_payload(cls, value: str) -> str:
         return value[:MAX_PAYLOAD_LENGTH]
+
+
+class DemoScanContext(ScanContext):
+    expected_addresses: list[str] = Field(
+        default_factory=list,
+        max_length=MAX_DEMO_EXPECTED_ADDRESSES,
+    )
+
+
+class DemoScanRequest(BaseModel):
+    payload: str
+    context: DemoScanContext = Field(default_factory=DemoScanContext)
+
+    @field_validator("payload")
+    @classmethod
+    def truncate_payload(cls, value: str) -> str:
+        return value[:MAX_DEMO_PAYLOAD_LENGTH]
+
+
+class DemoExample(BaseModel):
+    id: str
+    label: str
+    reason_code: ReasonCode | None
+    payload: str
 
 
 class Detection(BaseModel):

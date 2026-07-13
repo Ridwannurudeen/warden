@@ -11,7 +11,7 @@ def _time_now() -> float:
 
 
 _WINDOW_SECONDS = 60
-_STATE: dict[str, tuple[int, int]] = {}
+_STATE: dict[tuple[str, str], tuple[int, int]] = {}
 _STATE_LOCK = threading.Lock()
 
 
@@ -31,7 +31,7 @@ def _window_id(timestamp: float) -> int:
     return int(timestamp // _WINDOW_SECONDS)
 
 
-def check_rate_limit(request: object, limit_per_minute: int) -> bool:
+def check_rate_limit(request: object, limit_per_minute: int, scope: str = "paid") -> bool:
     """
     Return ``True`` when the caller is over quota.
     """
@@ -39,19 +39,20 @@ def check_rate_limit(request: object, limit_per_minute: int) -> bool:
         return False
 
     client = _client_ip(request)
+    state_key = (scope, client)
     window_id = _window_id(_time_now())
     with _STATE_LOCK:
         for known_client, (start, _) in list(_STATE.items()):
             if start < window_id:
                 del _STATE[known_client]
 
-        start, count = _STATE.get(client, (window_id, 0))
+        start, count = _STATE.get(state_key, (window_id, 0))
         if start != window_id:
             start = window_id
             count = 0
 
         count += 1
-        _STATE[client] = (start, count)
+        _STATE[state_key] = (start, count)
         return count > limit_per_minute
 
 
