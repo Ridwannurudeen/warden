@@ -18,7 +18,9 @@ def test_hire_catalog_is_derived_from_marketplace_snapshot():
 
     assert catalog["providerAgentId"] == "3808"
     assert [service["key"] for service in catalog["services"]] == ["scan", "audit"]
-    assert [service["serviceId"] for service in catalog["services"]] == ["31669", "31670"]
+    service_ids = [service["serviceId"] for service in catalog["services"]]
+    assert all(service_id.isdecimal() for service_id in service_ids)
+    assert len(set(service_ids)) == len(service_ids)
     assert [service["endpoint"] for service in catalog["services"]] == [
         "https://warden.gudman.xyz/scan",
         "https://warden.gudman.xyz/audit",

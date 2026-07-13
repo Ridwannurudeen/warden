@@ -11,12 +11,12 @@
   "corpusFingerprint": "sha256:6d5bff99dac7364761796ef6c6da214f0c3cac13e1d3171033c4fad0168be83a",
   "services": [
     {
-      "serviceId": "31669",
+      "serviceId": "33460",
       "name": "Payload Security Scan",
       "endpoint": "https://warden.gudman.xyz/scan"
     },
     {
-      "serviceId": "31670",
+      "serviceId": "33461",
       "name": "Agent Endpoint Security Audit",
       "endpoint": "https://warden.gudman.xyz/audit"
     }
