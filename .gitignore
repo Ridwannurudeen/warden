@@ -5,6 +5,9 @@
 # Runtime state — issued audit badges (regenerated at runtime)
 badges/
 
+# Generated marketplace pages (rebuild with scripts/build_index.py)
+/site/agents/
+
 # Python
 __pycache__/
 *.py[cod]

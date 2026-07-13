@@ -30,6 +30,8 @@ Use `certbot certonly --webroot`, not `certbot --nginx`.
 Run locally from the repository root after explicit approval:
 
 ```bash
+python scripts/build_index.py
+
 tar --exclude '.env' --exclude '.env.*' --exclude '.venv' --exclude 'venv' --exclude '__pycache__' --exclude '.pytest_cache' --exclude '.ruff_cache' --exclude 'warden.egg-info' -czf - . |
   ssh root@75.119.153.252 'mkdir -p /opt/warden && tar -xzf - -C /opt/warden'
 
@@ -65,6 +67,8 @@ Warden runs as a dedicated unprivileged `warden` system user (`deploy/warden.ser
 Run locally from the repository root after explicit approval:
 
 ```bash
+python scripts/build_index.py
+
 tar --exclude '.env' --exclude '.env.*' --exclude '.venv' --exclude 'venv' --exclude '__pycache__' --exclude '.pytest_cache' --exclude '.ruff_cache' --exclude 'warden.egg-info' -czf - . |
   ssh root@75.119.153.252 'mkdir -p /opt/warden && tar -xzf - -C /opt/warden'
 
@@ -98,6 +102,7 @@ The production vhost serves the landing page from `/opt/warden-site` and proxies
 - `POST /audit`: proxy to `http://127.0.0.1:8031`.
 - `GET /health`: proxy to `http://127.0.0.1:8031`.
 - `GET /badge/{audit_id}`: proxy to `http://127.0.0.1:8031`.
+- `/api/*`: proxy to `http://127.0.0.1:8031`.
 
 Also serve `/.well-known/warden-consent` from `/opt/warden-site` when running in hard-consent mode. It should return HTTP 200 with body `warden-audit-allowed` and can be left absent when `WARDEN_REQUIRE_CONSENT=false`.
 

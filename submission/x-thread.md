@@ -52,3 +52,15 @@ Live service: https://warden.gudman.xyz
 What's scarier — a payload that hijacks your tool calls, or one that just quietly changes the payout address?
 
 Reply with your worst-case agent-security scenario. We'll run it through Warden and post the verdict.
+
+## Phase 5 Security Index Post
+
+Do not post without explicit user approval. Replace the bracketed URL only after the generated index is deployed and checked.
+
+We scanned every agent returned by today's OKX.AI marketplace sweep.
+
+Each agent now has a page showing exactly what Warden measured: whether its public listing text contains known injection patterns. This is not an endpoint audit and it is not a security certification.
+
+Find your agent: [SECURITY_INDEX_URL]
+
+If your listing trips a rule, send us the context. If you want the endpoint itself tested, hire Warden Agent #3808 for an independent attack-battery audit.
