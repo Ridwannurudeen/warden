@@ -6,6 +6,15 @@
     <meta name="description" content="Examples and boundaries for Warden&#x27;s eleven deterministic reason codes.">
     <meta name="color-scheme" content="dark light">
     <title>Detection documentation | Warden</title>
+    <link rel="canonical" href="https://warden.gudman.xyz/docs">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Warden">
+    <meta property="og:title" content="Detection documentation | Warden">
+    <meta property="og:description" content="Examples and boundaries for Warden&#x27;s eleven deterministic reason codes.">
+    <meta property="og:url" content="https://warden.gudman.xyz/docs">
+    <meta property="og:image" content="https://warden.gudman.xyz/assets/warden-social-card.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://warden.gudman.xyz/assets/warden-social-card.png">
     <link rel="icon" href="/assets/warden-avatar.png">
     <link rel="stylesheet" href="/styles.css">
   </head>
@@ -14,9 +23,11 @@
     <header class="site-header page-shell">
       <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
-      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><a href="/playground">Playground</a><a href="/agents">Agents</a><a href="/gauntlet">Gauntlet</a><a href="/hire">Hire</a><a href="/docs" aria-current="page">Docs</a><a href="/integrate">Integrate</a><a href="/badges">Badges</a></nav>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><details class="nav-group"><summary>Product</summary><div class="nav-menu"><a href="/playground">Playground</a><a href="/agents">Marketplace index</a><a href="/gauntlet">Gauntlet</a><a href="/showcase">Judge showcase</a></div></details><details class="nav-group has-current"><summary>Developers</summary><div class="nav-menu"><a href="/docs" aria-current="page">Documentation</a><a href="/integrate">Integrate</a><a href="/status">API status</a></div></details><details class="nav-group"><summary>Evidence</summary><div class="nav-menu"><a href="/badges">Audit badges</a><a href="/agents#methodology">Public-text methodology</a><a href="/gauntlet#policy">Adversarial challenge</a></div></details><div class="nav-mobile-actions"><a class="button secondary" href="/hire">Hire on OKX.AI</a><a class="button primary" href="/playground">Run a live scan</a></div></nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status"><span class="live-dot" data-health-dot aria-hidden="true"></span><span data-health-label>API status</span></a>
+        <a class="status-pill" href="/status" aria-label="Open API status"><span class="live-dot" data-health-dot aria-hidden="true"></span><span data-health-label>Checking API</span></a>
+        <a class="header-hire" href="/hire">Hire</a>
+        <a class="header-scan" href="/playground">Run scan</a>
         <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button>
       </div>
     </header>
@@ -26,73 +37,120 @@
   <h1>Eleven reasons Warden can stop or reshape an action.</h1>
   <p class="hero-text">Each page is tied to a real regression-corpus example and documents the observed verdict, commerce impact, and detector boundary.</p>
 </section>
-<section class="proof-strip" aria-label="Documentation scope">
-  <div><span>Reason codes</span><strong class="num">11</strong></div>
-  <div><span>Decision states</span><strong>ALLOW / SANITIZE / BLOCK</strong></div>
-  <div><span>Engine</span><strong>Deterministic</strong></div>
-</section>
-<section class="docs-grid"><a class="reason-card" href="/docs/prompt-injection">
-  <span class="reason-code">PROMPT_INJECTION</span>
-  <h2>Prompt injection</h2>
-  <p>Seller or service text attempts to replace the buyer agent&#x27;s operating instructions.</p>
-  <span class="text-link">Open detection note</span>
-</a><a class="reason-card" href="/docs/role-override">
-  <span class="reason-code">ROLE_OVERRIDE</span>
-  <h2>Role override</h2>
-  <p>Untrusted content tries to coerce an agent outside its authorized commerce role.</p>
-  <span class="text-link">Open detection note</span>
-</a><a class="reason-card" href="/docs/web3-injection">
-  <span class="reason-code">WEB3_INJECTION</span>
-  <h2>Web3 injection</h2>
-  <p>Text can induce token approvals, transfers, withdrawals, or other wallet actions.</p>
-  <span class="text-link">Open detection note</span>
-</a><a class="reason-card" href="/docs/hidden-unicode">
-  <span class="reason-code">HIDDEN_UNICODE</span>
-  <h2>Hidden Unicode</h2>
-  <p>Invisible characters can conceal or alter listing, address, and response content.</p>
-  <span class="text-link">Open detection note</span>
-</a><a class="reason-card" href="/docs/encoding-trick">
-  <span class="reason-code">ENCODING_TRICK</span>
-  <h2>Encoding trick</h2>
-  <p>Encoded directives can evade a plain-text operator review before payment or execution.</p>
-  <span class="text-link">Open detection note</span>
-</a><a class="reason-card" href="/docs/statistical-anomaly">
-  <span class="reason-code">STATISTICAL_ANOMALY</span>
-  <h2>Statistical anomaly</h2>
-  <p>Dense imperatives and invisible characters can be mixed into otherwise plausible market copy.</p>
-  <span class="text-link">Open detection note</span>
-</a><a class="reason-card" href="/docs/corpus-match">
-  <span class="reason-code">CORPUS_MATCH</span>
-  <h2>Corpus similarity match</h2>
-  <p>A rephrased known attack may avoid literal patterns while remaining close to a regression case.</p>
-  <span class="text-link">Open detection note</span>
-</a><a class="reason-card" href="/docs/drain-address">
-  <span class="reason-code">DRAIN_ADDRESS</span>
-  <h2>Drain address</h2>
-  <p>A settlement recipient is replaced with an attacker-controlled wallet in untrusted content.</p>
-  <span class="text-link">Open detection note</span>
-</a><a class="reason-card" href="/docs/tool-hijack">
-  <span class="reason-code">TOOL_HIJACK</span>
-  <h2>Tool-call hijack</h2>
-  <p>Untrusted JSON imitates executable tool output and attempts to cross the data/action boundary.</p>
-  <span class="text-link">Open detection note</span>
-</a><a class="reason-card" href="/docs/secret-exfil">
-  <span class="reason-code">SECRET_EXFIL</span>
-  <h2>Secret exfiltration</h2>
-  <p>A response asks an operator or agent to expose wallet or authentication material.</p>
-  <span class="text-link">Open detection note</span>
-</a><a class="reason-card" href="/docs/malicious-link">
-  <span class="reason-code">MALICIOUS_LINK</span>
-  <h2>Malicious link</h2>
-  <p>An active or deceptive URL can move a buyer from trusted workflow into attacker-controlled content.</p>
-  <span class="text-link">Open detection note</span>
-</a></section>
-<aside class="callout"><strong>Interpretation:</strong> ALLOW means no implemented detector fired. It is not proof that content is safe, and multiple threat classes can appear in one result.</aside>
+<div class="doc-layout">
+  <aside class="doc-nav" aria-label="Documentation sections">
+    <a href="#decision-model">Decision model</a>
+    <a href="#reason-matrix">Reason matrix</a>
+    <a href="/docs/prompt-injection">PROMPT_INJECTION</a><a href="/docs/role-override">ROLE_OVERRIDE</a><a href="/docs/web3-injection">WEB3_INJECTION</a><a href="/docs/hidden-unicode">HIDDEN_UNICODE</a><a href="/docs/encoding-trick">ENCODING_TRICK</a><a href="/docs/statistical-anomaly">STATISTICAL_ANOMALY</a><a href="/docs/corpus-match">CORPUS_MATCH</a><a href="/docs/drain-address">DRAIN_ADDRESS</a><a href="/docs/tool-hijack">TOOL_HIJACK</a><a href="/docs/secret-exfil">SECRET_EXFIL</a><a href="/docs/malicious-link">MALICIOUS_LINK</a>
+  </aside>
+  <article class="prose">
+    <section id="decision-model">
+      <p class="eyebrow">Decision model</p>
+      <h2>Read the operational decision before the diagnostic detail.</h2>
+      <div class="card-grid docs-decision-grid">
+        <article><h3>Decision</h3><p><strong>ALLOW</strong>, <strong>SANITIZE</strong>, or <strong>BLOCK</strong> tells the integrating agent what to do next.</p></article>
+        <article><h3>Risk</h3><p>The observed severity band comes from the deterministic score and hard gates. It is not the decision itself.</p></article>
+        <article><h3>Reason and threat class</h3><p>A reason code names the detector that fired. The response's threat_classes array deduplicates those reasons.</p></article>
+        <article><h3>Confidence and score</h3><p>Detection confidence and the composite score are evidence used by the decision engine, not probabilities of safety.</p></article>
+        <article><h3>Detector boundary</h3><p>Fast and thorough depth do not run identical checks. CORPUS_MATCH is thorough-only.</p></article>
+      </div>
+      <aside class="callout"><strong>Why SANITIZE can show risk NONE:</strong> a low-scoring detection can still require redaction or review. Decision answers what to do; risk reports the score band. The malicious-link regression below demonstrates this implemented behavior.</aside>
+    </section>
+    <section id="reason-matrix">
+      <div class="section-heading">
+        <p class="eyebrow">Reason-code matrix</p>
+        <h2>Coverage, context, and intended action</h2>
+        <p class="section-copy">These are observed regression outcomes, not universal guarantees for every payload.</p>
+      </div>
+      <div class="filter-bar docs-filter-bar" aria-label="Reason-code filters">
+        <label>Search reasons<input type="search" data-doc-search autocomplete="off" placeholder="Reason, behavior, context, or action"></label>
+        <label>Decision<select data-doc-decision><option value="">All decisions</option><option value="ALLOW">ALLOW</option><option value="SANITIZE">SANITIZE</option><option value="BLOCK">BLOCK</option></select></label>
+        <label>Availability<select data-doc-availability><option value="">All paths</option><option value="fast-and-thorough">Fast and thorough</option><option value="thorough-only">Thorough-only signal</option></select></label>
+        <button class="button secondary" type="button" data-doc-reset>Clear filters</button>
+      </div>
+      <p class="snapshot-note" aria-live="polite"><span class="num" data-doc-visible>11</span> reason codes shown</p>
+      <div class="reason-matrix" data-doc-results>
+        <table>
+          <thead><tr><th scope="col">Reason</th><th scope="col">Fast</th><th scope="col">Thorough</th><th scope="col">Context</th><th scope="col">Intended action</th></tr></thead>
+          <tbody><tr data-doc-entry data-search="PROMPT_INJECTION Prompt injection Seller or service text attempts to replace the buyer agent&#x27;s operating instructions. None Use the sanitized payload and keep the original instruction untrusted." data-decisions="SANITIZE" data-availability="fast-and-thorough">
+  <th scope="row"><a href="/docs/prompt-injection"><span class="reason-code">PROMPT_INJECTION</span><span>Prompt injection</span></a></th>
+  <td data-label="Fast"><strong>SANITIZE</strong></td>
+  <td data-label="Thorough"><strong>SANITIZE</strong></td>
+  <td data-label="Context">None</td>
+  <td data-label="Intended action">Use the sanitized payload and keep the original instruction untrusted.</td>
+</tr><tr data-doc-entry data-search="ROLE_OVERRIDE Role override Untrusted content tries to coerce an agent outside its authorized commerce role. None Preserve the caller&#x27;s role and review the sanitized payload." data-decisions="SANITIZE" data-availability="fast-and-thorough">
+  <th scope="row"><a href="/docs/role-override"><span class="reason-code">ROLE_OVERRIDE</span><span>Role override</span></a></th>
+  <td data-label="Fast"><strong>SANITIZE</strong></td>
+  <td data-label="Thorough"><strong>SANITIZE</strong></td>
+  <td data-label="Context">None</td>
+  <td data-label="Intended action">Preserve the caller&#x27;s role and review the sanitized payload.</td>
+</tr><tr data-doc-entry data-search="WEB3_INJECTION Web3 injection Text can induce token approvals, transfers, withdrawals, or other wallet actions. None Require explicit policy authorization before any wallet action." data-decisions="SANITIZE" data-availability="fast-and-thorough">
+  <th scope="row"><a href="/docs/web3-injection"><span class="reason-code">WEB3_INJECTION</span><span>Web3 injection</span></a></th>
+  <td data-label="Fast"><strong>SANITIZE</strong></td>
+  <td data-label="Thorough"><strong>SANITIZE</strong></td>
+  <td data-label="Context">None</td>
+  <td data-label="Intended action">Require explicit policy authorization before any wallet action.</td>
+</tr><tr data-doc-entry data-search="HIDDEN_UNICODE Hidden Unicode Invisible characters can conceal or alter listing, address, and response content. None Inspect the detection and use normalized or sanitized text." data-decisions="SANITIZE" data-availability="fast-and-thorough">
+  <th scope="row"><a href="/docs/hidden-unicode"><span class="reason-code">HIDDEN_UNICODE</span><span>Hidden Unicode</span></a></th>
+  <td data-label="Fast"><strong>SANITIZE</strong></td>
+  <td data-label="Thorough"><strong>SANITIZE</strong></td>
+  <td data-label="Context">None</td>
+  <td data-label="Intended action">Inspect the detection and use normalized or sanitized text.</td>
+</tr><tr data-doc-entry data-search="ENCODING_TRICK Encoding trick Encoded directives can evade a plain-text operator review before payment or execution. None Treat the encoded block as data and inspect before use." data-decisions="SANITIZE" data-availability="fast-and-thorough">
+  <th scope="row"><a href="/docs/encoding-trick"><span class="reason-code">ENCODING_TRICK</span><span>Encoding trick</span></a></th>
+  <td data-label="Fast"><strong>SANITIZE</strong></td>
+  <td data-label="Thorough"><strong>SANITIZE</strong></td>
+  <td data-label="Context">None</td>
+  <td data-label="Intended action">Treat the encoded block as data and inspect before use.</td>
+</tr><tr data-doc-entry data-search="STATISTICAL_ANOMALY Statistical anomaly Dense imperatives and invisible characters can be mixed into otherwise plausible market copy. None Review the combined signals before allowing an action." data-decisions="SANITIZE" data-availability="fast-and-thorough">
+  <th scope="row"><a href="/docs/statistical-anomaly"><span class="reason-code">STATISTICAL_ANOMALY</span><span>Statistical anomaly</span></a></th>
+  <td data-label="Fast"><strong>SANITIZE</strong></td>
+  <td data-label="Thorough"><strong>SANITIZE</strong></td>
+  <td data-label="Context">None</td>
+  <td data-label="Intended action">Review the combined signals before allowing an action.</td>
+</tr><tr data-doc-entry data-search="CORPUS_MATCH Corpus similarity match A rephrased known attack may avoid literal patterns while remaining close to a regression case. None; thorough depth required Use thorough mode when corpus-similarity coverage is required." data-decisions="ALLOW SANITIZE" data-availability="thorough-only">
+  <th scope="row"><a href="/docs/corpus-match"><span class="reason-code">CORPUS_MATCH</span><span>Corpus similarity match</span></a></th>
+  <td data-label="Fast"><strong>ALLOW</strong></td>
+  <td data-label="Thorough"><strong>SANITIZE</strong></td>
+  <td data-label="Context">None; thorough depth required</td>
+  <td data-label="Intended action">Use thorough mode when corpus-similarity coverage is required.</td>
+</tr><tr data-doc-entry data-search="DRAIN_ADDRESS Drain address A settlement recipient is replaced with an attacker-controlled wallet in untrusted content. context.expected_addresses Stop the transfer and verify the intended recipient out of band." data-decisions="BLOCK" data-availability="fast-and-thorough">
+  <th scope="row"><a href="/docs/drain-address"><span class="reason-code">DRAIN_ADDRESS</span><span>Drain address</span></a></th>
+  <td data-label="Fast"><strong>BLOCK</strong></td>
+  <td data-label="Thorough"><strong>BLOCK</strong></td>
+  <td data-label="Context">context.expected_addresses</td>
+  <td data-label="Intended action">Stop the transfer and verify the intended recipient out of band.</td>
+</tr><tr data-doc-entry data-search="TOOL_HIJACK Tool-call hijack Untrusted JSON imitates executable tool output and attempts to cross the data/action boundary. None Keep the payload separate from the real tool dispatcher." data-decisions="SANITIZE" data-availability="fast-and-thorough">
+  <th scope="row"><a href="/docs/tool-hijack"><span class="reason-code">TOOL_HIJACK</span><span>Tool-call hijack</span></a></th>
+  <td data-label="Fast"><strong>SANITIZE</strong></td>
+  <td data-label="Thorough"><strong>SANITIZE</strong></td>
+  <td data-label="Context">None</td>
+  <td data-label="Intended action">Keep the payload separate from the real tool dispatcher.</td>
+</tr><tr data-doc-entry data-search="SECRET_EXFIL Secret exfiltration A response asks an operator or agent to expose wallet or authentication material. None Do not reveal the requested secret; stop the action." data-decisions="BLOCK" data-availability="fast-and-thorough">
+  <th scope="row"><a href="/docs/secret-exfil"><span class="reason-code">SECRET_EXFIL</span><span>Secret exfiltration</span></a></th>
+  <td data-label="Fast"><strong>BLOCK</strong></td>
+  <td data-label="Thorough"><strong>BLOCK</strong></td>
+  <td data-label="Context">None</td>
+  <td data-label="Intended action">Do not reveal the requested secret; stop the action.</td>
+</tr><tr data-doc-entry data-search="MALICIOUS_LINK Malicious link An active or deceptive URL can move a buyer from trusted workflow into attacker-controlled content. None Do not follow the flagged link; use the sanitized payload." data-decisions="SANITIZE" data-availability="fast-and-thorough">
+  <th scope="row"><a href="/docs/malicious-link"><span class="reason-code">MALICIOUS_LINK</span><span>Malicious link</span></a></th>
+  <td data-label="Fast"><strong>SANITIZE</strong></td>
+  <td data-label="Thorough"><strong>SANITIZE</strong></td>
+  <td data-label="Context">None</td>
+  <td data-label="Intended action">Do not follow the flagged link; use the sanitized payload.</td>
+</tr></tbody>
+        </table>
+      </div>
+      <p class="empty-state" data-doc-empty hidden>No reason codes match these filters. Clear a filter to restore the full matrix.</p>
+    </section>
+    <aside class="callout"><strong>Interpretation:</strong> ALLOW means no implemented detector fired. It is not proof that content is safe, and multiple threat classes can appear in one result.</aside>
+  </article>
+</div>
 </main>
     <footer class="site-footer page-shell">
-      <div><strong>Warden</strong><span>Deterministic security before autonomous action.</span></div>
-      <nav aria-label="Footer"><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav>
+      <div><strong>Warden</strong><span>Deterministic security before autonomous action.</span><span>Independent service listed on OKX.AI.</span></div>
+      <nav aria-label="Footer"><a href="/playground">Run a scan</a><a href="/showcase">Showcase</a><a href="/docs">Docs</a><a href="/badges">Evidence</a><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav>
     </footer>
-    <script src="/app.js" defer></script>
+    <script src="/app.js" defer></script><script src="/agents.js" defer></script>
   </body>
 </html>

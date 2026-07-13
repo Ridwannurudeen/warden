@@ -1,0 +1,208 @@
+(function (root) {
+  "use strict";
+
+  function normalize(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase();
+  }
+
+  function matchesSearch(haystack, query) {
+    const normalizedHaystack = normalize(haystack);
+    return normalize(query)
+      .split(/\s+/)
+      .filter(Boolean)
+      .every((term) => normalizedHaystack.includes(term));
+  }
+
+  function matchesAgentFilters(
+    dataset,
+    { query = "", category = "", match = "", audit = "" } = {},
+  ) {
+    const categories = String(dataset.category || "")
+      .split("|")
+      .filter(Boolean);
+    return (
+      matchesSearch(dataset.search, query) &&
+      (!category || categories.includes(category)) &&
+      (!match || dataset.match === match) &&
+      (!audit || dataset.audit === audit)
+    );
+  }
+
+  function numeric(value) {
+    if (value === "" || value === null || value === undefined) {
+      return Number.NEGATIVE_INFINITY;
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+  }
+
+  function compareText(left, right) {
+    const normalizedLeft = normalize(left);
+    const normalizedRight = normalize(right);
+    if (normalizedLeft < normalizedRight) {
+      return -1;
+    }
+    if (normalizedLeft > normalizedRight) {
+      return 1;
+    }
+    return 0;
+  }
+
+  function compareSoldThenName(left, right) {
+    const soldDifference = numeric(right.sold) - numeric(left.sold);
+    return (
+      soldDifference ||
+      compareText(left.name, right.name) ||
+      compareText(left.agentId, right.agentId)
+    );
+  }
+
+  function compareAgentRows(left, right, sort = "sold-desc") {
+    if (sort === "name-asc") {
+      return (
+        compareText(left.name, right.name) ||
+        compareText(left.agentId, right.agentId)
+      );
+    }
+    if (sort === "review-desc") {
+      return (
+        numeric(right.review) - numeric(left.review) ||
+        compareSoldThenName(left, right)
+      );
+    }
+    if (sort === "signal-first") {
+      const priority = { signal: 2, none: 1, unscanned: 0 };
+      return (
+        (priority[right.match] || 0) - (priority[left.match] || 0) ||
+        compareSoldThenName(left, right)
+      );
+    }
+    if (sort === "audit-first") {
+      return (
+        Number(right.audit === "audited") - Number(left.audit === "audited") ||
+        compareSoldThenName(left, right)
+      );
+    }
+    return compareSoldThenName(left, right);
+  }
+
+  function matchesDocumentFilters(
+    dataset,
+    { query = "", decision = "", availability = "" } = {},
+  ) {
+    const decisions = String(dataset.decisions || "")
+      .split(/\s+/)
+      .filter(Boolean);
+    return (
+      matchesSearch(dataset.search, query) &&
+      (!decision || decisions.includes(decision)) &&
+      (!availability || dataset.availability === availability)
+    );
+  }
+
+  const api = {
+    compareAgentRows,
+    matchesAgentFilters,
+    matchesDocumentFilters,
+  };
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
+  }
+
+  if (!root.document) {
+    return;
+  }
+
+  const document = root.document;
+  const agentResults = document.querySelector("[data-agent-results]");
+  if (agentResults) {
+    const rows = Array.from(agentResults.querySelectorAll("[data-agent-row]"));
+    const search = document.querySelector("[data-agent-search]");
+    const category = document.querySelector("[data-agent-category]");
+    const match = document.querySelector("[data-agent-match]");
+    const audit = document.querySelector("[data-agent-audit]");
+    const sort = document.querySelector("[data-agent-sort]");
+    const reset = document.querySelector("[data-agent-reset]");
+    const count = document.querySelector("[data-agent-visible]");
+    const empty = document.querySelector("[data-agent-empty]");
+
+    function renderAgents() {
+      const filters = {
+        query: search.value,
+        category: category.value,
+        match: match.value,
+        audit: audit.value,
+      };
+      const ordered = [...rows].sort((left, right) =>
+        compareAgentRows(left.dataset, right.dataset, sort.value),
+      );
+      let visible = 0;
+      for (const row of ordered) {
+        const matches = matchesAgentFilters(row.dataset, filters);
+        row.hidden = !matches;
+        visible += Number(matches);
+        agentResults.append(row);
+      }
+      count.textContent = visible.toLocaleString();
+      empty.hidden = visible !== 0;
+    }
+
+    search.addEventListener("input", renderAgents);
+    for (const control of [category, match, audit, sort]) {
+      control.addEventListener("change", renderAgents);
+    }
+    reset.addEventListener("click", () => {
+      search.value = "";
+      category.value = "";
+      match.value = "";
+      audit.value = "";
+      sort.value = "sold-desc";
+      renderAgents();
+      search.focus();
+    });
+    renderAgents();
+  }
+
+  const documentResults = document.querySelector("[data-doc-results]");
+  if (documentResults) {
+    const entries = Array.from(
+      documentResults.querySelectorAll("[data-doc-entry]"),
+    );
+    const search = document.querySelector("[data-doc-search]");
+    const decision = document.querySelector("[data-doc-decision]");
+    const availability = document.querySelector("[data-doc-availability]");
+    const reset = document.querySelector("[data-doc-reset]");
+    const count = document.querySelector("[data-doc-visible]");
+    const empty = document.querySelector("[data-doc-empty]");
+
+    function renderDocuments() {
+      const filters = {
+        query: search.value,
+        decision: decision.value,
+        availability: availability.value,
+      };
+      let visible = 0;
+      for (const entry of entries) {
+        const matches = matchesDocumentFilters(entry.dataset, filters);
+        entry.hidden = !matches;
+        visible += Number(matches);
+      }
+      count.textContent = visible.toLocaleString();
+      empty.hidden = visible !== 0;
+    }
+
+    search.addEventListener("input", renderDocuments);
+    decision.addEventListener("change", renderDocuments);
+    availability.addEventListener("change", renderDocuments);
+    reset.addEventListener("click", () => {
+      search.value = "";
+      decision.value = "";
+      availability.value = "";
+      renderDocuments();
+      search.focus();
+    });
+    renderDocuments();
+  }
+})(typeof globalThis === "undefined" ? this : globalThis);

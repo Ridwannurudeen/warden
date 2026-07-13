@@ -1,118 +1,460 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Verified OnchainOS, x402, Python, TypeScript, and local MCP integration patterns for Warden.">
-    <meta name="color-scheme" content="dark light">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Verified OnchainOS, x402, Python, TypeScript, and local MCP integration patterns for Warden."
+    />
+    <meta name="color-scheme" content="dark light" />
     <title>Integrate Warden</title>
-    <link rel="icon" href="/assets/warden-avatar.png">
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="canonical" href="https://warden.gudman.xyz/integrate" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Warden" />
+    <meta property="og:title" content="Integrate Warden" />
+    <meta
+      property="og:description"
+      content="Verified OnchainOS, x402, Python, TypeScript, and local MCP integration patterns for Warden."
+    />
+    <meta property="og:url" content="https://warden.gudman.xyz/integrate" />
+    <meta
+      property="og:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <link rel="icon" href="/assets/warden-avatar.png" />
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
-      <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
-      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
-      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><a href="/playground">Playground</a><a href="/agents">Agents</a><a href="/gauntlet">Gauntlet</a><a href="/hire">Hire</a><a href="/docs">Docs</a><a href="/integrate" aria-current="page">Integrate</a><a href="/badges">Badges</a></nav>
-      <div class="header-actions"><a class="status-pill" href="/status"><span class="live-dot" data-health-dot aria-hidden="true"></span><span data-health-label>API status</span></a><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button></div>
+      <a class="brand" href="/" aria-label="Warden home"
+        ><img
+          src="/assets/warden-avatar.png"
+          alt=""
+          width="36"
+          height="36"
+        /><span>Warden</span></a
+      >
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-nav"
+        data-nav-toggle
+      >
+        Menu
+      </button>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
+        <details class="nav-group">
+          <summary>Product</summary>
+          <div class="nav-menu">
+            <a href="/playground">Playground</a>
+            <a href="/agents">Marketplace index</a>
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/showcase">Judge showcase</a>
+          </div>
+        </details>
+        <details class="nav-group has-current">
+          <summary>Developers</summary>
+          <div class="nav-menu">
+            <a href="/docs">Documentation</a>
+            <a href="/integrate" aria-current="page">Integrate</a>
+            <a href="/status">API status</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Evidence</summary>
+          <div class="nav-menu">
+            <a href="/badges">Audit badges</a>
+            <a href="/agents#methodology">Public-text methodology</a>
+            <a href="/gauntlet#policy">Adversarial challenge</a>
+          </div>
+        </details>
+        <div class="nav-mobile-actions">
+          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
+          <a class="button primary" href="/playground">Run a live scan</a>
+        </div>
+      </nav>
+      <div class="header-actions">
+        <a class="status-pill" href="/status" aria-label="Open API status"
+          ><span class="live-dot" data-health-dot aria-hidden="true"></span
+          ><span data-health-label>Checking API</span></a
+        >
+        <a class="header-hire" href="/hire">Hire</a>
+        <a class="header-scan" href="/playground">Run scan</a>
+        <button
+          class="theme-toggle"
+          type="button"
+          data-theme-toggle
+          aria-label="Switch color theme"
+        >
+          Theme
+        </button>
+      </div>
     </header>
 
     <main id="main" class="page-shell site-main">
       <section class="page-hero">
         <p class="eyebrow">Five integration surfaces</p>
         <h1>Put the firewall at the action boundary.</h1>
-        <p class="hero-text">Send the untrusted payload to Warden before a transfer, tool call, secret-bearing response, or outbound link is acted on. Stop on BLOCK; review or use <code>sanitized_payload</code> on SANITIZE.</p>
+        <p class="hero-text">
+          Treat every response, tool result, and external message as untrusted
+          until Warden returns a typed decision. Only the resulting action
+          payload crosses into execution.
+        </p>
       </section>
+
+      <ol class="action-sequence" aria-label="Warden action-gating sequence">
+        <li>
+          <span>01</span><strong>Receive</strong>
+          <p>Keep the source payload inert.</p>
+        </li>
+        <li>
+          <span>02</span><strong>Scan</strong>
+          <p>Send it to the selected Warden surface.</p>
+        </li>
+        <li>
+          <span>03</span><strong>Decide</strong>
+          <p>Handle the typed scan decision or audit report explicitly.</p>
+        </li>
+        <li>
+          <span>04</span><strong>Act</strong>
+          <p>Use the permitted payload or review the audit findings.</p>
+        </li>
+      </ol>
 
       <aside class="callout">
-        Production <code>POST /scan</code> and <code>POST /audit</code> are x402-protected. The HTTP examples below accept an already-signed <code>PAYMENT-SIGNATURE</code>; they do not read a private key. Use the <a class="text-link" href="/hire">reviewable task flow</a> when the purchase should create an OKX task and support buyer feedback.
+        Production <code>POST /scan</code> and <code>POST /audit</code> are
+        x402-protected. Hosted examples accept an already-authorized
+        <code>PAYMENT-SIGNATURE</code> inside a server or agent process; they
+        never read a private key and must not be shipped as browser code. Use
+        the <a class="text-link" href="/hire">reviewable task flow</a> when the
+        purchase should support buyer feedback.
       </aside>
 
-      <section class="snippet-grid">
-        <article class="snippet-card">
-          <header><div><p class="eyebrow">OnchainOS / Claude Code</p><h2>Delegate a reviewable marketplace task</h2></div><button class="copy-button" type="button" data-copy-target="onchainos-prompt">Copy prompt</button></header>
-          <p>This prompt names the verified provider and current scan service. The agent operator still reviews and authorizes task creation and payment.</p>
-          <pre><code id="onchainos-prompt">Use the installed OnchainOS agent tools to create a reviewable task for Warden provider agent #3808, service #33460 (Payload Security Scan). Fetch the x402 accepts terms from https://warden.gudman.xyz/scan, pay through the task-402 flow, and return Warden's full verdict before completing the task. Do not submit feedback until I have reviewed the verdict.
+      <section class="integration-catalog" aria-labelledby="catalog-title">
+        <div class="section-heading">
+          <p class="eyebrow">Normalized marketplace catalog</p>
+          <h2 id="catalog-title">
+            Choose the service used by every hosted example
+          </h2>
+          <p data-integrate-catalog-status aria-live="polite">
+            Loading the normalized service catalog...
+          </p>
+          <button
+            class="button secondary"
+            type="button"
+            data-integrate-retry
+            hidden
+          >
+            Retry service catalog
+          </button>
+        </div>
+        <label>Service<select data-integrate-service disabled></select></label>
+        <dl class="data-list integration-service-facts" aria-live="polite">
+          <div>
+            <dt>Service</dt>
+            <dd data-integrate-service-name>Loading</dd>
+          </div>
+          <div>
+            <dt>Service ID</dt>
+            <dd class="num" data-integrate-service-id>--</dd>
+          </div>
+          <div>
+            <dt>Price</dt>
+            <dd class="num" data-integrate-service-price>--</dd>
+          </div>
+          <div>
+            <dt>Network</dt>
+            <dd data-integrate-service-network>--</dd>
+          </div>
+          <div>
+            <dt>Endpoint</dt>
+            <dd><code data-integrate-service-endpoint>--</code></dd>
+          </div>
+        </dl>
+      </section>
 
-Untrusted payload:
-&lt;PASTE_PAYLOAD_HERE&gt;</code></pre>
+      <section aria-labelledby="surfaces-title">
+        <div class="section-heading">
+          <p class="eyebrow">Implementation surfaces</p>
+          <h2 id="surfaces-title">
+            Use one boundary, not five competing flows
+          </h2>
+          <p>
+            Arrow keys move between tabs. The selected hosted examples update
+            from the committed catalog; local MCP remains intentionally separate
+            from the paid service.
+          </p>
+        </div>
+        <div
+          class="surface-tabs"
+          role="tablist"
+          aria-label="Integration surface"
+        >
+          <button
+            id="surface-tab-onchainos"
+            class="surface-tab"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="surface-panel-onchainos"
+            data-surface-tab="onchainos"
+          >
+            OnchainOS
+          </button>
+          <button
+            id="surface-tab-curl"
+            class="surface-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="surface-panel-curl"
+            tabindex="-1"
+            data-surface-tab="curl"
+          >
+            Raw x402
+          </button>
+          <button
+            id="surface-tab-python"
+            class="surface-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="surface-panel-python"
+            tabindex="-1"
+            data-surface-tab="python"
+          >
+            Python
+          </button>
+          <button
+            id="surface-tab-typescript"
+            class="surface-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="surface-panel-typescript"
+            tabindex="-1"
+            data-surface-tab="typescript"
+          >
+            TypeScript
+          </button>
+          <button
+            id="surface-tab-mcp"
+            class="surface-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="surface-panel-mcp"
+            tabindex="-1"
+            data-surface-tab="mcp"
+          >
+            MCP
+          </button>
+        </div>
+
+        <article
+          id="surface-panel-onchainos"
+          class="surface-panel snippet-card"
+          role="tabpanel"
+          aria-labelledby="surface-tab-onchainos"
+          data-surface-panel="onchainos"
+        >
+          <header>
+            <div>
+              <p class="eyebrow">OnchainOS / agent operator</p>
+              <h3>Delegate a reviewable marketplace task</h3>
+            </div>
+            <button
+              class="copy-button"
+              type="button"
+              data-copy-target="onchainos-prompt"
+            >
+              Copy prompt
+            </button>
+          </header>
+          <p>
+            The operator still reviews task creation, the x402 spend, the
+            returned result, completion, and any feedback.
+          </p>
+          <pre><code id="onchainos-prompt" data-integration-example="onchainos">Loading catalog-backed prompt...</code></pre>
         </article>
 
-        <article class="snippet-card">
-          <header><div><p class="eyebrow">Raw x402 / curl</p><h2>Challenge, sign, replay</h2></div><button class="copy-button" type="button" data-copy-target="curl-snippet">Copy curl</button></header>
-          <p>The unpaid GET exposes the x402 v2 challenge. After a wallet or x402 client produces the base64 payment payload, replay the real POST with that value in <code>PAYMENT-SIGNATURE</code>.</p>
-          <pre><code id="curl-snippet">curl -i https://warden.gudman.xyz/scan
-
-curl -sS https://warden.gudman.xyz/scan \
-  -H "content-type: application/json" \
-  -H "PAYMENT-SIGNATURE: ${PAYMENT_SIGNATURE}" \
-  --data '{"payload":"Review this untrusted agent response","context":{"expected_addresses":[]}}'</code></pre>
+        <article
+          id="surface-panel-curl"
+          class="surface-panel snippet-card"
+          role="tabpanel"
+          aria-labelledby="surface-tab-curl"
+          data-surface-panel="curl"
+          hidden
+        >
+          <header>
+            <div>
+              <p class="eyebrow">Raw x402 / curl</p>
+              <h3>Challenge, authorize, replay</h3>
+            </div>
+            <button
+              class="copy-button"
+              type="button"
+              data-copy-target="curl-snippet"
+            >
+              Copy curl
+            </button>
+          </header>
+          <p>
+            Payment construction and signing belong to the wallet layer. The
+            replay process receives only the resulting payment signature.
+          </p>
+          <pre><code id="curl-snippet" data-integration-example="curl">Loading catalog-backed curl...</code></pre>
         </article>
 
-        <article class="snippet-card">
-          <header><div><p class="eyebrow">Python / httpx</p><h2>Submit an already-authorized payment</h2></div><button class="copy-button" type="button" data-copy-target="python-snippet">Copy Python</button></header>
-          <p>This uses the same <code>httpx</code> request shape as Warden's pinned runtime. Payment construction and signing stay in the caller's wallet layer.</p>
-          <pre><code id="python-snippet">import os
-
-import httpx
-
-response = httpx.post(
-    "https://warden.gudman.xyz/scan",
-    headers={"PAYMENT-SIGNATURE": os.environ["PAYMENT_SIGNATURE"]},
-    json={
-        "payload": "Review this untrusted agent response",
-        "context": {"expected_addresses": []},
-    },
-    timeout=30,
-)
-response.raise_for_status()
-print(response.json())</code></pre>
+        <article
+          id="surface-panel-python"
+          class="surface-panel snippet-card"
+          role="tabpanel"
+          aria-labelledby="surface-tab-python"
+          data-surface-panel="python"
+          hidden
+        >
+          <header>
+            <div>
+              <p class="eyebrow">Python / httpx</p>
+              <h3>Fail closed before execution</h3>
+            </div>
+            <button
+              class="copy-button"
+              type="button"
+              data-copy-target="python-snippet"
+            >
+              Copy Python
+            </button>
+          </header>
+          <p>
+            The selected scan example handles all three verdicts and malformed
+            sanitization. The selected audit example validates score, grade,
+            results, and recommendations.
+          </p>
+          <pre><code id="python-snippet" data-integration-example="python">Loading catalog-backed Python...</code></pre>
         </article>
 
-        <article class="snippet-card">
-          <header><div><p class="eyebrow">TypeScript / fetch</p><h2>Gate the next action on the verdict</h2></div><button class="copy-button" type="button" data-copy-target="typescript-snippet">Copy TypeScript</button></header>
-          <p>Keep the payment signature in the process that owns the wallet session. Never place it in client-side source code.</p>
-          <pre><code id="typescript-snippet">const paymentSignature = process.env.PAYMENT_SIGNATURE;
-if (!paymentSignature) throw new Error("PAYMENT_SIGNATURE is required");
-
-const response = await fetch("https://warden.gudman.xyz/scan", {
-  method: "POST",
-  headers: {
-    "content-type": "application/json",
-    "PAYMENT-SIGNATURE": paymentSignature,
-  },
-  body: JSON.stringify({
-    payload: "Review this untrusted agent response",
-    context: { expected_addresses: [] },
-  }),
-});
-if (!response.ok) throw new Error(`Warden returned HTTP ${response.status}`);
-
-const verdict = await response.json();
-if (verdict.verdict === "BLOCK") throw new Error(verdict.recommendation);</code></pre>
+        <article
+          id="surface-panel-typescript"
+          class="surface-panel snippet-card"
+          role="tabpanel"
+          aria-labelledby="surface-tab-typescript"
+          data-surface-panel="typescript"
+          hidden
+        >
+          <header>
+            <div>
+              <p class="eyebrow">TypeScript / server fetch</p>
+              <h3>Make the decision exhaustive</h3>
+            </div>
+            <button
+              class="copy-button"
+              type="button"
+              data-copy-target="typescript-snippet"
+            >
+              Copy TypeScript
+            </button>
+          </header>
+          <p>
+            The selected service determines the response type: an exhaustive
+            scan union or a validated endpoint-audit report. The payment
+            signature stays in the server or agent runtime.
+          </p>
+          <pre><code id="typescript-snippet" data-integration-example="typescript">Loading catalog-backed TypeScript...</code></pre>
         </article>
 
-        <article class="snippet-card">
-          <header><div><p class="eyebrow">MCP / FastMCP stdio</p><h2>Expose the local engine as two tools</h2></div><button class="copy-button" type="button" data-copy-target="mcp-snippet">Copy MCP config</button></header>
-          <p>Run this from a Warden checkout with dependencies installed. FastMCP 3.4.2 defaults to stdio here and exposes <code>scan_payload</code> plus <code>audit_agent</code>. This local MCP process calls the local engine directly; it is not the paid hosted x402 service. Replace <code>cwd</code> if your checkout lives elsewhere.</p>
-          <pre><code id="mcp-snippet">{
-  "mcpServers": {
-    "warden": {
-      "command": "python",
-      "args": ["-m", "warden.mcp_server"],
-      "cwd": "C:/absolute/path/to/warden"
-    }
-  }
-}</code></pre>
-          <p>Then ask the MCP client: <code>Call scan_payload with the untrusted payload, depth "fast", and any trusted expected_addresses.</code></p>
+        <article
+          id="surface-panel-mcp"
+          class="surface-panel snippet-card"
+          role="tabpanel"
+          aria-labelledby="surface-tab-mcp"
+          data-surface-panel="mcp"
+          hidden
+        >
+          <header>
+            <div>
+              <p class="eyebrow">MCP / FastMCP stdio</p>
+              <h3>Run the local engine as two tools</h3>
+            </div>
+            <button
+              class="copy-button"
+              type="button"
+              data-copy-target="mcp-snippet"
+            >
+              Copy MCP config
+            </button>
+          </header>
+          <p>
+            From a trusted Warden checkout, local MCP exposes
+            <code>scan_payload</code> and <code>audit_agent</code>. It does not
+            purchase the hosted x402 service.
+          </p>
+          <pre><code id="mcp-snippet" data-integration-example="mcp">Loading local MCP configuration...</code></pre>
         </article>
       </section>
 
-      <aside class="caveat"><strong>Decision contract:</strong> ALLOW means no implemented detector fired. It is not a proof of safety. CORPUS_MATCH is available only at <code>depth="thorough"</code>; the free browser playground forces the fast path.</aside>
+      <section aria-labelledby="decision-title">
+        <div class="section-heading">
+          <p class="eyebrow">Typed decision contract</p>
+          <h2 id="decision-title">Only one payload reaches the action</h2>
+        </div>
+        <div class="decision-grid">
+          <article>
+            <strong>ALLOW</strong>
+            <p>
+              Use the original payload. No implemented detector fired; this is
+              not proof of safety.
+            </p>
+          </article>
+          <article>
+            <strong>SANITIZE</strong>
+            <p>
+              Require a string <code>sanitized_payload</code> and use that value
+              instead of the original.
+            </p>
+          </article>
+          <article>
+            <strong>BLOCK</strong>
+            <p>
+              Stop the action and surface the recommendation for operator
+              review.
+            </p>
+          </article>
+        </div>
+        <aside class="caveat">
+          Fail closed on an unknown verdict, malformed JSON, missing
+          <code>sanitized_payload</code>, payment rejection, timeout, or non-2xx
+          response. <code>CORPUS_MATCH</code> is available only at
+          <code>depth="thorough"</code>; the free browser playground forces the
+          fast path.
+        </aside>
+      </section>
     </main>
 
-    <footer class="site-footer page-shell"><div><strong>Warden</strong><span>Deterministic security before autonomous action.</span></div><nav aria-label="Footer"><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav></footer>
+    <footer class="site-footer page-shell">
+      <div>
+        <strong>Warden</strong
+        ><span>Deterministic security before autonomous action.</span
+        ><span>Independent service listed on OKX.AI.</span>
+      </div>
+      <nav aria-label="Footer">
+        <a href="/playground">Run a scan</a><a href="/showcase">Showcase</a
+        ><a href="/docs">Docs</a><a href="/badges">Evidence</a
+        ><a href="/status">Status</a><a href="/privacy">Privacy</a
+        ><a href="/terms">Terms</a
+        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+      </nav>
+    </footer>
     <script src="/app.js" defer></script>
+    <script src="/integrate.js" defer></script>
   </body>
 </html>

@@ -1,53 +1,352 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Run Warden's real deterministic fast-path scanner free in the browser.">
-    <meta name="color-scheme" content="dark light">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Run Warden's real deterministic fast-path scanner free in the browser."
+    />
+    <meta name="color-scheme" content="dark light" />
     <title>Payload Playground | Warden</title>
-    <link rel="icon" href="/assets/warden-avatar.png">
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="canonical" href="https://warden.gudman.xyz/playground" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Warden" />
+    <meta property="og:title" content="Payload Playground | Warden" />
+    <meta
+      property="og:description"
+      content="Run Warden's real deterministic fast-path scanner free in the browser."
+    />
+    <meta property="og:url" content="https://warden.gudman.xyz/playground" />
+    <meta
+      property="og:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <link rel="icon" href="/assets/warden-avatar.png" />
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
-      <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
-      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
-      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><a href="/playground" aria-current="page">Playground</a><a href="/agents">Agents</a><a href="/gauntlet">Gauntlet</a><a href="/hire">Hire</a><a href="/docs">Docs</a><a href="/integrate">Integrate</a><a href="/badges">Badges</a></nav>
-      <div class="header-actions"><a class="status-pill" href="/status"><span class="live-dot" data-health-dot aria-hidden="true"></span><span data-health-label>API status</span></a><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button></div>
+      <a class="brand" href="/" aria-label="Warden home"
+        ><img
+          src="/assets/warden-avatar.png"
+          alt=""
+          width="36"
+          height="36"
+        /><span>Warden</span></a
+      >
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-nav"
+        data-nav-toggle
+      >
+        Menu
+      </button>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
+        <details class="nav-group has-current">
+          <summary>Product</summary>
+          <div class="nav-menu">
+            <a href="/playground" aria-current="page">Playground</a>
+            <a href="/agents">Marketplace index</a>
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/showcase">Judge showcase</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Developers</summary>
+          <div class="nav-menu">
+            <a href="/docs">Documentation</a>
+            <a href="/integrate">Integrate</a>
+            <a href="/status">API status</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Evidence</summary>
+          <div class="nav-menu">
+            <a href="/badges">Audit badges</a>
+            <a href="/agents#methodology">Public-text methodology</a>
+            <a href="/gauntlet#policy">Adversarial challenge</a>
+          </div>
+        </details>
+        <div class="nav-mobile-actions">
+          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
+          <a class="button primary" href="/playground">Run a live scan</a>
+        </div>
+      </nav>
+      <div class="header-actions">
+        <a class="status-pill" href="/status" aria-label="Open API status"
+          ><span class="live-dot" data-health-dot aria-hidden="true"></span
+          ><span data-health-label>Checking API</span></a
+        >
+        <a class="header-hire" href="/hire">Hire</a>
+        <a class="header-scan" href="/playground" aria-current="page"
+          >Run scan</a
+        >
+        <button
+          class="theme-toggle"
+          type="button"
+          data-theme-toggle
+          aria-label="Switch color theme"
+        >
+          Theme
+        </button>
+      </div>
     </header>
 
     <main id="main" class="page-shell site-main">
-      <section class="page-hero">
+      <section class="page-hero page-hero--compact">
         <p class="eyebrow">Free deterministic fast path</p>
-        <h1>Put an untrusted payload through the real engine.</h1>
-        <p class="hero-text">This page calls <code>/api/demo/scan</code>, not the paid production route. It forces fast mode, caps payloads at 4,000 characters, and returns the full scan envelope.</p>
+        <h1>See what happens before the agent acts.</h1>
+        <p class="hero-text">
+          Paste untrusted content, add the recipients your agent actually
+          expects, and run Warden's real deterministic fast path. The result
+          tells the integrating agent whether to continue, sanitize, or stop.
+        </p>
       </section>
 
-      <section class="feature-panel">
-        <form data-playground-form>
-          <div class="form-grid">
-            <label>Corpus example<select data-demo-example><option value="">Write my own payload</option></select></label>
-            <label>Expected payment addresses<input data-demo-addresses autocomplete="off" placeholder="Comma-separated trusted recipients"></label>
+      <aside class="scan-boundary" aria-label="Free scan limits">
+        <strong>Fast demo</strong>
+        <span>Real <code>POST /api/demo/scan</code></span>
+        <span>4,000-character payload cap</span>
+        <span>Maximum 20 trusted recipients</span>
+        <span>No thorough <code>CORPUS_MATCH</code> check</span>
+      </aside>
+
+      <section
+        class="scan-workspace playground-workspace"
+        data-demo-workspace
+        aria-label="Payload scan workspace"
+      >
+        <form class="scan-input-panel" data-playground-form novalidate>
+          <div class="scan-panel-heading">
+            <div>
+              <p class="eyebrow">01 / Untrusted input</p>
+              <h2>Define the action context</h2>
+            </div>
+            <span class="status-label status-label--pending">Fast path</span>
           </div>
-          <label>Untrusted payload<textarea data-demo-payload rows="11" maxlength="4000" required spellcheck="false" placeholder="Paste a message, tool output, response, or payment instruction"></textarea></label>
-          <div class="hero-actions"><button class="button primary" type="submit">Run Warden</button><button class="button secondary" type="button" data-clear-demo>Clear</button></div>
-          <p data-demo-status aria-live="polite">Loading curated examples...</p>
-        </form>
-        <p class="caveat"><strong>Fast-path boundary:</strong> CORPUS_MATCH uses the thorough similarity layer and is intentionally unavailable here. ALLOW means no implemented fast detector fired.</p>
-      </section>
+          <label
+            >Curated corpus example
+            <select data-demo-example>
+              <option value="">Write my own payload</option>
+            </select>
+          </label>
+          <label
+            >Untrusted payload
+            <textarea
+              data-demo-payload
+              rows="12"
+              maxlength="4000"
+              required
+              spellcheck="false"
+              aria-describedby="demo-payload-hint demo-payload-error"
+              placeholder="Paste a message, tool output, response, or payment instruction"
+            ></textarea>
+          </label>
+          <p class="field-hint" id="demo-payload-hint">
+            Press Ctrl+Enter or Cmd+Enter to run the scan without leaving the
+            editor.
+          </p>
+          <p
+            class="field-error"
+            id="demo-payload-error"
+            data-demo-payload-error
+            role="alert"
+            hidden
+          ></p>
 
-      <section class="console-card" data-demo-result hidden aria-live="polite">
-        <div class="section-heading"><p class="eyebrow">Structured result</p><h2 data-demo-verdict>Waiting</h2><p data-demo-summary></p></div>
-        <section class="result-grid"><div><span>Risk level</span><strong data-demo-risk>—</strong></div><div><span>Threat classes</span><strong data-demo-classes>—</strong></div><div><span>Detections</span><strong class="num" data-demo-detections>0</strong></div><div><span>Latency</span><strong class="num" data-demo-latency>—</strong></div></section>
-        <pre><code id="demo-json" data-demo-json>{}</code></pre>
-        <button class="copy-button" type="button" data-copy-target="demo-json">Copy result JSON</button>
+          <fieldset class="address-fieldset">
+            <legend>Trusted payment recipients</legend>
+            <p class="field-hint">
+              Add known EVM or Solana recipients. Warden compares payment-like
+              addresses in the untrusted payload with this context.
+            </p>
+            <div class="address-entry">
+              <label class="sr-only" for="demo-address-input"
+                >Expected payment address</label
+              >
+              <input
+                id="demo-address-input"
+                data-demo-addresses
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                aria-describedby="demo-address-hint demo-address-error"
+                placeholder="0x... or Solana address"
+              />
+              <button
+                class="button secondary"
+                type="button"
+                data-add-demo-address
+              >
+                Add recipient
+              </button>
+            </div>
+            <p class="field-hint" id="demo-address-hint">
+              EVM recipients are normalized to lowercase; duplicates are
+              removed.
+            </p>
+            <p
+              class="field-error"
+              id="demo-address-error"
+              data-demo-address-error
+              role="alert"
+              hidden
+            ></p>
+            <div
+              class="address-chip-list"
+              data-demo-address-chips
+              aria-live="polite"
+            ></div>
+          </fieldset>
+
+          <div class="hero-actions">
+            <button class="button primary" type="submit">Run live scan</button>
+            <button class="button secondary" type="button" data-clear-demo>
+              Reset
+            </button>
+          </div>
+          <p class="scan-status" data-demo-status aria-live="polite">
+            Loading curated examples...
+          </p>
+          <div class="scan-error" data-demo-error role="alert" hidden>
+            <p data-demo-error-message></p>
+            <button class="button secondary" type="button" data-demo-retry>
+              Retry the same scan
+            </button>
+          </div>
+          <p class="privacy-note">
+            Your payload is sent to Warden for this scan. It is never placed in
+            a public share URL by this page.
+          </p>
+        </form>
+
+        <div class="scan-result-panel">
+          <div class="scan-empty-state" data-demo-empty>
+            <p class="eyebrow">02 / Warden decision</p>
+            <h2>Ready at the action boundary.</h2>
+            <p>
+              Run the selected drain-address example to see Warden compare an
+              untrusted recipient with trusted context before a transfer can
+              execute.
+            </p>
+          </div>
+
+          <section
+            class="scan-result"
+            data-demo-result
+            hidden
+            aria-live="polite"
+            aria-labelledby="demo-result-heading"
+          >
+            <div class="verdict-summary" data-demo-verdict-panel>
+              <p class="eyebrow">02 / Recommended next action</p>
+              <div class="verdict-heading-row">
+                <h2 id="demo-result-heading" data-demo-verdict>Waiting</h2>
+                <span class="status-label" data-demo-risk>--</span>
+              </div>
+              <p class="recommended-action" data-demo-action></p>
+              <p data-demo-summary></p>
+              <p class="decision-note" data-demo-risk-note></p>
+            </div>
+
+            <div
+              class="reason-chip-list"
+              data-demo-reasons
+              aria-label="Reason codes"
+            ></div>
+
+            <section class="result-grid" aria-label="Scan facts">
+              <div>
+                <span>Decision</span><strong data-demo-decision>--</strong>
+              </div>
+              <div>
+                <span>Risk severity</span
+                ><strong data-demo-risk-value>--</strong>
+              </div>
+              <div>
+                <span>Detections</span
+                ><strong class="num" data-demo-detections>0</strong>
+              </div>
+              <div>
+                <span>Latency</span
+                ><strong class="num" data-demo-latency>--</strong>
+              </div>
+            </section>
+
+            <section
+              class="payload-diff"
+              data-demo-diff
+              hidden
+              aria-labelledby="diff-heading"
+            >
+              <div class="section-heading">
+                <p class="eyebrow">Sanitized output</p>
+                <h3 id="diff-heading">Before and after</h3>
+              </div>
+              <div class="diff-grid">
+                <div>
+                  <span class="diff-label">Untrusted input</span>
+                  <pre><code data-demo-before></code></pre>
+                </div>
+                <div>
+                  <span class="diff-label">Warden output</span>
+                  <pre><code data-demo-after></code></pre>
+                </div>
+              </div>
+            </section>
+
+            <details class="result-disclosure" data-demo-analysis>
+              <summary>Analyzer evidence and detector boundary</summary>
+              <div class="detection-list" data-demo-detection-list></div>
+              <p class="caveat">
+                <strong>Boundary:</strong> This free route runs implemented fast
+                detectors only. It does not perform the thorough
+                corpus-similarity check, browse linked resources, or prove that
+                an ALLOW payload is safe.
+              </p>
+            </details>
+
+            <details class="result-disclosure">
+              <summary>Raw machine-readable response</summary>
+              <pre><code id="demo-json" data-demo-json>{}</code></pre>
+              <button
+                class="copy-button"
+                type="button"
+                data-copy-target="demo-json"
+              >
+                Copy result JSON
+              </button>
+            </details>
+          </section>
+        </div>
       </section>
     </main>
 
-    <footer class="site-footer page-shell"><div><strong>Warden</strong><span>Deterministic security before autonomous action.</span></div><nav aria-label="Footer"><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav></footer>
+    <footer class="site-footer page-shell">
+      <div>
+        <strong>Warden</strong
+        ><span>Deterministic security before autonomous action.</span
+        ><span>Independent service listed on OKX.AI.</span>
+      </div>
+      <nav aria-label="Footer">
+        <a href="/playground">Run a scan</a><a href="/showcase">Showcase</a
+        ><a href="/docs">Docs</a><a href="/badges">Evidence</a
+        ><a href="/status">Status</a><a href="/privacy">Privacy</a
+        ><a href="/terms">Terms</a
+        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+      </nav>
+    </footer>
     <script src="/app.js" defer></script>
+    <script src="/scan-client.js" defer></script>
     <script src="/playground.js" defer></script>
   </body>
 </html>

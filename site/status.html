@@ -1,75 +1,301 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Warden API reachability, dated marketplace facts, corpus fingerprint, and evidence boundaries.">
-    <meta name="color-scheme" content="dark light">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Warden API reachability, dated marketplace facts, corpus fingerprint, and evidence boundaries."
+    />
+    <meta name="color-scheme" content="dark light" />
     <title>Service Status | Warden</title>
-    <link rel="icon" href="/assets/warden-avatar.png">
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="canonical" href="https://warden.gudman.xyz/status" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Warden" />
+    <meta property="og:title" content="Service Status | Warden" />
+    <meta
+      property="og:description"
+      content="Warden API reachability, dated marketplace facts, corpus fingerprint, and evidence boundaries."
+    />
+    <meta property="og:url" content="https://warden.gudman.xyz/status" />
+    <meta
+      property="og:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <link rel="icon" href="/assets/warden-avatar.png" />
+    <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body>
+  <body data-status-page>
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
-      <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
-      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
-      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><a href="/playground">Playground</a><a href="/agents">Agents</a><a href="/gauntlet">Gauntlet</a><a href="/hire">Hire</a><a href="/docs">Docs</a><a href="/integrate">Integrate</a><a href="/badges">Badges</a></nav>
-      <div class="header-actions"><a class="status-pill" href="/status" aria-current="page"><span class="live-dot" data-health-dot aria-hidden="true"></span><span data-health-label>API status</span></a><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button></div>
+      <a class="brand" href="/" aria-label="Warden home"
+        ><img
+          src="/assets/warden-avatar.png"
+          alt=""
+          width="36"
+          height="36"
+        /><span>Warden</span></a
+      >
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-nav"
+        data-nav-toggle
+      >
+        Menu
+      </button>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
+        <details class="nav-group">
+          <summary>Product</summary>
+          <div class="nav-menu">
+            <a href="/playground">Playground</a>
+            <a href="/agents">Marketplace index</a>
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/showcase">Judge showcase</a>
+          </div>
+        </details>
+        <details class="nav-group has-current">
+          <summary>Developers</summary>
+          <div class="nav-menu">
+            <a href="/docs">Documentation</a>
+            <a href="/integrate">Integrate</a>
+            <a href="/status" aria-current="page">API status</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Evidence</summary>
+          <div class="nav-menu">
+            <a href="/badges">Audit badges</a>
+            <a href="/agents#methodology">Public-text methodology</a>
+            <a href="/gauntlet#policy">Adversarial challenge</a>
+          </div>
+        </details>
+        <div class="nav-mobile-actions">
+          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
+          <a class="button primary" href="/playground">Run a live scan</a>
+        </div>
+      </nav>
+      <div class="header-actions">
+        <a
+          class="status-pill"
+          href="/status"
+          aria-current="page"
+          aria-label="Open API status"
+          ><span
+            class="live-dot"
+            data-status-header-dot
+            aria-hidden="true"
+          ></span
+          ><span data-status-header-label>Checking API</span></a
+        >
+        <a class="header-hire" href="/hire">Hire</a>
+        <a class="header-scan" href="/playground">Run scan</a>
+        <button
+          class="theme-toggle"
+          type="button"
+          data-theme-toggle
+          aria-label="Switch color theme"
+        >
+          Theme
+        </button>
+      </div>
     </header>
 
     <main id="main" class="page-shell site-main">
       <section class="page-hero">
         <p class="eyebrow">Evidence, not implied guarantees</p>
         <h1>What is reachable now, and what we actually know.</h1>
-        <p class="hero-text">Live reachability comes from a same-origin <code>GET /health</code> in this browser. Marketplace, repository, and corpus facts below are dated build metadata, not live monitoring.</p>
+        <p class="hero-text">
+          This page makes one same-origin <code>GET /health</code> request on
+          initial load. Retry starts one new check. Marketplace, repository, and
+          corpus facts are dated metadata, not live monitoring.
+        </p>
       </section>
 
-      <section class="status-grid" aria-label="Current service facts">
-        <div><span>API reachability</span><strong data-status-api aria-live="polite">Checking now</strong></div>
-        <div><span>API version</span><strong class="num" data-status-version>--</strong></div>
-        <div><span>Corpus entries</span><strong class="num" data-status-corpus>--</strong></div>
-        <div><span>Analyzers loaded</span><strong class="num" data-status-analyzers>--</strong></div>
-        <div><span>Historical uptime</span><strong class="status-value--warn">Not measured</strong></div>
-        <div><span>Repository tests passed</span><strong class="num" data-status-tests>--</strong></div>
+      <section class="status-live-panel" aria-labelledby="live-status-title">
+        <div class="section-heading">
+          <p class="eyebrow">Live browser check</p>
+          <h2 id="live-status-title">Current API reachability</h2>
+          <div class="status-check-controls">
+            <button
+              class="button secondary"
+              type="button"
+              data-status-health-retry
+            >
+              Retry health check
+            </button>
+          </div>
+        </div>
+        <div class="status-grid" aria-label="Current service facts">
+          <div>
+            <span>API reachability</span
+            ><strong data-status-api aria-live="polite">Checking now</strong>
+          </div>
+          <div>
+            <span>Checked at</span
+            ><strong class="num"
+              ><time data-status-checked-at>Not checked yet</time></strong
+            >
+          </div>
+          <div>
+            <span>API version</span
+            ><strong class="num" data-status-version>--</strong>
+          </div>
+          <div>
+            <span>Corpus entries</span
+            ><strong class="num" data-status-corpus>--</strong>
+          </div>
+          <div>
+            <span>Analyzers loaded</span
+            ><strong class="num" data-status-analyzers>--</strong>
+          </div>
+          <div>
+            <span>Historical uptime</span
+            ><strong class="status-value--warn">Not measured</strong>
+          </div>
+        </div>
+        <p class="caveat" data-status-live-note aria-live="polite">
+          Historical uptime is not measured by this page. A successful check
+          establishes only that the API answered this browser at the displayed
+          instant.
+        </p>
       </section>
-      <p class="caveat" data-status-live-note aria-live="polite">Historical uptime is not measured by this page. A successful check establishes only that the API answered this browser now.</p>
 
-      <section class="section-heading">
-        <p class="eyebrow">Dated marketplace snapshot</p>
-        <h2>Listing and service state</h2>
-        <p class="section-copy">These values were verified from the public OKX.AI listing and committed as static metadata. They are not polled from OKX on each page load.</p>
-      </section>
-      <section class="data-grid">
-        <div><span>Provider agent</span><strong class="num" data-status-agent>#3808</strong></div>
-        <div><span>Listing status</span><strong data-status-listing>Loading</strong></div>
-        <div><span>Listing verified</span><strong class="num" data-status-listing-date>--</strong></div>
-        <div><span>Service IDs</span><strong class="num" data-status-services>--</strong></div>
-      </section>
-
-      <section class="section-heading">
-        <p class="eyebrow">Deterministic corpus version</p>
-        <h2>Byte-level build identity</h2>
-        <p class="section-copy">The fingerprint is SHA-256 over the attack corpus bytes followed by the benign corpus bytes. It identifies the exact two corpus files represented by this build.</p>
-      </section>
-      <section class="console-card">
-        <dl class="data-list">
-          <div><dt>Fingerprint</dt><dd><code data-status-corpus-fingerprint>Loading</code></dd></div>
-          <div><dt>Reason codes</dt><dd class="num">11</dd></div>
-          <div><dt>Decision states</dt><dd>ALLOW / SANITIZE / BLOCK</dd></div>
+      <section aria-labelledby="sources-title">
+        <div class="section-heading">
+          <p class="eyebrow">Source ledger</p>
+          <h2 id="sources-title">Live and dated evidence stay separate</h2>
+        </div>
+        <dl class="status-source-grid">
+          <div>
+            <dt>Live API source</dt>
+            <dd><code>GET /health</code> · checked at the exact time above</dd>
+          </div>
+          <div>
+            <dt>Build metadata verified</dt>
+            <dd class="num" data-status-metadata-date>Loading</dd>
+          </div>
+          <div>
+            <dt>Marketplace listing verified</dt>
+            <dd class="num" data-status-listing-date>Loading</dd>
+          </div>
+          <div>
+            <dt>Repository tests verified</dt>
+            <dd class="num" data-status-tests-date>Loading</dd>
+          </div>
         </dl>
       </section>
 
-      <section class="section-heading">
-        <p class="eyebrow">Payment evidence boundary</p>
-        <h2>Address activity is not an order receipt.</h2>
-        <p class="section-copy" data-payment-note>The address explorer link does not contain transaction-specific proof that a payment bought a Warden service.</p>
-        <div class="hero-actions"><a class="button secondary" data-payment-activity href="https://www.oklink.com/xlayer/address/0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51" rel="noreferrer">View X Layer address activity</a></div>
+      <section aria-labelledby="marketplace-status-title">
+        <div class="section-heading">
+          <p class="eyebrow">Dated marketplace snapshot</p>
+          <h2 id="marketplace-status-title">Listing and service state</h2>
+          <p class="section-copy">
+            These values were verified from the public OKX.AI listing and
+            committed as static metadata. They are not polled from OKX on each
+            page load.
+          </p>
+        </div>
+        <div class="data-grid">
+          <div>
+            <span>Provider agent</span
+            ><strong class="num" data-status-agent>#3808</strong>
+          </div>
+          <div>
+            <span>Listing status</span
+            ><strong data-status-listing>Loading</strong>
+          </div>
+          <div>
+            <span>Service IDs</span
+            ><strong class="num" data-status-services>--</strong>
+          </div>
+          <div>
+            <span>Repository tests passed</span
+            ><strong class="num" data-status-tests>--</strong>
+          </div>
+        </div>
+        <p class="caveat" data-status-tests-note>
+          Loading repository verification note...
+        </p>
       </section>
-      <aside class="callout">No transaction-specific payment proof is claimed on this page. The public listing's order count and an address's chain history are different evidence, and neither identifies which transaction purchased which Warden result without a specific transaction reference.</aside>
+
+      <section aria-labelledby="corpus-status-title">
+        <div class="section-heading">
+          <p class="eyebrow">Deterministic corpus version</p>
+          <h2 id="corpus-status-title">Byte-level build identity</h2>
+          <p class="section-copy">
+            The fingerprint is SHA-256 over the attack corpus bytes followed by
+            the benign corpus bytes. It identifies the exact two corpus files
+            represented by this build.
+          </p>
+        </div>
+        <div class="console-card">
+          <dl class="data-list">
+            <div>
+              <dt>Fingerprint</dt>
+              <dd><code data-status-corpus-fingerprint>Loading</code></dd>
+            </div>
+            <div>
+              <dt>Reason codes</dt>
+              <dd class="num">11</dd>
+            </div>
+            <div>
+              <dt>Decision states</dt>
+              <dd>ALLOW / SANITIZE / BLOCK</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section aria-labelledby="payment-evidence-title">
+        <div class="section-heading">
+          <p class="eyebrow">Payment evidence boundary</p>
+          <h2 id="payment-evidence-title">
+            Address activity is not an order receipt.
+          </h2>
+          <p class="section-copy" data-payment-note>
+            The address explorer link does not contain transaction-specific
+            proof that a payment bought a Warden service.
+          </p>
+          <div class="hero-actions">
+            <a
+              class="button secondary"
+              data-payment-activity
+              href="https://www.oklink.com/xlayer/address/0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51"
+              rel="noreferrer"
+              >View X Layer address activity</a
+            >
+          </div>
+        </div>
+      </section>
+      <aside class="callout">
+        No transaction-specific payment proof is claimed on this page. The
+        public listing's order count and an address's chain history are
+        different evidence, and neither identifies which transaction purchased
+        which Warden result without a specific transaction reference.
+      </aside>
     </main>
 
-    <footer class="site-footer page-shell"><div><strong>Warden</strong><span>Deterministic security before autonomous action.</span></div><nav aria-label="Footer"><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav></footer>
+    <footer class="site-footer page-shell">
+      <div>
+        <strong>Warden</strong
+        ><span>Deterministic security before autonomous action.</span
+        ><span>Independent service listed on OKX.AI.</span>
+      </div>
+      <nav aria-label="Footer">
+        <a href="/playground">Run a scan</a><a href="/showcase">Showcase</a
+        ><a href="/docs">Docs</a><a href="/badges">Evidence</a
+        ><a href="/status">Status</a><a href="/privacy">Privacy</a
+        ><a href="/terms">Terms</a
+        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+      </nav>
+    </footer>
     <script src="/app.js" defer></script>
     <script src="/status.js" defer></script>
   </body>

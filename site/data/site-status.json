@@ -4,7 +4,7 @@
   "agentId": "3808",
   "listingStatus": "Listed",
   "listingVerifiedAt": "2026-07-13",
-  "repositoryTests": 127,
+  "repositoryTests": 129,
   "repositoryTestsVerifiedAt": "2026-07-13",
   "repositoryTestsNote": "Tests passed in this checkout; this is not a live CI signal.",
   "corpusCount": 122,

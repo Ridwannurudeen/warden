@@ -1,52 +1,244 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Verify one signed Warden endpoint-audit badge by audit ID.">
-    <meta name="color-scheme" content="dark light">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Verify one signed Warden endpoint-audit badge by audit ID."
+    />
+    <meta name="color-scheme" content="dark light" />
     <title>Verify Audit Badge | Warden</title>
-    <link rel="icon" href="/assets/warden-avatar.png">
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="canonical" href="https://warden.gudman.xyz/badge" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Warden" />
+    <meta property="og:title" content="Verify Audit Badge | Warden" />
+    <meta
+      property="og:description"
+      content="Verify one signed Warden endpoint-audit badge by audit ID."
+    />
+    <meta property="og:url" content="https://warden.gudman.xyz/badge" />
+    <meta
+      property="og:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <link rel="icon" href="/assets/warden-avatar.png" />
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
-      <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
-      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
-      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><a href="/playground">Playground</a><a href="/agents">Agents</a><a href="/gauntlet">Gauntlet</a><a href="/hire">Hire</a><a href="/docs">Docs</a><a href="/integrate">Integrate</a><a href="/badges" aria-current="page">Badges</a></nav>
-      <div class="header-actions"><a class="status-pill" href="/status"><span class="live-dot" data-health-dot aria-hidden="true"></span><span data-health-label>API status</span></a><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button></div>
+      <a class="brand" href="/" aria-label="Warden home"
+        ><img
+          src="/assets/warden-avatar.png"
+          alt=""
+          width="36"
+          height="36"
+        /><span>Warden</span></a
+      >
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-nav"
+        data-nav-toggle
+      >
+        Menu
+      </button>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
+        <details class="nav-group">
+          <summary>Product</summary>
+          <div class="nav-menu">
+            <a href="/playground">Playground</a>
+            <a href="/agents">Marketplace index</a>
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/showcase">Judge showcase</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Developers</summary>
+          <div class="nav-menu">
+            <a href="/docs">Documentation</a>
+            <a href="/integrate">Integrate</a>
+            <a href="/status">API status</a>
+          </div>
+        </details>
+        <details class="nav-group has-current">
+          <summary>Evidence</summary>
+          <div class="nav-menu">
+            <a href="/badges" aria-current="page">Audit badges</a>
+            <a href="/agents#methodology">Public-text methodology</a>
+            <a href="/gauntlet#policy">Adversarial challenge</a>
+          </div>
+        </details>
+        <div class="nav-mobile-actions">
+          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
+          <a class="button primary" href="/playground">Run a live scan</a>
+        </div>
+      </nav>
+      <div class="header-actions">
+        <a class="status-pill" href="/status" aria-label="Open API status"
+          ><span class="live-dot" data-health-dot aria-hidden="true"></span
+          ><span data-health-label>Checking API</span></a
+        >
+        <a class="header-hire" href="/hire">Hire</a>
+        <a class="header-scan" href="/playground">Run scan</a>
+        <button
+          class="theme-toggle"
+          type="button"
+          data-theme-toggle
+          aria-label="Switch color theme"
+        >
+          Theme
+        </button>
+      </div>
     </header>
 
     <main id="main" class="page-shell site-main">
       <section class="page-hero page-hero--compact">
         <p class="eyebrow">Badge integrity check</p>
         <h1>Verify one issued audit record.</h1>
-        <p class="hero-text">This page resolves the audit ID from <code>/badges/{audit_id}</code> and checks the record through the singular <code>GET /badge/{audit_id}</code> API.</p>
-        <div class="hero-actions"><a class="button secondary" href="/badges">Back to registry</a></div>
+        <p class="hero-text">
+          The route resolves one 16-character audit ID and asks
+          <code>GET /badge/{audit_id}</code> for the stored public record and
+          its current server-side signature result.
+        </p>
+        <div class="hero-actions">
+          <a class="button secondary" href="/badges">Back to registry</a>
+        </div>
       </section>
 
-      <section class="console-card badge-detail" data-badge-detail>
+      <section
+        class="console-card badge-detail"
+        data-badge-detail
+        data-state="loading"
+      >
         <div class="section-heading">
           <p class="eyebrow">Verification result</p>
           <h2 data-badge-heading>Checking badge</h2>
-          <p data-badge-status aria-live="polite">Loading the signed record...</p>
+          <p data-badge-status aria-live="polite">
+            Loading the signed record...
+          </p>
+          <button
+            class="button secondary"
+            type="button"
+            data-badge-detail-retry
+            hidden
+          >
+            Retry badge lookup
+          </button>
         </div>
-        <span class="status-label status-label--pending" data-badge-verification>Pending</span>
-        <dl class="data-list">
-          <div><dt>Audit ID</dt><dd class="num" data-badge-audit-id>--</dd></div>
-          <div><dt>Target host</dt><dd data-badge-target>--</dd></div>
-          <div><dt>Grade</dt><dd data-badge-grade>--</dd></div>
-          <div><dt>Score</dt><dd class="num" data-badge-score>--</dd></div>
-          <div><dt>Attack payloads blocked</dt><dd class="num" data-badge-blocked>--</dd></div>
-          <div><dt>Issued</dt><dd class="num" data-badge-issued>--</dd></div>
-          <div><dt>Signature</dt><dd><code data-badge-signature>--</code></dd></div>
-        </dl>
-        <p class="caveat">Badge verification checks record integrity only. Audit results are point-in-time evidence from a fixed battery, not a guarantee that an endpoint is secure.</p>
+
+        <div class="badge-evidence-grid">
+          <section class="badge-evidence" aria-labelledby="integrity-title">
+            <p class="eyebrow">Integrity</p>
+            <h3 id="integrity-title">Stored record signature</h3>
+            <span
+              class="status-label status-label--pending"
+              data-badge-verification
+              >Pending</span
+            >
+            <dl class="data-list">
+              <div>
+                <dt>Audit ID</dt>
+                <dd class="num" data-badge-audit-id>--</dd>
+              </div>
+              <div>
+                <dt>Signature</dt>
+                <dd><code data-badge-signature>--</code></dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="badge-evidence" aria-labelledby="result-title">
+            <p class="eyebrow">Result</p>
+            <h3 id="result-title">Fixed-battery outcome</h3>
+            <dl class="data-list">
+              <div>
+                <dt>Grade</dt>
+                <dd data-badge-grade>--</dd>
+              </div>
+              <div>
+                <dt>Score</dt>
+                <dd class="num" data-badge-score>--</dd>
+              </div>
+              <div>
+                <dt>Battery cases blocked or flagged</dt>
+                <dd class="num" data-badge-blocked>--</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="badge-evidence" aria-labelledby="target-title">
+            <p class="eyebrow">Target</p>
+            <h3 id="target-title">Endpoint host recorded by the audit</h3>
+            <dl class="data-list">
+              <div>
+                <dt>Target host</dt>
+                <dd data-badge-target>--</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="badge-evidence" aria-labelledby="time-title">
+            <p class="eyebrow">Time</p>
+            <h3 id="time-title">Point-in-time issuance</h3>
+            <dl class="data-list">
+              <div>
+                <dt>Issued</dt>
+                <dd class="num" data-badge-issued>--</dd>
+              </div>
+            </dl>
+          </section>
+        </div>
+
+        <div class="record-actions" aria-label="Badge record actions">
+          <button
+            class="button secondary"
+            type="button"
+            data-badge-share
+            disabled
+          >
+            Copy verification URL
+          </button>
+          <button
+            class="button secondary"
+            type="button"
+            data-badge-print
+            disabled
+          >
+            Print this record
+          </button>
+          <p data-badge-action-status aria-live="polite"></p>
+        </div>
+        <p class="caveat">
+          Sharing copies only the canonical verification URL. Signature validity
+          proves record integrity for this stored payload; the audit result is
+          point-in-time evidence from a fixed battery, not a guarantee of target
+          safety, ownership, or future behavior.
+        </p>
       </section>
     </main>
 
-    <footer class="site-footer page-shell"><div><strong>Warden</strong><span>Deterministic security before autonomous action.</span></div><nav aria-label="Footer"><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav></footer>
+    <footer class="site-footer page-shell">
+      <div>
+        <strong>Warden</strong
+        ><span>Deterministic security before autonomous action.</span
+        ><span>Independent service listed on OKX.AI.</span>
+      </div>
+      <nav aria-label="Footer">
+        <a href="/playground">Run a scan</a><a href="/showcase">Showcase</a
+        ><a href="/docs">Docs</a><a href="/badges">Evidence</a
+        ><a href="/status">Status</a><a href="/privacy">Privacy</a
+        ><a href="/terms">Terms</a
+        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+      </nav>
+    </footer>
     <script src="/app.js" defer></script>
     <script src="/badge.js" defer></script>
   </body>

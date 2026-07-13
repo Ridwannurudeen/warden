@@ -25,24 +25,6 @@
     return /^[0-9a-f]{16}$/.test(auditId);
   }
 
-  const api = { isValidAuditId, resolveAuditId };
-  if (typeof module !== "undefined" && module.exports) {
-    module.exports = api;
-  }
-
-  if (!root.document) {
-    return;
-  }
-
-  const document = root.document;
-
-  function text(selector, value) {
-    const element = document.querySelector(selector);
-    if (element) {
-      element.textContent = value;
-    }
-  }
-
   function badgeValue(value, fallback) {
     return value === null || value === undefined || value === ""
       ? fallback
@@ -57,104 +39,281 @@
     return Number.isFinite(score) ? `${score.toFixed(2)} / 100` : "Unavailable";
   }
 
-  function verificationLabel(element, verified) {
+  function badgeViewModel(entry) {
+    const badge =
+      entry?.badge && typeof entry.badge === "object" ? entry.badge : {};
+    return {
+      auditId: badgeValue(badge.audit_id, "Unavailable"),
+      target: badgeValue(badge.target_host, "Unavailable"),
+      grade: badgeValue(badge.grade, "Unavailable"),
+      score: scoreLabel(badge.score),
+      blocked: `${badgeValue(badge.blocked, "--")} / ${badgeValue(badge.total, "--")}`,
+      issuedAt: badgeValue(badge.issued_at, "Unavailable"),
+      signature: badgeValue(badge.signature, "Unavailable"),
+      verified: entry?.verified === true,
+    };
+  }
+
+  const BADGE_STATES = {
+    loading: {
+      heading: "Checking badge",
+      integrity: "Pending",
+      className: "status-label status-label--pending",
+    },
+    invalid: {
+      heading: "Invalid audit ID",
+      integrity: "Not checked",
+      className: "status-label",
+    },
+    empty: {
+      heading: "Badge not issued",
+      integrity: "No issued record",
+      className: "status-label",
+    },
+    error: {
+      heading: "Badge lookup unavailable",
+      integrity: "Unavailable",
+      className: "status-label",
+    },
+    verified: {
+      heading: "Issued audit record",
+      integrity: "Signature verified",
+      className: "status-label status-label--allow",
+    },
+    "signature-invalid": {
+      heading: "Issued record with invalid signature",
+      integrity: "Signature invalid",
+      className: "status-label",
+    },
+  };
+
+  function badgeState(state) {
+    const value = BADGE_STATES[state];
+    if (!value) {
+      throw new Error(`Unknown badge state: ${state}`);
+    }
+    return { ...value };
+  }
+
+  function safeBadgeShareUrl(currentUrl, auditId) {
+    if (!isValidAuditId(auditId)) {
+      throw new Error("A valid audit ID is required to share a badge");
+    }
+    let parsed;
+    try {
+      parsed = new URL(currentUrl);
+    } catch (error) {
+      throw new Error("Badge sharing requires a valid HTTP origin", {
+        cause: error,
+      });
+    }
+    if (!/^https?:$/.test(parsed.protocol)) {
+      throw new Error("Badge sharing requires a valid HTTP origin");
+    }
+    return new URL(`/badges/${auditId}`, parsed.origin).href;
+  }
+
+  const api = {
+    badgeState,
+    badgeViewModel,
+    isValidAuditId,
+    resolveAuditId,
+    safeBadgeShareUrl,
+  };
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
+  }
+
+  if (!root.document) {
+    return;
+  }
+
+  const document = root.document;
+  let detailShareUrl = "";
+
+  function text(selector, value) {
+    const element = document.querySelector(selector);
+    if (element) {
+      element.textContent = value;
+    }
+  }
+
+  function verificationLabel(element, stateName) {
     if (!element) {
       return;
     }
-    element.textContent = verified ? "Signature verified" : "Signature invalid";
-    element.className = verified
-      ? "status-label status-label--allow"
-      : "status-label";
+    const state = badgeState(stateName);
+    element.textContent = state.integrity;
+    element.className = state.className;
+  }
+
+  function createFact(label, value, numeric) {
+    const wrapper = document.createElement("div");
+    const term = document.createElement("dt");
+    const description = document.createElement("dd");
+    term.textContent = label;
+    description.textContent = value;
+    if (numeric) {
+      description.className = "num";
+    }
+    wrapper.append(term, description);
+    return wrapper;
   }
 
   function createBadgeCard(entry) {
-    const badge =
-      entry?.badge && typeof entry.badge === "object" ? entry.badge : {};
-    const auditId = badgeValue(badge.audit_id, "unknown");
+    const view = badgeViewModel(entry);
     const card = document.createElement("a");
     card.className = "badge-card";
-    card.href = isValidAuditId(auditId) ? `/badges/${auditId}` : "/badges";
+    card.href = isValidAuditId(view.auditId)
+      ? `/badges/${view.auditId}`
+      : "/badges";
 
     const eyebrow = document.createElement("p");
     eyebrow.className = "eyebrow";
-    eyebrow.textContent = `Audit ${auditId}`;
+    eyebrow.textContent = `Audit ${view.auditId}`;
 
     const heading = document.createElement("h3");
-    heading.textContent = badgeValue(badge.target_host, "Target unavailable");
+    heading.textContent = view.target;
 
-    const summary = document.createElement("p");
-    summary.textContent = `Grade ${badgeValue(badge.grade, "--")} | ${scoreLabel(badge.score)} | ${badgeValue(badge.blocked, "--")}/${badgeValue(badge.total, "--")} payloads blocked | issued ${badgeValue(badge.issued_at, "date unavailable")}`;
+    const facts = document.createElement("dl");
+    facts.className = "badge-card-facts";
+    facts.append(
+      createFact("Result", `Grade ${view.grade} · ${view.score}`, false),
+      createFact("Time", view.issuedAt, true),
+      createFact("Target", view.target, false),
+    );
 
-    const state = document.createElement("span");
-    verificationLabel(state, entry?.verified === true);
-    card.append(eyebrow, heading, summary, state);
+    const integrity = document.createElement("span");
+    verificationLabel(
+      integrity,
+      view.verified ? "verified" : "signature-invalid",
+    );
+    card.append(eyebrow, heading, facts, integrity);
     return card;
+  }
+
+  function registryMessage(container, message) {
+    const list = container.querySelector("[data-badge-list]");
+    const state = document.createElement("p");
+    state.className = "empty-state";
+    state.textContent = message;
+    list.replaceChildren(state);
   }
 
   async function loadRegistry(container) {
     const status = document.querySelector("[data-badge-registry-status]");
     const list = container.querySelector("[data-badge-list]");
+    const retry = document.querySelector("[data-badge-registry-retry]");
+    container.dataset.state = "loading";
+    status.textContent = "Loading signed badge records...";
+    retry.hidden = true;
+    retry.disabled = true;
+    registryMessage(container, "Loading registry...");
     try {
       const response = await root.fetch("/api/badges", {
         headers: { accept: "application/json" },
         cache: "no-store",
       });
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        throw new Error(`Registry request failed with HTTP ${response.status}`);
       }
       const payload = await response.json();
-      const badges = Array.isArray(payload.badges) ? payload.badges : [];
-      list.replaceChildren(...badges.map(createBadgeCard));
+      if (!Array.isArray(payload.badges)) {
+        throw new Error("Registry response omitted the badges array");
+      }
+      const badges = payload.badges;
       if (badges.length === 0) {
-        const empty = document.createElement("p");
-        empty.className = "empty-state";
-        empty.textContent = "No issued badges are currently in the registry.";
-        list.replaceChildren(empty);
-      }
-      if (status) {
-        status.textContent = `${badges.length.toLocaleString()} issued badge record${badges.length === 1 ? "" : "s"}. Each result below was verified by the API for this request.`;
-      }
-    } catch {
-      if (status) {
+        container.dataset.state = "empty";
         status.textContent =
-          "The badge registry could not be loaded. Try again after API access is restored.";
+          "No issued badge records are currently in the registry.";
+        registryMessage(
+          container,
+          "Empty registry. A badge appears only after an eligible completed endpoint audit is issued and stored.",
+        );
+        return;
       }
-      if (list) {
-        const error = document.createElement("p");
-        error.className = "empty-state";
-        error.textContent = "Registry unavailable.";
-        list.replaceChildren(error);
-      }
+      container.dataset.state = "ready";
+      list.replaceChildren(...badges.map(createBadgeCard));
+      status.textContent = `${badges.length.toLocaleString()} issued badge record${badges.length === 1 ? "" : "s"}. Integrity was checked by the API for this request.`;
+    } catch (error) {
+      container.dataset.state = "error";
+      status.textContent = `${error.message}.`;
+      registryMessage(
+        container,
+        "Registry unavailable. No verification result is implied.",
+      );
+      retry.hidden = false;
+      retry.disabled = false;
     }
   }
 
+  function setDetailState(container, stateName, statusMessage) {
+    const state = badgeState(stateName);
+    container.dataset.state = stateName;
+    text("[data-badge-heading]", state.heading);
+    text("[data-badge-status]", statusMessage);
+    verificationLabel(
+      document.querySelector("[data-badge-verification]"),
+      stateName,
+    );
+  }
+
+  function resetDetailValues(auditId) {
+    text("[data-badge-audit-id]", auditId || "--");
+    text("[data-badge-target]", "--");
+    text("[data-badge-grade]", "--");
+    text("[data-badge-score]", "--");
+    text("[data-badge-blocked]", "--");
+    text("[data-badge-issued]", "--");
+    text("[data-badge-signature]", "--");
+    text("[data-badge-action-status]", "");
+    detailShareUrl = "";
+    for (const button of document.querySelectorAll(
+      "[data-badge-share], [data-badge-print]",
+    )) {
+      button.disabled = true;
+    }
+  }
+
+  function renderDetail(view) {
+    text("[data-badge-audit-id]", view.auditId);
+    text("[data-badge-target]", view.target);
+    text("[data-badge-grade]", view.grade);
+    text("[data-badge-score]", view.score);
+    text("[data-badge-blocked]", view.blocked);
+    text("[data-badge-issued]", view.issuedAt);
+    text("[data-badge-signature]", view.signature);
+  }
+
   async function loadDetail() {
+    const container = document.querySelector("[data-badge-detail]");
+    const retry = document.querySelector("[data-badge-detail-retry]");
     const auditId = resolveAuditId(
       root.location.search,
       root.location.pathname,
     );
-    const verification = document.querySelector("[data-badge-verification]");
+    resetDetailValues(auditId);
+    retry.hidden = true;
+    retry.disabled = true;
+
     if (!auditId) {
-      text("[data-badge-heading]", "Audit ID required");
-      text(
-        "[data-badge-status]",
-        "Open a badge from the registry or append ?id=<audit_id> to this page.",
+      setDetailState(
+        container,
+        "invalid",
+        "Open a badge from the registry. A verification URL must contain one audit ID.",
       );
-      verificationLabel(verification, false);
       return;
     }
     if (!isValidAuditId(auditId)) {
-      text("[data-badge-heading]", "Invalid audit ID");
-      text(
-        "[data-badge-status]",
+      setDetailState(
+        container,
+        "invalid",
         "Warden audit IDs contain exactly 16 lowercase hexadecimal characters.",
       );
-      verificationLabel(verification, false);
       return;
     }
 
-    text("[data-badge-heading]", `Audit ${auditId}`);
-    text("[data-badge-status]", "Checking the signed record...");
+    setDetailState(container, "loading", "Checking the issued record...");
     try {
       const response = await root.fetch(
         `/badge/${encodeURIComponent(auditId)}`,
@@ -163,61 +322,81 @@
           cache: "no-store",
         },
       );
-      if (!response.ok) {
-        if (response.status === 404) {
-          text(
-            "[data-badge-status]",
-            "No issued badge record exists for this audit ID.",
-          );
-        } else {
-          text(
-            "[data-badge-status]",
-            `Badge lookup failed with HTTP ${response.status}.`,
-          );
-        }
-        verificationLabel(verification, false);
+      if (response.status === 404) {
+        setDetailState(
+          container,
+          "empty",
+          "No issued badge record exists for this audit ID.",
+        );
+        retry.hidden = false;
+        retry.disabled = false;
         return;
+      }
+      if (!response.ok) {
+        throw new Error(`Badge lookup failed with HTTP ${response.status}`);
       }
 
       const payload = await response.json();
-      const badge =
-        payload?.badge && typeof payload.badge === "object"
-          ? payload.badge
-          : {};
-      verificationLabel(verification, payload.verified === true);
-      text(
-        "[data-badge-status]",
-        payload.verified === true
-          ? "The stored record matches its signature."
-          : "The stored record does not match its signature.",
+      const view = badgeViewModel(payload);
+      if (!isValidAuditId(view.auditId) || view.auditId !== auditId) {
+        throw new Error("Badge response did not match the requested audit ID");
+      }
+      renderDetail(view);
+      const stateName = view.verified ? "verified" : "signature-invalid";
+      setDetailState(
+        container,
+        stateName,
+        view.verified
+          ? "The stored public record matches its server-side signature."
+          : "The stored public record does not match its server-side signature.",
       );
-      text("[data-badge-audit-id]", badgeValue(badge.audit_id, auditId));
-      text("[data-badge-target]", badgeValue(badge.target_host, "Unavailable"));
-      text("[data-badge-grade]", badgeValue(badge.grade, "Unavailable"));
-      text("[data-badge-score]", scoreLabel(badge.score));
-      text(
-        "[data-badge-blocked]",
-        `${badgeValue(badge.blocked, "--")} / ${badgeValue(badge.total, "--")}`,
-      );
-      text("[data-badge-issued]", badgeValue(badge.issued_at, "Unavailable"));
-      text(
-        "[data-badge-signature]",
-        badgeValue(badge.signature, "Unavailable"),
-      );
-    } catch {
-      text(
-        "[data-badge-status]",
-        "The badge API could not be reached from this browser.",
-      );
-      verificationLabel(verification, false);
+      detailShareUrl = safeBadgeShareUrl(root.location.href, auditId);
+      for (const button of document.querySelectorAll(
+        "[data-badge-share], [data-badge-print]",
+      )) {
+        button.disabled = false;
+      }
+    } catch (error) {
+      setDetailState(container, "error", `${error.message}.`);
+      retry.hidden = false;
+      retry.disabled = false;
     }
   }
 
   const registry = document.querySelector("[data-badge-registry]");
   if (registry) {
+    document
+      .querySelector("[data-badge-registry-retry]")
+      ?.addEventListener("click", () => loadRegistry(registry));
     loadRegistry(registry);
   }
-  if (document.querySelector("[data-badge-detail]")) {
+
+  const detail = document.querySelector("[data-badge-detail]");
+  if (detail) {
+    document
+      .querySelector("[data-badge-detail-retry]")
+      ?.addEventListener("click", loadDetail);
+    document
+      .querySelector("[data-badge-share]")
+      ?.addEventListener("click", async () => {
+        if (!detailShareUrl) {
+          return;
+        }
+        try {
+          await root.navigator.clipboard.writeText(detailShareUrl);
+          text("[data-badge-action-status]", "Verification URL copied.");
+        } catch (error) {
+          text("[data-badge-action-status]", `Copy failed: ${error.message}`);
+        }
+      });
+    document
+      .querySelector("[data-badge-print]")
+      ?.addEventListener("click", () => {
+        if (!detailShareUrl) {
+          return;
+        }
+        root.print();
+      });
     loadDetail();
   }
 })(typeof globalThis === "undefined" ? this : globalThis);

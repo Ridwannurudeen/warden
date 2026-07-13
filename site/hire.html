@@ -9,6 +9,27 @@
     />
     <meta name="color-scheme" content="dark light" />
     <title>Hire Warden | Reviewable x402 Task Flow</title>
+    <link rel="canonical" href="https://warden.gudman.xyz/hire" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Warden" />
+    <meta
+      property="og:title"
+      content="Hire Warden | Reviewable x402 Task Flow"
+    />
+    <meta
+      property="og:description"
+      content="Hire Warden through the reviewable OKX agent task flow."
+    />
+    <meta property="og:url" content="https://warden.gudman.xyz/hire" />
+    <meta
+      property="og:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
     <link rel="icon" href="/assets/warden-avatar.png" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
@@ -33,16 +54,46 @@
         Menu
       </button>
       <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
-        <a href="/playground">Playground</a><a href="/agents">Agents</a
-        ><a href="/gauntlet">Gauntlet</a
-        ><a href="/hire" aria-current="page">Hire</a><a href="/docs">Docs</a
-        ><a href="/integrate">Integrate</a><a href="/badges">Badges</a>
+        <details class="nav-group">
+          <summary>Product</summary>
+          <div class="nav-menu">
+            <a href="/playground">Playground</a>
+            <a href="/agents">Marketplace index</a>
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/showcase">Judge showcase</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Developers</summary>
+          <div class="nav-menu">
+            <a href="/docs">Documentation</a>
+            <a href="/integrate">Integrate</a>
+            <a href="/status">API status</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Evidence</summary>
+          <div class="nav-menu">
+            <a href="/badges">Audit badges</a>
+            <a href="/agents#methodology">Public-text methodology</a>
+            <a href="/gauntlet#policy">Adversarial challenge</a>
+          </div>
+        </details>
+        <div class="nav-mobile-actions">
+          <a class="button secondary" href="/hire" aria-current="page"
+            >Hire on OKX.AI</a
+          >
+          <a class="button primary" href="/playground">Run a live scan</a>
+        </div>
       </nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status"
+        <a class="status-pill" href="/status" aria-label="Open API status"
           ><span class="live-dot" data-health-dot aria-hidden="true"></span
-          ><span data-health-label>API status</span></a
-        ><button
+          ><span data-health-label>Checking API</span></a
+        >
+        <a class="header-hire" href="/hire" aria-current="page">Hire</a>
+        <a class="header-scan" href="/playground">Run scan</a>
+        <button
           class="theme-toggle"
           type="button"
           data-theme-toggle
@@ -58,9 +109,10 @@
         <p class="eyebrow">Agent operator checkout</p>
         <h1>Hire Warden through the task flow.</h1>
         <p class="hero-text">
-          This six-step route creates a real task, pays the selected x402
-          service, and leaves a verified path for your review after you receive
-          the result.
+          This four-step command builder creates a reviewable task, prepares the
+          selected x402 payment, and leaves feedback locked until you confirm
+          the result. The browser never creates, signs, pays, completes, or
+          reviews a task.
         </p>
         <p class="caveat">
           <strong>Before you begin:</strong> you need an OKX User-role agent
@@ -70,57 +122,189 @@
         </p>
       </section>
 
+      <section class="readiness-panel" aria-labelledby="readiness-title">
+        <div class="section-heading">
+          <p class="eyebrow">Readiness check</p>
+          <h2 id="readiness-title">Confirm the operator boundary first</h2>
+          <p>
+            Every item stays local to this page. Confirm all four before the
+            first command unlocks.
+          </p>
+        </div>
+        <fieldset class="readiness-checklist">
+          <legend>Required operator checks</legend>
+          <label
+            ><input type="checkbox" data-readiness-check /><span
+              >I control the OKX User-role agent identity that will create this
+              task.</span
+            ></label
+          >
+          <label
+            ><input type="checkbox" data-readiness-check /><span
+              >The <code>onchainos</code> CLI is installed and authenticated to
+              that agent.</span
+            ></label
+          >
+          <label
+            ><input type="checkbox" data-readiness-check /><span
+              >My configured X Layer wallet can cover the displayed USDT amount
+              and network fees.</span
+            ></label
+          >
+          <label
+            ><input type="checkbox" data-readiness-check /><span
+              >This request contains no secrets, and I am authorized to test any
+              audit target.</span
+            ></label
+          >
+        </fieldset>
+        <p class="caveat" data-readiness-status aria-live="polite">
+          Four confirmations required.
+        </p>
+      </section>
+
       <section
         class="feature-panel hire-config"
         aria-labelledby="configure-title"
       >
         <p class="eyebrow">Configure</p>
         <h2 id="configure-title">Choose a live marketplace service</h2>
+        <p data-catalog-status aria-live="polite">
+          Loading the normalized service catalog...
+        </p>
+        <button
+          class="button secondary"
+          type="button"
+          data-retry-catalog
+          hidden
+        >
+          Retry service catalog
+        </button>
         <div class="form-grid">
           <label>Service<select data-hire-service></select></label>
           <label
-            >Command shell<select data-shell>
-              <option value="powershell">PowerShell</option>
-              <option value="posix">POSIX shell</option>
-            </select></label
-          >
-          <label
             >Job ID<input
               data-job-id
+              aria-describedby="job-id-help job-id-error"
               autocomplete="off"
-              placeholder="Paste the jobId from step 1"
-          /></label>
+              placeholder="Paste the jobId from step 1" /><span
+              id="job-id-help"
+              class="field-help"
+              >Required from step 2 onward.</span
+            ><span
+              id="job-id-error"
+              class="field-error"
+              data-job-id-error
+              aria-live="polite"
+            ></span
+          ></label>
           <label
             >Your reviewer agent ID<input
               data-reviewer-id
+              aria-describedby="reviewer-id-help reviewer-id-error"
               inputmode="numeric"
               autocomplete="off"
-              placeholder="Your User-role agent ID"
-          /></label>
+              placeholder="Your User-role agent ID" /><span
+              id="reviewer-id-help"
+              class="field-help"
+              >Optional until step 4; Warden identities cannot review
+              Warden.</span
+            ><span
+              id="reviewer-id-error"
+              class="field-error"
+              data-reviewer-id-error
+              aria-live="polite"
+            ></span
+          ></label>
           <label
             >Review score<input
               data-review-score
+              aria-describedby="review-score-error"
               type="number"
               min="0"
               max="5"
               step="0.01"
-              value="5"
-          /></label>
+              value="5" /><span
+              id="review-score-error"
+              class="field-error"
+              data-review-score-error
+              aria-live="polite"
+            ></span
+          ></label>
         </div>
+        <fieldset class="segmented-control" data-shell-group>
+          <legend>Command shell</legend>
+          <div class="segmented-control-options">
+            <label
+              ><input
+                type="radio"
+                name="hire-shell"
+                value="powershell"
+                checked
+              /><span>PowerShell</span></label
+            >
+            <label
+              ><input type="radio" name="hire-shell" value="posix" /><span
+                >POSIX shell</span
+              ></label
+            >
+          </div>
+        </fieldset>
         <label
           >Request body<textarea
             data-request-body
+            aria-describedby="request-body-help request-body-error"
             rows="8"
             spellcheck="false"
           ></textarea>
+          <span id="request-body-help" class="field-help"
+            >Embedded in the generated command and potentially retained in shell
+            history.</span
+          >
+          <span
+            id="request-body-error"
+            class="field-error"
+            data-request-body-error
+            aria-live="polite"
+          ></span>
         </label>
         <p class="caveat">
-          Your request body is embedded in a command and may remain in shell
-          history. Do not submit confidential material.
+          Do not submit confidential material. For endpoint audits, use only a
+          target you are authorized to test.
         </p>
-        <p data-service-summary aria-live="polite">
-          Loading the committed marketplace snapshot...
-        </p>
+        <section class="service-facts" aria-labelledby="service-facts-title">
+          <h3 id="service-facts-title">Selected purchase boundary</h3>
+          <dl class="data-list" data-service-summary aria-live="polite">
+            <div>
+              <dt>Service</dt>
+              <dd data-service-name>Loading</dd>
+            </div>
+            <div>
+              <dt>Service ID</dt>
+              <dd class="num" data-service-id>--</dd>
+            </div>
+            <div>
+              <dt>Price</dt>
+              <dd class="num" data-service-price>--</dd>
+            </div>
+            <div>
+              <dt>Token</dt>
+              <dd><code data-service-token>--</code></dd>
+            </div>
+            <div>
+              <dt>Network</dt>
+              <dd><code data-service-network>--</code></dd>
+            </div>
+            <div>
+              <dt>Endpoint</dt>
+              <dd><code data-service-endpoint>--</code></dd>
+            </div>
+            <div>
+              <dt>Accepted terms</dt>
+              <dd data-service-accepts>Waiting</dd>
+            </div>
+          </dl>
+        </section>
       </section>
 
       <section aria-labelledby="challenge-title">
@@ -131,8 +315,8 @@
           </h2>
           <p>
             Fetched free from Warden's own 402 response. The page validates the
-            endpoint and token against the selected marketplace listing before
-            it builds a payment command.
+            endpoint, network, token, and amount against the selected catalog
+            entry before building any payment command.
           </p>
         </div>
         <div class="console-card">
@@ -141,7 +325,7 @@
           </p>
           <pre><code data-accepts-output>[]</code></pre>
           <button class="button secondary" type="button" data-refresh-accepts>
-            Refresh payment terms
+            Retry current payment terms
           </button>
         </div>
       </section>
@@ -149,34 +333,56 @@
       <section aria-labelledby="steps-title">
         <div class="section-heading">
           <p class="eyebrow">Reviewable checkout</p>
-          <h2 id="steps-title">Run these commands in order</h2>
+          <h2 id="steps-title">Run these four commands in order</h2>
           <p>
-            Copy step 1 first. Paste its returned <code>jobId</code> above to
-            unlock steps 2–4. Only mark the task complete and review Warden
-            after you have received and checked the real verdict.
+            Step 1 unlocks after readiness and payment-term validation. Paste
+            its returned <code>jobId</code> above, then cross the explicit spend
+            boundary for step 2. Completion and review stay locked until you
+            confirm the real verdict.
           </p>
         </div>
         <ol class="command-flow">
-          <li>
-            <h3>Create the task</h3>
+          <li data-command-stage="1">
+            <h3>
+              Create the task
+              <span class="command-stage-state" data-stage-state="1"
+                >Locked</span
+              >
+            </h3>
             <p>
               Opens a private client task designating Agent #3808 and the
               current marketplace service, with a budget and x402 payment mode
               matching the selected service.
             </p>
             <pre><code data-command-step="1">Loading...</code></pre>
-            <button type="button" class="copy-button" data-copy-step="1">
+            <button
+              type="button"
+              class="copy-button"
+              data-copy-step="1"
+              disabled
+            >
               Copy command
             </button>
           </li>
-          <li>
-            <h3>Pay and call Warden</h3>
+          <li data-command-stage="2">
+            <h3>
+              Pay and call Warden
+              <span class="command-stage-state" data-stage-state="2"
+                >Locked</span
+              >
+            </h3>
             <p>
               <strong>This step spends the displayed USDT amount.</strong> It
-              signs the current 402 terms in your configured wallet and replays
-              your request body to the endpoint.
+              asks your configured CLI wallet to sign the current 402 terms and
+              replay the request body to the endpoint.
             </p>
-            <pre><code data-command-step="2">Enter the job ID and load payment terms.</code></pre>
+            <label class="spend-boundary"
+              ><input data-spend-confirmed type="checkbox" /> I understand that
+              running this command asks my CLI wallet to spend
+              <strong data-spend-amount>the selected amount</strong>. Copying it
+              from this page does not sign or pay.</label
+            >
+            <pre><code data-command-step="2">Complete the earlier gates first.</code></pre>
             <button
               type="button"
               class="copy-button"
@@ -186,12 +392,21 @@
               Copy command
             </button>
           </li>
-          <li>
-            <h3>Complete the task</h3>
+          <li data-command-stage="3">
+            <h3>
+              Complete the task
+              <span class="command-stage-state" data-stage-state="3"
+                >Locked</span
+              >
+            </h3>
             <p>
               Use this only after the endpoint returned the result you paid for.
             </p>
-            <pre><code data-command-step="3">Enter the job ID above.</code></pre>
+            <label class="confirmation"
+              ><input data-verdict-confirmed type="checkbox" /> I received and
+              checked Warden's verdict.</label
+            >
+            <pre><code data-command-step="3">Confirm the real verdict first.</code></pre>
             <button
               type="button"
               class="copy-button"
@@ -201,13 +416,18 @@
               Copy command
             </button>
           </li>
-          <li>
-            <h3>Leave an honest review</h3>
+          <li data-command-stage="4">
+            <h3>
+              Leave an honest review
+              <span class="command-stage-state" data-stage-state="4"
+                >Locked</span
+              >
+            </h3>
             <p>
               After checking the verdict, submit a score tied to this completed
               task. Warden never self-reviews or automates feedback.
             </p>
-            <pre><code data-command-step="4">Enter the job ID and your reviewer agent ID above.</code></pre>
+            <pre><code data-command-step="4">Confirm the verdict and enter your reviewer agent ID.</code></pre>
             <button
               type="button"
               class="copy-button"
@@ -218,10 +438,6 @@
             </button>
           </li>
         </ol>
-        <label class="confirmation"
-          ><input data-verdict-confirmed type="checkbox" /> I received and
-          checked Warden's verdict. Unlock completion and review.</label
-        >
         <p class="caveat">
           <strong>Security boundary:</strong> this website never receives wallet
           credentials or signing material. Inspect every generated command
@@ -233,10 +449,13 @@
     <footer class="site-footer page-shell">
       <div>
         <strong>Warden</strong
-        ><span>Deterministic security before autonomous action.</span>
+        ><span>Deterministic security before autonomous action.</span
+        ><span>Independent service listed on OKX.AI.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/status">Status</a><a href="/privacy">Privacy</a
+        <a href="/playground">Run a scan</a><a href="/showcase">Showcase</a
+        ><a href="/docs">Docs</a><a href="/badges">Evidence</a
+        ><a href="/status">Status</a><a href="/privacy">Privacy</a
         ><a href="/terms">Terms</a
         ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
       </nav>

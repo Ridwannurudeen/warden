@@ -56,6 +56,14 @@ def _buyer_review(value: float | None) -> str:
     return f"{formatted} / 5"
 
 
+def _public_text_status(indexed: IndexedAgent) -> tuple[str, str]:
+    if indexed.fields_scanned == 0 or indexed.verdict is None:
+        return "unscanned", "Not scanned — no public text"
+    if indexed.threat_classes:
+        return "signal", "Public-text pattern match"
+    return "none", "No public-text pattern match"
+
+
 def _verified_badge(records: list[dict[str, object]]) -> dict[str, object] | None:
     valid = [record for record in records if verify_badge(record)]
     if not valid:
@@ -128,8 +136,8 @@ def _render_agent_page(
     badge = _verified_badge(badge_records)
     if badge is None:
         audit_status = (
-            '<p class="status-label status-label--pending">Not yet audited</p>'
-            '<a class="button secondary" href="/hire">Get a Warden audit</a>'
+            '<p class="status-label status-label--pending">No linked Warden audit</p>'
+            '<a class="button secondary" href="/hire">Request an authorized endpoint audit</a>'
         )
     else:
         audit_id = _escape(badge.get("audit_id", ""))
@@ -146,8 +154,9 @@ def _render_agent_page(
         else "Marketplace avatar unavailable"
     )
     categories = ", ".join(agent.category_codes) or "Uncategorized"
-    threats = ", ".join(indexed.threat_classes) or "None detected"
+    threats = ", ".join(indexed.threat_classes) or "No public-text signals"
     verdict = indexed.verdict or "NOT_SCANNED"
+    _, public_text_label = _public_text_status(indexed)
     body = f"""
 <section class="agent-hero">
   <div class="agent-avatar" aria-hidden="true">{_escape(_initials(agent.name))}</div>
@@ -165,14 +174,15 @@ def _render_agent_page(
   <div><span>Buyer review average</span><strong class="num">{_buyer_review(agent.security_rate)}</strong></div>
 </section>
 <section class="feature-panel">
-  <p class="eyebrow">Warden public-text scan</p>
-  <h2>{_escape(verdict)}</h2>
+  <p class="eyebrow">Public listing text only</p>
+  <h2>{_escape(public_text_label)}</h2>
   <p>{_escape(indexed.rationale)}</p>
   <dl class="data-list">
+    <div><dt>Warden decision</dt><dd>{_escape(verdict)}</dd></div>
     <div><dt>Threat classes</dt><dd>{_escape(threats)}</dd></div>
     <div><dt>Fields scanned</dt><dd class="num">{indexed.fields_scanned}</dd></div>
   </dl>
-  <p class="caveat"><strong>Scope:</strong> This scans public listing descriptions only. It does not test endpoint behavior and does not certify that an agent is secure.</p>
+  <p class="caveat"><strong>Scope:</strong> This scans only the public profile and service descriptions captured in the dated marketplace snapshot. It does not call the endpoint, establish malicious intent, or certify security.</p>
 </section>
 <section>
   <p class="eyebrow">Independent audit</p>
@@ -191,6 +201,7 @@ def _render_agent_page(
         f"Public listing-text scan for OKX.AI Agent #{agent.agent_id}.",
         body,
         active="agents",
+        canonical_path=f"/agents/{agent.agent_id}",
     )
 
 
@@ -198,6 +209,7 @@ def _render_index_page(
     indexed_agents: list[IndexedAgent],
     fetched_at: str,
     summary: RenderSummary,
+    audited_agent_ids: set[str],
 ) -> str:
     categories = sorted(
         {category for indexed in indexed_agents for category in indexed.agent.category_codes}
@@ -216,13 +228,30 @@ def _render_index_page(
     rows = []
     for indexed in sorted_agents:
         agent = indexed.agent
-        has_match = bool(indexed.threat_classes)
+        match_state, public_text_label = _public_text_status(indexed)
+        audit_state = "audited" if agent.agent_id in audited_agent_ids else "not-audited"
+        audit_label = "Linked signed audit" if audit_state == "audited" else "No linked audit"
+        categories_text = ", ".join(agent.category_codes) or "Uncategorized"
+        category_data = "|".join(agent.category_codes)
+        search_text = " ".join(
+            (
+                agent.agent_id,
+                agent.name,
+                categories_text,
+                public_text_label,
+                " ".join(indexed.threat_classes),
+                audit_label,
+            )
+        )
+        sold_sort = "" if agent.sold_count is None else str(agent.sold_count)
+        review_sort = "" if agent.security_rate is None else str(agent.security_rate)
         rows.append(
-            f"""<a class="agent-row" href="/agents/{_escape(agent.agent_id)}" data-category="{_escape(" ".join(agent.category_codes))}" data-match="{"yes" if has_match else "no"}">
+            f"""<a class="agent-row" href="/agents/{_escape(agent.agent_id)}" data-agent-row data-search="{_escape(search_text)}" data-category="{_escape(category_data)}" data-match="{match_state}" data-audit="{audit_state}" data-name="{_escape(agent.name.casefold())}" data-agent-id="{_escape(agent.agent_id)}" data-sold="{sold_sort}" data-review="{review_sort}">
   <span><strong>{_escape(agent.name or "Unnamed agent")}</strong><small>Agent #{_escape(agent.agent_id)}</small></span>
-  <span data-label="Category">{_escape(", ".join(agent.category_codes) or "Uncategorized")}</span>
+  <span data-label="Category">{_escape(categories_text)}</span>
   <span class="num" data-label="Sold">{_number(agent.sold_count)}</span>
-  <span data-label="Text scan">{_escape(indexed.verdict or "NOT_SCANNED")}</span>
+  <span data-label="Public text"><strong>{_escape(public_text_label)}</strong><small>{_escape(indexed.verdict or "NOT_SCANNED")}</small></span>
+  <span data-label="Endpoint audit"><strong>{audit_label}</strong></span>
   <span class="num" data-label="Buyer reviews">{_buyer_review(agent.security_rate)}</span>
 </a>"""
         )
@@ -232,17 +261,35 @@ def _render_index_page(
 <section class="index-hero">
   <p class="eyebrow">OKX.AI marketplace security index</p>
   <h1><span class="num">{summary.agent_count}</span> {agent_label} indexed</h1>
-  <p class="hero-text">{summary.matched_count} with injection-pattern matches in public text | {summary.audited_count} independently audited.</p>
-  <p class="caveat">All agents returned by the marketplace sweep at {_escape(fetched_at)}. Results cover public listing text only, not endpoint behavior.</p>
+  <p class="hero-text">{summary.matched_count} with deterministic pattern matches in public listing text | {summary.audited_count} with linked signed endpoint-audit records.</p>
+  <p class="caveat"><strong>Public listing text only.</strong> All agents returned by the marketplace sweep at {_escape(fetched_at)}. A text signal is not a finding that an agent is malicious, compromised, or unsafe.</p>
 </section>
-<section class="filter-bar" aria-label="Agent filters">
+<details class="methodology-drawer" id="methodology">
+  <summary>Methodology and evidence boundary</summary>
+  <div class="feature-panel">
+    <h2>What the index checks</h2>
+    <p>Warden runs its deterministic fast path over each captured public profile description and public service description. The dated snapshot supplies names, categories, listing statistics, and service metadata.</p>
+    <h3>What this does not mean</h3>
+    <p>The index does not call agent endpoints, inspect private prompts, prove ownership, establish intent, or provide continuous monitoring. “No public-text pattern match” means only that no implemented fast detector fired on the captured listing fields.</p>
+    <h3>Independent endpoint audits</h3>
+    <p>Audit status is separate. “Linked signed audit” requires a valid Warden badge plus a reviewed audit-to-agent link and matching listed-service host. A badge is point-in-time evidence, not certification.</p>
+    <p><a class="button secondary" href="/hire">Configure an authorized endpoint audit</a></p>
+    <p class="caveat">Audit only a public endpoint you own or are authorized to test. A returned result is not independent proof of target-owner permission.</p>
+  </div>
+</details>
+<section class="filter-bar marketplace-filter-bar" aria-label="Search, filter, and sort agents">
+  <label>Search listings<input type="search" data-agent-search autocomplete="off" placeholder="Name, agent ID, category, or signal"></label>
   <label>Category<select data-agent-category><option value="">All categories</option>{options}</select></label>
-  <label>Public-text match<select data-agent-match><option value="">All results</option><option value="yes">Pattern match</option><option value="no">No match</option></select></label>
+  <label>Public-text signal<select data-agent-match><option value="">All public-text results</option><option value="signal">Pattern match</option><option value="none">No pattern match</option><option value="unscanned">No public text to scan</option></select></label>
+  <label>Endpoint audit<select data-agent-audit><option value="">All audit states</option><option value="audited">Linked signed audit</option><option value="not-audited">No linked audit</option></select></label>
+  <label>Sort<select data-agent-sort><option value="sold-desc">Sold count, high to low</option><option value="name-asc">Name, A to Z</option><option value="review-desc">Buyer review, high to low</option><option value="signal-first">Public-text signals first</option><option value="audit-first">Linked audits first</option></select></label>
+  <button class="button secondary" type="button" data-agent-reset>Clear filters</button>
 </section>
 <section>
-  <p class="snapshot-note"><span class="num" data-agent-visible>{summary.agent_count}</span> agents visible</p>
-  <div class="agent-row agent-row--header" aria-hidden="true"><span>Agent</span><span>Category</span><span>Sold</span><span>Text scan</span><span>Buyer review average</span></div>
+  <p class="snapshot-note" aria-live="polite"><span class="num" data-agent-visible>{summary.agent_count}</span> agents visible</p>
+  <div class="agent-row agent-row--header" aria-hidden="true"><span>Agent</span><span>Category</span><span>Sold</span><span>Public listing text</span><span>Endpoint audit</span><span>Buyer review average</span></div>
   <div data-agent-results>{"".join(rows)}</div>
+  <p class="empty-state" data-agent-empty hidden>No marketplace listings match these filters. Clear a filter to restore the full dated snapshot.</p>
 </section>
 """
     return page_shell(
@@ -250,6 +297,8 @@ def _render_index_page(
         "Public listing-text scans for agents returned by the OKX.AI marketplace sweep.",
         body,
         active="agents",
+        scripts=("agents.js",),
+        canonical_path="/agents",
     )
 
 
@@ -268,10 +317,12 @@ def render_marketplace(
             existing.unlink()
 
     audited_count = 0
+    audited_agent_ids: set[str] = set()
     for indexed in indexed_agents:
         records = badges.get(indexed.agent.agent_id, [])
         if _verified_badge(records) is not None:
             audited_count += 1
+            audited_agent_ids.add(indexed.agent.agent_id)
         page = _render_agent_page(indexed, fetched_at, records)
         (output_dir / f"{indexed.agent.agent_id}.html").write_text(page, encoding="utf-8")
 
@@ -280,6 +331,6 @@ def render_marketplace(
         matched_count=sum(bool(indexed.threat_classes) for indexed in indexed_agents),
         audited_count=audited_count,
     )
-    index_page = _render_index_page(indexed_agents, fetched_at, summary)
+    index_page = _render_index_page(indexed_agents, fetched_at, summary, audited_agent_ids)
     (output_dir / "index.html").write_text(index_page, encoding="utf-8")
     return summary

@@ -1,53 +1,215 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Browse issued Warden endpoint-audit badges and verify each record against its server-side signature.">
-    <meta name="color-scheme" content="dark light">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Browse issued Warden endpoint-audit badges and verify each record against its server-side signature."
+    />
+    <meta name="color-scheme" content="dark light" />
     <title>Audit Badge Registry | Warden</title>
-    <link rel="icon" href="/assets/warden-avatar.png">
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="canonical" href="https://warden.gudman.xyz/badges" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Warden" />
+    <meta property="og:title" content="Audit Badge Registry | Warden" />
+    <meta
+      property="og:description"
+      content="Browse issued Warden endpoint-audit badges and verify each record against its server-side signature."
+    />
+    <meta property="og:url" content="https://warden.gudman.xyz/badges" />
+    <meta
+      property="og:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <link rel="icon" href="/assets/warden-avatar.png" />
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
-      <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
-      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
-      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><a href="/playground">Playground</a><a href="/agents">Agents</a><a href="/gauntlet">Gauntlet</a><a href="/hire">Hire</a><a href="/docs">Docs</a><a href="/integrate">Integrate</a><a href="/badges" aria-current="page">Badges</a></nav>
-      <div class="header-actions"><a class="status-pill" href="/status"><span class="live-dot" data-health-dot aria-hidden="true"></span><span data-health-label>API status</span></a><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button></div>
+      <a class="brand" href="/" aria-label="Warden home"
+        ><img
+          src="/assets/warden-avatar.png"
+          alt=""
+          width="36"
+          height="36"
+        /><span>Warden</span></a
+      >
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-nav"
+        data-nav-toggle
+      >
+        Menu
+      </button>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
+        <details class="nav-group">
+          <summary>Product</summary>
+          <div class="nav-menu">
+            <a href="/playground">Playground</a>
+            <a href="/agents">Marketplace index</a>
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/showcase">Judge showcase</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Developers</summary>
+          <div class="nav-menu">
+            <a href="/docs">Documentation</a>
+            <a href="/integrate">Integrate</a>
+            <a href="/status">API status</a>
+          </div>
+        </details>
+        <details class="nav-group has-current">
+          <summary>Evidence</summary>
+          <div class="nav-menu">
+            <a href="/badges" aria-current="page">Audit badges</a>
+            <a href="/agents#methodology">Public-text methodology</a>
+            <a href="/gauntlet#policy">Adversarial challenge</a>
+          </div>
+        </details>
+        <div class="nav-mobile-actions">
+          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
+          <a class="button primary" href="/playground">Run a live scan</a>
+        </div>
+      </nav>
+      <div class="header-actions">
+        <a class="status-pill" href="/status" aria-label="Open API status"
+          ><span class="live-dot" data-health-dot aria-hidden="true"></span
+          ><span data-health-label>Checking API</span></a
+        >
+        <a class="header-hire" href="/hire">Hire</a>
+        <a class="header-scan" href="/playground">Run scan</a>
+        <button
+          class="theme-toggle"
+          type="button"
+          data-theme-toggle
+          aria-label="Switch color theme"
+        >
+          Theme
+        </button>
+      </div>
     </header>
 
     <main id="main" class="page-shell site-main">
       <section class="page-hero">
         <p class="eyebrow">Signed audit evidence</p>
-        <h1>Every issued badge, verified when this page loads.</h1>
-        <p class="hero-text">The registry calls <code>GET /api/badges</code>. Warden checks each HMAC signature server-side and returns the public badge record with its current verification result.</p>
+        <h1>Inspect issued records and their current integrity result.</h1>
+        <p class="hero-text">
+          The registry calls <code>GET /api/badges</code>. Warden checks each
+          stored record's HMAC signature server-side and returns public audit
+          evidence only when the request succeeds.
+        </p>
       </section>
 
       <section class="proof-strip" aria-label="Badge registry boundaries">
-        <div><span>Evidence type</span><strong>Point-in-time audit</strong></div>
-        <div><span>Integrity check</span><strong>Per-record signature</strong></div>
-        <div><span>Audit battery</span><strong class="num">20 payloads</strong></div>
+        <div>
+          <span>Evidence type</span><strong>Point-in-time audit</strong>
+        </div>
+        <div>
+          <span>Integrity check</span><strong>Per-record signature</strong>
+        </div>
+        <div>
+          <span>Audit battery</span><strong class="num">20 payloads</strong>
+        </div>
         <div><span>Security guarantee</span><strong>None implied</strong></div>
+      </section>
+
+      <section aria-labelledby="badge-process-title">
+        <div class="section-heading">
+          <p class="eyebrow">Before the registry</p>
+          <h2 id="badge-process-title">How an audit becomes a badge</h2>
+          <p>
+            A badge is a signed record of one completed endpoint-audit result.
+            It is not a live monitor or a security certification.
+          </p>
+        </div>
+        <ol class="badge-process">
+          <li>
+            <span>01</span><strong>Attest authorization and run</strong>
+            <p>
+              The caller must own or be authorized to test the public target;
+              the returned audit is not independent proof of permission.
+            </p>
+          </li>
+          <li>
+            <span>02</span><strong>Record the result</strong>
+            <p>
+              An eligible completed audit stores its target, result, issue time,
+              and signature.
+            </p>
+          </li>
+          <li>
+            <span>03</span><strong>Verify integrity</strong>
+            <p>
+              The API recomputes the server-side signature for each registry
+              request.
+            </p>
+          </li>
+          <li>
+            <span>04</span><strong>Read the boundaries</strong>
+            <p>
+              Target, result, time, and integrity remain separate facts on the
+              detail page.
+            </p>
+          </li>
+        </ol>
       </section>
 
       <section data-badge-registry>
         <div class="section-heading">
           <p class="eyebrow">Issued records</p>
           <h2>Public endpoint-audit registry</h2>
-          <p class="section-copy" data-badge-registry-status aria-live="polite">Loading signed badge records...</p>
+          <p class="section-copy" data-badge-registry-status aria-live="polite">
+            Loading signed badge records...
+          </p>
+          <button
+            class="button secondary"
+            type="button"
+            data-badge-registry-retry
+            hidden
+          >
+            Retry registry
+          </button>
         </div>
         <div class="badge-grid" data-badge-list></div>
-        <noscript><p class="empty-state">JavaScript is required to load and verify the badge registry.</p></noscript>
+        <noscript
+          ><p class="empty-state">
+            JavaScript is required to load and verify the badge registry.
+          </p></noscript
+        >
       </section>
 
       <aside class="callout">
-        A valid signature proves that the displayed record was issued by the Warden instance holding the configured badge key. It does not prove permanent safety, ownership of the target, or protection against attacks outside the tested battery.
+        A valid signature proves that the displayed record was issued by the
+        Warden instance holding the configured badge key. It does not prove
+        permanent safety, ownership of the target, or protection against attacks
+        outside the tested battery.
       </aside>
     </main>
 
-    <footer class="site-footer page-shell"><div><strong>Warden</strong><span>Deterministic security before autonomous action.</span></div><nav aria-label="Footer"><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav></footer>
+    <footer class="site-footer page-shell">
+      <div>
+        <strong>Warden</strong
+        ><span>Deterministic security before autonomous action.</span
+        ><span>Independent service listed on OKX.AI.</span>
+      </div>
+      <nav aria-label="Footer">
+        <a href="/playground">Run a scan</a><a href="/showcase">Showcase</a
+        ><a href="/docs">Docs</a><a href="/badges">Evidence</a
+        ><a href="/status">Status</a><a href="/privacy">Privacy</a
+        ><a href="/terms">Terms</a
+        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+      </nav>
+    </footer>
     <script src="/app.js" defer></script>
     <script src="/badge.js" defer></script>
   </body>

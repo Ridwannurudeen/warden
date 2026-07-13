@@ -184,6 +184,7 @@ def test_renderer_escapes_content_handles_zero_services_and_verifies_badge(tmp_p
     assert "Buyer review average" in agent_html
     assert "1</span> agent indexed" in index_html
     assert 'src="http' not in agent_html
+    assert 'rel="canonical" href="https://warden.gudman.xyz/agents/3808"' in agent_html
 
 
 def test_renderer_does_not_attach_tampered_badge(tmp_path, monkeypatch):
@@ -213,7 +214,81 @@ def test_renderer_does_not_attach_tampered_badge(tmp_path, monkeypatch):
         badge_records={"3808": [badge]},
     )
 
-    assert "Not yet audited" in (tmp_path / "3808.html").read_text(encoding="utf-8")
+    assert "No linked Warden audit" in (tmp_path / "3808.html").read_text(encoding="utf-8")
+
+
+def test_marketplace_index_renders_search_filters_sorting_and_separate_evidence_states(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("WARDEN_BADGE_SECRET", "marketplace-controls-test-key")
+    badge = issue_badge(
+        target_host="signal.example.org",
+        score=90,
+        grade="A",
+        blocked=18,
+        total=20,
+        issued_at="2026-07-13",
+    )
+    signal = IndexedAgent(
+        agent=_agent(
+            agentId="7",
+            name="Signal Agent",
+            categoryCode=["SECURITY", "SOFTWARE_SERVICES"],
+            soldCount=12,
+            securityRate=4.5,
+        ),
+        verdict="SANITIZE",
+        risk_level="LOW",
+        threat_classes=["TOOL_HIJACK"],
+        fields_scanned=1,
+        rationale="Public listing text contains a tool-shaped pattern.",
+    )
+    unscanned = IndexedAgent(
+        agent=_agent(
+            agentId="8",
+            name="No Description Agent",
+            profileDescription="",
+            categoryCode=[],
+            soldCount=None,
+            securityRate=None,
+        ),
+        verdict=None,
+        risk_level=None,
+        threat_classes=[],
+        fields_scanned=0,
+        rationale="No public description text was available to scan.",
+    )
+
+    render_marketplace(
+        [signal, unscanned],
+        tmp_path,
+        fetched_at="2026-07-13T15:30:00Z",
+        badge_records={"7": [badge]},
+    )
+    index_html = (tmp_path / "index.html").read_text(encoding="utf-8")
+
+    for control in (
+        "data-agent-search",
+        "data-agent-category",
+        "data-agent-match",
+        "data-agent-audit",
+        "data-agent-sort",
+        "data-agent-reset",
+        "data-agent-empty",
+    ):
+        assert control in index_html
+    assert 'data-match="signal"' in index_html
+    assert 'data-match="unscanned"' in index_html
+    assert 'data-audit="audited"' in index_html
+    assert 'data-audit="not-audited"' in index_html
+    assert "Public listing text only" in index_html
+    assert "What this does not mean" in index_html
+    assert 'id="methodology"' in index_html
+    assert "Linked signed audit" in index_html
+    assert "Configure an authorized endpoint audit" in index_html
+    assert 'href="/hire"' in index_html
+    assert 'aria-label="Open public listing-text record' not in index_html
+    assert '<script src="/agents.js" defer></script>' in index_html
 
 
 @pytest.mark.asyncio
@@ -304,9 +379,7 @@ def test_badge_association_requires_an_explicit_reviewed_link(monkeypatch):
     )
 
     assert associate_badges(indexed, [badge], {}) == {}
-    assert associate_badges(indexed, [badge], {str(badge["audit_id"]): "3808"}) == {
-        "3808": [badge]
-    }
+    assert associate_badges(indexed, [badge], {str(badge["audit_id"]): "3808"}) == {"3808": [badge]}
 
 
 def test_badge_link_manifest_rejects_conflicting_agent_ownership(tmp_path):

@@ -7,9 +7,12 @@ const test = require("node:test");
 
 const {
   buildCommands,
+  commandAvailability,
+  isCurrentHireRequest,
   parsePaymentResponse,
   parsePaymentRequiredHeader,
   quoteArgument,
+  validateHireInputs,
 } = require(path.join(__dirname, "..", "..", "site", "hire.js"));
 
 const fixture = JSON.parse(
@@ -22,7 +25,7 @@ const fixture = JSON.parse(
 const services = {
   scan: {
     key: "scan",
-    serviceId: "31669",
+    serviceId: "33460",
     serviceName: "Payload Security Scan",
     serviceType: "A2MCP",
     endpoint: "https://warden.gudman.xyz/scan",
@@ -38,11 +41,11 @@ const services = {
   },
   audit: {
     key: "audit",
-    serviceId: "31670",
+    serviceId: "33461",
     serviceName: "Agent Endpoint Security Audit",
     serviceType: "A2MCP",
     endpoint: "https://warden.gudman.xyz/audit",
-    feeAmount: "15",
+    feeAmount: "0.5",
     feeTokenAddress: "0x779ded0c9e1022225f8e0630b35a9b54be713736",
     taskTitle: "Warden endpoint audit",
     taskDescription: "Audit an agent endpoint with Warden",
@@ -69,6 +72,12 @@ test("payment-required fixture decodes and validates for both live services", ()
   }
 });
 
+test("stale payment terms cannot replace the newly selected service", () => {
+  assert.equal(isCurrentHireRequest(1, 2, "33460", "33461"), false);
+  assert.equal(isCurrentHireRequest(2, 2, "33460", "33461"), false);
+  assert.equal(isCurrentHireRequest(2, 2, "33461", "33461"), true);
+});
+
 test("commands use the selected snapshot service and complete the reviewable task flow", () => {
   for (const name of ["scan", "audit"]) {
     const service = services[name];
@@ -80,6 +89,7 @@ test("commands use the selected snapshot service and complete the reviewable tas
       reviewerAgentId: "9876",
       score: "5",
       shell: "powershell",
+      spendConfirmed: true,
       verdictConfirmed: true,
     });
 
@@ -175,10 +185,97 @@ test("completion and review stay locked until the buyer confirms a verdict", () 
     reviewerAgentId: "9876",
     score: "5",
     shell: "powershell",
+    spendConfirmed: true,
     verdictConfirmed: false,
   });
   assert.equal(commands[2], null);
   assert.equal(commands[3], null);
+});
+
+test("payment and later commands stay absent until spend is confirmed", () => {
+  const commands = buildCommands({
+    providerAgentId: "3808",
+    service: services.scan,
+    accepts: fixture.scan.accepts,
+    jobId: "job-123",
+    reviewerAgentId: "9876",
+    score: "5",
+    shell: "powershell",
+    spendConfirmed: false,
+    verdictConfirmed: true,
+  });
+  assert.deepEqual(commands.slice(1), [null, null, null]);
+});
+
+test("command availability advances through readiness, spend, verdict, and reviewer gates", () => {
+  const base = {
+    catalogReady: true,
+    paymentTermsReady: true,
+    readinessConfirmed: true,
+    requestValid: true,
+    hasJobId: false,
+    spendConfirmed: false,
+    verdictConfirmed: false,
+    hasReviewerAgentId: false,
+  };
+
+  assert.deepEqual(commandAvailability(base), {
+    create: true,
+    pay: false,
+    complete: false,
+    review: false,
+  });
+  assert.deepEqual(
+    commandAvailability({
+      ...base,
+      hasJobId: true,
+      spendConfirmed: true,
+    }),
+    { create: true, pay: true, complete: false, review: false },
+  );
+  assert.deepEqual(
+    commandAvailability({
+      ...base,
+      hasJobId: true,
+      spendConfirmed: true,
+      verdictConfirmed: true,
+      hasReviewerAgentId: true,
+    }),
+    { create: true, pay: true, complete: true, review: true },
+  );
+  assert.equal(
+    commandAvailability({ ...base, readinessConfirmed: false }).create,
+    false,
+  );
+});
+
+test("hire input validation returns field-specific errors without weakening command checks", () => {
+  const invalid = validateHireInputs({
+    providerAgentId: "3808",
+    service: services.audit,
+    requestBodyText:
+      '{"target_url":"https://user:password@example.com","sample_prompts":[]}',
+    jobId: "job\nsecond-command",
+    reviewerAgentId: "03808",
+    score: "5.01",
+  });
+
+  assert.equal(invalid.valid, false);
+  assert.match(invalid.errors.requestBody, /credentials/);
+  assert.match(invalid.errors.jobId, /single line/);
+  assert.match(invalid.errors.reviewerAgentId, /must not review/);
+  assert.match(invalid.errors.score, /between 0 and 5/);
+
+  const valid = validateHireInputs({
+    providerAgentId: "3808",
+    service: services.scan,
+    requestBodyText: JSON.stringify(services.scan.requestBody),
+    jobId: "job-123",
+    reviewerAgentId: "9876",
+    score: "4.75",
+  });
+  assert.equal(valid.valid, true);
+  assert.deepEqual(valid.requestBody, services.scan.requestBody);
 });
 
 test("command generation rejects invalid or self-dealing reviewer identities", () => {
