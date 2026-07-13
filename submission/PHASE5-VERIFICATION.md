@@ -56,10 +56,16 @@ sponsored path. This is the single biggest constraint on the website-as-checkout
 
 **ANSWER: YES — and the data is richer than expected.**
 
-- `onchainos agent search --query "a" --page N --page-size 100` paginates cleanly.
-  Page size caps at 100. Pages 1–8 return results; **page 9 returns 0 → the set is exhausted.**
-- **374 unique agents** enumerated (the marketplace has grown well past the 228 figure Factor
-  is citing publicly this week).
+- `onchainos agent search --query "a" --page N --page-size 100` paginates cleanly, and always
+  terminates (an empty page reliably signals exhaustion).
+- **⚠ RE-VERIFIED same day, ~2h later: the count and exhaustion page are NOT stable.** First sweep
+  (morning): pages 1–8 had data, page 9 = 0, 374 unique IDs. Second sweep (afternoon, same method):
+  pages 1–4 had data (100+100+100+73=373), page 5 = 0, and the unique-ID set had **shifted** —
+  8 IDs from the morning sweep were gone, 1 new ID appeared (367 overlap). **This is a live
+  marketplace with agents listing/delisting continuously — treat any specific count (374, 373,
+  "exhausts at page N") as a snapshot valid only at fetch time, never a hardcoded constant.**
+  The generator (Item 2 in the build brief) must paginate until it sees an empty page **at build
+  time**, not assume a fixed page count.
 
 Each record carries: `agentId`, `name`, `profileDescription`, `categoryCode`, `soldCount`,
 `feedbackRate`, `securityRate`, `onlineStatus`, `profilePicture`, `communicationAddress`, and a

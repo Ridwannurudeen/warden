@@ -1,6 +1,7 @@
 # Warden Phase 5 — Codex Build Brief (The Marketplace Security Index)
 
-**Branch:** create `phase5-web-platform` off `master` (currently `beb2b34`, 57 tests green, ruff clean).
+**Branch:** create `phase5-web-platform` off `master` (currently `beb2b34`, **74 tests green** —
+re-verified 2026-07-13, corrects an earlier 57 count from Phase-3 that's now stale — ruff clean).
 
 **Read `submission/PHASE5-VERIFICATION.md` before writing a line.** Every strategic claim in this
 brief was verified live on 2026-07-13 against the OKX `onchainos` CLI v4.1.0, the live
@@ -14,12 +15,14 @@ or second-guess those findings; do verify any *code* fact you depend on.
 The website is currently a brochure: `site/app.js:67` calls exactly one endpoint (`GET /health`).
 Every actual capability we have — an 11-class deterministic engine, a 92-attack corpus, HMAC-signed
 badges, a live attack-battery auditor — is invisible and unusable from the web. Meanwhile we
-verified that **all 374 agents on the OKX.AI marketplace are publicly enumerable, with their live
-endpoints and descriptions**, and that **only the task flow (not raw x402) can ever earn us a
-review** — reviews being an explicit Highest Revenue judging criterion. Phase 5 turns the website
-into the security index *of the marketplace it sells into*: a page for every agent, a real
-task-flow checkout, and a staked public challenge. That is the thing no competitor can replicate,
-because it compounds on data and a deterministic engine that only we have.
+verified that **every agent on the OKX.AI marketplace is publicly enumerable, with live
+endpoints and descriptions** (the count fluctuates live — 374 in one sweep, 373 with 8 IDs churned
+out and 1 new one 2h later; treat it as "however many exist at fetch time," never a hardcoded
+number), and that **only the task flow (not raw x402) can ever earn us a review** — reviews being
+an explicit Highest Revenue judging criterion. Phase 5 turns the website into the security index
+*of the marketplace it sells into*: a page for every agent, a real task-flow checkout, and a
+staked public challenge. That is the thing no competitor can replicate, because it compounds on
+data and a deterministic engine that only we have.
 
 ## Standing constraints (same as Phases 2–4 — these are hard)
 
@@ -95,8 +98,12 @@ Enumerate all agents via the OKX CLI (verified working, 2026-07-13):
 onchainos agent search --query "a" --page <N> --page-size 100
 ```
 
-Verified behaviour — rely on it, but re-confirm before trusting: page size caps at 100, pages 1–8
-return data, **page 9 returns 0 → the set is exhausted at 374 unique agents**. Deduplicate by
+Verified behaviour: page size caps at 100, and an **empty page reliably signals exhaustion** —
+paginate until you see one. **Do NOT hardcode a page count or agent total.** Re-verified same-day,
+~2h apart: first sweep exhausted at page 9 with 374 unique IDs; second sweep exhausted at page 5
+with 373 IDs, 8 of the original IDs gone and 1 new one present (367 overlap). This is a live
+marketplace — agents list/delist continuously. The fetch module must paginate to exhaustion **at
+run time** and record whatever count it actually finds, with a fetch timestamp. Deduplicate by
 `agentId`.
 
 Each record gives you (all verified present): `agentId`, `name`, `profileDescription`,
@@ -138,11 +145,13 @@ public text, 0 independently audited.*
 
 **Generation is a build step, not a request-time path.** A script (`scripts/build_index.py` or a
 Makefile-style entry — match whatever the repo already does) regenerates `site/agents/`. Commit the
-generator; **do not commit 374 generated HTML files** unless they are small and clean — decide, and
-say which you chose in the handoff.
+generator; **do not commit the full set of generated per-agent HTML files** (currently on the order
+of ~370, and it changes) unless they're small and clean — decide, and say which you chose in the
+handoff.
 
 **2d. The distribution hook.** The whole point: this becomes one X post — *"We scanned every agent
-on OKX.AI. Find yours."* — where all 374 operators have a personalised page waiting. Draft the post
+on OKX.AI. Find yours."* — where every operator listed at generation time has a personalised page
+waiting. Draft the post
 copy into `submission/x-thread.md` (append; don't rewrite what's there). Do **not** post it.
 
 **⚠ Framing constraint (non-negotiable):** aggregate stats and per-agent pages are fine; a
