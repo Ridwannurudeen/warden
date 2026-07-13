@@ -1,0 +1,48 @@
+{
+  "scan": {
+    "x402Version": 2,
+    "error": "Payment required",
+    "resource": {
+      "url": "https://warden.gudman.xyz/scan",
+      "description": "Warden payload security scan",
+      "mimeType": "application/json"
+    },
+    "accepts": [
+      {
+        "scheme": "exact",
+        "network": "eip155:196",
+        "asset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+        "amount": "10000",
+        "payTo": "0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51",
+        "maxTimeoutSeconds": 300,
+        "extra": {
+          "name": "USDT",
+          "version": "1"
+        }
+      }
+    ]
+  },
+  "audit": {
+    "x402Version": 2,
+    "error": "Payment required",
+    "resource": {
+      "url": "https://warden.gudman.xyz/audit",
+      "description": "Warden agent endpoint security audit",
+      "mimeType": "application/json"
+    },
+    "accepts": [
+      {
+        "scheme": "exact",
+        "network": "eip155:196",
+        "asset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+        "amount": "15000000",
+        "payTo": "0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51",
+        "maxTimeoutSeconds": 300,
+        "extra": {
+          "name": "USDT",
+          "version": "1"
+        }
+      }
+    ]
+  }
+}
