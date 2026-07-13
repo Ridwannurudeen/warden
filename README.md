@@ -149,8 +149,13 @@ The verdict path constructs `InjectionScanner(ai_analyzer=None)`, so the corpus-
 python -m pip install -e ".[dev]"
 python scripts/build_site.py && python scripts/build_index.py
 python -m pytest -q && node --test tests/js/*.test.js && python -m ruff check .
-python -m uvicorn warden.api:app --host 127.0.0.1 --port 8031
+python -m uvicorn scripts.preview_site:app --host 127.0.0.1 --port 8031
 ```
+
+The preview entry point serves the full site and local API on one origin with the same clean public
+route boundaries used by the production Nginx configuration. It also applies the production
+security headers that are safe on local HTTP; HSTS and CSP HTTPS upgrades remain production-only.
+Use `warden.api:app` instead when you need the API alone.
 
 ### Try It Without Installing
 
@@ -257,7 +262,8 @@ python -m pytest tests/test_corpus.py -q     # deterministic corpus and false-po
 python -m ruff check .                       # lint gate
 python scripts/build_site.py                 # regenerate reason-code documentation
 python scripts/build_index.py                # rebuild from the committed marketplace snapshot
-python -m uvicorn warden.api:app --reload    # local API server
+python -m uvicorn scripts.preview_site:app --reload # full site and local API
+python -m uvicorn warden.api:app --reload    # local API only
 python demo/run_demo.py --mode local         # no-funds recording demo
 ```
 

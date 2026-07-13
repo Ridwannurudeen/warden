@@ -194,9 +194,131 @@ def test_shared_styles_support_light_dark_mobile_and_new_surfaces():
     ):
         assert selector in css
     assert "prefers-reduced-motion: reduce" in css
-    assert "prefers-reduced-motion: reduce" in (SITE / "showcase.js").read_text(
-        encoding="utf-8"
+    assert "prefers-reduced-motion: reduce" in (SITE / "showcase.js").read_text(encoding="utf-8")
+
+
+def test_marketplace_rows_and_mobile_navigation_fit_narrow_viewports():
+    css = (SITE / "styles.css").read_text(encoding="utf-8")
+    app = (SITE / "app.js").read_text(encoding="utf-8")
+
+    card_layout = re.search(
+        r"@media \(max-width: 900px\) \{(?P<body>.*?)\n\}\n\n@media \(max-width: 780px\)",
+        css,
+        re.DOTALL,
     )
+    assert card_layout
+    assert ".agent-row--header" in card_layout.group("body")
+    assert "display: none" in card_layout.group("body")
+    assert ".agent-row [data-label]::before" in card_layout.group("body")
+    assert re.search(
+        r"\.agent-row > \*\s*\{[^}]*min-width:\s*0;[^}]*overflow-wrap:\s*anywhere;",
+        css,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"\.hero-text,\s*\.service-card p\s*\{[^}]*overflow-wrap:\s*anywhere;",
+        css,
+        re.DOTALL,
+    )
+
+    mobile_navigation = re.search(
+        r"@media \(max-width: 1060px\) \{(?P<body>.*?)\n\}\n\n@media \(max-width: 900px\)",
+        css,
+        re.DOTALL,
+    )
+    assert mobile_navigation
+    assert "overscroll-behavior: contain" in mobile_navigation.group("body")
+    assert "body.nav-open" in mobile_navigation.group("body")
+    assert ".nav-close" in mobile_navigation.group("body")
+    assert ".js-enabled .site-nav" in mobile_navigation.group("body")
+
+    focusables = re.search(
+        r"function focusableNavigationElements\(\) \{(?P<body>.*?)\n    \}",
+        app,
+        re.DOTALL,
+    )
+    assert focusables
+    assert "siteNav.querySelectorAll" in focusables.group("body")
+    assert "navToggle," not in focusables.group("body")
+    assert "element.getClientRects().length > 0" in focusables.group("body")
+    assert 'navClose.className = "nav-close"' in app
+    assert "siteNav.prepend(navClose)" in app
+    assert 'navClose.addEventListener("click"' in app
+    assert 'document.documentElement.classList.add("js-enabled")' in app
+    assert "element.inert = isolated" in app
+
+
+def test_shared_styles_meet_wcag_contrast_contract():
+    css = (SITE / "styles.css").read_text(encoding="utf-8")
+
+    def theme_tokens(selector):
+        match = re.search(
+            rf"{re.escape(selector)}\s*\{{(?P<body>.*?)\n\}}",
+            css,
+            re.DOTALL,
+        )
+        assert match, selector
+        return dict(re.findall(r"--([a-z-]+):\s*(#[0-9a-fA-F]{6});", match.group("body")))
+
+    def relative_luminance(color):
+        channels = [int(color[index : index + 2], 16) / 255 for index in (1, 3, 5)]
+        linear = [
+            channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+            for channel in channels
+        ]
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+    def contrast_ratio(foreground, background):
+        luminances = sorted(
+            (relative_luminance(foreground), relative_luminance(background)),
+            reverse=True,
+        )
+        return (luminances[0] + 0.05) / (luminances[1] + 0.05)
+
+    dark = theme_tokens(":root")
+    light = {**dark, **theme_tokens(':root[data-theme="light"]')}
+    required_tokens = {
+        "on-cyan",
+        "on-danger",
+        "on-mint",
+        "on-amber",
+        "control-border",
+    }
+    assert required_tokens <= dark.keys()
+    assert required_tokens <= light.keys()
+
+    text_pairs = (
+        ("on-cyan", "cyan-bright"),
+        ("on-danger", "danger"),
+        ("on-mint", "mint"),
+        ("on-amber", "amber"),
+        ("faint", "bg-deep"),
+        ("faint", "surface-soft"),
+    )
+    control_backgrounds = ("surface-raised", "surface", "bg", "bg-deep")
+    for theme_name, tokens in (("dark", dark), ("light", light)):
+        for foreground, background in text_pairs:
+            ratio = contrast_ratio(tokens[foreground], tokens[background])
+            assert ratio >= 4.5, f"{theme_name} {foreground}/{background}: {ratio:.3f}"
+        for background in control_backgrounds:
+            ratio = contrast_ratio(tokens["control-border"], tokens[background])
+            assert ratio >= 3, f"{theme_name} control-border/{background}: {ratio:.3f}"
+
+    selector_contracts = (
+        r"\.button\.primary\s*\{[^}]*color: var\(--on-cyan\);[^}]*background: var\(--cyan-bright\)",
+        r"\.verdict-badge,\s*\.status-label\s*\{[^}]*color: var\(--on-danger\);[^}]*background: var\(--danger\)",
+        r"\.status-label--allow\s*\{[^}]*color: var\(--on-mint\);[^}]*background: var\(--mint\)",
+        r"\.status-label--pending\s*\{[^}]*color: var\(--on-amber\);[^}]*background: var\(--amber\)",
+        r"\.status-label--sanitize\s*\{[^}]*color: var\(--on-amber\);[^}]*background: var\(--sanitize\)",
+        r"\.risk-label--none,\s*\.risk-label--low\s*\{[^}]*color: var\(--on-mint\);[^}]*background: var\(--mint\)",
+        r"\.risk-label--medium\s*\{[^}]*color: var\(--on-amber\);[^}]*background: var\(--amber\)",
+        r"\.risk-label--high,\s*\.risk-label--critical\s*\{[^}]*color: var\(--on-danger\);[^}]*background: var\(--danger\)",
+        r"\.receipt-state\s*\{[^}]*color: var\(--on-cyan\);[^}]*background: var\(--cyan-bright\)",
+        r"\.receipt-state--detected\s*\{[^}]*color: var\(--on-danger\);[^}]*background: var\(--danger\)",
+        r"\.receipt-state--candidate\s*\{[^}]*color: var\(--on-amber\);[^}]*background: var\(--amber\)",
+        r"input,\s*select,\s*textarea\s*\{[^}]*border: 1px solid var\(--control-border\)",
+    )
+    assert all(re.search(pattern, css, re.DOTALL) for pattern in selector_contracts)
 
 
 def test_hire_readiness_and_shell_controls_match_semantic_styles():

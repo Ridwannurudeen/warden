@@ -274,9 +274,20 @@ def test_marketplace_index_renders_search_filters_sorting_and_separate_evidence_
         "data-agent-audit",
         "data-agent-sort",
         "data-agent-reset",
+        "data-agent-controls",
+        "data-agent-rendered",
+        "data-agent-more",
         "data-agent-empty",
     ):
         assert control in index_html
+    assert index_html.count("data-agent-row") == 2
+    assert "data-agent-row hidden" not in index_html
+    assert 'data-agent-controls hidden aria-label="Search, filter, and sort agents"' in index_html
+    assert '<span class="num" data-agent-rendered>2</span>' in index_html
+    assert '<span class="num" data-agent-visible>2</span>' in index_html
+    assert "data-agent-more hidden" in index_html
+    assert 'aria-live="polite" aria-atomic="true"' in index_html
+    assert "Search and filter controls require JavaScript" in index_html
     assert 'data-match="signal"' in index_html
     assert 'data-match="unscanned"' in index_html
     assert 'data-audit="audited"' in index_html
@@ -288,6 +299,13 @@ def test_marketplace_index_renders_search_filters_sorting_and_separate_evidence_
     assert "Configure an authorized endpoint audit" in index_html
     assert 'href="/hire"' in index_html
     assert 'aria-label="Open public listing-text record' not in index_html
+    assert (
+        'aria-label="Agent: Signal Agent; Agent ID: 7; Category: SECURITY, '
+        "SOFTWARE_SERVICES; Sold: 12; Public listing text: Public-text pattern "
+        "match; Verdict: SANITIZE; Endpoint audit: Linked signed audit; Buyer "
+        'review average: 4.5 / 5"'
+    ) in index_html
+    assert '<span class="sr-only">Agent: </span>' not in index_html
     assert '<script src="/agents.js" defer></script>' in index_html
 
 

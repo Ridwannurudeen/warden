@@ -8,16 +8,6 @@
     return prefersLight ? "light" : "dark";
   }
 
-  function matchesAgentFilters(dataset, categoryFilter, matchFilter) {
-    const categories = String(dataset.category || "")
-      .split(/\s+/)
-      .filter(Boolean);
-    const categoryMatches =
-      !categoryFilter || categories.includes(categoryFilter);
-    const matchMatches = !matchFilter || dataset.match === matchFilter;
-    return categoryMatches && matchMatches;
-  }
-
   function cycleFocusIndex(currentIndex, direction, count) {
     if (!Number.isInteger(count) || count < 1) {
       return -1;
@@ -46,6 +36,29 @@
     return group?.querySelector?.("summary") || null;
   }
 
+  function isOutsideNavigationPointer(siteNav, navToggle, target) {
+    return !siteNav?.contains?.(target) && !navToggle?.contains?.(target);
+  }
+
+  function focusStatusTarget(element) {
+    if (!element || typeof element.focus !== "function") {
+      return false;
+    }
+    element.tabIndex = -1;
+    element.focus();
+    return true;
+  }
+
+  function copyButtonBaseLabel(button) {
+    if (!button?.dataset) {
+      return "";
+    }
+    if (!("copyBaseLabel" in button.dataset)) {
+      button.dataset.copyBaseLabel = button.textContent;
+    }
+    return button.dataset.copyBaseLabel;
+  }
+
   function normalizeEvidenceCount(value, label) {
     if (!Number.isInteger(value) || value < 0) {
       throw new Error(`${label} must be a non-negative integer`);
@@ -59,9 +72,11 @@
 
   const api = {
     catalogServiceByKey,
+    copyButtonBaseLabel,
     cycleFocusIndex,
+    focusStatusTarget,
     isHealthyResponse,
-    matchesAgentFilters,
+    isOutsideNavigationPointer,
     normalizeEvidenceCount,
     resolveTheme,
     summaryToRestoreOnEscape,
@@ -69,12 +84,14 @@
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   }
+  root.WardenUI = api;
 
   if (!root.document) {
     return;
   }
 
   const document = root.document;
+  document.documentElement.classList.add("js-enabled");
   const themeButtons = Array.from(
     document.querySelectorAll("[data-theme-toggle]"),
   );
@@ -117,16 +134,30 @@
   const navToggle = document.querySelector("[data-nav-toggle]");
   const siteNav = document.querySelector("[data-site-nav]");
   if (navToggle && siteNav) {
+    const navClose = document.createElement("button");
+    navClose.className = "nav-close";
+    navClose.type = "button";
+    navClose.textContent = "Close menu";
+    siteNav.prepend(navClose);
+
+    function setNavigationIsolation(isolated) {
+      for (const element of document.querySelectorAll(
+        ".skip-link, .site-header > :not([data-site-nav]), main, .site-footer",
+      )) {
+        element.inert = isolated;
+      }
+    }
+
     function focusableNavigationElements() {
-      const candidates = [
-        navToggle,
-        ...siteNav.querySelectorAll(
+      const candidates = Array.from(
+        siteNav.querySelectorAll(
           "summary, a[href], button:not([disabled]), input:not([disabled]), select:not([disabled])",
         ),
-      ];
+      );
       return candidates.filter((element) => {
         const closedGroup = element.closest("details:not([open])");
-        return !closedGroup || element.tagName === "SUMMARY";
+        const visibleGroup = !closedGroup || element.tagName === "SUMMARY";
+        return visibleGroup && element.getClientRects().length > 0;
       });
     }
 
@@ -134,10 +165,9 @@
       siteNav.classList.toggle("is-open", open);
       document.body.classList.toggle("nav-open", open);
       navToggle.setAttribute("aria-expanded", String(open));
+      setNavigationIsolation(open);
       if (open) {
-        const first = focusableNavigationElements().find(
-          (element) => element !== navToggle,
-        );
+        const first = focusableNavigationElements()[0];
         first?.focus();
       } else {
         for (const group of siteNav.querySelectorAll("details[open]")) {
@@ -152,6 +182,9 @@
     navToggle.addEventListener("click", () => {
       const open = !siteNav.classList.contains("is-open");
       setNavigation(open, false);
+    });
+    navClose.addEventListener("click", () => {
+      setNavigation(false, true);
     });
     siteNav.addEventListener("click", (event) => {
       if (event.target.closest("a")) {
@@ -171,12 +204,15 @@
       });
     }
     document.addEventListener("pointerdown", (event) => {
-      if (
-        siteNav.classList.contains("is-open") &&
-        !siteNav.contains(event.target) &&
-        !navToggle.contains(event.target)
-      ) {
+      if (!isOutsideNavigationPointer(siteNav, navToggle, event.target)) {
+        return;
+      }
+      if (siteNav.classList.contains("is-open")) {
         setNavigation(false, false);
+        return;
+      }
+      for (const group of siteNav.querySelectorAll("details[open]")) {
+        group.open = false;
       }
     });
     document.addEventListener("keydown", (event) => {
@@ -403,33 +439,6 @@
       });
   }
 
-  const categoryFilter = document.querySelector("[data-agent-category]");
-  const matchFilter = document.querySelector("[data-agent-match]");
-  const agentRows = Array.from(
-    document.querySelectorAll("[data-category][data-match]"),
-  );
-  if (agentRows.length && categoryFilter && matchFilter) {
-    function filterAgents() {
-      let visible = 0;
-      for (const row of agentRows) {
-        const matches = matchesAgentFilters(
-          row.dataset,
-          categoryFilter.value,
-          matchFilter.value,
-        );
-        row.hidden = !matches;
-        visible += Number(matches);
-      }
-      const count = document.querySelector("[data-agent-visible]");
-      if (count) {
-        count.textContent = visible.toLocaleString();
-      }
-    }
-    categoryFilter.addEventListener("change", filterAgents);
-    matchFilter.addEventListener("change", filterAgents);
-    filterAgents();
-  }
-
   let toastRegion = document.querySelector("[data-toast-region]");
   if (!toastRegion) {
     toastRegion = document.createElement("div");
@@ -441,6 +450,7 @@
   }
 
   for (const button of document.querySelectorAll("[data-copy-target]")) {
+    const baseLabel = copyButtonBaseLabel(button);
     button.addEventListener("click", async () => {
       const target = document.getElementById(button.dataset.copyTarget);
       if (!target) {
@@ -448,15 +458,14 @@
       }
       try {
         await root.navigator.clipboard.writeText(target.textContent);
-        const original = button.textContent;
         button.textContent = "Copied";
         toastRegion.textContent = "Copied to clipboard.";
         root.setTimeout(() => {
-          button.textContent = original;
+          button.textContent = baseLabel;
           toastRegion.textContent = "";
         }, 1200);
       } catch (error) {
-        button.textContent = "Copy failed";
+        button.textContent = baseLabel;
         toastRegion.textContent = `Copy failed: ${error.message}`;
       }
     });

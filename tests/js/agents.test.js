@@ -5,9 +5,12 @@ const path = require("node:path");
 const test = require("node:test");
 
 const {
+  AGENT_PAGE_SIZE,
   compareAgentRows,
+  focusIndexAfterAgentExpansion,
   matchesAgentFilters,
   matchesDocumentFilters,
+  selectAgentRows,
 } = require(path.join(__dirname, "..", "..", "site", "agents.js"));
 
 test("marketplace search and filters require every selected condition", () => {
@@ -81,6 +84,41 @@ test("marketplace sorting handles missing numbers and deterministic ties", () =>
     true,
   );
   assert.equal(compareAgentRows(agents[2], agents[1], "audit-first") < 0, true);
+});
+
+test("marketplace window filters every cached row before slicing", () => {
+  const rows = Array.from({ length: 120 }, (_, index) => ({
+    dataset: {
+      search: `agent ${index}`,
+      category: "SOFTWARE_SERVICES",
+      match: "none",
+      audit: "not-audited",
+    },
+  }));
+  rows[100].dataset.search += " offscreen-target";
+
+  const initial = selectAgentRows(rows, {}, AGENT_PAGE_SIZE);
+  assert.equal(AGENT_PAGE_SIZE, 50);
+  assert.equal(initial.matchingRows.length, 120);
+  assert.deepEqual(initial.renderedRows, rows.slice(0, 50));
+
+  const searched = selectAgentRows(
+    rows,
+    { query: "offscreen-target" },
+    AGENT_PAGE_SIZE,
+  );
+  assert.deepEqual(searched.matchingRows, [rows[100]]);
+  assert.deepEqual(searched.renderedRows, [rows[100]]);
+
+  const expanded = selectAgentRows(rows, {}, AGENT_PAGE_SIZE * 2);
+  assert.equal(expanded.matchingRows.length, 120);
+  assert.deepEqual(expanded.renderedRows, rows.slice(0, 100));
+});
+
+test("marketplace expansion moves focus to the first new row", () => {
+  assert.equal(focusIndexAfterAgentExpansion(50, 100), 50);
+  assert.equal(focusIndexAfterAgentExpansion(350, 376), 350);
+  assert.equal(focusIndexAfterAgentExpansion(50, 50), -1);
 });
 
 test("documentation filters search the matrix by decision and availability", () => {

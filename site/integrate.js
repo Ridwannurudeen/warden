@@ -209,7 +209,18 @@ Local MCP does not spend ${price} USDT or call marketplace service #${serviceId}
     return currentIndex;
   }
 
-  const api = { buildIntegrationExamples, decisionPayload, nextTabIndex };
+  function setIntegrationCopiesEnabled(buttons, enabled) {
+    for (const button of buttons) {
+      button.disabled = !enabled;
+    }
+  }
+
+  const api = {
+    buildIntegrationExamples,
+    decisionPayload,
+    nextTabIndex,
+    setIntegrationCopiesEnabled,
+  };
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   }
@@ -226,6 +237,9 @@ Local MCP does not spend ${price} USDT or call marketplace service #${serviceId}
     "[data-integrate-catalog-status]",
   );
   const retryButton = document.querySelector("[data-integrate-retry]");
+  const copyButtons = Array.from(
+    document.querySelectorAll("[data-surface-panel] [data-copy-target]"),
+  );
   let catalog = null;
 
   function selectTab(tab) {
@@ -269,6 +283,7 @@ Local MCP does not spend ${price} USDT or call marketplace service #${serviceId}
   }
 
   function renderService() {
+    setIntegrationCopiesEnabled(copyButtons, false);
     const service = selectedService();
     if (!service) {
       return;
@@ -285,9 +300,11 @@ Local MCP does not spend ${price} USDT or call marketplace service #${serviceId}
     for (const [surface, example] of Object.entries(examples)) {
       setText(`[data-integration-example="${surface}"]`, example);
     }
+    setIntegrationCopiesEnabled(copyButtons, true);
   }
 
   async function loadCatalog() {
+    setIntegrationCopiesEnabled(copyButtons, false);
     retryButton.hidden = true;
     retryButton.disabled = true;
     serviceSelect.disabled = true;
@@ -317,6 +334,7 @@ Local MCP does not spend ${price} USDT or call marketplace service #${serviceId}
       renderService();
     } catch (error) {
       catalog = null;
+      setIntegrationCopiesEnabled(copyButtons, false);
       catalogStatus.textContent = `${error.message}.`;
       retryButton.hidden = false;
       retryButton.disabled = false;
@@ -324,10 +342,14 @@ Local MCP does not spend ${price} USDT or call marketplace service #${serviceId}
   }
 
   serviceSelect?.addEventListener("change", renderService);
-  retryButton?.addEventListener("click", loadCatalog);
+  retryButton?.addEventListener("click", () => {
+    root.WardenUI?.focusStatusTarget(catalogStatus);
+    loadCatalog();
+  });
   if (tabs.length > 0) {
     selectTab(tabs[0]);
   }
+  setIntegrationCopiesEnabled(copyButtons, false);
   if (serviceSelect && catalogStatus && retryButton) {
     loadCatalog();
   }

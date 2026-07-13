@@ -10,6 +10,7 @@ const {
   deriveGauntletStats,
   getGauntletExample,
   isCurrentGauntletRequest,
+  isCurrentGauntletStatsRequest,
   retryableGauntletRequest,
 } = require(path.join(__dirname, "..", "..", "site", "gauntlet.js"));
 
@@ -170,4 +171,9 @@ test("retry requires current consent instead of reusing stale authorization", ()
 test("gauntlet ignores a receipt superseded by form or consent changes", () => {
   assert.equal(isCurrentGauntletRequest(1, 2), false);
   assert.equal(isCurrentGauntletRequest(2, 2), true);
+});
+
+test("gauntlet counters ignore an older polling response", () => {
+  assert.equal(isCurrentGauntletStatsRequest(4, 5), false);
+  assert.equal(isCurrentGauntletStatsRequest(5, 5), true);
 });

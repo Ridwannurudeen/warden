@@ -738,7 +738,10 @@
 
   serviceSelect.addEventListener("change", selectService);
   refreshButton.addEventListener("click", loadChallenge);
-  retryCatalogButton.addEventListener("click", loadCatalog);
+  retryCatalogButton.addEventListener("click", () => {
+    root.WardenUI?.focusStatusTarget(catalogStatus);
+    loadCatalog();
+  });
   for (const control of [
     jobInput,
     reviewerInput,

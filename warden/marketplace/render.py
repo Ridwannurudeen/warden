@@ -245,8 +245,16 @@ def _render_index_page(
         )
         sold_sort = "" if agent.sold_count is None else str(agent.sold_count)
         review_sort = "" if agent.security_rate is None else str(agent.security_rate)
+        row_label = (
+            f"Agent: {agent.name or 'Unnamed agent'}; Agent ID: {agent.agent_id}; "
+            f"Category: {categories_text}; Sold: {_number(agent.sold_count)}; "
+            f"Public listing text: {public_text_label}; "
+            f"Verdict: {indexed.verdict or 'NOT_SCANNED'}; "
+            f"Endpoint audit: {audit_label}; "
+            f"Buyer review average: {_buyer_review(agent.security_rate)}"
+        )
         rows.append(
-            f"""<a class="agent-row" href="/agents/{_escape(agent.agent_id)}" data-agent-row data-search="{_escape(search_text)}" data-category="{_escape(category_data)}" data-match="{match_state}" data-audit="{audit_state}" data-name="{_escape(agent.name.casefold())}" data-agent-id="{_escape(agent.agent_id)}" data-sold="{sold_sort}" data-review="{review_sort}">
+            f"""<a class="agent-row" href="/agents/{_escape(agent.agent_id)}" aria-label="{_escape(row_label)}" data-agent-row data-search="{_escape(search_text)}" data-category="{_escape(category_data)}" data-match="{match_state}" data-audit="{audit_state}" data-name="{_escape(agent.name.casefold())}" data-agent-id="{_escape(agent.agent_id)}" data-sold="{sold_sort}" data-review="{review_sort}">
   <span><strong>{_escape(agent.name or "Unnamed agent")}</strong><small>Agent #{_escape(agent.agent_id)}</small></span>
   <span data-label="Category">{_escape(categories_text)}</span>
   <span class="num" data-label="Sold">{_number(agent.sold_count)}</span>
@@ -277,7 +285,7 @@ def _render_index_page(
     <p class="caveat">Audit only a public endpoint you own or are authorized to test. A returned result is not independent proof of target-owner permission.</p>
   </div>
 </details>
-<section class="filter-bar marketplace-filter-bar" aria-label="Search, filter, and sort agents">
+<section class="filter-bar marketplace-filter-bar" data-agent-controls hidden aria-label="Search, filter, and sort agents">
   <label>Search listings<input type="search" data-agent-search autocomplete="off" placeholder="Name, agent ID, category, or signal"></label>
   <label>Category<select data-agent-category><option value="">All categories</option>{options}</select></label>
   <label>Public-text signal<select data-agent-match><option value="">All public-text results</option><option value="signal">Pattern match</option><option value="none">No pattern match</option><option value="unscanned">No public text to scan</option></select></label>
@@ -286,9 +294,11 @@ def _render_index_page(
   <button class="button secondary" type="button" data-agent-reset>Clear filters</button>
 </section>
 <section>
-  <p class="snapshot-note" aria-live="polite"><span class="num" data-agent-visible>{summary.agent_count}</span> agents visible</p>
+  <p class="snapshot-note" aria-live="polite" aria-atomic="true">Showing <span class="num" data-agent-rendered>{summary.agent_count}</span> of <span class="num" data-agent-visible>{summary.agent_count}</span> matching agents.</p>
+  <noscript><p class="snapshot-note">Search and filter controls require JavaScript. All agents in this dated snapshot are listed below.</p></noscript>
   <div class="agent-row agent-row--header" aria-hidden="true"><span>Agent</span><span>Category</span><span>Sold</span><span>Public listing text</span><span>Endpoint audit</span><span>Buyer review average</span></div>
   <div data-agent-results>{"".join(rows)}</div>
+  <button class="button secondary" type="button" data-agent-more hidden>Show more agents</button>
   <p class="empty-state" data-agent-empty hidden>No marketplace listings match these filters. Clear a filter to restore the full dated snapshot.</p>
 </section>
 """

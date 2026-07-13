@@ -154,12 +154,19 @@ self-only resource boundary remain intact.
 
 Post-build verification on 2026-07-13:
 
-- `python -m pytest -q`: 129 passed; one existing Starlette/httpx deprecation warning.
-- `node --test tests/js/*.test.js`: 58 passed.
+- `python -m pytest -q`: 165 passed; one existing Starlette/httpx deprecation warning.
+- `node --test tests/js/*.test.js`: 65 passed.
 - `python -m ruff check .`: clean.
 - `python scripts/build_site.py`: docs index and all 11 reason pages regenerated.
 - `python scripts/build_index.py`: 376 agents, two public-text matches, zero linked audits.
 - Prettier and `git diff --check`: clean.
+- The local same-origin preview serves production-shaped clean routes and API boundaries, enforces
+  exact Linux path casing, rejects traversal aliases, and applies the production security headers
+  that are safe on local HTTP. A real Uvicorn smoke passed 14 success routes, seven parity 404s,
+  and a `BLOCK` / `DRAIN_ADDRESS` demo result.
+- Source-level WCAG contracts verify small text at 4.5:1 or higher and active control boundaries at
+  3:1 or higher in both themes. Marketplace progressive enhancement reduces the connected agent
+  rows from 376 to 50 while preserving all-agent search and the complete no-JavaScript index.
 - Source audit across 400 generated and hand-authored HTML pages: no duplicate IDs, broken ARIA
   references, unbound labels, unnamed controls, inline CSP violations, external loaded resources, or
   broken local links/fragments.

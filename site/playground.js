@@ -55,6 +55,13 @@
     return requestId === activeRequestId;
   }
 
+  function recipientFocusIndexAfterRemoval(removedIndex, remainingCount) {
+    if (!Number.isInteger(removedIndex) || remainingCount < 1) {
+      return -1;
+    }
+    return Math.min(removedIndex, remainingCount - 1);
+  }
+
   function recommendedAction(verdict) {
     if (verdict === "BLOCK") {
       return "Stop. Do not execute the requested action.";
@@ -92,6 +99,7 @@
     defaultExampleId,
     deriveScanPresentation,
     isCurrentPlaygroundRequest,
+    recipientFocusIndexAfterRemoval,
   };
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
@@ -158,11 +166,20 @@
       remove.textContent = "Remove";
       remove.setAttribute("aria-label", `Remove expected recipient ${address}`);
       remove.addEventListener("click", () => {
+        const removedIndex = expectedAddresses.indexOf(address);
         supersedeScan();
         expectedAddresses = expectedAddresses.filter(
           (candidate) => candidate !== address,
         );
         renderAddressChips();
+        const nextIndex = recipientFocusIndexAfterRemoval(
+          removedIndex,
+          expectedAddresses.length,
+        );
+        const nextRemoveButton = addressChips.querySelectorAll(
+          ".address-chip-remove",
+        )[nextIndex];
+        (nextRemoveButton || addressInput).focus();
       });
       chip.append(value, remove);
       return chip;
@@ -500,6 +517,7 @@
 
   retryButton.addEventListener("click", () => {
     if (lastSubmission) {
+      root.WardenUI?.focusStatusTarget(status);
       runScan(lastSubmission.request, lastSubmission.originalPayload);
     }
   });

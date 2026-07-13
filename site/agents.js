@@ -1,6 +1,8 @@
 (function (root) {
   "use strict";
 
+  const AGENT_PAGE_SIZE = 50;
+
   function normalize(value) {
     return String(value || "")
       .trim()
@@ -28,6 +30,28 @@
       (!match || dataset.match === match) &&
       (!audit || dataset.audit === audit)
     );
+  }
+
+  function selectAgentRows(rows, filters = {}, limit = AGENT_PAGE_SIZE) {
+    const matchingRows = rows.filter((row) =>
+      matchesAgentFilters(row.dataset, filters),
+    );
+    return {
+      matchingRows,
+      renderedRows: matchingRows.slice(0, limit),
+    };
+  }
+
+  function focusIndexAfterAgentExpansion(previousRendered, currentRendered) {
+    if (
+      !Number.isInteger(previousRendered) ||
+      !Number.isInteger(currentRendered) ||
+      previousRendered < 0 ||
+      currentRendered <= previousRendered
+    ) {
+      return -1;
+    }
+    return previousRendered;
   }
 
   function numeric(value) {
@@ -103,9 +127,12 @@
   }
 
   const api = {
+    AGENT_PAGE_SIZE,
     compareAgentRows,
+    focusIndexAfterAgentExpansion,
     matchesAgentFilters,
     matchesDocumentFilters,
+    selectAgentRows,
   };
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
@@ -125,44 +152,76 @@
     const audit = document.querySelector("[data-agent-audit]");
     const sort = document.querySelector("[data-agent-sort]");
     const reset = document.querySelector("[data-agent-reset]");
-    const count = document.querySelector("[data-agent-visible]");
+    const controls = document.querySelector("[data-agent-controls]");
+    const renderedCount = document.querySelector("[data-agent-rendered]");
+    const matchingCount = document.querySelector("[data-agent-visible]");
+    const more = document.querySelector("[data-agent-more]");
     const empty = document.querySelector("[data-agent-empty]");
+    let orderedRows;
+    let visibleLimit = AGENT_PAGE_SIZE;
 
-    function renderAgents() {
+    controls.hidden = false;
+
+    function orderRows() {
+      orderedRows = [...rows].sort((left, right) =>
+        compareAgentRows(left.dataset, right.dataset, sort.value),
+      );
+    }
+
+    function renderAgents(resetLimit = false) {
+      if (resetLimit) {
+        visibleLimit = AGENT_PAGE_SIZE;
+      }
       const filters = {
         query: search.value,
         category: category.value,
         match: match.value,
         audit: audit.value,
       };
-      const ordered = [...rows].sort((left, right) =>
-        compareAgentRows(left.dataset, right.dataset, sort.value),
+      const { matchingRows, renderedRows } = selectAgentRows(
+        orderedRows,
+        filters,
+        visibleLimit,
       );
-      let visible = 0;
-      for (const row of ordered) {
-        const matches = matchesAgentFilters(row.dataset, filters);
-        row.hidden = !matches;
-        visible += Number(matches);
-        agentResults.append(row);
-      }
-      count.textContent = visible.toLocaleString();
-      empty.hidden = visible !== 0;
+      agentResults.replaceChildren(...renderedRows);
+      renderedCount.textContent = renderedRows.length.toLocaleString();
+      matchingCount.textContent = matchingRows.length.toLocaleString();
+      const remaining = matchingRows.length - renderedRows.length;
+      more.hidden = remaining === 0;
+      more.textContent = `Show ${Math.min(AGENT_PAGE_SIZE, remaining).toLocaleString()} more agents`;
+      empty.hidden = matchingRows.length !== 0;
     }
 
-    search.addEventListener("input", renderAgents);
-    for (const control of [category, match, audit, sort]) {
-      control.addEventListener("change", renderAgents);
+    search.addEventListener("input", () => renderAgents(true));
+    for (const control of [category, match, audit]) {
+      control.addEventListener("change", () => renderAgents(true));
     }
+    sort.addEventListener("change", () => {
+      orderRows();
+      renderAgents(true);
+    });
+    more.addEventListener("click", () => {
+      const previousRendered = agentResults.childElementCount;
+      visibleLimit += AGENT_PAGE_SIZE;
+      renderAgents();
+      const focusIndex = focusIndexAfterAgentExpansion(
+        previousRendered,
+        agentResults.childElementCount,
+      );
+      agentResults.children[focusIndex]?.focus();
+    });
     reset.addEventListener("click", () => {
       search.value = "";
       category.value = "";
       match.value = "";
       audit.value = "";
       sort.value = "sold-desc";
-      renderAgents();
+      orderRows();
+      renderAgents(true);
       search.focus();
     });
-    renderAgents();
+    orderRows();
+    renderAgents(true);
   }
 
   const documentResults = document.querySelector("[data-doc-results]");

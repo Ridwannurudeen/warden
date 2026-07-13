@@ -367,7 +367,12 @@
   if (registry) {
     document
       .querySelector("[data-badge-registry-retry]")
-      ?.addEventListener("click", () => loadRegistry(registry));
+      ?.addEventListener("click", () => {
+        root.WardenUI?.focusStatusTarget(
+          document.querySelector("[data-badge-registry-status]"),
+        );
+        loadRegistry(registry);
+      });
     loadRegistry(registry);
   }
 
@@ -375,7 +380,12 @@
   if (detail) {
     document
       .querySelector("[data-badge-detail-retry]")
-      ?.addEventListener("click", loadDetail);
+      ?.addEventListener("click", () => {
+        root.WardenUI?.focusStatusTarget(
+          document.querySelector("[data-badge-status]"),
+        );
+        loadDetail();
+      });
     document
       .querySelector("[data-badge-share]")
       ?.addEventListener("click", async () => {

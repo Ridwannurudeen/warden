@@ -9,6 +9,7 @@ const {
   defaultExampleId,
   deriveScanPresentation,
   isCurrentPlaygroundRequest,
+  recipientFocusIndexAfterRemoval,
 } = require(path.join(__dirname, "..", "..", "site", "playground.js"));
 
 const SOLANA_ADDRESS = "11111111111111111111111111111111";
@@ -103,4 +104,10 @@ test("playground presentation separates decision, risk, and sanitized output", (
     ).action,
     /own action policy/,
   );
+});
+
+test("recipient removal keeps focus on the nearest remaining control", () => {
+  assert.equal(recipientFocusIndexAfterRemoval(0, 2), 0);
+  assert.equal(recipientFocusIndexAfterRemoval(2, 2), 1);
+  assert.equal(recipientFocusIndexAfterRemoval(0, 0), -1);
 });

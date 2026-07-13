@@ -5,9 +5,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
-const { buildIntegrationExamples, decisionPayload, nextTabIndex } = require(
-  path.join(__dirname, "..", "..", "site", "integrate.js"),
-);
+const {
+  buildIntegrationExamples,
+  decisionPayload,
+  nextTabIndex,
+  setIntegrationCopiesEnabled,
+} = require(path.join(__dirname, "..", "..", "site", "integrate.js"));
 
 const catalog = JSON.parse(
   fs.readFileSync(
@@ -106,4 +109,20 @@ test("surface tab navigation wraps and supports Home and End", () => {
   assert.equal(nextTabIndex(2, "Home", 5), 0);
   assert.equal(nextTabIndex(2, "End", 5), 4);
   assert.equal(nextTabIndex(2, "Enter", 5), 2);
+});
+
+test("integration copy controls stay locked until examples are valid", () => {
+  const buttons = [{ disabled: false }, { disabled: false }];
+
+  setIntegrationCopiesEnabled(buttons, false);
+  assert.deepEqual(
+    buttons.map((button) => button.disabled),
+    [true, true],
+  );
+
+  setIntegrationCopiesEnabled(buttons, true);
+  assert.deepEqual(
+    buttons.map((button) => button.disabled),
+    [false, false],
+  );
 });

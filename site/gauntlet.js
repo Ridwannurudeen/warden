@@ -172,12 +172,17 @@
     return requestId === activeRequestId;
   }
 
+  function isCurrentGauntletStatsRequest(requestId, activeRequestId) {
+    return requestId === activeRequestId;
+  }
+
   const api = {
     buildGauntletRequest,
     deriveGauntletReceipt,
     deriveGauntletStats,
     getGauntletExample,
     isCurrentGauntletRequest,
+    isCurrentGauntletStatsRequest,
     retryableGauntletRequest,
   };
   if (typeof module !== "undefined" && module.exports) {
@@ -211,6 +216,7 @@
   let lastRequest = null;
   let submissionBusy = false;
   let submissionRequestId = 0;
+  let statsRequestId = 0;
 
   function setStatus(message, state = "ready") {
     status.textContent = message;
@@ -230,6 +236,7 @@
   }
 
   async function loadStats() {
+    const requestId = ++statsRequestId;
     statsPanel.setAttribute("aria-busy", "true");
     statsRetry.hidden = true;
     statsStatus.textContent = "Loading live Gauntlet counters...";
@@ -237,6 +244,9 @@
       const stats = deriveGauntletStats(
         await getJson("/api/demo/gauntlet/stats"),
       );
+      if (!isCurrentGauntletStatsRequest(requestId, statsRequestId)) {
+        return;
+      }
       for (const [key, value] of Object.entries(stats.values)) {
         const target = document.querySelector(`[data-stat="${key}"]`);
         if (target) {
@@ -247,10 +257,15 @@
       statsStatus.textContent =
         "Live counters loaded from this Warden instance.";
     } catch (error) {
+      if (!isCurrentGauntletStatsRequest(requestId, statsRequestId)) {
+        return;
+      }
       statsStatus.textContent = formatScanError(error);
       statsRetry.hidden = false;
     } finally {
-      statsPanel.setAttribute("aria-busy", "false");
+      if (isCurrentGauntletStatsRequest(requestId, statsRequestId)) {
+        statsPanel.setAttribute("aria-busy", "false");
+      }
     }
   }
 
@@ -426,6 +441,7 @@
     const request = retryableGauntletRequest(lastRequest, consent.checked);
     if (request) {
       setConsentError();
+      root.WardenUI?.focusStatusTarget(status);
       submitChallenge(request);
     } else if (lastRequest) {
       const message = "Confirm authorization again before retrying.";
@@ -434,7 +450,10 @@
       consent.focus();
     }
   });
-  statsRetry.addEventListener("click", loadStats);
+  statsRetry.addEventListener("click", () => {
+    root.WardenUI?.focusStatusTarget(statsStatus);
+    loadStats();
+  });
 
   loadStats();
   root.setInterval(loadStats, 60000);

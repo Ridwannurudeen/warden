@@ -4,15 +4,19 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 const test = require("node:test");
 
+const appApi = require(path.join(__dirname, "..", "..", "site", "app.js"));
+
 const {
   catalogServiceByKey,
+  copyButtonBaseLabel,
   cycleFocusIndex,
+  focusStatusTarget,
   isHealthyResponse,
-  matchesAgentFilters,
+  isOutsideNavigationPointer,
   normalizeEvidenceCount,
   resolveTheme,
   summaryToRestoreOnEscape,
-} = require(path.join(__dirname, "..", "..", "site", "app.js"));
+} = appApi;
 
 test("theme resolution respects a stored choice before system preference", () => {
   assert.equal(resolveTheme("light", false), "light");
@@ -28,27 +32,8 @@ test("header reachability accepts only the documented healthy response", () => {
   assert.equal(isHealthyResponse(null), false);
 });
 
-test("agent filters require both selected category and match state", () => {
-  assert.equal(
-    matchesAgentFilters(
-      { category: "SOFTWARE_SERVICES DEFI", match: "yes" },
-      "SOFTWARE_SERVICES",
-      "yes",
-    ),
-    true,
-  );
-  assert.equal(
-    matchesAgentFilters(
-      { category: "DEFI", match: "yes" },
-      "SOFTWARE_SERVICES",
-      "yes",
-    ),
-    false,
-  );
-  assert.equal(
-    matchesAgentFilters({ category: "DEFI", match: "no" }, "", "yes"),
-    false,
-  );
+test("shared app leaves marketplace filtering to the route module", () => {
+  assert.equal(appApi.matchesAgentFilters, undefined);
 });
 
 test("mobile navigation focus cycles in both directions", () => {
@@ -75,6 +60,36 @@ test("desktop menu escape restores focus to the owning summary", () => {
   };
   assert.equal(summaryToRestoreOnEscape(activeElement), summary);
   assert.equal(summaryToRestoreOnEscape(null), null);
+});
+
+test("desktop menus recognize pointer interaction outside the navigation", () => {
+  const siteNav = { contains: (target) => target === "nav" };
+  const navToggle = { contains: (target) => target === "toggle" };
+
+  assert.equal(
+    isOutsideNavigationPointer(siteNav, navToggle, "page-content"),
+    true,
+  );
+  assert.equal(isOutsideNavigationPointer(siteNav, navToggle, "nav"), false);
+  assert.equal(isOutsideNavigationPointer(siteNav, navToggle, "toggle"), false);
+});
+
+test("async status focus and copy labels remain stable across retries", () => {
+  let focused = false;
+  const status = {
+    tabIndex: 0,
+    focus() {
+      focused = true;
+    },
+  };
+  assert.equal(focusStatusTarget(status), true);
+  assert.equal(status.tabIndex, -1);
+  assert.equal(focused, true);
+
+  const button = { dataset: {}, textContent: "Copy result" };
+  assert.equal(copyButtonBaseLabel(button), "Copy result");
+  button.textContent = "Copy failed";
+  assert.equal(copyButtonBaseLabel(button), "Copy result");
 });
 
 test("service metadata resolves only from a normalized catalog", () => {
