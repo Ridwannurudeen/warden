@@ -73,7 +73,7 @@ def test_hire_page_is_task_first_and_contains_no_stale_service_ids():
     assert "data-accepts-output" in page
     assert "data-shell" in page
     assert "data-verdict-confirmed" in page
-    assert all(f'data-command-step="{step}"' in page for step in range(1, 7))
+    assert all(f'data-command-step="{step}"' in page for step in range(1, 5))
     assert "task flow" in page.lower()
     assert "18954" not in page
     assert "18955" not in page

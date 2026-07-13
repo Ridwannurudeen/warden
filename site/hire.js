@@ -244,9 +244,7 @@
     const quote = (value) => quoteArgument(value, shell);
 
     const commands = [
-      `onchainos agent create-task --description ${quote(taskDescription)} --budget ${amount} --max-budget ${amount} --currency ${tokenSymbol} --title ${quote(taskTitle)} --provider ${provider} --visibility 1`,
-      null,
-      null,
+      `onchainos agent create-task --description ${quote(taskDescription)} --budget ${amount} --max-budget ${amount} --currency ${tokenSymbol} --title ${quote(taskTitle)} --provider ${provider} --visibility 1 --payment-mode x402 --service-id ${serviceId} --service-params ${quote(serviceParams)} --service-token-address ${service.feeTokenAddress} --service-token-amount ${amount}`,
       null,
       null,
       null,
@@ -255,13 +253,11 @@
       return commands;
     }
 
-    commands[1] = `onchainos agent set-asp ${quote(job)} --provider-agent-id ${provider} --service-id ${serviceId} --service-type A2MCP --service-params ${quote(serviceParams)} --service-token-address ${service.feeTokenAddress} --service-token-amount ${amount} --payment-token-symbol ${tokenSymbol} --payment-token-amount ${amount}`;
-    commands[2] = `onchainos agent set-payment-mode ${quote(job)} --payment-mode x402 --token-symbol ${tokenSymbol} --token-amount ${amount} --endpoint ${quote(service.endpoint)}`;
-    commands[3] = `onchainos agent task-402-pay ${quote(job)} --provider-agent-id ${provider} --accepts ${quote(JSON.stringify(accepts))} --endpoint ${quote(service.endpoint)} --token-symbol ${tokenSymbol} --token-amount ${amount} --body ${quote(JSON.stringify(service.requestBody))}`;
+    commands[1] = `onchainos agent task-402-pay ${quote(job)} --provider-agent-id ${provider} --accepts ${quote(JSON.stringify(accepts))} --endpoint ${quote(service.endpoint)} --token-symbol ${tokenSymbol} --token-amount ${amount} --body ${quote(JSON.stringify(service.requestBody))}`;
     if (verdictConfirmed) {
-      commands[4] = `onchainos agent complete ${quote(job)}`;
+      commands[2] = `onchainos agent complete ${quote(job)}`;
       if (reviewer) {
-        commands[5] = `onchainos agent feedback-submit --agent-id ${provider} --creator-id ${reviewer} --score ${normalizedScore} --task-id ${quote(job)}`;
+        commands[3] = `onchainos agent feedback-submit --agent-id ${provider} --creator-id ${reviewer} --score ${normalizedScore} --task-id ${quote(job)}`;
       }
     }
     return commands;
@@ -317,10 +313,10 @@
       );
       const button = root.document.querySelector(`[data-copy-step="${step}"]`);
       let lockedMessage = "Enter the job ID above.";
-      if (step === 5) {
+      if (step === 3) {
         lockedMessage =
           "Confirm that you received a verdict to unlock this step.";
-      } else if (step === 6) {
+      } else if (step === 4) {
         lockedMessage = "Confirm the verdict and enter your reviewer agent ID.";
       }
       output.textContent = command || lockedMessage;
@@ -332,7 +328,7 @@
   function renderCommands() {
     const service = selectedService();
     if (!catalog || !service || !challenge) {
-      setCommands([null, null, null, null, null, null]);
+      setCommands([null, null, null, null]);
       return;
     }
     try {
@@ -354,7 +350,7 @@
       const acceptance = acceptanceFor(service, challenge.accepts);
       serviceSummary.textContent = `${service.serviceName} | ${service.feeAmount} ${acceptance.extra.name} | marketplace service #${service.serviceId}`;
     } catch (error) {
-      setCommands([null, null, null, null, null, null]);
+      setCommands([null, null, null, null]);
       serviceSummary.textContent = error.message;
     }
   }
@@ -365,7 +361,7 @@
       return;
     }
     challenge = null;
-    setCommands([null, null, null, null, null, null]);
+    setCommands([null, null, null, null]);
     acceptsStatus.textContent = "Fetching current payment terms...";
     acceptsOutput.textContent = "[]";
     try {

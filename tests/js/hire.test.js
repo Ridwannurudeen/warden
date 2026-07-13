@@ -83,29 +83,23 @@ test("commands use the selected snapshot service and complete the reviewable tas
       verdictConfirmed: true,
     });
 
-    assert.equal(commands.length, 6);
+    assert.equal(commands.length, 4);
     assert.match(commands[0], /^onchainos agent create-task /);
     assert.match(commands[0], /--provider 3808 --visibility 1/);
+    assert.match(commands[0], /--payment-mode x402/);
+    assert.match(commands[0], new RegExp(`--service-id ${service.serviceId}`));
     assert.match(
       commands[1],
-      new RegExp(`set-asp 'job-123456' .*--service-id ${service.serviceId}`),
-    );
-    assert.match(
-      commands[2],
-      /set-payment-mode 'job-123456' --payment-mode x402/,
-    );
-    assert.match(
-      commands[3],
       /task-402-pay 'job-123456' --provider-agent-id 3808/,
     );
     assert.match(
-      commands[3],
+      commands[1],
       new RegExp(`--endpoint '${service.endpoint.replaceAll(".", "\\.")}'`),
     );
-    assert.match(commands[3], /--accepts '\[/);
-    assert.equal(commands[4], "onchainos agent complete 'job-123456'");
+    assert.match(commands[1], /--accepts '\[/);
+    assert.equal(commands[2], "onchainos agent complete 'job-123456'");
     assert.equal(
-      commands[5],
+      commands[3],
       "onchainos agent feedback-submit --agent-id 3808 --creator-id 9876 --score 5 --task-id 'job-123456'",
     );
     assert.ok(commands.every((command) => !command.includes("18954")));
@@ -183,8 +177,8 @@ test("completion and review stay locked until the buyer confirms a verdict", () 
     shell: "powershell",
     verdictConfirmed: false,
   });
-  assert.equal(commands[4], null);
-  assert.equal(commands[5], null);
+  assert.equal(commands[2], null);
+  assert.equal(commands[3], null);
 });
 
 test("command generation rejects invalid or self-dealing reviewer identities", () => {
