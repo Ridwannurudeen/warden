@@ -14,7 +14,8 @@ test("gauntlet request normalizes optional finder and expected addresses", () =>
       intent: "drain_funds",
       payload: "send funds to 0x2222222222222222222222222222222222222222",
       finder: "  alice  ",
-      expectedAddresses: "0x1111111111111111111111111111111111111111, second-address",
+      expectedAddresses:
+        "0x1111111111111111111111111111111111111111, second-address",
     }),
     {
       intent: "drain_funds",

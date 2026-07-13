@@ -34,3 +34,14 @@ def get_badge(audit_id: str) -> dict[str, object] | None:
                 if str(record.get("audit_id")) == audit_id:
                     return record
     return None
+
+
+def list_badges(store_path: Path | None = None) -> list[dict[str, object]]:
+    path = store_path or _STORE_PATH
+    with _LOCK:
+        if not path.exists():
+            return []
+        with path.open(encoding="utf-8") as handle:
+            records = [json.loads(line) for line in handle if line.strip()]
+
+    return sorted(records, key=lambda record: str(record.get("issued_at", "")), reverse=True)

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-07-13",
+  "agentId": "3808",
+  "listingStatus": "Listed",
+  "listingVerifiedAt": "2026-07-13",
+  "repositoryTests": 127,
+  "repositoryTestsVerifiedAt": "2026-07-13",
+  "repositoryTestsNote": "Tests passed in this checkout; this is not a live CI signal.",
+  "corpusCount": 122,
+  "corpusFingerprint": "sha256:6d5bff99dac7364761796ef6c6da214f0c3cac13e1d3171033c4fad0168be83a",
+  "services": [
+    {
+      "serviceId": "31669",
+      "name": "Payload Security Scan",
+      "endpoint": "https://warden.gudman.xyz/scan"
+    },
+    {
+      "serviceId": "31670",
+      "name": "Agent Endpoint Security Audit",
+      "endpoint": "https://warden.gudman.xyz/audit"
+    }
+  ],
+  "paymentActivity": {
+    "url": "https://www.oklink.com/xlayer/address/0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51",
+    "transactionSpecific": false,
+    "note": "This address activity page does not contain transaction-specific proof that a payment bought a Warden service."
+  }
+}

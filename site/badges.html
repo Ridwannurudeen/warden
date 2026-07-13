@@ -3,9 +3,9 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Verify one signed Warden endpoint-audit badge by audit ID.">
+    <meta name="description" content="Browse issued Warden endpoint-audit badges and verify each record against its server-side signature.">
     <meta name="color-scheme" content="dark light">
-    <title>Verify Audit Badge | Warden</title>
+    <title>Audit Badge Registry | Warden</title>
     <link rel="icon" href="/assets/warden-avatar.png">
     <link rel="stylesheet" href="/styles.css">
   </head>
@@ -19,31 +19,32 @@
     </header>
 
     <main id="main" class="page-shell site-main">
-      <section class="page-hero page-hero--compact">
-        <p class="eyebrow">Badge integrity check</p>
-        <h1>Verify one issued audit record.</h1>
-        <p class="hero-text">This page resolves the audit ID from <code>/badges/{audit_id}</code> and checks the record through the singular <code>GET /badge/{audit_id}</code> API.</p>
-        <div class="hero-actions"><a class="button secondary" href="/badges">Back to registry</a></div>
+      <section class="page-hero">
+        <p class="eyebrow">Signed audit evidence</p>
+        <h1>Every issued badge, verified when this page loads.</h1>
+        <p class="hero-text">The registry calls <code>GET /api/badges</code>. Warden checks each HMAC signature server-side and returns the public badge record with its current verification result.</p>
       </section>
 
-      <section class="console-card badge-detail" data-badge-detail>
-        <div class="section-heading">
-          <p class="eyebrow">Verification result</p>
-          <h2 data-badge-heading>Checking badge</h2>
-          <p data-badge-status aria-live="polite">Loading the signed record...</p>
-        </div>
-        <span class="status-label status-label--pending" data-badge-verification>Pending</span>
-        <dl class="data-list">
-          <div><dt>Audit ID</dt><dd class="num" data-badge-audit-id>--</dd></div>
-          <div><dt>Target host</dt><dd data-badge-target>--</dd></div>
-          <div><dt>Grade</dt><dd data-badge-grade>--</dd></div>
-          <div><dt>Score</dt><dd class="num" data-badge-score>--</dd></div>
-          <div><dt>Attack payloads blocked</dt><dd class="num" data-badge-blocked>--</dd></div>
-          <div><dt>Issued</dt><dd class="num" data-badge-issued>--</dd></div>
-          <div><dt>Signature</dt><dd><code data-badge-signature>--</code></dd></div>
-        </dl>
-        <p class="caveat">Badge verification checks record integrity only. Audit results are point-in-time evidence from a fixed battery, not a guarantee that an endpoint is secure.</p>
+      <section class="proof-strip" aria-label="Badge registry boundaries">
+        <div><span>Evidence type</span><strong>Point-in-time audit</strong></div>
+        <div><span>Integrity check</span><strong>Per-record signature</strong></div>
+        <div><span>Audit battery</span><strong class="num">20 payloads</strong></div>
+        <div><span>Security guarantee</span><strong>None implied</strong></div>
       </section>
+
+      <section data-badge-registry>
+        <div class="section-heading">
+          <p class="eyebrow">Issued records</p>
+          <h2>Public endpoint-audit registry</h2>
+          <p class="section-copy" data-badge-registry-status aria-live="polite">Loading signed badge records...</p>
+        </div>
+        <div class="badge-grid" data-badge-list></div>
+        <noscript><p class="empty-state">JavaScript is required to load and verify the badge registry.</p></noscript>
+      </section>
+
+      <aside class="callout">
+        A valid signature proves that the displayed record was issued by the Warden instance holding the configured badge key. It does not prove permanent safety, ownership of the target, or protection against attacks outside the tested battery.
+      </aside>
     </main>
 
     <footer class="site-footer page-shell"><div><strong>Warden</strong><span>Deterministic security before autonomous action.</span></div><nav aria-label="Footer"><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav></footer>

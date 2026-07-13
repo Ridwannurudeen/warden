@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Examples and boundaries for Warden&#x27;s eleven deterministic reason codes.">
+    <meta name="color-scheme" content="dark light">
+    <title>Detection documentation | Warden</title>
+    <link rel="icon" href="/assets/warden-avatar.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header page-shell">
+      <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><a href="/playground">Playground</a><a href="/agents">Agents</a><a href="/gauntlet">Gauntlet</a><a href="/hire">Hire</a><a href="/docs" aria-current="page">Docs</a><a href="/integrate">Integrate</a><a href="/badges">Badges</a></nav>
+      <div class="header-actions">
+        <a class="status-pill" href="/status"><span class="live-dot" data-health-dot aria-hidden="true"></span><span data-health-label>API status</span></a>
+        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button>
+      </div>
+    </header>
+    <main id="main" class="page-shell site-main">
+<section class="page-hero page-hero--compact">
+  <p class="eyebrow">Detection reference</p>
+  <h1>Eleven reasons Warden can stop or reshape an action.</h1>
+  <p class="hero-text">Each page is tied to a real regression-corpus example and documents the observed verdict, commerce impact, and detector boundary.</p>
+</section>
+<section class="proof-strip" aria-label="Documentation scope">
+  <div><span>Reason codes</span><strong class="num">11</strong></div>
+  <div><span>Decision states</span><strong>ALLOW / SANITIZE / BLOCK</strong></div>
+  <div><span>Engine</span><strong>Deterministic</strong></div>
+</section>
+<section class="docs-grid"><a class="reason-card" href="/docs/prompt-injection">
+  <span class="reason-code">PROMPT_INJECTION</span>
+  <h2>Prompt injection</h2>
+  <p>Seller or service text attempts to replace the buyer agent&#x27;s operating instructions.</p>
+  <span class="text-link">Open detection note</span>
+</a><a class="reason-card" href="/docs/role-override">
+  <span class="reason-code">ROLE_OVERRIDE</span>
+  <h2>Role override</h2>
+  <p>Untrusted content tries to coerce an agent outside its authorized commerce role.</p>
+  <span class="text-link">Open detection note</span>
+</a><a class="reason-card" href="/docs/web3-injection">
+  <span class="reason-code">WEB3_INJECTION</span>
+  <h2>Web3 injection</h2>
+  <p>Text can induce token approvals, transfers, withdrawals, or other wallet actions.</p>
+  <span class="text-link">Open detection note</span>
+</a><a class="reason-card" href="/docs/hidden-unicode">
+  <span class="reason-code">HIDDEN_UNICODE</span>
+  <h2>Hidden Unicode</h2>
+  <p>Invisible characters can conceal or alter listing, address, and response content.</p>
+  <span class="text-link">Open detection note</span>
+</a><a class="reason-card" href="/docs/encoding-trick">
+  <span class="reason-code">ENCODING_TRICK</span>
+  <h2>Encoding trick</h2>
+  <p>Encoded directives can evade a plain-text operator review before payment or execution.</p>
+  <span class="text-link">Open detection note</span>
+</a><a class="reason-card" href="/docs/statistical-anomaly">
+  <span class="reason-code">STATISTICAL_ANOMALY</span>
+  <h2>Statistical anomaly</h2>
+  <p>Dense imperatives and invisible characters can be mixed into otherwise plausible market copy.</p>
+  <span class="text-link">Open detection note</span>
+</a><a class="reason-card" href="/docs/corpus-match">
+  <span class="reason-code">CORPUS_MATCH</span>
+  <h2>Corpus similarity match</h2>
+  <p>A rephrased known attack may avoid literal patterns while remaining close to a regression case.</p>
+  <span class="text-link">Open detection note</span>
+</a><a class="reason-card" href="/docs/drain-address">
+  <span class="reason-code">DRAIN_ADDRESS</span>
+  <h2>Drain address</h2>
+  <p>A settlement recipient is replaced with an attacker-controlled wallet in untrusted content.</p>
+  <span class="text-link">Open detection note</span>
+</a><a class="reason-card" href="/docs/tool-hijack">
+  <span class="reason-code">TOOL_HIJACK</span>
+  <h2>Tool-call hijack</h2>
+  <p>Untrusted JSON imitates executable tool output and attempts to cross the data/action boundary.</p>
+  <span class="text-link">Open detection note</span>
+</a><a class="reason-card" href="/docs/secret-exfil">
+  <span class="reason-code">SECRET_EXFIL</span>
+  <h2>Secret exfiltration</h2>
+  <p>A response asks an operator or agent to expose wallet or authentication material.</p>
+  <span class="text-link">Open detection note</span>
+</a><a class="reason-card" href="/docs/malicious-link">
+  <span class="reason-code">MALICIOUS_LINK</span>
+  <h2>Malicious link</h2>
+  <p>An active or deceptive URL can move a buyer from trusted workflow into attacker-controlled content.</p>
+  <span class="text-link">Open detection note</span>
+</a></section>
+<aside class="callout"><strong>Interpretation:</strong> ALLOW means no implemented detector fired. It is not proof that content is safe, and multiple threat classes can appear in one result.</aside>
+</main>
+    <footer class="site-footer page-shell">
+      <div><strong>Warden</strong><span>Deterministic security before autonomous action.</span></div>
+      <nav aria-label="Footer"><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav>
+    </footer>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

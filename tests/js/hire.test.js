@@ -13,7 +13,10 @@ const {
 } = require(path.join(__dirname, "..", "..", "site", "hire.js"));
 
 const fixture = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "..", "fixtures", "payment_required.json"), "utf8"),
+  fs.readFileSync(
+    path.join(__dirname, "..", "fixtures", "payment_required.json"),
+    "utf8",
+  ),
 );
 
 const services = {
@@ -57,7 +60,10 @@ function encodedChallenge(name) {
 
 test("payment-required fixture decodes and validates for both live services", () => {
   for (const name of ["scan", "audit"]) {
-    const challenge = parsePaymentRequiredHeader(encodedChallenge(name), services[name]);
+    const challenge = parsePaymentRequiredHeader(
+      encodedChallenge(name),
+      services[name],
+    );
     assert.deepEqual(challenge.accepts, fixture[name].accepts);
     assert.equal(challenge.resource.url, services[name].endpoint);
   }
@@ -80,9 +86,18 @@ test("commands use the selected snapshot service and complete the reviewable tas
     assert.equal(commands.length, 6);
     assert.match(commands[0], /^onchainos agent create-task /);
     assert.match(commands[0], /--provider 3808 --visibility 1/);
-    assert.match(commands[1], new RegExp(`set-asp 'job-123456' .*--service-id ${service.serviceId}`));
-    assert.match(commands[2], /set-payment-mode 'job-123456' --payment-mode x402/);
-    assert.match(commands[3], /task-402-pay 'job-123456' --provider-agent-id 3808/);
+    assert.match(
+      commands[1],
+      new RegExp(`set-asp 'job-123456' .*--service-id ${service.serviceId}`),
+    );
+    assert.match(
+      commands[2],
+      /set-payment-mode 'job-123456' --payment-mode x402/,
+    );
+    assert.match(
+      commands[3],
+      /task-402-pay 'job-123456' --provider-agent-id 3808/,
+    );
     assert.match(
       commands[3],
       new RegExp(`--endpoint '${service.endpoint.replaceAll(".", "\\.")}'`),
@@ -134,15 +149,27 @@ test("challenge validation rejects a mismatched endpoint or asset", () => {
 });
 
 test("payment response validation rejects non-402 and missing headers", () => {
-  assert.throws(() => parsePaymentResponse(429, encodedChallenge("scan"), services.scan), /429/);
-  assert.throws(() => parsePaymentResponse(200, encodedChallenge("scan"), services.scan), /200/);
+  assert.throws(
+    () => parsePaymentResponse(429, encodedChallenge("scan"), services.scan),
+    /429/,
+  );
+  assert.throws(
+    () => parsePaymentResponse(200, encodedChallenge("scan"), services.scan),
+    /200/,
+  );
   assert.throws(() => parsePaymentResponse(402, "", services.scan), /omitted/);
 });
 
 test("shell quoting keeps untrusted bodies inside one PowerShell or POSIX argument", () => {
   const dangerous = `don't $(run); \"render\"\nnext`;
-  assert.equal(quoteArgument(dangerous, "powershell"), `'don''t $(run); \"render\"\nnext'`);
-  assert.equal(quoteArgument(dangerous, "posix"), `'don'\"'\"'t $(run); \"render\"\nnext'`);
+  assert.equal(
+    quoteArgument(dangerous, "powershell"),
+    `'don''t $(run); \"render\"\nnext'`,
+  );
+  assert.equal(
+    quoteArgument(dangerous, "posix"),
+    `'don'\"'\"'t $(run); \"render\"\nnext'`,
+  );
 });
 
 test("completion and review stay locked until the buyer confirms a verdict", () => {
@@ -161,7 +188,7 @@ test("completion and review stay locked until the buyer confirms a verdict", () 
 });
 
 test("command generation rejects invalid or self-dealing reviewer identities", () => {
-  for (const reviewerAgentId of ["3808", "4844"]) {
+  for (const reviewerAgentId of ["3808", "03808", "4844", "004844"]) {
     assert.throws(
       () =>
         buildCommands({

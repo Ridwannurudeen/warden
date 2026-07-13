@@ -1,10 +1,13 @@
 """Marketplace snapshot, indexing, and static rendering tests."""
 
+import json
+from argparse import Namespace
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
+from scripts.build_index import build, load_badge_links
 from warden.badges import issue_badge
 from warden.engine import WardenEngine
 from warden.marketplace.fetch import (
@@ -15,7 +18,7 @@ from warden.marketplace.fetch import (
     parse_search_output,
 )
 from warden.marketplace.index import IndexedAgent, index_agent
-from warden.marketplace.render import render_marketplace
+from warden.marketplace.render import associate_badges, render_marketplace
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures"
@@ -211,3 +214,116 @@ def test_renderer_does_not_attach_tampered_badge(tmp_path, monkeypatch):
     )
 
     assert "Not yet audited" in (tmp_path / "3808.html").read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_build_index_attaches_badge_for_unique_marketplace_service_host(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("WARDEN_BADGE_SECRET", "marketplace-build-test-key")
+    outputs = iter(
+        [
+            _fixture("onchainos_agent_search_page.json"),
+            _fixture("onchainos_agent_search_empty.json"),
+        ]
+    )
+    snapshot_path = tmp_path / "agents-v1.jsonl"
+    fetch_snapshot(
+        snapshot_path,
+        query="Warden",
+        page_size=10,
+        fetched_at="2026-07-13T15:30:00Z",
+        command_runner=lambda command: next(outputs),
+    )
+    badge = issue_badge(
+        target_host="warden.gudman.xyz",
+        score=100,
+        grade="A",
+        blocked=20,
+        total=20,
+        issued_at="2026-07-13",
+    )
+    badge_store = tmp_path / "issued.jsonl"
+    badge_store.write_text(json.dumps(badge) + "\n", encoding="utf-8")
+    badge_links = tmp_path / "badge-links-v1.json"
+    badge_links.write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "links": [{"auditId": badge["audit_id"], "agentId": "3808"}],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "agents"
+    marketplace_summary = tmp_path / "marketplace-summary.json"
+
+    await build(
+        Namespace(
+            refresh=False,
+            query="Warden",
+            page_size=10,
+            snapshot=snapshot_path,
+            output=output,
+            hire_catalog=tmp_path / "warden-services.json",
+            marketplace_summary=marketplace_summary,
+            badge_store=badge_store,
+            badge_links=badge_links,
+        )
+    )
+
+    summary = json.loads(marketplace_summary.read_text(encoding="utf-8"))
+    assert summary["auditedCount"] == 1
+    assert "Verified audit badge" in (output / "3808.html").read_text(encoding="utf-8")
+
+
+def test_badge_association_requires_an_explicit_reviewed_link(monkeypatch):
+    monkeypatch.setenv("WARDEN_BADGE_SECRET", "marketplace-association-test-key")
+    service = MarketplaceService.model_validate(
+        {"serviceId": "1", "endpoint": "https://shared.example.org/service"}
+    )
+    indexed = [
+        IndexedAgent(
+            agent=_agent(agentId=agent_id, services=[service]),
+            verdict="ALLOW",
+            risk_level="NONE",
+            threat_classes=[],
+            fields_scanned=1,
+            rationale="No injection patterns were detected.",
+        )
+        for agent_id in ("3808", "4844")
+    ]
+    badge = issue_badge(
+        target_host="shared.example.org",
+        score=100,
+        grade="A",
+        blocked=20,
+        total=20,
+        issued_at="2026-07-13",
+    )
+
+    assert associate_badges(indexed, [badge], {}) == {}
+    assert associate_badges(indexed, [badge], {str(badge["audit_id"]): "3808"}) == {
+        "3808": [badge]
+    }
+
+
+def test_badge_link_manifest_rejects_conflicting_agent_ownership(tmp_path):
+    audit_id = "0123456789abcdef"
+    manifest = tmp_path / "badge-links-v1.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "links": [
+                    {"auditId": audit_id, "agentId": "3808"},
+                    {"auditId": audit_id, "agentId": "4844"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="multiple agents"):
+        load_badge_links(manifest)

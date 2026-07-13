@@ -1,88 +1,204 @@
-(function () {
-  const buttons = Array.from(document.querySelectorAll("[data-tab-target]"));
-  const panels = Array.from(document.querySelectorAll("[data-tab-panel]"));
-  const tabLinks = Array.from(document.querySelectorAll("[data-link-tab]"));
+(function (root) {
+  "use strict";
 
-  function activateTab(tabName, focusPanel) {
-    const targetPanel = panels.find((panel) => panel.dataset.tabPanel === tabName) || panels[0];
-    const targetName = targetPanel.dataset.tabPanel;
-
-    for (const button of buttons) {
-      const isActive = button.dataset.tabTarget === targetName;
-      button.classList.toggle("is-active", isActive);
-      button.setAttribute("aria-pressed", String(isActive));
+  function resolveTheme(storedTheme, prefersLight) {
+    if (storedTheme === "light" || storedTheme === "dark") {
+      return storedTheme;
     }
-
-    for (const panel of panels) {
-      panel.classList.toggle("is-active", panel === targetPanel);
-    }
-
-    if (window.location.hash !== `#${targetName}`) {
-      history.replaceState(null, "", `#${targetName}`);
-    }
-
-    if (focusPanel) {
-      targetPanel.focus({ preventScroll: true });
-    }
+    return prefersLight ? "light" : "dark";
   }
 
-  for (const button of buttons) {
-    button.addEventListener("click", () => activateTab(button.dataset.tabTarget, true));
+  function matchesAgentFilters(dataset, categoryFilter, matchFilter) {
+    const categories = String(dataset.category || "")
+      .split(/\s+/)
+      .filter(Boolean);
+    const categoryMatches =
+      !categoryFilter || categories.includes(categoryFilter);
+    const matchMatches = !matchFilter || dataset.match === matchFilter;
+    return categoryMatches && matchMatches;
   }
 
-  for (const link of tabLinks) {
-    link.addEventListener("click", (event) => {
-      event.preventDefault();
-      activateTab(link.dataset.linkTab, true);
-    });
+  const api = { matchesAgentFilters, resolveTheme };
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
   }
 
-  window.addEventListener("hashchange", () => {
-    const tabName = window.location.hash.replace("#", "");
-    if (tabName) {
-      activateTab(tabName, false);
+  if (!root.document) {
+    return;
+  }
+
+  const document = root.document;
+  const themeButtons = Array.from(
+    document.querySelectorAll("[data-theme-toggle]"),
+  );
+  let storedTheme = null;
+  try {
+    storedTheme = root.localStorage.getItem("warden-theme");
+  } catch {
+    storedTheme = null;
+  }
+  const initialTheme = resolveTheme(
+    storedTheme,
+    root.matchMedia?.("(prefers-color-scheme: light)").matches === true,
+  );
+
+  function setTheme(theme, persist) {
+    document.documentElement.dataset.theme = theme;
+    for (const button of themeButtons) {
+      const next = theme === "dark" ? "light" : "dark";
+      button.textContent = `${next[0].toUpperCase()}${next.slice(1)} theme`;
+      button.setAttribute("aria-label", `Switch to ${next} theme`);
     }
-  });
-
-  const initialTab = window.location.hash.replace("#", "");
-  if (initialTab) {
-    activateTab(initialTab, false);
-  }
-
-  const healthLabel = document.getElementById("health-label");
-  const liveDot = document.querySelector(".live-dot");
-
-  function setHealthState(label, stateClass) {
-    if (healthLabel) {
-      healthLabel.textContent = label;
-    }
-    if (liveDot) {
-      liveDot.classList.remove("is-ok", "is-offline");
-      if (stateClass) {
-        liveDot.classList.add(stateClass);
-      }
-    }
-  }
-
-  fetch("/health", { headers: { accept: "application/json" } })
-    .then((response) => {
-      if (!response.ok) {
-        setHealthState("Local preview - API not attached", "is-offline");
-        return null;
-      }
-      return response.json();
-    })
-    .then((data) => {
-      if (!data) {
+    if (persist) {
+      try {
+        root.localStorage.setItem("warden-theme", theme);
+      } catch {
         return;
       }
-      const analyzerCount = Array.isArray(data.analyzers) ? data.analyzers.length : 0;
-      setHealthState(
-        `Live API ok - ${data.corpus_size} corpus cases - ${analyzerCount} analyzers`,
-        "is-ok",
-      );
-    })
-    .catch(() => {
-      setHealthState("Local preview - API not attached", "is-offline");
+    }
+  }
+
+  setTheme(initialTheme, false);
+  for (const button of themeButtons) {
+    button.addEventListener("click", () => {
+      const next =
+        document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      setTheme(next, true);
     });
-})();
+  }
+
+  const navToggle = document.querySelector("[data-nav-toggle]");
+  const siteNav = document.querySelector("[data-site-nav]");
+  if (navToggle && siteNav) {
+    navToggle.addEventListener("click", () => {
+      const open = !siteNav.classList.contains("is-open");
+      siteNav.classList.toggle("is-open", open);
+      navToggle.setAttribute("aria-expanded", String(open));
+    });
+    siteNav.addEventListener("click", (event) => {
+      if (event.target.closest("a")) {
+        siteNav.classList.remove("is-open");
+        navToggle.setAttribute("aria-expanded", "false");
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        siteNav.classList.remove("is-open");
+        navToggle.setAttribute("aria-expanded", "false");
+      }
+    });
+  }
+
+  const healthLabels = Array.from(
+    document.querySelectorAll("[data-health-label]"),
+  );
+  const healthDots = Array.from(document.querySelectorAll("[data-health-dot]"));
+  if (healthLabels.length || healthDots.length) {
+    root
+      .fetch("/health", {
+        headers: { accept: "application/json" },
+        cache: "no-store",
+      })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((health) => {
+        for (const label of healthLabels) {
+          label.textContent =
+            label.dataset.healthDetail === "full"
+              ? `API ${health.status}`
+              : "API live";
+        }
+        for (const dot of healthDots) {
+          dot.classList.add("is-ok");
+        }
+      })
+      .catch(() => {
+        for (const label of healthLabels) {
+          label.textContent = "API unavailable";
+        }
+        for (const dot of healthDots) {
+          dot.classList.add("is-offline");
+        }
+      });
+  }
+
+  const marketplaceCount = document.querySelector("[data-marketplace-count]");
+  if (marketplaceCount) {
+    root
+      .fetch("/data/marketplace-summary.json", {
+        headers: { accept: "application/json" },
+        cache: "no-store",
+      })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((summary) => {
+        marketplaceCount.textContent = Number(
+          summary.agentCount,
+        ).toLocaleString();
+        const snapshot = document.querySelector("[data-marketplace-snapshot]");
+        if (snapshot) {
+          snapshot.textContent = `Snapshot ${summary.fetchedAt}`;
+        }
+      })
+      .catch(() => {
+        const snapshot = document.querySelector("[data-marketplace-snapshot]");
+        if (snapshot) {
+          snapshot.textContent = "Committed marketplace snapshot";
+        }
+      });
+  }
+
+  const categoryFilter = document.querySelector("[data-agent-category]");
+  const matchFilter = document.querySelector("[data-agent-match]");
+  const agentRows = Array.from(
+    document.querySelectorAll("[data-category][data-match]"),
+  );
+  if (agentRows.length && categoryFilter && matchFilter) {
+    function filterAgents() {
+      let visible = 0;
+      for (const row of agentRows) {
+        const matches = matchesAgentFilters(
+          row.dataset,
+          categoryFilter.value,
+          matchFilter.value,
+        );
+        row.hidden = !matches;
+        visible += Number(matches);
+      }
+      const count = document.querySelector("[data-agent-visible]");
+      if (count) {
+        count.textContent = visible.toLocaleString();
+      }
+    }
+    categoryFilter.addEventListener("change", filterAgents);
+    matchFilter.addEventListener("change", filterAgents);
+    filterAgents();
+  }
+
+  for (const button of document.querySelectorAll("[data-copy-target]")) {
+    button.addEventListener("click", async () => {
+      const target = document.getElementById(button.dataset.copyTarget);
+      if (!target) {
+        return;
+      }
+      try {
+        await root.navigator.clipboard.writeText(target.textContent);
+        const original = button.textContent;
+        button.textContent = "Copied";
+        root.setTimeout(() => {
+          button.textContent = original;
+        }, 1200);
+      } catch {
+        button.textContent = "Copy failed";
+      }
+    });
+  }
+})(typeof globalThis === "undefined" ? this : globalThis);

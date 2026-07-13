@@ -26,7 +26,7 @@ Warden returns `BLOCK` + `DRAIN_ADDRESS` and redacts the attacker address before
 - secret-exfil analyzer
 - malicious-link analyzer
 
-Current corpus: 88 attack cases, 30 benign guards, 0 false positives in the gate.
+Current corpus: 92 attack cases, 30 benign guards, 0 false positives in the gate.
 
 4. Two services are attached to Agent #3808, live on X Layer via x402:
 

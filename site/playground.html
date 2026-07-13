@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Run Warden's real deterministic fast-path scanner free in the browser.">
+    <meta name="color-scheme" content="dark light">
+    <title>Payload Playground | Warden</title>
+    <link rel="icon" href="/assets/warden-avatar.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header page-shell">
+      <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><a href="/playground" aria-current="page">Playground</a><a href="/agents">Agents</a><a href="/gauntlet">Gauntlet</a><a href="/hire">Hire</a><a href="/docs">Docs</a><a href="/integrate">Integrate</a><a href="/badges">Badges</a></nav>
+      <div class="header-actions"><a class="status-pill" href="/status"><span class="live-dot" data-health-dot aria-hidden="true"></span><span data-health-label>API status</span></a><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button></div>
+    </header>
+
+    <main id="main" class="page-shell site-main">
+      <section class="page-hero">
+        <p class="eyebrow">Free deterministic fast path</p>
+        <h1>Put an untrusted payload through the real engine.</h1>
+        <p class="hero-text">This page calls <code>/api/demo/scan</code>, not the paid production route. It forces fast mode, caps payloads at 4,000 characters, and returns the full scan envelope.</p>
+      </section>
+
+      <section class="feature-panel">
+        <form data-playground-form>
+          <div class="form-grid">
+            <label>Corpus example<select data-demo-example><option value="">Write my own payload</option></select></label>
+            <label>Expected payment addresses<input data-demo-addresses autocomplete="off" placeholder="Comma-separated trusted recipients"></label>
+          </div>
+          <label>Untrusted payload<textarea data-demo-payload rows="11" maxlength="4000" required spellcheck="false" placeholder="Paste a message, tool output, response, or payment instruction"></textarea></label>
+          <div class="hero-actions"><button class="button primary" type="submit">Run Warden</button><button class="button secondary" type="button" data-clear-demo>Clear</button></div>
+          <p data-demo-status aria-live="polite">Loading curated examples...</p>
+        </form>
+        <p class="caveat"><strong>Fast-path boundary:</strong> CORPUS_MATCH uses the thorough similarity layer and is intentionally unavailable here. ALLOW means no implemented fast detector fired.</p>
+      </section>
+
+      <section class="console-card" data-demo-result hidden aria-live="polite">
+        <div class="section-heading"><p class="eyebrow">Structured result</p><h2 data-demo-verdict>Waiting</h2><p data-demo-summary></p></div>
+        <section class="result-grid"><div><span>Risk level</span><strong data-demo-risk>—</strong></div><div><span>Threat classes</span><strong data-demo-classes>—</strong></div><div><span>Detections</span><strong class="num" data-demo-detections>0</strong></div><div><span>Latency</span><strong class="num" data-demo-latency>—</strong></div></section>
+        <pre><code id="demo-json" data-demo-json>{}</code></pre>
+        <button class="copy-button" type="button" data-copy-target="demo-json">Copy result JSON</button>
+      </section>
+    </main>
+
+    <footer class="site-footer page-shell"><div><strong>Warden</strong><span>Deterministic security before autonomous action.</span></div><nav aria-label="Footer"><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav></footer>
+    <script src="/app.js" defer></script>
+    <script src="/playground.js" defer></script>
+  </body>
+</html>

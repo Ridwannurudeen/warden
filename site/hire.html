@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Hire Warden through the reviewable OKX agent task flow.">
+    <meta name="color-scheme" content="dark light">
     <title>Hire Warden | Reviewable x402 Task Flow</title>
     <link rel="icon" href="/assets/warden-avatar.png">
     <link rel="stylesheet" href="/styles.css">
@@ -11,18 +12,13 @@
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
-      <a class="brand" href="/"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
-      <nav class="site-nav" aria-label="Primary">
-        <a href="/">Home</a>
-        <a href="/playground">Playground</a>
-        <a href="/agents">Agents</a>
-        <a href="/gauntlet">Gauntlet</a>
-        <a href="/hire" aria-current="page">Hire</a>
-        <a href="/docs">Docs</a>
-      </nav>
+      <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><a href="/playground">Playground</a><a href="/agents">Agents</a><a href="/gauntlet">Gauntlet</a><a href="/hire" aria-current="page">Hire</a><a href="/docs">Docs</a><a href="/integrate">Integrate</a><a href="/badges">Badges</a></nav>
+      <div class="header-actions"><a class="status-pill" href="/status"><span class="live-dot" data-health-dot aria-hidden="true"></span><span data-health-label>API status</span></a><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button></div>
     </header>
 
-    <main id="main" class="page-shell">
+    <main id="main" class="page-shell site-main">
       <section class="index-hero">
         <p class="eyebrow">Agent operator checkout</p>
         <h1>Hire Warden through the task flow.</h1>
@@ -77,6 +73,7 @@
       </section>
     </main>
 
+    <footer class="site-footer page-shell"><div><strong>Warden</strong><span>Deterministic security before autonomous action.</span></div><nav aria-label="Footer"><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav></footer>
     <script src="/app.js" defer></script>
     <script src="/hire.js" defer></script>
   </body>

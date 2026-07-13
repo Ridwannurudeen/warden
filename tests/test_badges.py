@@ -101,3 +101,52 @@ def test_badge_lookup_unknown_id_returns_404():
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Badge not found"
+
+
+def test_badge_registry_returns_empty_list_when_store_is_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr("warden.badge_store._STORE_PATH", tmp_path / "missing.jsonl")
+
+    with TestClient(app) as client:
+        response = client.get("/api/badges")
+
+    assert response.status_code == 200
+    assert response.json() == {"badges": [], "total": 0}
+
+
+def test_badge_registry_verifies_each_record_and_only_returns_public_fields(
+    tmp_path, monkeypatch
+):
+    store_path = tmp_path / "issued.jsonl"
+    monkeypatch.setattr("warden.badge_store._STORE_PATH", store_path)
+
+    verified_badge = issue_badge(
+        target_host="verified.example.org",
+        score=90.0,
+        grade="A",
+        blocked=18,
+        total=20,
+        issued_at="2026-07-12",
+    )
+    record_badge(verified_badge)
+
+    tampered_badge = issue_badge(
+        target_host="tampered.example.org",
+        score=75.0,
+        grade="C",
+        blocked=15,
+        total=20,
+        issued_at="2026-07-13",
+    )
+    tampered_badge["score"] = 10.0
+    tampered_badge["internal_only"] = "redacted"
+    record_badge(tampered_badge)
+
+    with TestClient(app) as client:
+        response = client.get("/api/badges")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 2
+    assert payload["badges"][0]["verified"] is False
+    assert "internal_only" not in payload["badges"][0]["badge"]
+    assert payload["badges"][1] == {"badge": verified_badge, "verified": True}

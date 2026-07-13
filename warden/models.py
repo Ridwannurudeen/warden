@@ -161,6 +161,16 @@ class BadgeRecord(BaseModel):
     signature: str
 
 
+class BadgeRegistryEntry(BaseModel):
+    badge: BadgeRecord
+    verified: bool
+
+
+class BadgeRegistryResponse(BaseModel):
+    badges: list[BadgeRegistryEntry]
+    total: int
+
+
 class AuditResponse(BaseModel):
     score: float = Field(ge=0, le=100)
     grade: Grade

@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from warden.badge_store import get_badge
+from warden.badge_store import get_badge, list_badges
 from warden.badges import verify_badge
 from warden import __version__
 from warden.auditor import AgentAuditor
@@ -19,6 +19,9 @@ from warden.ratelimit import check_rate_limit, retry_after_seconds
 from warden.models import (
     AuditRequest,
     AuditResponse,
+    BadgeRecord,
+    BadgeRegistryEntry,
+    BadgeRegistryResponse,
     DemoExample,
     DemoScanRequest,
     GauntletRequest,
@@ -266,6 +269,18 @@ async def get_badge_endpoint(audit_id: str):
     if badge is None:
         raise HTTPException(status_code=404, detail="Badge not found")
     return {"badge": badge, "verified": verify_badge(badge)}
+
+
+@app.get("/api/badges", response_model=BadgeRegistryResponse)
+async def list_badges_endpoint() -> BadgeRegistryResponse:
+    badges = [
+        BadgeRegistryEntry(
+            badge=BadgeRecord.model_validate(badge),
+            verified=verify_badge(badge),
+        )
+        for badge in list_badges()
+    ]
+    return BadgeRegistryResponse(badges=badges, total=len(badges))
 
 
 @app.get("/")

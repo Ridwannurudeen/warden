@@ -3,38 +3,76 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Warden Terms</title>
-    <link rel="icon" href="assets/warden-avatar.png">
-    <link rel="stylesheet" href="styles.css">
+    <meta name="description" content="Terms and security boundaries for Warden scans, audits, Gauntlet claims, and badges.">
+    <meta name="color-scheme" content="dark light">
+    <title>Terms | Warden</title>
+    <link rel="icon" href="/assets/warden-avatar.png">
+    <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to content</a>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header page-shell">
+      <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><a href="/playground">Playground</a><a href="/agents">Agents</a><a href="/gauntlet">Gauntlet</a><a href="/hire">Hire</a><a href="/docs">Docs</a><a href="/integrate">Integrate</a><a href="/badges">Badges</a></nav>
+      <div class="header-actions"><a class="status-pill" href="/status"><span class="live-dot" data-health-dot aria-hidden="true"></span><span data-health-label>API status</span></a><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button></div>
+    </header>
 
-    <main id="main" class="site-main">
-      <section class="hero">
-        <div class="section-heading">
-          <p class="eyebrow">Warden</p>
-          <h1>Service Terms</h1>
-          <p class="note">
-            Warden provides a deterministic security audit and scan API.
-            Public documentation only; no payment is required to read this page.
-          </p>
-          <ul>
-            <li><strong>Service scope:</strong> /scan, /audit, and /badge/{audit_id}.</li>
-            <li><strong>Scope of service:</strong> Warden evaluates the payloads you send and does not guarantee perfect safety.</li>
-            <li><strong>Consent:</strong> By default, /audit proceeds without explicit target consent and returns a best-effort
-              consent flag. Set <code>WARDEN_REQUIRE_CONSENT=true</code> to require
-              a reachable <code>/.well-known/warden-consent</code> response containing
-              <code>warden-audit-allowed</code> before an audit runs.</li>
-            <li><strong>Use limits:</strong> rate limits are configured by operator policy.</li>
-            <li><strong>No misuse:</strong> you may not use this site to probe internal or unauthorized systems.</li>
-          </ul>
-          <p class="note">
-            By using the API you acknowledge the service is provided as-is and is intended for security workflow support, not as legal or financial advice.
-          </p>
-          <p><a class="header-link" href="index.html">Return to home</a></p>
-        </div>
+    <main id="main" class="page-shell site-main">
+      <section class="page-hero page-hero--compact">
+        <p class="eyebrow">Service terms</p>
+        <h1>Use Warden as a security control, not a guarantee.</h1>
+        <p class="hero-text">These terms describe the implemented service boundary for public demos, paid scans and audits, the adversarial Gauntlet, and signed audit badges.</p>
+        <p class="snapshot-note">Effective 13 July 2026.</p>
       </section>
+
+      <article class="legal-copy">
+        <section>
+          <h2>Service surfaces</h2>
+          <p>Warden provides the free <code>/api/demo/scan</code>, <code>/api/demo/examples</code>, <code>/api/demo/gauntlet</code>, <code>/api/demo/gauntlet/stats</code>, <code>/api/badges</code>, <code>/badge/{audit_id}</code>, and <code>/health</code> routes. Production <code>POST /scan</code> and <code>POST /audit</code> are protected by the x402 terms returned by the live endpoint.</p>
+        </section>
+
+        <section>
+          <h2>Security decision boundary</h2>
+          <p>Warden applies implemented deterministic scanners and analyzers and returns ALLOW, SANITIZE, or BLOCK. ALLOW means no implemented detector fired for that request. It does not establish that content, an agent, an endpoint, a transaction, or a linked resource is safe. You remain responsible for approval policy, wallet controls, and the action taken after a verdict.</p>
+        </section>
+
+        <section>
+          <h2>Authorized endpoint audits</h2>
+          <p>You may audit only a public HTTP endpoint you own or are authorized to test. Do not use Warden to probe internal networks, third-party systems without permission, or endpoints where the fixed attack battery could cause harm. Warden rejects private and reserved network targets, but that technical control does not replace your authorization obligation.</p>
+          <p>The audit response reports whether the target appeared to block or flag the tested payloads. Target consent may be checked through the Warden consent document, and the operator can require that check, but a returned audit is not independent proof that the target owner granted permission.</p>
+        </section>
+
+        <section>
+          <h2>Gauntlet submissions</h2>
+          <p>An ALLOW result from <code>/api/demo/gauntlet</code> creates a pending candidate, not a confirmed bypass. Human review determines whether the declared attack intent is genuine. By submitting, you permit the Warden operator to retain and analyze the claim and, if confirmed, reproduce it and add it to the security corpus. Finder credit can be attached when a finder name is supplied, but no payment or reward is promised.</p>
+          <p>Do not place secrets, personal information, unlawful content, or payloads you lack permission to share into a Gauntlet claim.</p>
+        </section>
+
+        <section>
+          <h2>Badges and registry records</h2>
+          <p>A verified badge signature establishes the integrity of the displayed Warden record. A badge is point-in-time evidence for the fixed audit battery and target observed on its issue date. It is not a certification, ownership proof, continuous monitor, warranty, or statement about attacks the audit did not test.</p>
+        </section>
+
+        <section>
+          <h2>Payments and marketplace activity</h2>
+          <p>The live x402 challenge controls the payment terms for a production call. Successful settlement is recorded on a public chain. A raw x402 call does not create an OKX task and cannot itself support task-linked feedback; use the guided hire flow when a reviewable task is required. Do not self-pay or self-review to create misleading marketplace activity.</p>
+        </section>
+
+        <section>
+          <h2>Availability and limits</h2>
+          <p>The <code>/api/demo/*</code> routes use a dedicated public-demo rate-limit budget, while <code>/scan</code> and <code>/audit</code> use the paid-route budget. The current application does not apply that limiter to <code>/health</code>, <code>/api/badges</code>, or <code>/badge/{audit_id}</code>. Availability, marketplace listing state, corpus content, and service metadata may change. The status page distinguishes current browser reachability from historical uptime, which is not measured.</p>
+        </section>
+
+        <section>
+          <h2>Disclaimer and independence</h2>
+          <p>The service is provided as-is for security workflow support. To the extent permitted by law, no warranty of uninterrupted operation, merchantability, fitness for a particular purpose, or complete attack detection is made. Warden does not provide legal, financial, custody, or investment advice.</p>
+          <p>Warden is an independent service listed on OKX.AI and does not claim endorsement by OKX or OKLink.</p>
+        </section>
+      </article>
     </main>
+
+    <footer class="site-footer page-shell"><div><strong>Warden</strong><span>Deterministic security before autonomous action.</span></div><nav aria-label="Footer"><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav></footer>
+    <script src="/app.js" defer></script>
   </body>
 </html>

@@ -3,32 +3,66 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Warden Privacy</title>
-    <link rel="icon" href="assets/warden-avatar.png">
-    <link rel="stylesheet" href="styles.css">
+    <meta name="description" content="What Warden processes, what it persists, and which records are public.">
+    <meta name="color-scheme" content="dark light">
+    <title>Privacy | Warden</title>
+    <link rel="icon" href="/assets/warden-avatar.png">
+    <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to content</a>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header page-shell">
+      <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><a href="/playground">Playground</a><a href="/agents">Agents</a><a href="/gauntlet">Gauntlet</a><a href="/hire">Hire</a><a href="/docs">Docs</a><a href="/integrate">Integrate</a><a href="/badges">Badges</a></nav>
+      <div class="header-actions"><a class="status-pill" href="/status"><span class="live-dot" data-health-dot aria-hidden="true"></span><span data-health-label>API status</span></a><button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button></div>
+    </header>
 
-    <main id="main" class="site-main">
-      <section class="hero">
-        <div class="section-heading">
-          <p class="eyebrow">Warden</p>
-          <h1>Privacy Summary</h1>
-          <p class="note">
-            Warden does not request, store, or sell personally identifiable information from
-            visitors. Requests made to scan endpoints include only the payload text and optional
-            context fields needed for analysis.
-          </p>
-          <ul>
-            <li>Audit records are retained only for badge lookup and are identified by audit id.</li>
-            <li>Log fields may include request metadata required for service operation.</li>
-            <li>For paid requests, payment metadata is handled by the configured payment gateway.</li>
-            <li>Warden is an independent service and does not claim endorsement by OKX; paid usage terms are defined by this project.</li>
-          </ul>
-          <p><a class="header-link" href="index.html">Return to home</a></p>
-        </div>
+    <main id="main" class="page-shell site-main">
+      <section class="page-hero page-hero--compact">
+        <p class="eyebrow">Privacy boundary</p>
+        <h1>What is processed, persisted, and made public.</h1>
+        <p class="hero-text">Warden is a security service, so payload handling matters. This summary distinguishes transient scans from the append-only Gauntlet-review store and public badge store implemented by the application.</p>
+        <p class="snapshot-note">Effective 13 July 2026.</p>
       </section>
+
+      <article class="legal-copy">
+        <section>
+          <h2>Browser data</h2>
+          <p>The site stores the selected light or dark theme in browser local storage. The site code does not include advertising, analytics trackers, or third-party auto-loaded fonts, scripts, or images. Links to external sites load only when you follow them.</p>
+        </section>
+
+        <section>
+          <h2>Scans and audits</h2>
+          <p>Free demo scans and paid payload scans transmit the payload and optional context to the API for analysis. The application does not write those scan requests to an application data store. Do not submit private keys, seed phrases, API credentials, personal data, or other material you are not authorized to process.</p>
+          <p>Endpoint audits process the target URL and any custom prompts supplied by the caller. When an audit completes, Warden persists a public badge record containing the target host, grade, score, blocked and total counts, issue date, audit ID, and integrity signature. The detailed audit response is returned to the caller; the badge record is available through the public badge APIs.</p>
+        </section>
+
+        <section>
+          <h2>Gauntlet retention</h2>
+          <p>Every Gauntlet attempt creates an append-only record with hashes of the payload and declared intent, timestamp, verdict, risk level, threat classes, and claim status. A pending Gauntlet claim produced by an ALLOW verdict also retains the raw payload, declared intent, context, and optional finder name so a human can review whether it is a genuine bypass.</p>
+          <p>BLOCK and SANITIZE attempts do not retain the raw payload or intent in the Gauntlet store. Duplicate pending claims retain a reference to the existing claim rather than a second raw submission. No automatic deletion period is currently implemented for these records, so submit only material you are comfortable retaining for security review.</p>
+        </section>
+
+        <section>
+          <h2>Public records and payment rails</h2>
+          <p>Issued badge records are public through <code>/api/badges</code> and <code>/badge/{audit_id}</code>. The marketplace security index is built from public OKX.AI listing data, not visitor data.</p>
+          <p>Paid calls use x402 settlement on X Layer. Blockchain addresses and transactions are public by design, and the payment facilitator processes the signed payment payload. Warden's browser pages do not request or store a wallet private key.</p>
+        </section>
+
+        <section>
+          <h2>Operational metadata</h2>
+          <p>The application is served behind HTTP infrastructure that may process request metadata such as IP address, timestamp, route, user agent, and response status under operator policy. This repository does not publish a retention period for infrastructure logs and does not provide an authenticated account or self-service deletion endpoint.</p>
+        </section>
+
+        <section>
+          <h2>Independent service</h2>
+          <p>Warden is an independent service listed on OKX.AI. It does not claim endorsement by OKX or OKLink. Their services and privacy practices are governed by their own terms.</p>
+        </section>
+      </article>
     </main>
+
+    <footer class="site-footer page-shell"><div><strong>Warden</strong><span>Deterministic security before autonomous action.</span></div><nav aria-label="Footer"><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav></footer>
+    <script src="/app.js" defer></script>
   </body>
 </html>

@@ -10,7 +10,12 @@
     "other",
   ]);
 
-  function buildGauntletRequest({ intent, payload, finder, expectedAddresses }) {
+  function buildGauntletRequest({
+    intent,
+    payload,
+    finder,
+    expectedAddresses,
+  }) {
     if (!INTENTS.has(intent)) {
       throw new Error("Choose a supported attack intent");
     }
@@ -98,18 +103,25 @@
       });
       const response = await root.fetch("/api/demo/gauntlet", {
         method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json" },
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+        },
         body: JSON.stringify(request),
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.detail || `Request failed with HTTP ${response.status}`);
+        throw new Error(
+          data.detail || `Request failed with HTTP ${response.status}`,
+        );
       }
       verdict.textContent = data.verdict;
       if (data.claim_status === "pending") {
-        message.textContent = "Candidate queued for human review. It is not a confirmed bypass.";
+        message.textContent =
+          "Candidate queued for human review. It is not a confirmed bypass.";
       } else if (data.claim_status === "duplicate") {
-        message.textContent = "This candidate is already in the human-review queue.";
+        message.textContent =
+          "This candidate is already in the human-review queue.";
       } else {
         message.textContent = "Warden detected the attack path before action.";
       }

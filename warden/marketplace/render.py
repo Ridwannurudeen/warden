@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 from warden.badges import verify_badge
 from warden.marketplace.index import IndexedAgent
+from warden.site_render import page_shell
 
 
 @dataclass(frozen=True)
@@ -62,39 +63,38 @@ def _verified_badge(records: list[dict[str, object]]) -> dict[str, object] | Non
     return max(valid, key=lambda record: str(record.get("issued_at", "")))
 
 
-def _page_shell(title: str, description: str, body: str, active: str = "agents") -> str:
-    nav = []
-    for href, label, key in (
-        ("/", "Home", "home"),
-        ("/playground", "Playground", "playground"),
-        ("/agents", "Agents", "agents"),
-        ("/gauntlet", "Gauntlet", "gauntlet"),
-        ("/hire", "Hire", "hire"),
-        ("/docs", "Docs", "docs"),
-    ):
-        current = ' aria-current="page"' if key == active else ""
-        nav.append(f'<a href="{href}"{current}>{label}</a>')
-    return f"""<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="{_escape(description)}">
-    <title>{_escape(title)}</title>
-    <link rel="icon" href="/assets/warden-avatar.png">
-    <link rel="stylesheet" href="/styles.css">
-  </head>
-  <body>
-    <a class="skip-link" href="#main">Skip to main content</a>
-    <header class="site-header page-shell">
-      <a class="brand" href="/"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
-      <nav class="site-nav" aria-label="Primary">{" ".join(nav)}</nav>
-    </header>
-    <main id="main" class="page-shell">{body}</main>
-    <script src="/app.js" defer></script>
-  </body>
-</html>
-"""
+def associate_badges(
+    indexed_agents: list[IndexedAgent],
+    badge_records: list[dict[str, object]],
+    badge_links: dict[str, str],
+) -> dict[str, list[dict[str, object]]]:
+    service_hosts_by_agent: dict[str, set[str]] = {}
+    for indexed in indexed_agents:
+        for service in indexed.agent.services:
+            endpoint = urlparse(service.endpoint)
+            if (
+                endpoint.scheme not in {"http", "https"}
+                or not endpoint.hostname
+                or endpoint.username
+                or endpoint.password
+            ):
+                continue
+            host = endpoint.hostname.rstrip(".").casefold()
+            service_hosts_by_agent.setdefault(indexed.agent.agent_id, set()).add(host)
+
+    associated: dict[str, list[dict[str, object]]] = {}
+    for badge in badge_records:
+        if not verify_badge(badge):
+            continue
+        audit_id = str(badge.get("audit_id", ""))
+        agent_id = badge_links.get(audit_id)
+        if agent_id not in service_hosts_by_agent:
+            continue
+        target_host = str(badge.get("target_host", "")).rstrip(".").casefold()
+        if target_host not in service_hosts_by_agent[agent_id]:
+            continue
+        associated.setdefault(agent_id, []).append(badge)
+    return associated
 
 
 def _render_services(indexed: IndexedAgent) -> str:
@@ -136,6 +136,7 @@ def _render_agent_page(
         audit_status = (
             '<p class="status-label status-label--allow">Verified audit badge</p>'
             f'<a class="button secondary" href="/badges/{audit_id}">Open badge {audit_id}</a>'
+            '<p class="caveat">The badge signature verifies record integrity. Its agent association comes from a reviewed build manifest and a matching listed-service host.</p>'
         )
 
     avatar_url = _safe_external_url(agent.profile_picture)
@@ -154,7 +155,7 @@ def _render_agent_page(
     <p class="eyebrow">Marketplace agent #{_escape(agent.agent_id)}</p>
     <h1>{_escape(agent.name or "Unnamed agent")}</h1>
     <p class="hero-text">{_escape(agent.profile_description or "No public profile description.")}</p>
-    <p class="source-link">{avatar_link} · <a href="https://www.okx.ai/" rel="noreferrer">Open OKX.AI and search Agent #{_escape(agent.agent_id)}</a></p>
+    <p class="source-link">{avatar_link} | <a href="https://www.okx.ai/" rel="noreferrer">Open OKX.AI and search Agent #{_escape(agent.agent_id)}</a></p>
   </div>
 </section>
 <section class="data-grid" aria-label="Marketplace statistics">
@@ -185,10 +186,11 @@ def _render_agent_page(
 </section>
 <p class="snapshot-note">Marketplace snapshot fetched {_escape(fetched_at)}.</p>
 """
-    return _page_shell(
+    return page_shell(
         f"{agent.name or 'Unnamed agent'} | Warden Security Index",
         f"Public listing-text scan for OKX.AI Agent #{agent.agent_id}.",
         body,
+        active="agents",
     )
 
 
@@ -218,10 +220,10 @@ def _render_index_page(
         rows.append(
             f"""<a class="agent-row" href="/agents/{_escape(agent.agent_id)}" data-category="{_escape(" ".join(agent.category_codes))}" data-match="{"yes" if has_match else "no"}">
   <span><strong>{_escape(agent.name or "Unnamed agent")}</strong><small>Agent #{_escape(agent.agent_id)}</small></span>
-  <span>{_escape(", ".join(agent.category_codes) or "Uncategorized")}</span>
-  <span class="num">{_number(agent.sold_count)}</span>
-  <span>{_escape(indexed.verdict or "NOT_SCANNED")}</span>
-  <span class="num">{_buyer_review(agent.security_rate)}</span>
+  <span data-label="Category">{_escape(", ".join(agent.category_codes) or "Uncategorized")}</span>
+  <span class="num" data-label="Sold">{_number(agent.sold_count)}</span>
+  <span data-label="Text scan">{_escape(indexed.verdict or "NOT_SCANNED")}</span>
+  <span class="num" data-label="Buyer reviews">{_buyer_review(agent.security_rate)}</span>
 </a>"""
         )
 
@@ -230,7 +232,7 @@ def _render_index_page(
 <section class="index-hero">
   <p class="eyebrow">OKX.AI marketplace security index</p>
   <h1><span class="num">{summary.agent_count}</span> {agent_label} indexed</h1>
-  <p class="hero-text">{summary.matched_count} with injection-pattern matches in public text · {summary.audited_count} independently audited.</p>
+  <p class="hero-text">{summary.matched_count} with injection-pattern matches in public text | {summary.audited_count} independently audited.</p>
   <p class="caveat">All agents returned by the marketplace sweep at {_escape(fetched_at)}. Results cover public listing text only, not endpoint behavior.</p>
 </section>
 <section class="filter-bar" aria-label="Agent filters">
@@ -238,14 +240,16 @@ def _render_index_page(
   <label>Public-text match<select data-agent-match><option value="">All results</option><option value="yes">Pattern match</option><option value="no">No match</option></select></label>
 </section>
 <section>
+  <p class="snapshot-note"><span class="num" data-agent-visible>{summary.agent_count}</span> agents visible</p>
   <div class="agent-row agent-row--header" aria-hidden="true"><span>Agent</span><span>Category</span><span>Sold</span><span>Text scan</span><span>Buyer review average</span></div>
   <div data-agent-results>{"".join(rows)}</div>
 </section>
 """
-    return _page_shell(
+    return page_shell(
         "Marketplace Security Index | Warden",
         "Public listing-text scans for agents returned by the OKX.AI marketplace sweep.",
         body,
+        active="agents",
     )
 
 

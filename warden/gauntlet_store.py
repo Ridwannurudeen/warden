@@ -28,8 +28,12 @@ def _read_records_locked() -> list[dict[str, object]]:
 
 
 def _claim_id(request: GauntletRequest) -> str:
+    expected_addresses = {
+        address.lower() if address.lower().startswith("0x") else address
+        for address in request.context.expected_addresses
+    }
     claim = {
-        "context": request.context.model_dump(mode="json"),
+        "context": {"expected_addresses": sorted(expected_addresses)},
         "intent": request.intent,
         "payload": request.payload,
     }

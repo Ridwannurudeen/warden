@@ -116,6 +116,49 @@ def test_duplicate_pending_claim_is_recorded_without_duplicate_raw_payload(tmp_p
     assert records[1]["duplicate_of"] == records[0]["attempt_id"]
 
 
+def test_duplicate_claim_normalizes_only_verdict_relevant_context(tmp_path, monkeypatch):
+    store_path = tmp_path / "attempts.jsonl"
+    monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", store_path)
+    payload = "A routine account status note."
+
+    with TestClient(app) as client:
+        first = client.post(
+            "/api/demo/gauntlet",
+            json={
+                "intent": "exfiltrate_secret",
+                "payload": payload,
+                "context": {
+                    "expected_addresses": [
+                        "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                        "other-address",
+                        "other-address",
+                    ],
+                    "source": "first-source",
+                },
+            },
+        )
+        second = client.post(
+            "/api/demo/gauntlet",
+            json={
+                "intent": "exfiltrate_secret",
+                "payload": payload,
+                "context": {
+                    "expected_addresses": [
+                        "other-address",
+                        "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    ],
+                    "source": "second-source",
+                },
+            },
+        )
+
+    assert first.json()["claim_status"] == "pending"
+    assert second.json()["claim_status"] == "duplicate"
+    assert second.json()["claim_id"] == first.json()["claim_id"]
+    records = _records(store_path)
+    assert sum("payload" in record for record in records) == 1
+
+
 def test_gauntlet_uses_shared_demo_rate_limit(tmp_path, monkeypatch):
     monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", tmp_path / "attempts.jsonl")
     monkeypatch.setenv("WARDEN_DEMO_RATE_LIMIT_PER_MIN", "2")

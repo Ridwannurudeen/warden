@@ -3,7 +3,9 @@
 
   function decodeBase64(value) {
     if (typeof root.atob === "function") {
-      const bytes = Uint8Array.from(root.atob(value), (character) => character.charCodeAt(0));
+      const bytes = Uint8Array.from(root.atob(value), (character) =>
+        character.charCodeAt(0),
+      );
       return new TextDecoder().decode(bytes);
     }
     return Buffer.from(value, "base64").toString("utf8");
@@ -17,7 +19,7 @@
     if (!/^\d+$/.test(normalized)) {
       throw new Error(`${label} must contain decimal digits only`);
     }
-    return normalized;
+    return normalized.replace(/^0+(?=\d)/, "");
   }
 
   function boundedText(value, label, required, maxLength) {
@@ -25,8 +27,14 @@
     if (!normalized && !required) {
       return "";
     }
-    if (!normalized || normalized.length > maxLength || /[\0\r\n]/.test(normalized)) {
-      throw new Error(`${label} must be a single line of at most ${maxLength} characters`);
+    if (
+      !normalized ||
+      normalized.length > maxLength ||
+      /[\0\r\n]/.test(normalized)
+    ) {
+      throw new Error(
+        `${label} must be a single line of at most ${maxLength} characters`,
+      );
     }
     return normalized;
   }
@@ -51,7 +59,9 @@
     }
     const [whole, fraction = ""] = String(service.feeAmount).split(".");
     if (!/^\d+$/.test(whole) || !/^\d{0,6}$/.test(fraction)) {
-      throw new Error("Service fee cannot be represented in six-decimal USDT units");
+      throw new Error(
+        "Service fee cannot be represented in six-decimal USDT units",
+      );
     }
     const expectedAmount = (
       BigInt(whole) * 1000000n +
@@ -62,12 +72,15 @@
         candidate &&
         candidate.scheme === "exact" &&
         candidate.network === "eip155:196" &&
-        String(candidate.asset || "").toLowerCase() === service.feeTokenAddress.toLowerCase() &&
+        String(candidate.asset || "").toLowerCase() ===
+          service.feeTokenAddress.toLowerCase() &&
         candidate.extra?.name === "USDT" &&
         String(candidate.amount) === expectedAmount,
     );
     if (!acceptance) {
-      throw new Error("Payment terms do not match the selected service asset or amount on X Layer");
+      throw new Error(
+        "Payment terms do not match the selected service asset or amount on X Layer",
+      );
     }
     return acceptance;
   }
@@ -80,10 +93,17 @@
     try {
       challenge = JSON.parse(decodeBase64(encoded));
     } catch (error) {
-      throw new Error("The payment-required header is not valid base64 JSON", { cause: error });
+      throw new Error("The payment-required header is not valid base64 JSON", {
+        cause: error,
+      });
     }
-    if (challenge.x402Version !== 2 || challenge.resource?.url !== service.endpoint) {
-      throw new Error("The payment challenge endpoint does not match the selected service");
+    if (
+      challenge.x402Version !== 2 ||
+      challenge.resource?.url !== service.endpoint
+    ) {
+      throw new Error(
+        "The payment challenge endpoint does not match the selected service",
+      );
     }
     acceptanceFor(service, challenge.accepts);
     return challenge;
@@ -91,7 +111,9 @@
 
   function parsePaymentResponse(status, encoded, service) {
     if (status !== 402) {
-      throw new Error(`Expected a 402 payment challenge but received HTTP ${status}`);
+      throw new Error(
+        `Expected a 402 payment challenge but received HTTP ${status}`,
+      );
     }
     return parsePaymentRequiredHeader(encoded, service);
   }
@@ -102,26 +124,39 @@
       throw new Error("Request body must be a JSON object");
     }
     if (service.key === "scan") {
-      if (typeof body.payload !== "string" || !body.payload || body.payload.length > 100000) {
+      if (
+        typeof body.payload !== "string" ||
+        !body.payload ||
+        body.payload.length > 100000
+      ) {
         throw new Error("Scan payload must contain 1 to 100,000 characters");
       }
       if (
         body.context !== undefined &&
-        (!body.context || typeof body.context !== "object" || Array.isArray(body.context))
+        (!body.context ||
+          typeof body.context !== "object" ||
+          Array.isArray(body.context))
       ) {
         throw new Error("Scan context must be a JSON object");
       }
       return;
     }
     if (service.key === "audit") {
-      if (typeof body.target_url !== "string" || body.target_url.length > 2048) {
-        throw new Error("Audit target_url must contain at most 2,048 characters");
+      if (
+        typeof body.target_url !== "string" ||
+        body.target_url.length > 2048
+      ) {
+        throw new Error(
+          "Audit target_url must contain at most 2,048 characters",
+        );
       }
       let target;
       try {
         target = new URL(body.target_url);
       } catch (error) {
-        throw new Error("Audit target_url must be a valid URL", { cause: error });
+        throw new Error("Audit target_url must be a valid URL", {
+          cause: error,
+        });
       }
       if (!/^https?:$/.test(target.protocol)) {
         throw new Error("Audit target_url must use HTTP or HTTPS");
@@ -129,12 +164,19 @@
       if (target.username || target.password) {
         throw new Error("Audit target_url must not contain credentials");
       }
-      if (!Array.isArray(body.sample_prompts) || body.sample_prompts.length > 20) {
-        throw new Error("Audit sample_prompts must be an array with at most 20 entries");
+      if (
+        !Array.isArray(body.sample_prompts) ||
+        body.sample_prompts.length > 20
+      ) {
+        throw new Error(
+          "Audit sample_prompts must be an array with at most 20 entries",
+        );
       }
       return;
     }
-    throw new Error("The selected service does not have a supported request body");
+    throw new Error(
+      "The selected service does not have a supported request body",
+    );
   }
 
   function buildCommands({
@@ -147,16 +189,26 @@
     shell = "powershell",
     verdictConfirmed = false,
   }) {
-    const provider = decimalIdentifier(providerAgentId, "provider agent ID", true);
+    const provider = decimalIdentifier(
+      providerAgentId,
+      "provider agent ID",
+      true,
+    );
     const serviceId = decimalIdentifier(service.serviceId, "service ID", true);
     const job = boundedText(jobId, "job ID", false, 256);
-    const reviewer = decimalIdentifier(reviewerAgentId, "reviewer agent ID", false);
+    const reviewer = decimalIdentifier(
+      reviewerAgentId,
+      "reviewer agent ID",
+      false,
+    );
     if (reviewer && (reviewer === provider || reviewer === "4844")) {
       throw new Error(`Agent #${reviewer} must not review Warden`);
     }
     const normalizedScore = String(score).trim();
     if (!/^(?:[0-4](?:\.\d{1,2})?|5(?:\.0{1,2})?)$/.test(normalizedScore)) {
-      throw new Error("Review score must be between 0 and 5 with at most two decimals");
+      throw new Error(
+        "Review score must be between 0 and 5 with at most two decimals",
+      );
     }
     if (service.serviceType !== "A2MCP") {
       throw new Error("The selected service must use A2MCP");
@@ -170,10 +222,25 @@
     }
     validateRequestBody(service);
     const acceptance = acceptanceFor(service, accepts);
-    const tokenSymbol = boundedText(acceptance.extra?.name, "token symbol", true, 16);
+    const tokenSymbol = boundedText(
+      acceptance.extra?.name,
+      "token symbol",
+      true,
+      16,
+    );
     const taskTitle = boundedText(service.taskTitle, "task title", true, 128);
-    const taskDescription = boundedText(service.taskDescription, "task description", true, 512);
-    const serviceParams = boundedText(service.serviceParams, "service parameters", true, 512);
+    const taskDescription = boundedText(
+      service.taskDescription,
+      "task description",
+      true,
+      512,
+    );
+    const serviceParams = boundedText(
+      service.serviceParams,
+      "service parameters",
+      true,
+      512,
+    );
     const quote = (value) => quoteArgument(value, shell);
 
     const commands = [
@@ -224,7 +291,9 @@
   const reviewerInput = root.document.querySelector("[data-reviewer-id]");
   const scoreInput = root.document.querySelector("[data-review-score]");
   const requestBody = root.document.querySelector("[data-request-body]");
-  const verdictConfirmed = root.document.querySelector("[data-verdict-confirmed]");
+  const verdictConfirmed = root.document.querySelector(
+    "[data-verdict-confirmed]",
+  );
   const serviceSummary = root.document.querySelector("[data-service-summary]");
   const acceptsStatus = root.document.querySelector("[data-accepts-status]");
   const acceptsOutput = root.document.querySelector("[data-accepts-output]");
@@ -233,17 +302,24 @@
   let challenge = null;
 
   function selectedService() {
-    return catalog?.services.find((service) => service.serviceId === serviceSelect.value) || null;
+    return (
+      catalog?.services.find(
+        (service) => service.serviceId === serviceSelect.value,
+      ) || null
+    );
   }
 
   function setCommands(commands) {
     commands.forEach((command, index) => {
       const step = index + 1;
-      const output = root.document.querySelector(`[data-command-step="${step}"]`);
+      const output = root.document.querySelector(
+        `[data-command-step="${step}"]`,
+      );
       const button = root.document.querySelector(`[data-copy-step="${step}"]`);
       let lockedMessage = "Enter the job ID above.";
       if (step === 5) {
-        lockedMessage = "Confirm that you received a verdict to unlock this step.";
+        lockedMessage =
+          "Confirm that you received a verdict to unlock this step.";
       } else if (step === 6) {
         lockedMessage = "Confirm the verdict and enter your reviewer agent ID.";
       }
@@ -260,7 +336,10 @@
       return;
     }
     try {
-      const configuredService = { ...service, requestBody: JSON.parse(requestBody.value) };
+      const configuredService = {
+        ...service,
+        requestBody: JSON.parse(requestBody.value),
+      };
       const commands = buildCommands({
         providerAgentId: catalog.providerAgentId,
         service: configuredService,
@@ -291,14 +370,18 @@
     acceptsOutput.textContent = "[]";
     try {
       const endpointPath = new URL(service.endpoint).pathname;
-      const response = await root.fetch(endpointPath, { method: "GET", cache: "no-store" });
+      const response = await root.fetch(endpointPath, {
+        method: "GET",
+        cache: "no-store",
+      });
       challenge = parsePaymentResponse(
         response.status,
         response.headers.get("payment-required"),
         service,
       );
       acceptsOutput.textContent = JSON.stringify(challenge.accepts, null, 2);
-      acceptsStatus.textContent = "Current terms loaded and matched to the selected listing.";
+      acceptsStatus.textContent =
+        "Current terms loaded and matched to the selected listing.";
       renderCommands();
     } catch (error) {
       acceptsStatus.textContent = `Could not load verified payment terms: ${error.message}`;
@@ -312,7 +395,10 @@
     loadChallenge();
   }
 
-  root.fetch("/data/warden-services.json", { headers: { accept: "application/json" } })
+  root
+    .fetch("/data/warden-services.json", {
+      headers: { accept: "application/json" },
+    })
     .then((response) => {
       if (!response.ok) {
         throw new Error("The service catalog is unavailable");
