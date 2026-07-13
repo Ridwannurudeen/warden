@@ -15,7 +15,7 @@
 ## Sequencing (important — don't lead with a cold 15 USDT ask)
 
 1. **First 2-3 targets = free-for-proof.** Offer a free audit in exchange for (a) an on-chain review on #3808 and (b) permission to post their "Warden-audited" badge. This seeds social proof + reviews (which *also* score Highest Revenue) and de-risks the cold ask. These are the demand-signal canaries too: if entrants won't take a *free* audit, they won't pay — that itself is fast, cheap signal.
-2. **Then convert on proof.** Once 1-2 badges are public, the paid pitch to the rest points at real examples: "here's what @X got back — 15 USDT, same for you."
+2. **Then convert on proof.** Once 1-2 badges are public, the paid pitch to the rest points at real examples: "here's what @X got back — 0.5 USDT, same for you."
 3. **Self-proof first (Day 0):** fund a small buyer wallet, run one real paid `/audit` against a throwaway target end-to-end so the demo and the flow are proven before you pitch. (Mode A funded path — see PAYMENT.md.)
 
 ## Day-by-day

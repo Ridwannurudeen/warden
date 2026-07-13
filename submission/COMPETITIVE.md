@@ -33,6 +33,11 @@ Verified on-platform 2026-07-06 via `agent search` + `agent get-agents` + `servi
 
 Free, brand-trusted SlowMist offers overlapping **audit/review** services (their #3 URL-injection ≈ Warden scan; their #5 product review ≈ Warden `audit_agent`). **Warden's paid `audit_agent` (15 USDT) competes against "free, from a famous firm."** That pitch is weak. Do not build the revenue thesis on paid audits — SlowMist undercuts it.
 
+**Repriced 2026-07-13 to 0.5 USDT** (for a PolicyPool coverage integration, not a response to this
+critique — but it happens to blunt it: a near-zero-cost audit is a much harder "free vs. paid" fight
+to lose than a $15 one). The core conclusion still holds — don't build the *primary* revenue thesis
+on audits, lead with the runtime scan — but the audit is no longer purely a loss-leader.
+
 ## Where Warden wins — a lane SlowMist has NOT taken
 
 None of SlowMist's 6 services is a **runtime, per-payload firewall in the agent loop.** They do periodic, human-firm-style audits. That is a different job from what Warden's `scan_payload` actually is. Reframe Warden accordingly:

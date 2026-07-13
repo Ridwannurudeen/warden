@@ -120,7 +120,7 @@ if os.getenv("OKX_API_KEY"):
         accepts=[
             PaymentOption(
                 scheme="exact",
-                price="$15",
+                price="$0.5",
                 network=_NETWORK,
                 pay_to=_pay_to,
                 max_timeout_seconds=300,

@@ -23,7 +23,7 @@ Keep the terminal zoomed enough that `BLOCK`, `DRAIN_ADDRESS`, and `valid: true`
 | 20-38s | Click **Run Warden**; reveal the structured result | "The free playground uses Warden's real deterministic fast path. It returns BLOCK with DRAIN_ADDRESS and redacts the attacker address before execution." |
 | 38-52s | Result JSON | "The verdict, risk level, threat classes, sanitized payload, and checks are machine-readable so an agent can enforce the decision." |
 | 52-65s | Terminal `Live payment gate` from Mode B | "The production endpoint remains paywalled with x402 v2 on X Layer. This recording uses the no-funds path, so no private key or token spend is shown." |
-| 65-80s | `/hire` reviewable task flow | "Operators can hire the 0.01 USDT payload scan or 15 USDT endpoint audit through a task, receive the result, and then leave an honest task-linked review." |
+| 65-80s | `/hire` reviewable task flow | "Operators can hire the 0.01 USDT payload scan or 0.5 USDT endpoint audit through a task, receive the result, and then leave an honest task-linked review." |
 | 80-90s | `/agents` marketplace security index | "Agent 3808 was listed and eligible when verified on July 13. The index reports only patterns in public listing text, not a claim that an endpoint is secure." |
 
 ## On-Screen Commands

@@ -73,6 +73,12 @@ free one-off audit as the lead-magnet** to seed reviews + badges. Do NOT lead wi
 SlowMist audits free, so a 15 USDT audit pitch loses. Cite Warden's OWN measured number
 (median verdict 0.13 ms), never "faster than SlowMist" (their latency is unmeasured).
 
+**Repriced 2026-07-13: audit is now 0.5 USDT, not 15** (was cut to unlock a PolicyPool coverage
+integration — see ROADMAP.md). At 0.5 USDT the "loses against SlowMist's free" critique above is
+much weaker; a near-zero-cost audit is a viable wedge on its own, not just a lead-magnet. Still
+lead outreach with the runtime scan — that's the real recurring-revenue product — but the audit
+pitch no longer needs to be positioned as a loss-leader.
+
 ## Templates
 
 ### A. Entrant DM / reply (EN) — runtime firewall lead
@@ -112,7 +118,7 @@ SlowMist audits free, so a 15 USDT audit pitch loses. Cite Warden's OWN measured
 - Never spam: one contact per project, one follow-up max after 48h.
 - Honest claims only: we do NOT guarantee passing OKX review; we test against a published
   corpus. Never imply OKX endorses or requires Warden. Never claim we're faster than SlowMist.
-- Every claim must stay true to the live service (0.01 USDT/call scan, 15 USDT audit, x402,
+- Every claim must stay true to the live service (0.01 USDT/call scan, 0.5 USDT audit, x402,
   median 0.13 ms verdict compute). Update templates if pricing/latency changes.
 - All actual posting/DMs are user-executed (accounts are user-owned).
 
