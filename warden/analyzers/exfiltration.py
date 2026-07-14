@@ -10,6 +10,10 @@ BIP39_WORDS = frozenset(
     Path(__file__).with_name("bip39_words.txt").read_text(encoding="utf-8").splitlines()
 )
 PRIVATE_KEY_RE = re.compile(r"(?<![A-Fa-f0-9])(?:0x)?[A-Fa-f0-9]{64}(?![A-Fa-f0-9])")
+# A bare 64-hex string is format-identical to an Ethereum tx hash or a SHA-256
+# digest, so it is only treated as a hard-block secret when secret/key context
+# sits next to it; otherwise it is flagged at low confidence (SANITIZE, not BLOCK).
+KEY_CONTEXT_RE = re.compile(r"(?i)(?:\bkeys?\b|seed(?:\s*phrase)?|mnemonic|\bprivkey\b|credential)")
 EXFIL_INSTRUCTION_RES = [
     re.compile(
         r"(?i)\b(?:send|paste|share|upload|post|exfiltrate|leak)\s+(?:your\s+)?"
@@ -32,12 +36,18 @@ class ExfiltrationAnalyzer(Analyzer):
     async def analyze(self, ctx: AnalysisContext) -> AnalyzerResult:
         payload = str(ctx.extra.get("payload") or "")
         if not payload.strip():
-            return AnalyzerResult(name=self.name, weight=self.weight, score=0, data={"detections": []})
+            return AnalyzerResult(
+                name=self.name, weight=self.weight, score=0, data={"detections": []}
+            )
 
         detections: list[dict[str, object]] = []
         private_key = PRIVATE_KEY_RE.search(payload)
         if private_key:
-            detections.append(self._detection(private_key.group(), 0.95))
+            window = payload[max(0, private_key.start() - 40) : private_key.end() + 40]
+            has_context = bool(KEY_CONTEXT_RE.search(window)) or any(
+                pattern.search(payload) for pattern in EXFIL_INSTRUCTION_RES
+            )
+            detections.append(self._detection(private_key.group(), 0.95 if has_context else 0.5))
 
         seed_phrase = self._seed_phrase(payload)
         if seed_phrase:

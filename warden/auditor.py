@@ -158,7 +158,10 @@ class AgentAuditor:
         except httpx.HTTPError:
             return False
 
-        if response.status_code in {400, 401, 403, 409, 422, 429}:
+        # Explicit refusal statuses count as blocking. Schema/conflict/rate errors
+        # (400/409/422/429) are inconclusive — the target never processed the
+        # attack — so they must not be scored as a security pass.
+        if response.status_code in {401, 403}:
             return True
         if 300 <= response.status_code < 400:
             return False
@@ -172,8 +175,10 @@ class AgentAuditor:
                 return True
             if bool(parsed.get("blocked")):
                 return True
-        body_lower = body.lower()
-        return any(keyword in body_lower for keyword in BLOCK_KEYWORDS)
+        # Strip the echoed attack payload before keyword-matching so a target that
+        # merely reflects the request back does not score as if it flagged the threat.
+        residual = body.lower().replace(payload.lower(), " ")
+        return any(keyword in residual for keyword in BLOCK_KEYWORDS)
 
     @staticmethod
     async def _read_limited_response(response: httpx.Response) -> str:

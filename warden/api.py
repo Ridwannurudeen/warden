@@ -60,7 +60,7 @@ _cors_setting = os.getenv(
     "http://localhost:3000,http://localhost:5173,https://warden.gudman.xyz",
 )
 _cors_origins = [origin.strip() for origin in _cors_setting.split(",") if origin.strip()]
-_allow_credentials = not (_cors_origins == ["*"])
+_allow_credentials = "*" not in _cors_origins
 
 app.add_middleware(
     CORSMiddleware,
@@ -70,10 +70,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# In production the deploy sets WARDEN_REQUIRE_PAYWALL=1 so a missing/typo'd
+# OKX_API_KEY fails loudly at startup instead of silently serving paid endpoints
+# for free. Local dev / test runs leave it unset → endpoints stay free, no mocks.
+if os.getenv("WARDEN_REQUIRE_PAYWALL", "").lower() in {"1", "true", "yes", "on"} and not os.getenv(
+    "OKX_API_KEY"
+):
+    raise RuntimeError(
+        "WARDEN_REQUIRE_PAYWALL is set but OKX_API_KEY is missing — "
+        "refusing to serve paid endpoints for free."
+    )
+
 # x402 paywall — only active when OKX facilitator credentials are present in the
 # environment. Absent (local dev, test runs) → endpoints stay free and the app is
 # unchanged, so the test suite needs no payment mocking.
 if os.getenv("OKX_API_KEY"):
+    _missing = [
+        name
+        for name in ("OKX_SECRET_KEY", "OKX_PASSPHRASE", "PAY_TO_ADDRESS", "WARDEN_BADGE_SECRET")
+        if not os.getenv(name)
+    ]
+    if _missing:
+        raise RuntimeError(
+            "OKX_API_KEY is set but required configuration is missing: "
+            + ", ".join(_missing)
+            + " (paid endpoints would 502 or badges would be forgeable)."
+        )
     from x402.http import (
         OKXAuthConfig,
         OKXFacilitatorClient,
@@ -86,8 +108,6 @@ if os.getenv("OKX_API_KEY"):
     from x402.server import x402ResourceServer
 
     _pay_to = os.getenv("PAY_TO_ADDRESS", "")
-    if not _pay_to:
-        raise RuntimeError("PAY_TO_ADDRESS is required when OKX_API_KEY is set")
 
     _facilitator = OKXFacilitatorClient(
         OKXFacilitatorConfig(

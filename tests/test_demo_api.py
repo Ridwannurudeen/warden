@@ -136,6 +136,7 @@ assert 'payment-required' not in response.headers
             "OKX_PASSPHRASE": "demo-test-passphrase",
             "OKX_BASE_URL": "http://127.0.0.1:9",
             "PAY_TO_ADDRESS": "0x0000000000000000000000000000000000000001",
+            "WARDEN_BADGE_SECRET": "test-badge-secret",
             "WARDEN_DEMO_RATE_LIMIT_PER_MIN": "0",
         }
     )

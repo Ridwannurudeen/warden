@@ -5,7 +5,7 @@ import re
 from warden.core.analyzer import AnalysisContext, Analyzer, AnalyzerResult
 from warden.core.verdict import ReasonCode
 
-EVM_ADDRESS_RE = re.compile(r"0x[a-fA-F0-9]{40}")
+EVM_ADDRESS_RE = re.compile(r"0x[a-fA-F0-9]{40}(?![a-fA-F0-9])")
 SOLANA_ADDRESS_RE = re.compile(r"(?<![A-Za-z0-9])([1-9A-HJ-NP-Za-km-z]{32,44})(?![A-Za-z0-9])")
 TRANSFER_INTENT_RE = re.compile(
     r"(?i)\b(send|transfer|pay|deposit|withdraw|recipient|payment|funds|to address"
@@ -25,7 +25,9 @@ class DrainAddressAnalyzer(Analyzer):
     async def analyze(self, ctx: AnalysisContext) -> AnalyzerResult:
         payload = str(ctx.extra.get("payload") or "")
         if not payload.strip():
-            return AnalyzerResult(name=self.name, weight=self.weight, score=0, data={"detections": []})
+            return AnalyzerResult(
+                name=self.name, weight=self.weight, score=0, data={"detections": []}
+            )
 
         expected_addresses = ctx.extra.get("expected_addresses", [])
         has_expected = bool(expected_addresses)
@@ -57,7 +59,9 @@ class DrainAddressAnalyzer(Analyzer):
             address = match.group(1)
             if address in expected_other:
                 continue
-            confidence = self._confidence(payload, match.start(1), match.end(1), False, has_expected)
+            confidence = self._confidence(
+                payload, match.start(1), match.end(1), False, has_expected
+            )
             if confidence:
                 detections.append(self._detection(address, confidence))
 

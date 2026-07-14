@@ -15,7 +15,10 @@ INJECTION_PATTERNS = {
         r"(?i)reveal\s+(?:the\s+)?(?:system|developer)\s+prompt",
     ],
     "role_override": [
-        r"(?i)you\s+are\s+(?:now\s+)?(?:a|an)\s+",
+        r"(?i)you\s+are\s+(?:now\s+)?(?:a|an)\s+(?:[\w-]+\s+){0,4}"
+        r"(?:assistant|agent|ai|model|bot|admin(?:istrator)?|operator|drainer|persona"
+        r"|character|hacker|jailbreak\w*|oracle|approver|executor|entity|dan|"
+        r"unrestricted|unfiltered|uncensored)",
         r"(?i)act\s+as\s+(?:if\s+)?(?:you\s+are\s+)?",
         r"(?i)pretend\s+(?:to\s+be|you\s+are)",
         r"(?i)your\s+(?:new\s+)?(?:role|identity|persona)\s+is",
@@ -81,22 +84,72 @@ HEURISTIC_WEIGHTS = {
 }
 
 # Imperative verbs for instruction density analysis
-IMPERATIVE_VERBS = frozenset({
-    "transfer", "send", "approve", "execute", "call", "set",
-    "override", "ignore", "forget", "disregard", "delete", "remove",
-    "change", "modify", "update", "replace", "switch", "swap",
-    "withdraw", "deposit", "mint", "burn", "migrate", "upgrade",
-    "claim", "redeem", "sign", "confirm", "click", "visit",
-    "connect", "authorize", "grant", "revoke",
-})
+IMPERATIVE_VERBS = frozenset(
+    {
+        "transfer",
+        "send",
+        "approve",
+        "execute",
+        "call",
+        "set",
+        "override",
+        "ignore",
+        "forget",
+        "disregard",
+        "delete",
+        "remove",
+        "change",
+        "modify",
+        "update",
+        "replace",
+        "switch",
+        "swap",
+        "withdraw",
+        "deposit",
+        "mint",
+        "burn",
+        "migrate",
+        "upgrade",
+        "claim",
+        "redeem",
+        "sign",
+        "confirm",
+        "click",
+        "visit",
+        "connect",
+        "authorize",
+        "grant",
+        "revoke",
+    }
+)
 
 # Instruction-like keywords for context switch detection
-INSTRUCTION_KEYWORDS = frozenset({
-    "ignore", "forget", "disregard", "override", "instead",
-    "new", "instructions", "prompt", "rules", "now", "you",
-    "must", "should", "always", "never", "transfer", "approve",
-    "send", "execute", "urgent", "immediately", "admin",
-})
+INSTRUCTION_KEYWORDS = frozenset(
+    {
+        "ignore",
+        "forget",
+        "disregard",
+        "override",
+        "instead",
+        "new",
+        "instructions",
+        "prompt",
+        "rules",
+        "now",
+        "you",
+        "must",
+        "should",
+        "always",
+        "never",
+        "transfer",
+        "approve",
+        "send",
+        "execute",
+        "urgent",
+        "immediately",
+        "admin",
+    }
+)
 
 # ── Layer 3: Known injection corpus ────────────────────────────────────
 

@@ -149,10 +149,32 @@ class VerdictEngine:
                 failed_checks=[],
             )
 
+        # SANITIZE means the returned payload is safe to use. If nothing was
+        # actually removed (e.g. a tool-hijack, which the redactor cannot rewrite),
+        # do not hand back the untouched attack labelled "sanitized" — block it.
+        if detections and sanitized_payload == payload:
+            checks["risk_band"] = f"block - threat present but not sanitizable (score {score:.1f})"
+            unsanitizable_risk = self._risk_level(score, scanner_risk, hard_block=False)
+            if unsanitizable_risk in ("NONE", "LOW"):
+                unsanitizable_risk = "MEDIUM"
+            return Verdict(
+                verdict="BLOCK",
+                risk_level=unsanitizable_risk,
+                threat_classes=threat_classes,
+                detections=detections,
+                sanitized_payload=sanitized_payload,
+                recommendation="Block this payload. Warden could not neutralize the detected threat.",
+                checks=checks,
+                failed_checks=threat_classes,
+            )
+
         checks["risk_band"] = f"sanitize - score {score:.1f} in review band or detections present"
+        risk_level = self._risk_level(score, scanner_risk, hard_block=False)
+        if detections and risk_level == "NONE":
+            risk_level = "LOW"
         return Verdict(
             verdict="SANITIZE",
-            risk_level=self._risk_level(score, scanner_risk, hard_block=False),
+            risk_level=risk_level,
             threat_classes=threat_classes,
             detections=detections,
             sanitized_payload=sanitized_payload,
