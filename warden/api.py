@@ -213,6 +213,18 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+# OKX's create-task auto-replay re-requests the paid resource with GET but does
+# not forward a business body, so a service that needs input (scan/audit) has
+# nothing to act on. The supported path for such services is task-402-pay --body
+# (which warden.gudman.xyz/hire generates). This hint turns the 400 into a
+# self-service recovery for anyone inspecting a task frozen in `accepted`.
+_RECOVERY_HINT = (
+    " If your task froze in `accepted` after paying, OKX's auto-replay sent no "
+    "body — re-send with `task-402-pay --body '{...}'` or use "
+    "https://warden.gudman.xyz/hire. No charge was made for this request."
+)
+
+
 async def _get_request_fields(request: Request) -> dict[str, object]:
     """Read a paid GET's fields from the query string, or a JSON body if one was sent.
 
@@ -255,7 +267,8 @@ async def scan_get(request: Request) -> ScanResponse:
     except ValidationError as exc:
         raise HTTPException(
             status_code=400,
-            detail="Provide the payload to scan as a 'payload' query parameter or JSON body field.",
+            detail="Provide the payload to scan as a 'payload' query parameter or JSON body field."
+            + _RECOVERY_HINT,
         ) from exc
     return await scan(req)
 
@@ -344,7 +357,8 @@ async def audit_get(request: Request) -> AuditResponse:
     except ValidationError as exc:
         raise HTTPException(
             status_code=400,
-            detail="Provide the endpoint to audit as a 'target_url' query parameter or JSON body field.",
+            detail="Provide the endpoint to audit as a 'target_url' query parameter or JSON body field."
+            + _RECOVERY_HINT,
         ) from exc
     return await audit(req)
 
