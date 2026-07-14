@@ -1,5 +1,13 @@
 # Warden — Entrant Outreach Kit (Highest Revenue campaign)
 
+> **⚠⚠ STALE AS OF 2026-07-14 — DO NOT SEND AS-IS. Pricing changed: both services are now 0.5 USDT
+> (scan raised 0.01→0.5 to dodge the OKX agent-min price flap). Every "0.01 USDT/call", "cheap",
+> "drop it in your loop per-call", and "runtime firewall you run on every payload" line below is now
+> FALSE and, worse, off-strategy: at 0.5/call you can't pitch "screen every payload cheaply," and
+> Warden is no longer cheaper than Prompt Guard (0.25). These templates need a genuine reposition
+> (premium per-call security check, not a cheap volume firewall) before use — see COMPETITIVE.md.**
+
+
 Goal: paid `scan_payload` / `audit_agent` orders from distinct entrant wallets before the deadline —
 revenue + orders + positive reviews during the campaign window are the literal judging criteria for
 the Highest Revenue Award (10k/6k/4k USDT).

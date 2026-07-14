@@ -30,7 +30,7 @@ Current corpus: 92 attack cases, 30 benign guards, 0 false positives in the gate
 
 4. Two services are attached to Agent #3808, live on X Layer via x402:
 
-- Payload Security Scan (runtime firewall, in your agent loop): 0.01 USDT/call
+- Payload Security Scan (runtime firewall, in your agent loop): 0.5 USDT/call
 - Agent Endpoint Security Audit (pre-listing, one-off): 0.5 USDT
 
 Verified end-to-end: a real paid /scan call settled on-chain over x402.

@@ -52,7 +52,7 @@ Differentiators Warden can win on, cleanly, without touching SlowMist's brand ad
 | Latency | unknown (their speed NOT measured) | **measured: verdict compute p50 0.13ms / max 1.12ms over 118 payloads; end-to-end HTTP p50 2.54ms local. VPS figure not yet measured.** No LLM in the verdict path. |
 | Integration | submit content, await report | **drop-in per-call** (0.01 USDT), fits high-frequency loop use |
 | Verifiability | opaque report | **HMAC-signed, publicly verifiable badge** (already built) |
-| Pricing model | free (no SLA, no revenue) | micro-fee per call → real revenue, scales with volume |
+| Pricing model | free (no SLA, no revenue) | per-call revenue at 0.5 USDT/call → real revenue; premium per-call check (NOT a high-volume micro-fee model — both services 0.5 as of 2026-07-14) |
 | Determinism | LLM/analyst judgment | published corpus, zero-flake, reproducible verdict |
 
 ## Derived positioning & minimal infra changes (NOT a rebuild)
@@ -85,5 +85,5 @@ The build is done; this is repositioning + small additive sharpening, not a new 
 
 **Implications:**
 1. Ranking is winnable *now* while the whole lane sits at 0 sold/0 feedback — first to accumulate sales+reviews locks the top spot (see #2118).
-2. Warden's real edges vs the paid field: 25× cheaper than Prompt Guard (0.01 vs 0.25), drain-address specialization, <1s deterministic verdict, signed badge.
+2. Warden's real edges vs the paid field (⚠ price edge REMOVED 2026-07-14: both services now 0.5 USDT to dodge the OKX agent-min price flap, so Warden is NO LONGER cheaper than Prompt Guard — it is now ~2× its 0.25; the "cheap per-call volume firewall" thesis no longer holds): drain-address specialization, <1s deterministic verdict, signed verifiable badge. Repositioning needed — premium per-call security check, not a price-undercut/volume play.
 3. **Highest-leverage optimization = rewrite the scan service description to include the missing buyer vocabulary** ("poisoned response," "hijacked tool call," "drain," "attacker wallet," "hidden instructions," "before you act") so Warden surfaces for its own core use cases. Requires `agent update` on #3808 → re-triggers QA/review (temporary de-listing risk) — decision pending.
