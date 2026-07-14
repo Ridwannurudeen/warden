@@ -1264,6 +1264,10 @@ form > label {
 }
 
 .action-gate {
+  /* One shared cycle keeps every gate element choreographed on the same
+     timeline, so no per-element delay can drift out of sync. */
+  --gate-cycle: 5600ms;
+
   min-width: 0;
   margin: 0;
   overflow: hidden;
@@ -1386,7 +1390,10 @@ form > label {
   width: 56px;
   height: 2px;
   background: linear-gradient(to right, transparent, var(--accent));
-  animation: gate-scan 720ms ease-out 1 both;
+}
+
+.action-gate .gate-trace {
+  animation: gate-scan var(--gate-cycle) linear infinite;
 }
 
 .gate-trace::after {
@@ -1401,12 +1408,132 @@ form > label {
   content: "";
 }
 
+.action-gate .gate-cell {
+  animation: gate-impact var(--gate-cycle) linear infinite;
+}
+
+.action-gate .gate-rail {
+  animation: gate-rail-flash var(--gate-cycle) linear infinite;
+}
+
+.action-gate .gate-cell > div {
+  animation: gate-stamp var(--gate-cycle) linear infinite;
+}
+
+.action-gate .gate-payload strong {
+  animation: gate-payload-flag var(--gate-cycle) linear infinite;
+}
+
+.action-gate .gate-prevented strong,
+.action-gate .gate-prevented p:last-child {
+  animation: gate-prevented-in var(--gate-cycle) linear infinite;
+}
+
+.action-gate .gate-prevented p:last-child {
+  animation-name: gate-prevented-in-late;
+}
+
+/* Travels out of the untrusted payload, across the boundary, into the gate. */
 @keyframes gate-scan {
-  from {
+  0% {
     opacity: 0;
-    transform: translateX(-58px);
+    transform: translateX(-190px);
   }
-  to {
+  4% {
+    opacity: 1;
+  }
+  13% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  17%,
+  100% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+}
+
+/* The gate reacts at the moment of contact. */
+@keyframes gate-impact {
+  0%,
+  12% {
+    background: color-mix(in srgb, var(--danger) 4%, var(--surface));
+  }
+  16% {
+    background: color-mix(in srgb, var(--danger) 15%, var(--surface));
+  }
+  30%,
+  100% {
+    background: color-mix(in srgb, var(--danger) 4%, var(--surface));
+  }
+}
+
+@keyframes gate-rail-flash {
+  0%,
+  12% {
+    opacity: 0.5;
+  }
+  16% {
+    opacity: 1;
+  }
+  34%,
+  100% {
+    opacity: 0.5;
+  }
+}
+
+/* The verdict stamps down onto the payload. */
+@keyframes gate-stamp {
+  0%,
+  13% {
+    opacity: 0;
+    transform: scale(1.28);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(0.97);
+  }
+  24%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* The attacker address is what the verdict is about — mark it on contact. */
+@keyframes gate-payload-flag {
+  0%,
+  13% {
+    opacity: 0.55;
+  }
+  18%,
+  100% {
+    opacity: 1;
+  }
+}
+
+/* The consequence resolves only after the verdict exists. */
+@keyframes gate-prevented-in {
+  0%,
+  22% {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  32%,
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes gate-prevented-in-late {
+  0%,
+  28% {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  38%,
+  100% {
     opacity: 1;
     transform: translateX(0);
   }
