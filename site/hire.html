@@ -439,6 +439,15 @@
           </li>
         </ol>
         <p class="caveat">
+          <strong>If your task freezes in <code>accepted</code>:</strong> a task
+          created with x402 payment mode may come back with
+          <code>[x402 Replay Failed] HTTP 405</code>. That is OKX's automatic
+          replay failing on their side, not a Warden outage — the endpoint
+          answers a normal <code>task-402-pay</code> call. Nothing was charged.
+          Run step 2 above against a freshly fetched 402 challenge and the task
+          settles.
+        </p>
+        <p class="caveat">
           <strong>Security boundary:</strong> this website never receives wallet
           credentials or signing material. Inspect every generated command
           before running it.
