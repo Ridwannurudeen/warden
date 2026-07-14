@@ -1,26 +1,26 @@
 :root {
   color-scheme: dark;
-  --bg: #070a0f;
-  --bg-deep: #040609;
-  --surface: #0c121a;
-  --surface-raised: #111a25;
-  --surface-soft: #172231;
-  --ink: #f3f0e8;
-  --muted: #acb8c5;
-  --faint: #8798aa;
-  --line: #243142;
-  --line-strong: #3a4d63;
-  --cyan: #55d5ff;
-  --cyan-bright: #9ce8ff;
-  --mint: #39d99a;
-  --amber: #f2b84b;
-  --danger: #ff6578;
-  --focus: #78dcff;
-  --on-cyan: #03131d;
+  --bg: #0b0a08;
+  --bg-deep: #060505;
+  --surface: #14110c;
+  --surface-raised: #1b1712;
+  --surface-soft: #231e16;
+  --ink: #f6f1e7;
+  --muted: #c3baa9;
+  --faint: #9b9280;
+  --line: #2d2820;
+  --line-strong: #4c4433;
+  --accent: #e3b264;
+  --accent-bright: #f2cd8d;
+  --mint: #46d992;
+  --amber: #f0834d;
+  --danger: #ff6470;
+  --focus: #f2cd8d;
+  --on-accent: #201302;
   --on-mint: #042317;
-  --on-amber: #2b1b00;
+  --on-amber: #2b1000;
   --on-danger: #21070c;
-  --control-border: #526980;
+  --control-border: #7c7057;
   --allow: var(--mint);
   --sanitize: var(--amber);
   --block: var(--danger);
@@ -42,29 +42,29 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f4f2eb;
-  --bg-deep: #e9e6dc;
-  --surface: #fffdf7;
-  --surface-raised: #f0ede4;
-  --surface-soft: #e7e5de;
-  --ink: #111820;
-  --muted: #435463;
-  --faint: #556876;
-  --line: #c7d0d5;
-  --line-strong: #93a6b2;
-  --cyan: #006f93;
-  --cyan-bright: #005f80;
-  --mint: #087a51;
-  --amber: #865800;
-  --danger: #b52540;
-  --focus: #005f80;
-  --on-cyan: #fffdf7;
-  --on-mint: #fffdf7;
-  --on-amber: #fffdf7;
-  --on-danger: #fffdf7;
-  --control-border: #718591;
-  --shadow: 0 24px 60px rgba(33, 47, 57, 0.12);
-  --shadow-control: 0 10px 28px rgba(33, 47, 57, 0.1);
+  --bg: #f7f3ea;
+  --bg-deep: #ece6d8;
+  --surface: #fffdf8;
+  --surface-raised: #f1ece1;
+  --surface-soft: #e9e3d5;
+  --ink: #1a150c;
+  --muted: #4d4636;
+  --faint: #6a624e;
+  --line: #d6cdba;
+  --line-strong: #a89c82;
+  --accent: #8a6114;
+  --accent-bright: #6f4d0d;
+  --mint: #0d7a4b;
+  --amber: #a34a00;
+  --danger: #b3243e;
+  --focus: #6f4d0d;
+  --on-accent: #fffdf8;
+  --on-mint: #fffdf8;
+  --on-amber: #fffdf8;
+  --on-danger: #fffdf8;
+  --control-border: #8d8064;
+  --shadow: 0 24px 60px rgba(57, 47, 26, 0.12);
+  --shadow-control: 0 10px 28px rgba(57, 47, 26, 0.1);
 }
 
 * {
@@ -121,7 +121,7 @@ body::after {
     ),
     radial-gradient(
       ellipse 62% 42% at 50% -12%,
-      color-mix(in srgb, var(--cyan) 12%, transparent),
+      color-mix(in srgb, var(--accent) 12%, transparent),
       transparent 72%
     );
 }
@@ -158,7 +158,7 @@ textarea {
 
 ::selection {
   color: var(--bg);
-  background: var(--cyan-bright);
+  background: var(--accent-bright);
 }
 
 .skip-link {
@@ -169,7 +169,7 @@ textarea {
   transform: translateY(-150%);
   padding: 11px 14px;
   color: var(--bg);
-  background: var(--cyan-bright);
+  background: var(--accent-bright);
   border-radius: 6px;
   text-decoration: none;
   font-weight: 750;
@@ -311,7 +311,7 @@ textarea {
   width: 5px;
   height: 5px;
   margin-right: 8px;
-  background: var(--cyan);
+  background: var(--accent);
   border-radius: 50%;
   content: "";
 }
@@ -367,13 +367,13 @@ textarea {
 
 .header-scan {
   color: var(--bg-deep);
-  background: var(--cyan-bright);
-  border-color: var(--cyan-bright);
+  background: var(--accent-bright);
+  border-color: var(--accent-bright);
 }
 
 .header-scan:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--cyan) 16%, transparent);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .live-dot {
@@ -501,7 +501,7 @@ li {
 .reason-code,
 .status-label {
   margin: 0 0 12px;
-  color: var(--cyan-bright);
+  color: var(--accent-bright);
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 720;
@@ -591,9 +591,9 @@ li {
 }
 
 .button.primary {
-  color: var(--on-cyan);
-  background: var(--cyan-bright);
-  border-color: var(--cyan-bright);
+  color: var(--on-accent);
+  background: var(--accent-bright);
+  border-color: var(--accent-bright);
 }
 
 .button.secondary,
@@ -612,7 +612,7 @@ li {
 }
 
 .text-link {
-  color: var(--cyan-bright);
+  color: var(--accent-bright);
   font-size: 13px;
   font-weight: 700;
 }
@@ -777,8 +777,8 @@ pre {
   margin: 12px 0 0;
   padding: 17px;
   overflow: auto;
-  color: color-mix(in srgb, var(--ink) 93%, var(--cyan));
-  background: #050910;
+  color: color-mix(in srgb, var(--ink) 93%, var(--accent));
+  background: var(--bg-deep);
   border: 1px solid var(--line);
   border-radius: 7px;
   white-space: pre-wrap;
@@ -786,8 +786,8 @@ pre {
 }
 
 :root[data-theme="light"] pre {
-  color: #173047;
-  background: #e9f0f5;
+  color: #33290f;
+  background: #f3eee0;
 }
 
 code {
@@ -798,7 +798,7 @@ code {
 
 :not(pre) > code {
   padding: 0.14em 0.38em;
-  color: var(--cyan-bright);
+  color: var(--accent-bright);
   background: var(--surface-soft);
   border: 1px solid var(--line);
   border-radius: 4px;
@@ -874,7 +874,7 @@ code {
   place-items: center;
   width: 82px;
   height: 82px;
-  color: var(--cyan-bright);
+  color: var(--accent-bright);
   background: var(--surface-soft);
   border: 1px solid var(--line-strong);
   border-radius: 10px;
@@ -1022,7 +1022,7 @@ form > label {
   place-items: center;
   width: 34px;
   height: 34px;
-  color: var(--cyan-bright);
+  color: var(--accent-bright);
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   font-family: var(--mono);
@@ -1124,7 +1124,7 @@ form > label {
   color: var(--muted);
   background: var(--surface);
   border: 1px solid var(--line-strong);
-  border-left: 4px solid var(--cyan);
+  border-left: 4px solid var(--accent);
 }
 
 .badge-grid {
@@ -1216,12 +1216,29 @@ form > label {
 }
 
 .home-hero {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 0.94fr) minmax(470px, 1.06fr);
   gap: 54px;
   align-items: center;
   min-height: 600px;
   padding-bottom: 72px;
+}
+
+.home-hero::before {
+  position: absolute;
+  top: -140px;
+  right: -180px;
+  z-index: -1;
+  width: 720px;
+  height: 720px;
+  pointer-events: none;
+  content: "";
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 9%, transparent) 0%,
+    transparent 62%
+  );
 }
 
 .home-hero-copy h1 {
@@ -1268,7 +1285,7 @@ form > label {
 }
 
 .action-gate figcaption strong {
-  color: var(--cyan-bright);
+  color: var(--accent-bright);
   font-family: var(--mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1350,8 +1367,8 @@ form > label {
   top: 20px;
   bottom: 20px;
   width: 1px;
-  background: var(--cyan);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--cyan) 28%, transparent);
+  background: var(--accent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 .gate-rail--left {
@@ -1368,7 +1385,7 @@ form > label {
   left: -42px;
   width: 56px;
   height: 2px;
-  background: linear-gradient(to right, transparent, var(--cyan));
+  background: linear-gradient(to right, transparent, var(--accent));
   animation: gate-scan 720ms ease-out 1 both;
 }
 
@@ -1378,9 +1395,9 @@ form > label {
   right: 0;
   width: 8px;
   height: 8px;
-  background: var(--cyan);
+  background: var(--accent);
   border-radius: 50%;
-  box-shadow: 0 0 14px var(--cyan);
+  box-shadow: 0 0 14px var(--accent);
   content: "";
 }
 
@@ -1417,7 +1434,7 @@ form > label {
   justify-content: space-between;
   min-height: 48px;
   padding: 0 16px;
-  color: var(--cyan-bright);
+  color: var(--accent-bright);
   border-top: 1px solid var(--line);
   text-decoration: none;
   font-size: 13px;
@@ -1504,7 +1521,7 @@ form > label {
 
 .boundary-steps li > span {
   grid-row: 1 / 3;
-  color: var(--cyan-bright);
+  color: var(--accent-bright);
   font-family: var(--mono);
   font-size: 10px;
 }
@@ -1561,8 +1578,8 @@ form > label {
 
 .boundary-warden {
   position: relative;
-  color: var(--cyan-bright);
-  background: color-mix(in srgb, var(--cyan) 7%, var(--surface));
+  color: var(--accent-bright);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
   text-align: center;
 }
 
@@ -1572,7 +1589,7 @@ form > label {
   top: 16px;
   bottom: 16px;
   width: 1px;
-  background: var(--cyan);
+  background: var(--accent);
   content: "";
 }
 
@@ -1675,7 +1692,7 @@ form > label {
 }
 
 .decision-anatomy dt {
-  color: var(--cyan-bright);
+  color: var(--accent-bright);
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.09em;
@@ -1702,7 +1719,7 @@ form > label {
 }
 
 .audience-grid article:hover {
-  border-top-color: var(--cyan);
+  border-top-color: var(--accent);
 }
 
 .audience-grid h3 {
@@ -1737,9 +1754,9 @@ form > label {
 }
 
 .service-card--featured {
-  border-color: var(--cyan);
+  border-color: var(--accent);
   box-shadow:
-    inset 0 3px 0 var(--cyan),
+    inset 0 3px 0 var(--accent),
     var(--shadow);
 }
 
@@ -1898,7 +1915,7 @@ form > label {
 .showcase-progress li[data-state="current"] {
   color: var(--ink);
   background: var(--surface-raised);
-  box-shadow: inset 0 3px 0 var(--cyan);
+  box-shadow: inset 0 3px 0 var(--accent);
 }
 
 .showcase-progress li[data-state="complete"] {
@@ -2031,8 +2048,8 @@ form > label {
   display: grid;
   place-items: center;
   min-height: 330px;
-  color: var(--cyan-bright);
-  background: color-mix(in srgb, var(--cyan) 6%, var(--bg-deep));
+  color: var(--accent-bright);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-deep));
 }
 
 .showcase-gate > div {
@@ -2063,7 +2080,7 @@ form > label {
 }
 
 .showcase-scan-status[data-state="loading"] {
-  border-left-color: var(--cyan);
+  border-left-color: var(--accent);
 }
 
 .showcase-scan-status[data-state="error"] {
@@ -2141,7 +2158,7 @@ form > label {
 }
 
 .mini-task-flow li > span {
-  color: var(--cyan-bright);
+  color: var(--accent-bright);
   font-family: var(--mono);
   font-size: 12px;
 }
@@ -2238,7 +2255,7 @@ form > label {
 
 .methodology-drawer > summary::after,
 .result-disclosure > summary::after {
-  color: var(--cyan-bright);
+  color: var(--accent-bright);
   font-family: var(--mono);
   content: "+";
 }
@@ -2287,7 +2304,7 @@ form > label {
 }
 
 .docs-decision-grid article:first-child {
-  border-top-color: var(--cyan);
+  border-top-color: var(--accent);
 }
 
 .docs-filter-bar {
@@ -2436,7 +2453,7 @@ h3:hover .heading-anchor,
 }
 
 .scan-boundary strong {
-  color: var(--cyan-bright);
+  color: var(--accent-bright);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -2517,9 +2534,9 @@ h3:hover .heading-anchor,
   align-items: center;
   max-width: 100%;
   padding: 7px 9px;
-  color: var(--cyan-bright);
-  background: color-mix(in srgb, var(--cyan) 7%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--cyan) 42%, var(--line));
+  color: var(--accent-bright);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--line));
   border-radius: var(--radius-sm);
   font-family: var(--mono);
   font-size: 10px;
@@ -2715,7 +2732,7 @@ h3:hover .heading-anchor,
 .challenge-steps li > span,
 .badge-process li > span,
 .action-sequence li > span {
-  color: var(--cyan-bright);
+  color: var(--accent-bright);
   font-family: var(--mono);
   font-size: 11px;
 }
@@ -2770,7 +2787,7 @@ h3:hover .heading-anchor,
 }
 
 .gauntlet-example:hover {
-  border-color: var(--cyan);
+  border-color: var(--accent);
   transform: translateY(-2px);
 }
 
@@ -2798,8 +2815,8 @@ h3:hover .heading-anchor,
 }
 
 .receipt-state {
-  color: var(--on-cyan);
-  background: var(--cyan-bright);
+  color: var(--on-accent);
+  background: var(--accent-bright);
   font-family: var(--mono);
   font-size: 11px;
 }
@@ -3027,8 +3044,8 @@ h3:hover .heading-anchor,
 }
 
 .surface-tab[aria-selected="true"] {
-  color: var(--cyan-bright);
-  border-bottom-color: var(--cyan);
+  color: var(--accent-bright);
+  border-bottom-color: var(--accent);
 }
 
 .surface-panel {
@@ -3150,7 +3167,7 @@ h3:hover .heading-anchor,
 }
 
 .text-link {
-  color: var(--cyan-bright);
+  color: var(--accent-bright);
   text-underline-offset: 3px;
 }
 
@@ -3203,7 +3220,7 @@ h3:hover .heading-anchor,
     border-left: 1px solid var(--line-strong);
     box-shadow:
       -18px 0 50px rgba(0, 0, 0, 0.3),
-      0 0 0 100vmax rgba(2, 5, 8, 0.68);
+      0 0 0 100vmax rgba(6, 5, 3, 0.68);
   }
 
   .js-enabled .site-nav.is-open {

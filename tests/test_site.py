@@ -278,7 +278,7 @@ def test_shared_styles_meet_wcag_contrast_contract():
     dark = theme_tokens(":root")
     light = {**dark, **theme_tokens(':root[data-theme="light"]')}
     required_tokens = {
-        "on-cyan",
+        "on-accent",
         "on-danger",
         "on-mint",
         "on-amber",
@@ -288,7 +288,7 @@ def test_shared_styles_meet_wcag_contrast_contract():
     assert required_tokens <= light.keys()
 
     text_pairs = (
-        ("on-cyan", "cyan-bright"),
+        ("on-accent", "accent-bright"),
         ("on-danger", "danger"),
         ("on-mint", "mint"),
         ("on-amber", "amber"),
@@ -305,7 +305,7 @@ def test_shared_styles_meet_wcag_contrast_contract():
             assert ratio >= 3, f"{theme_name} control-border/{background}: {ratio:.3f}"
 
     selector_contracts = (
-        r"\.button\.primary\s*\{[^}]*color: var\(--on-cyan\);[^}]*background: var\(--cyan-bright\)",
+        r"\.button\.primary\s*\{[^}]*color: var\(--on-accent\);[^}]*background: var\(--accent-bright\)",
         r"\.verdict-badge,\s*\.status-label\s*\{[^}]*color: var\(--on-danger\);[^}]*background: var\(--danger\)",
         r"\.status-label--allow\s*\{[^}]*color: var\(--on-mint\);[^}]*background: var\(--mint\)",
         r"\.status-label--pending\s*\{[^}]*color: var\(--on-amber\);[^}]*background: var\(--amber\)",
@@ -313,7 +313,7 @@ def test_shared_styles_meet_wcag_contrast_contract():
         r"\.risk-label--none,\s*\.risk-label--low\s*\{[^}]*color: var\(--on-mint\);[^}]*background: var\(--mint\)",
         r"\.risk-label--medium\s*\{[^}]*color: var\(--on-amber\);[^}]*background: var\(--amber\)",
         r"\.risk-label--high,\s*\.risk-label--critical\s*\{[^}]*color: var\(--on-danger\);[^}]*background: var\(--danger\)",
-        r"\.receipt-state\s*\{[^}]*color: var\(--on-cyan\);[^}]*background: var\(--cyan-bright\)",
+        r"\.receipt-state\s*\{[^}]*color: var\(--on-accent\);[^}]*background: var\(--accent-bright\)",
         r"\.receipt-state--detected\s*\{[^}]*color: var\(--on-danger\);[^}]*background: var\(--danger\)",
         r"\.receipt-state--candidate\s*\{[^}]*color: var\(--on-amber\);[^}]*background: var\(--amber\)",
         r"input,\s*select,\s*textarea\s*\{[^}]*border: 1px solid var\(--control-border\)",
