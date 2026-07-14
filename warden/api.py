@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from warden.badge_store import get_badge, list_badges
 from warden.badges import verify_badge
@@ -131,9 +132,9 @@ if os.getenv("OKX_API_KEY"):
     )
     # Challenge unpaid GET as well as POST: OKX's x402-check probes with GET and
     # expects a 402 payment challenge; a POST-only paywall returns 405 and reads
-    # as an invalid x402 service. GET is not left unpaywalled — the paid handlers
-    # remain POST-only, so a paid GET simply 405s after settlement (no real
-    # caller does this; buyers POST). OPTIONS is deliberately left free for CORS.
+    # as an invalid x402 service. OKX's paid auto-replay also uses GET, so /scan
+    # and /audit serve GET too — a paid GET that 405s freezes the buyer's task.
+    # OPTIONS is deliberately left free for CORS.
     _paid_routes = {
         "POST /scan": _scan_route,
         "GET /scan": _scan_route,
@@ -177,6 +178,30 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+async def _get_request_fields(request: Request) -> dict[str, object]:
+    """Read a paid GET's fields from the query string, or a JSON body if one was sent.
+
+    OKX's x402 auto-replay re-requests the paid resource with GET, so a POST-only
+    handler answers 405 and the buyer's task freezes in `accepted`.
+    """
+    fields: dict[str, object] = dict(request.query_params)
+    if fields:
+        return fields
+
+    raw = await request.body()
+    if not raw:
+        return fields
+
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Request body is not valid JSON") from exc
+
+    if not isinstance(parsed, dict):
+        raise HTTPException(status_code=400, detail="Request body must be a JSON object")
+    return parsed
+
+
 @app.post("/scan", response_model=ScanResponse)
 async def scan(req: ScanRequest) -> ScanResponse:
     verdict = await engine.scan(
@@ -185,6 +210,19 @@ async def scan(req: ScanRequest) -> ScanResponse:
         context=req.context.model_dump(),
     )
     return ScanResponse.from_verdict(verdict)
+
+
+@app.get("/scan", response_model=ScanResponse)
+async def scan_get(request: Request) -> ScanResponse:
+    fields = await _get_request_fields(request)
+    try:
+        req = ScanRequest.model_validate(fields)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide the payload to scan as a 'payload' query parameter or JSON body field.",
+        ) from exc
+    return await scan(req)
 
 
 @app.post("/api/demo/scan", response_model=ScanResponse)
@@ -261,6 +299,19 @@ async def audit(req: AuditRequest) -> AuditResponse:
         return await auditor.audit(req.target_url, req.sample_prompts)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/audit", response_model=AuditResponse)
+async def audit_get(request: Request) -> AuditResponse:
+    fields = await _get_request_fields(request)
+    try:
+        req = AuditRequest.model_validate(fields)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide the endpoint to audit as a 'target_url' query parameter or JSON body field.",
+        ) from exc
+    return await audit(req)
 
 
 @app.get("/badge/{audit_id}")

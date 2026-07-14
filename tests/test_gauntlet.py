@@ -327,12 +327,15 @@ def test_paid_http_contract_remains_frozen():
         "badge_record",
         "consent_verified",
     }
-    paid_routes = {
-        (route.path, frozenset(route.methods or set()))
-        for route in app.routes
-        if isinstance(route, APIRoute) and route.path in {"/scan", "/audit"}
-    }
-    assert paid_routes == {
-        ("/scan", frozenset({"POST"})),
-        ("/audit", frozenset({"POST"})),
+    paid_methods: dict[str, set[str]] = {"/scan": set(), "/audit": set()}
+    for route in app.routes:
+        if isinstance(route, APIRoute) and route.path in paid_methods:
+            paid_methods[route.path] |= set(route.methods or set())
+
+    # POST is the documented call and stays frozen. GET is served because OKX's
+    # paid x402 auto-replay re-requests with GET; a 405 there freezes the buyer's
+    # task. No other method is exposed on a paid route.
+    assert paid_methods == {
+        "/scan": {"POST", "GET"},
+        "/audit": {"POST", "GET"},
     }
