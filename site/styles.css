@@ -2462,7 +2462,7 @@ h3:hover .heading-anchor,
   display: grid;
   grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
   align-items: start;
-  background: var(--line-strong);
+  background: var(--bg-deep);
   border: 1px solid var(--line-strong);
   box-shadow: var(--shadow);
 }
@@ -2719,6 +2719,10 @@ h3:hover .heading-anchor,
   background: var(--line);
   border: 1px solid var(--line);
   gap: 1px;
+}
+
+.challenge-steps {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .challenge-steps li,
