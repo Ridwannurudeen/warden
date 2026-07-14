@@ -76,7 +76,8 @@ full `services[]` array — each service with `endpoint` (the live URL), `feeAmo
 **Warden (#3808) shows `null`.** Worth understanding what populates it — it is literally a
 security score on the platform, and we are the security ASP with a blank one.
 
-**This means** a per-agent security page for all 374 agents is fully buildable from public data,
+**This means** a per-agent security page for every agent the sweep returns (368 in the shipped
+snapshot; the live count drifts with listings) is fully buildable from public data,
 including their public endpoints and descriptions.
 
 ---
@@ -118,7 +119,7 @@ review distribution `{"3": 1, "4": 7, "5": 48}`:
 
 and agent 1445's `securityRate` in the search index is **4.84**. Exact match.
 
-Across all 374 agents: 254 are `null`, 80 are exactly `5.0`, and the rest are review-averages
+Across the dated sweep of 374 agents: 254 are `null`, 80 are exactly `5.0`, and the rest are review-averages
 (4.67, 4.71, 4.98 …). `securityRate` is non-null **only** for agents that have received reviews.
 
 **So Warden's `securityRate: null` is not a platform judgement about our security — it just means
@@ -161,7 +162,7 @@ payable inside a task:
 
 **Implication for the website:** the checkout must drive buyers through the **task flow**, not the
 raw x402 call. Only the task flow yields all three judged criteria (revenue + orders + reviews).
-The buyer needs an agent identity — which every one of the 374 marketplace operators already has,
+The buyer needs an agent identity — which every marketplace operator already has,
 and no cold human does. This *confirms* the retarget: the website's paying audience is agent
 operators, not passers-by.
 
@@ -174,7 +175,7 @@ operators, not passers-by.
 - `securityRate` is just the review average (Q4) — it populates itself once real reviews land.
   Nothing special to build for it.
 - Website-as-checkout is **real**, but cold humans can't pay (no USDT0 on X Layer, no agent
-  identity). The audience is **the 374 agent operators** (Q1 + Q4).
+  identity). The audience is **the marketplace agent operators** (Q1 + Q4).
 - The all-agents security index is **real and unblocked** — best data asset we have (Q2).
 - Marketplace attribution is **real** (Q3): paid calls do increment the public `soldCount`.
 - **Honesty line:** never farm `soldCount` or reviews with self-payments/self-reviews. Payer==payTo

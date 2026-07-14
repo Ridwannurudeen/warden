@@ -180,6 +180,29 @@
       text("[data-status-corpus-fingerprint]", status.corpusFingerprint);
       text("[data-status-services]", status.services);
 
+      // Service IDs are reassigned on every `agent update`, so overlay the live
+      // IDs from the build-generated catalog instead of the static snapshot.
+      try {
+        const catalogResponse = await root.fetch("/data/warden-services.json", {
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        });
+        if (catalogResponse.ok) {
+          const catalog = await catalogResponse.json();
+          const liveIds = (
+            Array.isArray(catalog.services) ? catalog.services : []
+          )
+            .map((service) => String(service.serviceId || ""))
+            .filter(Boolean)
+            .join(" / ");
+          if (liveIds) {
+            text("[data-status-services]", liveIds);
+          }
+        }
+      } catch {
+        // Keep the committed-snapshot service IDs on any fetch failure.
+      }
+
       const payment = status.paymentActivity;
       text(
         "[data-payment-note]",

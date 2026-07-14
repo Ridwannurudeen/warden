@@ -249,6 +249,14 @@
               ></label
             >
           </div>
+          <p class="field-help">
+            Step 2 passes JSON arguments (<code>--accepts</code>,
+            <code>--body</code>). On Windows PowerShell 5.1 or PowerShell 7.2
+            and earlier, embedded quotes can be mangled when handed to the
+            <code>onchainos</code> binary — use PowerShell 7.3+ (native argument
+            passing) or the POSIX shell option, or paste the command into a
+            script file.
+          </p>
         </fieldset>
         <label
           >Request body<textarea

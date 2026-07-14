@@ -161,6 +161,10 @@ if os.getenv("OKX_API_KEY"):
         "POST /audit": _audit_route,
         "GET /audit": _audit_route,
     }
+    # Note: the OKX x402 middleware must reach the facilitator's /supported to
+    # build even an unpaid 402 challenge, so a facilitator outage takes the paid
+    # routes down regardless of how this is wired (confirmed against the package
+    # source — not fixable app-side). Monitor facilitator availability instead.
     app.add_middleware(PaymentMiddlewareASGI, routes=_paid_routes, server=_server)
 
 
@@ -181,6 +185,17 @@ async def request_size_limit_middleware(request: Request, call_next):
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     path = request.url.path.rstrip("/")
+    # A request that already carries an x402 payment authorization has paid its
+    # own way — never rate-limit it. OKX's paid auto-replay and its x402-check
+    # probe share OKX egress IPs, so counting them risks 429-ing a real paid
+    # settlement (money signed, no deliverable) or making the listing read as an
+    # invalid x402 service. Unpaid challenges are still limited below.
+    carries_payment = bool(
+        request.headers.get("payment-signature") or request.headers.get("x-payment")
+    )
+    if carries_payment and path in {"/scan", "/audit"}:
+        return await call_next(request)
+
     if path.startswith("/api/demo/"):
         limit_per_minute = _demo_rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute, scope="demo")

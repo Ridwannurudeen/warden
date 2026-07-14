@@ -104,3 +104,20 @@ def test_http_scan_route_skips_when_disabled(monkeypatch):
             client.post("/scan", json={"payload": "normal settlement note"}) for _ in range(5)
         ]
     assert all(response.status_code == 200 for response in responses)
+
+
+def test_paid_request_bypasses_rate_limit(monkeypatch):
+    # A request carrying an x402 payment header must never be rate-limited, even
+    # when the per-client window is exhausted (OKX's paid replay + x402-check probe
+    # share OKX egress IPs; a 429 there strands a signed payment or fails the check).
+    monkeypatch.setenv("WARDEN_RATE_LIMIT_PER_MIN", "1")
+    ratelimit._reset_state()
+    client = TestClient(app)
+
+    assert client.post("/scan", json={"payload": "x"}).status_code == 200
+    assert client.post("/scan", json={"payload": "x"}).status_code == 429
+
+    ratelimit._reset_state()
+    headers = {"payment-signature": "dummy"}
+    for _ in range(3):
+        assert client.post("/scan", json={"payload": "x"}, headers=headers).status_code != 429

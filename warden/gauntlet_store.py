@@ -14,6 +14,9 @@ from warden.models import ClaimStatus, GauntletRequest, ScanResponse
 
 _STORE_PATH = Path(__file__).resolve().parents[1] / "gauntlet" / "attempts.jsonl"
 _LOCK = Lock()
+# Cap on-disk growth from the unauthenticated public demo route. Pending/confirmed
+# candidate bypasses are always retained; only routine attempts are trimmed.
+_MAX_RECORDS = 5000
 
 
 def _timestamp() -> str:
@@ -23,8 +26,27 @@ def _timestamp() -> str:
 def _read_records_locked() -> list[dict[str, object]]:
     if not _STORE_PATH.exists():
         return []
+    records: list[dict[str, object]] = []
     with _STORE_PATH.open(encoding="utf-8") as handle:
-        return [json.loads(line) for line in handle if line.strip()]
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                # A single truncated/corrupt line (e.g. a crash mid-append) must not
+                # break every subsequent read of the store.
+                continue
+    return records
+
+
+def _prune_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
+    if len(records) <= _MAX_RECORDS:
+        return records
+    kept = [r for r in records if r.get("status") in {"pending", "confirmed"}]
+    routine = [r for r in records if r.get("status") not in {"pending", "confirmed"}]
+    budget = max(0, _MAX_RECORDS - len(kept))
+    return kept + routine[-budget:]
 
 
 def _claim_id(request: GauntletRequest) -> str:
@@ -91,9 +113,18 @@ def record_attempt(
             claim_id = None
         record["status"] = status
 
-        serialized = json.dumps(record, ensure_ascii=False, sort_keys=True)
-        with _STORE_PATH.open("a", encoding="utf-8") as handle:
-            handle.write(serialized + "\n")
+        if len(records) + 1 > _MAX_RECORDS:
+            # Rare path: over cap → rewrite the pruned store atomically.
+            pruned = _prune_records([*records, record])
+            tmp = _STORE_PATH.with_suffix(".jsonl.tmp")
+            with tmp.open("w", encoding="utf-8") as handle:
+                for item in pruned:
+                    handle.write(json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n")
+            tmp.replace(_STORE_PATH)
+        else:
+            serialized = json.dumps(record, ensure_ascii=False, sort_keys=True)
+            with _STORE_PATH.open("a", encoding="utf-8") as handle:
+                handle.write(serialized + "\n")
     return status, claim_id
 
 
