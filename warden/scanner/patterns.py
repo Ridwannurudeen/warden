@@ -8,8 +8,11 @@ and imperative verb lists used by the InjectionScanner.
 
 INJECTION_PATTERNS = {
     "direct_instruction": [
-        r"(?i)ignore\s+(?:all\s+)?(?:previous|prior|above)\s+(?:instructions?|prompts?|rules?|context)",
-        r"(?i)disregard\s+(?:all\s+)?(?:previous|prior)\s+(?:instructions?|prompts?)",
+        r"(?i)(?:ignore|disregard|override|forget)\s+(?:all\s+)?(?:the\s+)?"
+        r"(?:previous|prior|above|earlier|foregoing)\s+"
+        r"(?:instructions?|prompts?|rules?|context|restrictions?|safeguards?"
+        r"|guardrails?|directives?|guidelines?|constraints?|polic(?:y|ies)"
+        r"|safety\s+(?:constraints?|rules?|guidelines?|measures?|checks?))",
         r"(?i)forget\s+(?:everything|all)\s+(?:you\s+)?(?:know|were\s+told)",
         r"(?i)new\s+(?:instructions?|rules?|prompt)\s*:",
         r"(?i)reveal\s+(?:the\s+)?(?:system|developer)\s+prompt",
