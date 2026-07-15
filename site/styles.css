@@ -4741,3 +4741,129 @@ h1, h2 { letter-spacing: -0.02em; }
   color: #fff;
   transform: translateY(-2px);
 }
+
+/* ============================================================
+   LUMINOUS TRUST v9 — interactive live-scan hero widget
+   ============================================================ */
+
+.live-scan { animation: none !important; }          /* stable for interaction */
+.live-scan figcaption {
+  font-weight: 600;
+  color: var(--muted);
+}
+.ls-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+}
+.ls-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ls-chip {
+  padding: 7px 13px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+.ls-chip:hover { border-color: var(--accent); color: var(--accent); }
+.ls-chip.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.ls-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+}
+.ls-input {
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-soft);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+.ls-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.ls-run { width: 100%; justify-content: center; }
+.ls-run.is-loading { opacity: 0.7; pointer-events: none; }
+.ls-run.is-loading span { animation: ls-spin 0.7s linear infinite; display: inline-block; }
+@keyframes ls-spin { to { transform: rotate(360deg); } }
+
+.ls-result {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.ls-result.is-in { animation: ls-pop 320ms cubic-bezier(0.2, 1.1, 0.5, 1); }
+@keyframes ls-pop {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ls-verdict {
+  display: inline-block;
+  padding: 8px 20px;
+  border-radius: var(--radius-pill);
+  font-family: var(--display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+.ls-verdict.ls-allow { background: linear-gradient(180deg, var(--mint), color-mix(in srgb, var(--mint) 78%, #000)); box-shadow: 0 10px 26px color-mix(in srgb, var(--mint) 40%, transparent); }
+.ls-verdict.ls-sanitize { background: linear-gradient(180deg, var(--amber), color-mix(in srgb, var(--amber) 78%, #000)); color: #241500; box-shadow: 0 10px 26px color-mix(in srgb, var(--amber) 40%, transparent); }
+.ls-verdict.ls-block { background: linear-gradient(180deg, var(--danger), color-mix(in srgb, var(--danger) 74%, #4a0011)); box-shadow: 0 10px 26px color-mix(in srgb, var(--danger) 42%, transparent); }
+.ls-verdict.ls-error { background: var(--surface-soft); color: var(--danger); border: 1px solid var(--line); font-family: var(--sans); font-size: 0.9rem; }
+
+.ls-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0 0;
+}
+.ls-meta dt {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+  margin-bottom: 2px;
+}
+.ls-meta dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+.ls-sanitized {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  border: 1px dashed var(--line-strong);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* v9 fix — long threat names collide on narrow screens */
+.ls-meta dd { overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .ls-meta { grid-template-columns: 1fr; gap: 10px; }
+}

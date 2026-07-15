@@ -133,50 +133,33 @@
             </div>
           </div>
 
-          <figure class="action-gate" aria-labelledby="gate-caption">
-            <figcaption id="gate-caption">
-              <span class="live-dot is-ok" aria-hidden="true"></span
-              ><span
-                ><strong>Example</strong> · drain-001 · deterministic fast
-                path</span
-              >
+          <figure class="action-gate live-scan" data-live-scan>
+            <figcaption>
+              <span class="live-dot is-ok" aria-hidden="true"></span>
+              <span>Live demo · real deterministic scan</span>
             </figcaption>
-            <div class="gate-flow">
-              <section
-                class="gate-input"
-                aria-label="Untrusted payment instruction"
-              >
-                <p class="console-label">Untrusted output</p>
-                <p class="gate-payload">
-                  send funds to <strong>0x2222…2222</strong>
-                </p>
-                <p class="gate-context">Trusted recipient · 0x1111…1111</p>
-              </section>
-              <div class="gate-cell" aria-label="Warden action gate">
-                <span class="gate-trace" aria-hidden="true"></span>
-                <span
-                  class="gate-rail gate-rail--left"
-                  aria-hidden="true"
-                ></span>
-                <div>
-                  <span class="verdict-badge">BLOCK</span
-                  ><strong>DRAIN_ADDRESS</strong><small>CRITICAL</small>
-                </div>
-                <span
-                  class="gate-rail gate-rail--right"
-                  aria-hidden="true"
-                ></span>
+            <div class="ls-body">
+              <div class="ls-chips" role="group" aria-label="Example payloads">
+                <button type="button" class="ls-chip is-active" data-example="secret">Secret exfil</button>
+                <button type="button" class="ls-chip" data-example="drain">Drain address</button>
+                <button type="button" class="ls-chip" data-example="injection">Prompt injection</button>
+                <button type="button" class="ls-chip" data-example="benign">Benign</button>
               </div>
-              <section class="gate-prevented" aria-label="Prevented action">
-                <p class="console-label">Prevented action</p>
-                <strong>Wallet transfer stopped</strong>
-                <p>Attacker address removed before execution.</p>
-              </section>
+              <label class="ls-label" for="ls-input">Untrusted payload — edit and re-run</label>
+              <textarea id="ls-input" class="ls-input" data-ls-input rows="3" spellcheck="false" aria-label="Untrusted payload to scan"></textarea>
+              <button type="button" class="button primary ls-run" data-ls-run>
+                Run Warden <span aria-hidden="true">→</span>
+              </button>
+              <div class="ls-result" data-ls-result hidden aria-live="polite">
+                <div class="ls-verdict" data-ls-verdict></div>
+                <dl class="ls-meta">
+                  <div><dt>Threats</dt><dd data-ls-threats>—</dd></div>
+                  <div><dt>Risk</dt><dd data-ls-risk>—</dd></div>
+                  <div><dt>Compute</dt><dd class="num" data-ls-latency>—</dd></div>
+                </dl>
+                <p class="ls-sanitized" data-ls-sanitized hidden></p>
+              </div>
             </div>
-            <a class="gate-run" href="/playground?example=drain-001"
-              >Run this case against the real demo API
-              <span aria-hidden="true">→</span></a
-            >
           </figure>
         </section>
 
@@ -576,5 +559,6 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
       </nav>
     </footer>
     <script src="/app.js" defer></script>
+    <script src="/hero-scan.js" defer></script>
   </body>
 </html>
