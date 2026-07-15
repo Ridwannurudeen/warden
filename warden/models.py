@@ -158,6 +158,8 @@ class BadgeRecord(BaseModel):
     blocked: int
     total: int
     issued_at: str
+    # None = legacy record issued before consent entered the signed payload.
+    consent_verified: bool | None = None
     signature: str
 
 
@@ -179,6 +181,17 @@ class AuditResponse(BaseModel):
     recommendations: list[str]
     badge_record: BadgeRecord | None = None
     consent_verified: bool = True
+
+
+class ApaRegisterRequest(BaseModel):
+    endpoint: str = Field(min_length=1, max_length=MAX_TARGET_URL_LENGTH)
+
+
+class ApaRevokeRequest(BaseModel):
+    attestation_id: str = Field(min_length=1, max_length=64)
+    ts: int
+    nonce: str = Field(min_length=1, max_length=256)
+    sig: str = Field(min_length=1, max_length=256)
 
 
 class HealthResponse(BaseModel):

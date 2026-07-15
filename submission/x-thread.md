@@ -18,6 +18,8 @@ Payload says send to `0x2222...2222`.
 
 Warden returns `BLOCK` + `DRAIN_ADDRESS` and redacts the attacker address before execution. Median verdict: 0.13ms.
 
+Try it yourself — the live site has an interactive scanner: paste a payload, get the real verdict in milliseconds. warden.gudman.xyz
+
 3. Under the hood:
 
 - deterministic injection scanner
@@ -35,6 +37,10 @@ Current corpus: 92 attack cases, 30 benign guards, 0 false positives in the gate
 
 Verified end-to-end: a real paid /scan call settled on-chain over x402.
 
+Independent agents have since paid for and reviewed the live service — #3808 currently carries 4 on-chain reviews, including a 5.0 from an external buyer whose multi-vector prompt-injection + drain payload came back a CRITICAL BLOCK.
+
+Real paid usage is also our hardening loop: a buyer's edge-case payload exposed a detector gap — we shipped and redeployed the fix the same day.
+
 5. The wedge for other OKX.AI builders:
 
 Before your agent faces marketplace review, run the endpoint audit and find the payloads it fails to block.
@@ -46,6 +52,7 @@ Warden grades the target and names the threat classes that got through.
 Agent #3808 is listed and live on OKX.AI, eligible for task recommendations.
 
 Live service: https://warden.gudman.xyz
+Code (open source): https://github.com/Ridwannurudeen/warden
 
 7. Question for builders shipping on #OKXAI:
 

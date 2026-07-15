@@ -17,3 +17,9 @@ venv/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
+
+# APA runtime artifacts — NEVER commit (issuer private key, sqlite)
+data/*.key
+data/*.db
+data/protection.db
+.warden/

@@ -6,18 +6,20 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
 from warden.badge_store import get_badge, list_badges
 from warden.badges import verify_badge
-from warden import __version__
+from warden import __version__, protection, protection_store
 from warden.auditor import AgentAuditor
 from warden.core.verdict import ReasonCode
 from warden.engine import WardenEngine
 from warden.gauntlet_store import get_stats, record_attempt
 from warden.ratelimit import check_rate_limit, retry_after_seconds
 from warden.models import (
+    ApaRegisterRequest,
+    ApaRevokeRequest,
     AuditRequest,
     AuditResponse,
     BadgeRecord,
@@ -48,6 +50,13 @@ def _demo_rate_limit_per_minute() -> int:
         return int(os.getenv("WARDEN_DEMO_RATE_LIMIT_PER_MIN", "20") or "20")
     except ValueError:
         return 20
+
+
+def _apa_rate_limit_per_minute() -> int:
+    try:
+        return int(os.getenv("WARDEN_APA_RATE_LIMIT_PER_MIN", "10") or "10")
+    except ValueError:
+        return 10
 
 
 engine = WardenEngine()
@@ -199,6 +208,9 @@ async def rate_limit_middleware(request: Request, call_next):
     if path.startswith("/api/demo/"):
         limit_per_minute = _demo_rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute, scope="demo")
+    elif path in {"/apa/register", "/apa/revoke"}:
+        limit_per_minute = _apa_rate_limit_per_minute()
+        rate_limited = check_rate_limit(request, limit_per_minute, scope="apa")
     elif path in {"/scan", "/audit"}:
         limit_per_minute = _rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute)
@@ -381,6 +393,90 @@ async def list_badges_endpoint() -> BadgeRegistryResponse:
         for badge in list_badges()
     ]
     return BadgeRegistryResponse(badges=badges, total=len(badges))
+
+
+@app.get("/.well-known/apa-issuer.json")
+async def apa_issuer_document() -> dict[str, object]:
+    return protection.issuer_document()
+
+
+@app.post("/apa/register")
+async def apa_register(req: ApaRegisterRequest) -> dict[str, object]:
+    """TOFU registration per APA-SPEC §4: probe, bind host→pub, issue, log."""
+    try:
+        endpoint_host, pub, scans = await protection.probe_guard(req.endpoint)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    binding = protection_store.get_binding(endpoint_host)
+    if binding is None:
+        protection_store.bind_host(endpoint_host, pub)
+        status = "active"
+    elif binding["pub"] == pub:
+        status = "active"
+    else:
+        # A different key for a bound host: possible rotation or compromise —
+        # never silently rebind (APA-SPEC §4.3).
+        protection_store.flag_key_changed(endpoint_host)
+        status = "key-changed"
+
+    record = protection.issue_attestation(endpoint_host, pub, scans, status=status)
+    protection_store.store_attestation(record)
+    protection_store.append_log("issued", record)
+    return {"attestation": record, "verified": protection.verify_attestation_record(record)}
+
+
+@app.get("/apa/attestation/{attestation_id}")
+async def apa_attestation(attestation_id: str) -> dict[str, object]:
+    record = protection_store.get_attestation(attestation_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Attestation not found")
+    return {
+        "attestation": record,
+        "status": protection.effective_status(record),
+        "verified": protection.verify_attestation_record(record),
+    }
+
+
+@app.get("/apa/attestation/{attestation_id}/badge.svg")
+async def apa_badge_svg(attestation_id: str) -> Response:
+    record = protection_store.get_attestation(attestation_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Attestation not found")
+    status = protection.effective_status(record)
+    scans = record.get("scans_24h")
+    svg = protection.render_badge_svg(status, scans if isinstance(scans, int) else None)
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.get("/apa/log")
+async def apa_log() -> dict[str, object]:
+    entries = protection_store.read_log()
+    return {"entries": entries, "total": len(entries)}
+
+
+@app.post("/apa/revoke")
+async def apa_revoke(req: ApaRevokeRequest) -> dict[str, object]:
+    record = protection_store.get_attestation(req.attestation_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Attestation not found")
+    endpoint_host = str(record["endpoint_host"])
+    binding = protection_store.get_binding(endpoint_host)
+    if binding is None:
+        raise HTTPException(status_code=400, detail="No key binding for this endpoint host")
+    try:
+        protection.verify_revocation(req.model_dump(), str(binding["pub"]), endpoint_host)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    updated = protection_store.set_attestation_status(req.attestation_id, "revoked")
+    if updated is not None:
+        protection_store.append_log("revoked", updated)
+    return {"attestation_id": req.attestation_id, "status": "revoked"}
 
 
 @app.get("/")
