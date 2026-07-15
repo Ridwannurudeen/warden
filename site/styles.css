@@ -4867,3 +4867,12 @@ h1, h2 { letter-spacing: -0.02em; }
 @media (max-width: 480px) {
   .ls-meta { grid-template-columns: 1fr; gap: 10px; }
 }
+
+/* v10 — stat band now has 4 cards; fill the row evenly + trim gap */
+.evidence-rail {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 40px;
+}
+@media (max-width: 780px) {
+  .evidence-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

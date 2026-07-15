@@ -185,20 +185,6 @@
             <span>Reason codes</span><strong class="num">11</strong
             ><small>Fast and thorough coverage labeled</small>
           </div>
-          <div>
-            <span>Issued audit badges</span
-            ><strong class="num" data-home-badge-count>—</strong
-            ><small data-home-badge-source
-              >Checking live signed-record registry</small
-            >
-          </div>
-          <div>
-            <span>Confirmed Gauntlet bypasses</span
-            ><strong class="num" data-home-bypass-count>—</strong
-            ><small data-home-bypass-source
-              >Checking live human-reviewed count</small
-            >
-          </div>
         </section>
       </div>
 
@@ -258,112 +244,6 @@
       </section>
 
       <div class="page-shell">
-        <section class="decision-section" aria-labelledby="decision-title">
-          <div class="section-heading">
-            <p class="eyebrow">Decision contract</p>
-            <h2 id="decision-title">One response. Four separate questions.</h2>
-            <p class="section-copy">
-              The integrating agent should not collapse verdict, severity,
-              evidence, and coverage into one green or red label.
-            </p>
-          </div>
-          <div class="decision-layout">
-            <article class="decision-card decision-card--allow">
-              <span class="status-label status-label--allow">ALLOW</span>
-              <h3>Continue under policy</h3>
-              <p>
-                No implemented detector fired for this request. This is not
-                proof that the content is safe.
-              </p>
-            </article>
-            <article class="decision-card decision-card--sanitize">
-              <span class="status-label status-label--sanitize">SANITIZE</span>
-              <h3>Use the safe output or review</h3>
-              <p>
-                Warden removed or reshaped risky material. A heuristic link can
-                be sanitized even when the score maps to risk <code>NONE</code>.
-              </p>
-            </article>
-            <article class="decision-card decision-card--block">
-              <span class="status-label">BLOCK</span>
-              <h3>Stop the next action</h3>
-              <p>
-                A hard gate or composite signal crossed the enforcement
-                boundary. Do not execute the original payload.
-              </p>
-            </article>
-            <dl class="decision-anatomy">
-              <div>
-                <dt>Decision</dt>
-                <dd>What the integrating agent should do next.</dd>
-              </div>
-              <div>
-                <dt>Risk</dt>
-                <dd>Severity assigned to the observed condition.</dd>
-              </div>
-              <div>
-                <dt>Reason and threat class</dt>
-                <dd>Which implemented detector fired and why.</dd>
-              </div>
-              <div>
-                <dt>Detector boundary</dt>
-                <dd>What this request did—and did not—check.</dd>
-              </div>
-            </dl>
-          </div>
-        </section>
-
-        <section class="audience-section">
-          <div class="section-heading">
-            <p class="eyebrow">Built for the action owner</p>
-            <h2>Protect the component that can actually do something.</h2>
-          </div>
-          <div class="audience-grid">
-            <article>
-              <span class="path-label">ASP builders</span>
-              <h3>Inspect service output</h3>
-              <p><strong>Trigger:</strong> an ASP prepares a response.</p>
-              <p>
-                <strong>Warden action:</strong> scan the exact outgoing payload.
-              </p>
-              <p>
-                <strong>Outcome:</strong> keep poisoned content away from buyer
-                execution.
-              </p>
-            </article>
-            <article>
-              <span class="path-label">Agent operators</span>
-              <h3>Gate wallets and tools</h3>
-              <p>
-                <strong>Trigger:</strong> an external result requests an action.
-              </p>
-              <p>
-                <strong>Warden action:</strong> compare it with trusted policy
-                context.
-              </p>
-              <p>
-                <strong>Outcome:</strong> stop redirects, tool hijacks, secret
-                requests, and deceptive links.
-              </p>
-            </article>
-            <article>
-              <span class="path-label">Marketplaces and reviewers</span>
-              <h3>Separate signals from audits</h3>
-              <p>
-                <strong>Trigger:</strong> public listing text or an authorized
-                endpoint needs evaluation.
-              </p>
-              <p>
-                <strong>Warden action:</strong> scan the correct evidence
-                surface.
-              </p>
-              <p>
-                <strong>Outcome:</strong> report scoped findings without
-                declaring an agent compromised.
-              </p>
-            </article>
-          </div>
-        </section>
 
         <section class="services-section" id="services">
           <div class="section-heading">
@@ -483,46 +363,6 @@
 if (result.verdict === "BLOCK") stop()
 if (result.verdict === "SANITIZE") review(result.sanitized_payload)
 if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
-        </section>
-
-        <section class="evidence-section" id="evidence">
-          <div class="section-heading">
-            <p class="eyebrow">Three evidence surfaces</p>
-            <h2>Know exactly what each result proves.</h2>
-          </div>
-          <div class="evidence-grid">
-            <a href="/agents"
-              ><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="eyebrow">Marketplace index</span>
-              <h3>Public listing-text signals</h3>
-              <p>
-                Scans public descriptions. It does not test endpoint behavior or
-                prove compromise.
-              </p>
-              <span class="text-link"
-                >Explore
-                <span class="num" data-marketplace-count>376</span>
-                listings</span
-              ></a
-            >
-            <a href="/gauntlet"
-              ><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4"/></svg><span class="eyebrow">The Gauntlet</span>
-              <h3>Adversarial fast-path challenge</h3>
-              <p>
-                An ALLOW creates a candidate. Human review decides whether a
-                real bypass exists.
-              </p>
-              <span class="text-link">Challenge the live path</span></a
-            >
-            <a href="/badges"
-              ><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5l2.3 1.7 2.8-.2.9 2.7 2.3 1.7-1 2.7 1 2.7-2.3 1.7-.9 2.7-2.8-.2L12 21.5l-2.3-1.7-2.8.2-.9-2.7L3.7 15l1-2.7-1-2.7 2.3-1.7.9-2.7 2.8.2z"/><path d="m9 12 2 2 4-4"/></svg><span class="eyebrow">Audit badges</span>
-              <h3>Signed point-in-time records</h3>
-              <p>
-                A valid signature proves record integrity, not ownership,
-                certification, or permanent safety.
-              </p>
-              <span class="text-link">Verify issued evidence</span></a
-            >
-          </div>
         </section>
 
         <section class="final-cta">
