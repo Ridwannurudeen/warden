@@ -5,7 +5,8 @@
     if (storedTheme === "light" || storedTheme === "dark") {
       return storedTheme;
     }
-    return prefersLight ? "light" : "dark";
+    // Luminous Trust: warm light landing is the default welcome.
+    return "light";
   }
 
   function cycleFocusIndex(currentIndex, direction, count) {

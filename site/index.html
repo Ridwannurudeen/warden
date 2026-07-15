@@ -114,7 +114,7 @@
             <p class="eyebrow">
               Deterministic pre-action security for the agent economy
             </p>
-            <h1>Stop poisoned agent output before it moves money.</h1>
+            <h1>Stop <span class="accent-word">poisoned</span> agent output before it moves money.</h1>
             <p class="hero-text">
               Warden inspects untrusted messages, tool output, links, and
               payment instructions before an agent transfers funds or calls a
@@ -231,19 +231,19 @@
             </p>
             <ol class="boundary-steps">
               <li>
-                <span>01</span><strong>Inspect exact payload</strong
+                <span>01</span><strong><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Inspect exact payload</strong
                 ><small
                   >Pair untrusted text with the minimum trusted context.</small
                 >
               </li>
               <li>
-                <span>02</span><strong>Run deterministic detectors</strong
+                <span>02</span><strong><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 7-7 8-4-1-7-3.5-7-8V6z"/><path d="m9 12 2 2 4-4"/></svg>Run deterministic detectors</strong
                 ><small
                   >Repeatable checks return reasons and a severity band.</small
                 >
               </li>
               <li>
-                <span>03</span><strong>Enforce next action</strong
+                <span>03</span><strong><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 3h8.2L21 7.9v8.2L16.1 21H7.9L3 16.1V7.9z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>Enforce next action</strong
                 ><small
                   >Continue, use sanitized output, or stop before
                   execution.</small
@@ -509,7 +509,7 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
           </div>
           <div class="evidence-grid">
             <a href="/agents"
-              ><span class="eyebrow">Marketplace index</span>
+              ><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="eyebrow">Marketplace index</span>
               <h3>Public listing-text signals</h3>
               <p>
                 Scans public descriptions. It does not test endpoint behavior or
@@ -522,7 +522,7 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
               ></a
             >
             <a href="/gauntlet"
-              ><span class="eyebrow">The Gauntlet</span>
+              ><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4"/></svg><span class="eyebrow">The Gauntlet</span>
               <h3>Adversarial fast-path challenge</h3>
               <p>
                 An ALLOW creates a candidate. Human review decides whether a
@@ -531,7 +531,7 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
               <span class="text-link">Challenge the live path</span></a
             >
             <a href="/badges"
-              ><span class="eyebrow">Audit badges</span>
+              ><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5l2.3 1.7 2.8-.2.9 2.7 2.3 1.7-1 2.7 1 2.7-2.3 1.7-.9 2.7-2.8-.2L12 21.5l-2.3-1.7-2.8.2-.9-2.7L3.7 15l1-2.7-1-2.7 2.3-1.7.9-2.7 2.8.2z"/><path d="m9 12 2 2 4-4"/></svg><span class="eyebrow">Audit badges</span>
               <h3>Signed point-in-time records</h3>
               <p>
                 A valid signature proves record integrity, not ownership,

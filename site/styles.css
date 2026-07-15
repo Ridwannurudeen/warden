@@ -1,70 +1,101 @@
+/* Self-hosted fonts (no external request → no CSP console error) */
+@font-face {
+  font-family: "Fraunces";
+  src: url(/fonts/fraunces.woff2) format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url(/fonts/jakarta.woff2) format("woff2");
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  color-scheme: dark;
-  --bg: #0b0a08;
-  --bg-deep: #060505;
-  --surface: #14110c;
-  --surface-raised: #1b1712;
-  --surface-soft: #231e16;
-  --ink: #f6f1e7;
-  --muted: #c3baa9;
-  --faint: #9b9280;
-  --line: #2d2820;
-  --line-strong: #4c4433;
-  --accent: #e3b264;
-  --accent-bright: #f2cd8d;
-  --mint: #46d992;
-  --amber: #f0834d;
-  --danger: #ff6470;
-  --focus: #f2cd8d;
-  --on-accent: #201302;
-  --on-mint: #042317;
-  --on-amber: #2b1000;
-  --on-danger: #21070c;
-  --control-border: #7c7057;
+  color-scheme: light;
+  /* Luminous Trust — light default */
+  --bg: #fbfaff;
+  --bg-deep: #f2f0fc;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-soft: #f6f5ff;
+  --ink: #14121f;
+  --muted: #4a4763;
+  --faint: #78748f;
+  --line: #e8e5f6;
+  --line-strong: #d6d1ee;
+  --accent: #6d5ef6;
+  --accent-bright: #8b7dff;
+  --accent-soft: #efecff;
+  --mint: #10b981;
+  --amber: #f59e0b;
+  --danger: #f43f5e;
+  --focus: #6d5ef6;
+  --on-accent: #ffffff;
+  --on-mint: #052e22;
+  --on-amber: #3a2600;
+  --on-danger: #ffffff;
+  --control-border: #cec9ea;
   --allow: var(--mint);
   --sanitize: var(--amber);
   --block: var(--danger);
-  --shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
-  --shadow-control: 0 12px 32px rgba(0, 0, 0, 0.2);
+  --glass: color-mix(in srgb, var(--surface) 72%, transparent);
+  --halo: radial-gradient(
+    120% 120% at 50% -10%,
+    color-mix(in srgb, var(--accent) 16%, transparent),
+    transparent 60%
+  );
+  --shadow: 0 24px 60px rgba(76, 60, 180, 0.13), 0 2px 10px rgba(20, 18, 31, 0.05);
+  --shadow-control: 0 12px 34px rgba(76, 60, 180, 0.14);
+  --shadow-glow: 0 14px 40px rgba(109, 94, 246, 0.32);
   --display:
-    "Bahnschrift", "Aptos Display", "Segoe UI Variable Display", system-ui,
-    sans-serif;
-  --sans: "Segoe UI Variable Text", "Aptos", "Segoe UI", system-ui, sans-serif;
-  --mono: "Cascadia Code", "Cascadia Mono", Consolas, monospace;
-  --radius-sm: 3px;
-  --radius: 6px;
-  --radius-lg: 10px;
+    "Fraunces", "Space Grotesk", Georgia, "Times New Roman", serif;
+  --sans:
+    "Plus Jakarta Sans", "Segoe UI Variable Text", "Aptos", "Segoe UI",
+    system-ui, sans-serif;
+  --mono: "Cascadia Code", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
   --content: 1180px;
   --reading: 760px;
   font-family: var(--sans);
   font-size: 16px;
 }
 
-:root[data-theme="light"] {
-  color-scheme: light;
-  --bg: #f7f3ea;
-  --bg-deep: #ece6d8;
-  --surface: #fffdf8;
-  --surface-raised: #f1ece1;
-  --surface-soft: #e9e3d5;
-  --ink: #1a150c;
-  --muted: #4d4636;
-  --faint: #6a624e;
-  --line: #d6cdba;
-  --line-strong: #a89c82;
-  --accent: #8a6114;
-  --accent-bright: #6f4d0d;
-  --mint: #0d7a4b;
-  --amber: #a34a00;
-  --danger: #b3243e;
-  --focus: #6f4d0d;
-  --on-accent: #fffdf8;
-  --on-mint: #fffdf8;
-  --on-amber: #fffdf8;
-  --on-danger: #fffdf8;
-  --control-border: #8d8064;
-  --shadow: 0 24px 60px rgba(57, 47, 26, 0.12);
-  --shadow-control: 0 10px 28px rgba(57, 47, 26, 0.1);
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* Luminous Trust — refined dark variant */
+  --bg: #0b0a16;
+  --bg-deep: #07060f;
+  --surface: #14121f;
+  --surface-raised: #1c1830;
+  --surface-soft: #221d3a;
+  --ink: #f4f2ff;
+  --muted: #b9b4d8;
+  --faint: #8a84ab;
+  --line: #2a2547;
+  --line-strong: #3e3766;
+  --accent: #8b7dff;
+  --accent-bright: #a79bff;
+  --accent-soft: #201b3c;
+  --mint: #34d399;
+  --amber: #fbbf24;
+  --danger: #fb7185;
+  --focus: #a79bff;
+  --on-accent: #0b0a16;
+  --on-mint: #04231a;
+  --on-amber: #2b1400;
+  --on-danger: #2a0810;
+  --control-border: #4a4370;
+  --glass: color-mix(in srgb, var(--surface) 66%, transparent);
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+  --shadow-control: 0 14px 36px rgba(0, 0, 0, 0.44);
+  --shadow-glow: 0 14px 44px rgba(139, 125, 255, 0.4);
 }
 
 * {
@@ -786,8 +817,8 @@ pre {
 }
 
 :root[data-theme="light"] pre {
-  color: #33290f;
-  background: #f3eee0;
+  color: #2a2545;
+  background: #f4f2ff;
 }
 
 code {
@@ -3997,4 +4028,716 @@ h3:hover .heading-anchor,
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* ============================================================
+   LUMINOUS TRUST — polish layer (append-only; later rules win)
+   Full UI/UX overhaul: warm light landing, glassy sticky tabs,
+   elevated hero + cards. Cascades to all pages via shared sheet.
+   ============================================================ */
+
+body {
+  font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ambient page glow — soft, warm, welcoming (replaces harsh vignette) */
+body::after {
+  background:
+    radial-gradient(
+      60% 42% at 50% -8%,
+      color-mix(in srgb, var(--accent) 14%, transparent),
+      transparent 64%
+    ),
+    radial-gradient(
+      40% 30% at 92% 8%,
+      color-mix(in srgb, var(--mint) 10%, transparent),
+      transparent 70%
+    );
+}
+
+/* ---- Sticky glass header + tabs ---- */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  margin-top: 12px;
+  padding-block: 14px;
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  backdrop-filter: saturate(180%) blur(18px);
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 8px 30px rgba(20, 18, 31, 0.06);
+}
+
+.brand {
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-size: 1.18rem;
+}
+.brand img {
+  border-radius: 9px;
+  box-shadow: var(--shadow-glow);
+}
+
+.nav-group summary {
+  border-radius: var(--radius-pill);
+  padding: 8px 14px;
+  font-weight: 600;
+  transition: background 180ms ease, color 180ms ease;
+  cursor: pointer;
+}
+.nav-group summary:hover,
+.nav-group[open] summary,
+.nav-group.has-current summary {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.nav-menu {
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  background: var(--surface);
+}
+.nav-menu a {
+  border-radius: 8px;
+  transition: background 150ms ease, color 150ms ease;
+}
+.nav-menu a:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.status-pill {
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  padding: 6px 12px;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+.status-pill:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* ---- Buttons: rounded, glowing primary, clear states ---- */
+.button {
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
+    transform 160ms cubic-bezier(0.34, 1.3, 0.64, 1),
+    box-shadow 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+.button.primary {
+  background: linear-gradient(180deg, var(--accent-bright), var(--accent));
+  color: var(--on-accent);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-glow);
+}
+.button.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 48px rgba(109, 94, 246, 0.42);
+}
+.button.secondary {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+}
+.button.secondary:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: var(--shadow-control);
+}
+.button--hero {
+  padding: 15px 30px;
+  font-size: 1.02rem;
+}
+
+/* ---- Typographic scale: bigger, friendlier display ---- */
+h1, h2 {
+  font-family: var(--display);
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+}
+.home-hero-copy h1 {
+  font-size: clamp(2.6rem, 6vw, 4.2rem);
+  background: linear-gradient(
+    180deg,
+    var(--ink),
+    color-mix(in srgb, var(--ink) 78%, var(--accent))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.home-hero-copy .hero-text {
+  font-size: 1.16rem;
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: 46ch;
+}
+.eyebrow {
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.76rem;
+}
+
+/* ---- Hero + trust strip ---- */
+.trust-strip {
+  border-radius: var(--radius-pill);
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  padding: 10px 20px;
+}
+.home-hero::before { display: none; }
+
+/* ---- Action gate card (the money-shot) ---- */
+.action-gate {
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.action-gate .verdict-badge {
+  background: linear-gradient(180deg, var(--danger), color-mix(in srgb, var(--danger) 78%, #000));
+  color: #fff;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--danger) 42%, transparent);
+}
+
+/* ---- Cards: services, decision, evidence, audience ---- */
+.service-card,
+.decision-card,
+.audience-grid article,
+.evidence-grid a,
+.evidence-rail > div {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  transition: transform 200ms cubic-bezier(0.34, 1.2, 0.64, 1),
+    box-shadow 200ms ease, border-color 200ms ease;
+}
+.service-card:hover,
+.audience-grid article:hover,
+.evidence-grid a:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+.service-card--featured {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  box-shadow: var(--shadow-glow);
+  background: linear-gradient(180deg, var(--accent-soft), var(--surface));
+}
+.decision-card--allow { border-top: 3px solid var(--allow); }
+.decision-card--sanitize { border-top: 3px solid var(--sanitize); }
+.decision-card--block { border-top: 3px solid var(--block); }
+
+.status-label {
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.status-label--allow { background: color-mix(in srgb, var(--allow) 16%, transparent); color: var(--allow); }
+.status-label--sanitize { background: color-mix(in srgb, var(--sanitize) 18%, transparent); color: var(--amber); }
+.decision-card--block .status-label { background: color-mix(in srgb, var(--block) 16%, transparent); color: var(--block); }
+
+/* ---- Full-bleed section warmth ---- */
+.full-bleed-section {
+  background: linear-gradient(180deg, var(--bg-deep), var(--bg));
+  border-block: 1px solid var(--line);
+}
+.integration-preview pre {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--ink);
+  box-shadow: var(--shadow-control);
+}
+
+/* ---- Final CTA band ---- */
+.final-cta {
+  border-radius: var(--radius-lg);
+  background:
+    var(--halo),
+    linear-gradient(180deg, var(--accent-soft), var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  box-shadow: var(--shadow);
+}
+
+/* ---- Footer ---- */
+.site-footer {
+  border-top: 1px solid var(--line);
+  margin-top: 40px;
+}
+
+/* ---- Numbers (tabular) ---- */
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---- Focus visibility (a11y) ---- */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--focus);
+  border-radius: var(--radius-sm);
+}
+
+/* ============================================================
+   LUMINOUS TRUST v2 — craft pass (kill mono-overuse, fix hero
+   verdict visibility, add depth). Append-only; later wins.
+   ============================================================ */
+
+/* 1. De-mono the UI chrome — mono ONLY for real code + addresses */
+.eyebrow,
+.trust-strip span,
+.evidence-rail span,
+.evidence-rail small,
+.service-id,
+.console-label,
+.path-label,
+.status-label,
+.snapshot-note,
+.section-copy,
+.action-gate figcaption,
+.action-gate figcaption strong,
+.gate-cell strong,
+.gate-cell small,
+.integration-pills span,
+.boundary-source small,
+.boundary-warden small,
+.decision-anatomy dt {
+  font-family: var(--sans);
+}
+
+/* 2. Hero headline: never clip on mobile */
+.home-hero-copy h1 {
+  font-size: clamp(2.05rem, 7.4vw, 4.2rem);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* 3. Fix the money-shot: verdict ALWAYS visible, bold, intentional */
+.action-gate [class*="gate"],
+.action-gate figcaption,
+.action-gate .gate-cell > div {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+.gate-cell {
+  background:
+    radial-gradient(120% 120% at 50% 0%, color-mix(in srgb, var(--danger) 10%, transparent), transparent 70%),
+    var(--surface);
+  border-inline: 1px solid var(--line);
+}
+.gate-cell > div {
+  gap: 10px;
+  padding: 8px;
+}
+.action-gate .verdict-badge {
+  display: inline-block;
+  padding: 9px 20px;
+  font-family: var(--display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: linear-gradient(180deg, var(--danger), color-mix(in srgb, var(--danger) 74%, #4a0011));
+  color: #fff;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--danger) 40%, transparent);
+}
+.gate-cell strong {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}
+.gate-cell small {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--danger);
+  letter-spacing: 0.12em;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+.gate-rail { background: color-mix(in srgb, var(--danger) 45%, transparent); box-shadow: none; opacity: 0.5; }
+.gate-trace { display: none; }
+.gate-prevented strong { color: var(--ink); font-weight: 700; }
+.gate-input { background: var(--surface-soft); }
+
+/* 4. Stat band → filled cards, big display numbers, quiet captions */
+.evidence-rail {
+  gap: 14px;
+}
+.evidence-rail > div {
+  padding: 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 2px 10px rgba(20, 18, 31, 0.04);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+.evidence-rail > div:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  box-shadow: var(--shadow-control);
+}
+.evidence-rail strong.num,
+.evidence-rail strong {
+  font-family: var(--display);
+  font-size: 2.1rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.evidence-rail span {
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+.evidence-rail small {
+  color: var(--faint);
+  font-size: 0.78rem;
+}
+
+/* 5. Boundary diagram → cards with depth, not thin lines */
+.boundary-source,
+.boundary-warden {
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+}
+.boundary-source { background: var(--surface); }
+.boundary-warden {
+  background: linear-gradient(180deg, var(--accent-soft), var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  color: var(--accent);
+}
+.boundary-warden span { color: var(--accent); font-weight: 700; }
+.boundary-diagram ul li {
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 12px 14px;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+.boundary-diagram ul li:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  transform: translateX(3px);
+}
+
+/* 6. Section rhythm — more breathing room + soft dividers */
+.decision-section,
+.audience-section,
+.services-section,
+.integration-preview,
+.evidence-section {
+  padding-block: clamp(48px, 7vw, 88px);
+}
+
+/* 7. Trust strip: quiet, pill dots */
+.trust-strip span { font-size: 0.82rem; color: var(--muted); font-weight: 500; }
+
+/* 8. Integration pills → soft chips */
+.integration-pills span {
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  padding: 7px 15px;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+/* ============================================================
+   LUMINOUS TRUST v3 — mobile overflow fix + final polish
+   ============================================================ */
+
+/* Never let anything push past the viewport */
+html, body { max-width: 100%; overflow-x: hidden; }
+
+@media (max-width: 900px) {
+  .home-hero {
+    grid-template-columns: 1fr !important;
+    gap: 32px;
+  }
+  .home-hero-copy,
+  .home-hero .action-gate,
+  .hero-actions,
+  .hero-text { min-width: 0; max-width: 100%; }
+  .action-gate { min-width: 0 !important; }
+  .gate-flow { grid-template-columns: minmax(0, 1fr) 128px minmax(0, 0.9fr); }
+  .hero-actions { flex-wrap: wrap; }
+  .hero-actions .button { flex: 1 1 auto; }
+}
+
+@media (max-width: 560px) {
+  .home-hero-copy h1 { font-size: clamp(1.85rem, 8.8vw, 3rem); }
+  .gate-flow {
+    grid-template-columns: 1fr;
+  }
+  .gate-cell { border-inline: none; border-block: 1px solid var(--line); min-height: 150px; }
+  .gate-rail { display: none; }
+  .trust-strip { padding: 12px 16px; }
+  .trust-strip span { flex: 0 0 auto; }
+}
+
+/* Trust strip: proper wrapped chips with dot separators removed on wrap */
+.trust-strip { row-gap: 8px; column-gap: 4px; }
+
+/* Subtle premium hero backdrop wash (adds depth, not noise) */
+.home-hero {
+  border-radius: var(--radius-lg);
+}
+
+/* Section headings: tighter, more confident */
+.section-heading h2 { max-width: 18ch; }
+.section-copy { max-width: 56ch; color: var(--muted); line-height: 1.6; }
+
+/* Give the whole page a touch more vertical air between shells */
+.site-main > .page-shell { padding-block: clamp(28px, 4vw, 56px); }
+
+/* ============================================================
+   LUMINOUS TRUST v4 — prevented-action visibility + rhythm
+   ============================================================ */
+
+/* Make the "prevented action" consequence always visible */
+.action-gate .gate-prevented strong,
+.action-gate .gate-prevented p,
+.action-gate .gate-prevented p:last-child {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+.gate-prevented .console-label { color: var(--accent); font-weight: 700; }
+.gate-prevented p:last-child { color: var(--muted); }
+
+/* Tighten vertical rhythm — sections were too sparse */
+.site-main > .page-shell { padding-block: clamp(20px, 2.6vw, 36px); }
+.decision-section,
+.audience-section,
+.services-section,
+.integration-preview,
+.evidence-section {
+  padding-block: clamp(36px, 4.4vw, 60px);
+}
+.final-cta { padding-block: clamp(40px, 5vw, 64px); padding-inline: clamp(24px, 4vw, 56px); }
+
+/* Decision cards: calmer top accent (was rainbow-loud) */
+.decision-card--allow,
+.decision-card--sanitize,
+.decision-card--block {
+  border-top-width: 4px;
+}
+
+/* ============================================================
+   LUMINOUS TRUST v5 — signature hero aurora + rich dark
+   contrast band + depth. Reduced-motion safe (global rule
+   neutralizes animations).
+   ============================================================ */
+
+/* 1. Signature hero aurora — soft drifting indigo/emerald/rose glow */
+.home-hero { overflow: visible; }
+.home-hero::before {
+  display: block;
+  content: "";
+  position: absolute;
+  inset: -30% -8% auto -8%;
+  height: 560px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 60% at 18% 32%, color-mix(in srgb, var(--accent) 34%, transparent), transparent 70%),
+    radial-gradient(34% 54% at 82% 18%, color-mix(in srgb, var(--mint) 24%, transparent), transparent 72%),
+    radial-gradient(44% 52% at 62% 66%, color-mix(in srgb, #ec4899 20%, transparent), transparent 72%);
+  filter: blur(64px);
+  opacity: 0.75;
+  animation: aurora-drift 20s ease-in-out infinite alternate;
+}
+@keyframes aurora-drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(-4%, 3%, 0) scale(1.09); }
+}
+
+/* Gentle float on the verdict card so the hero feels alive */
+.home-hero .action-gate { animation: card-float 7s ease-in-out infinite; }
+@keyframes card-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* 2. Rich dark contrast band — the memorable moment mid-page */
+.action-boundary-section {
+  background: linear-gradient(155deg, #191534 0%, #0d0a1f 100%);
+  border-block: 1px solid #2a2547;
+  position: relative;
+  overflow: hidden;
+}
+.action-boundary-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(40% 60% at 12% 20%, rgba(139,125,255,0.22), transparent 70%),
+    radial-gradient(36% 50% at 88% 80%, rgba(16,185,129,0.14), transparent 72%);
+  pointer-events: none;
+}
+.action-boundary-section > * { position: relative; }
+.action-boundary-section .eyebrow { color: #a79bff; }
+.action-boundary-section h2 {
+  color: #f6f4ff;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+.action-boundary-section .section-copy { color: #c3bee0; }
+.action-boundary-section .boundary-steps li strong { color: #f6f4ff; }
+.action-boundary-section .boundary-steps li small { color: #948eb8; }
+.action-boundary-section .boundary-steps li span { color: #a79bff; }
+.action-boundary-section .boundary-source,
+.action-boundary-section .boundary-diagram ul li {
+  background: rgba(255,255,255,0.045);
+  border-color: rgba(255,255,255,0.09);
+}
+.action-boundary-section .boundary-source span,
+.action-boundary-section .boundary-diagram ul li strong { color: #f6f4ff; }
+.action-boundary-section .boundary-source small,
+.action-boundary-section .boundary-diagram ul li span { color: #948eb8; }
+.action-boundary-section .boundary-warden {
+  background: linear-gradient(180deg, rgba(139,125,255,0.24), rgba(139,125,255,0.06));
+  border-color: rgba(139,125,255,0.45);
+}
+.action-boundary-section .boundary-warden span { color: #c4bbff; }
+.action-boundary-section .boundary-warden small { color: #a79bff; }
+
+/* 3. Depth: gradient hairline on featured + final CTA */
+.service-card--featured,
+.final-cta {
+  position: relative;
+}
+.final-cta h2 {
+  background: linear-gradient(180deg, var(--ink), color-mix(in srgb, var(--ink) 70%, var(--accent)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* 4. Catch remaining mono UI labels on inner pages */
+.data-list dt,
+thead th,
+.record-label,
+.field-label,
+.step-label { font-family: var(--sans); }
+
+/* ============================================================
+   LUMINOUS TRUST v6 — fix dark-band diagram legibility.
+   Make the boundary diagram a light "spotlight" card floating
+   on the dark band, with dark text (readable), not white-on-light.
+   ============================================================ */
+
+.action-boundary-section .boundary-diagram {
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+}
+.action-boundary-section .boundary-source,
+.action-boundary-section .boundary-diagram ul li {
+  background: var(--surface-soft);
+  border-color: var(--line);
+}
+.action-boundary-section .boundary-source span,
+.action-boundary-section .boundary-diagram ul li strong {
+  color: var(--ink);
+}
+.action-boundary-section .boundary-source small,
+.action-boundary-section .boundary-diagram ul li span {
+  color: var(--faint);
+}
+.action-boundary-section .boundary-warden {
+  background: linear-gradient(180deg, var(--accent-soft), var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+.action-boundary-section .boundary-warden span { color: var(--accent); }
+.action-boundary-section .boundary-warden small { color: var(--muted); }
+
+/* ============================================================
+   LUMINOUS TRUST v7 — editorial serif refinements (Tollgate)
+   + two-tone accent headline (ShieldBot). Fraunces italic accent.
+   ============================================================ */
+
+/* Editorial serif tuning: slightly less tight tracking than sans */
+h1, h2 { letter-spacing: -0.02em; }
+.home-hero-copy h1 {
+  letter-spacing: -0.02em;
+  line-height: 1.02;
+  /* solid ink reads sharper than gradient-clip in serif */
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--ink);
+}
+
+/* Two-tone accent headline word — Fraunces italic in brand indigo */
+.accent-word {
+  font-style: italic;
+  color: var(--accent);
+}
+:root[data-theme="dark"] .accent-word { color: var(--accent-bright); }
+
+/* Bigger, punchier stat numbers with accent emphasis (ShieldBot impact) */
+.evidence-rail strong,
+.evidence-rail strong.num {
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--accent);
+}
+.evidence-rail > div:hover strong { color: var(--accent-bright); }
+
+/* Section headings in serif get a touch more size for editorial weight */
+.section-heading h2 { font-size: clamp(1.9rem, 3.2vw, 2.6rem); }
+.final-cta h2 { font-size: clamp(2.1rem, 3.6vw, 3rem); }
+
+/* ============================================================
+   LUMINOUS TRUST v8 — SVG icon system (Lucide-style, no emoji)
+   ============================================================ */
+
+/* Inline step icons in the boundary band */
+.step-icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: -3px;
+  margin-right: 9px;
+  color: var(--accent);
+}
+.action-boundary-section .step-icon { color: #a79bff; }
+
+/* Icon badges atop evidence cards */
+.card-icon {
+  display: block;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  margin-bottom: 16px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: var(--radius);
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+}
+.evidence-grid a:hover .card-icon {
+  background: var(--accent);
+  color: #fff;
+  transform: translateY(-2px);
 }
