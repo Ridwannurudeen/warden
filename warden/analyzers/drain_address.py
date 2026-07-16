@@ -12,6 +12,12 @@ TRANSFER_INTENT_RE = re.compile(
     r"|move|redirect|payout|route|wallet\s+is|receiving address)\b"
 )
 CONTEXTUAL_RECIPIENT_RE = re.compile(r"(?i)\b(?:recipients?|payments?)\b")
+FORWARD_TRANSFER_INTENT_RE = re.compile(
+    r"(?i)\bforward\s+(?:(?:the|all|remaining|entire)\s+)?"
+    r"(?:\d+(?:\.\d+)?\s+)?"
+    r"(?:eth|btc|bnb|sol|usdt|usdc|dai|tokens?|funds?|payments?|balance|assets?|holdings)"
+    r"\s+to\b"
+)
 HIGH_RISK_DRAIN_INTENT_RE = re.compile(
     r"(?i)\b(?:send|transfer|wire|route|forward|move)\s+(?:the\s+)?"
     r"(?:remaining|entire|all)\s+(?:funds|balance|holdings|assets|tokens?)\b"
@@ -73,8 +79,11 @@ class DrainAddressAnalyzer(Analyzer):
             if confidence:
                 detections.append(self._detection(address, confidence))
 
-        if TRANSFER_INTENT_RE.search(payload) or HIGH_RISK_DRAIN_INTENT_RE.search(payload) or (
-            has_expected and CONTEXTUAL_RECIPIENT_RE.search(payload)
+        if (
+            TRANSFER_INTENT_RE.search(payload)
+            or FORWARD_TRANSFER_INTENT_RE.search(payload)
+            or HIGH_RISK_DRAIN_INTENT_RE.search(payload)
+            or (has_expected and CONTEXTUAL_RECIPIENT_RE.search(payload))
         ):
             for match in MALFORMED_ADDR_RE.finditer(payload):
                 token = match.group()
@@ -105,8 +114,10 @@ class DrainAddressAnalyzer(Analyzer):
         window = payload[max(0, start - 80) : min(len(payload), end + 80)]
         if HIGH_RISK_DRAIN_INTENT_RE.search(window):
             return 0.95
-        if not TRANSFER_INTENT_RE.search(window) and not (
-            has_expected and CONTEXTUAL_RECIPIENT_RE.search(window)
+        if (
+            not TRANSFER_INTENT_RE.search(window)
+            and not FORWARD_TRANSFER_INTENT_RE.search(window)
+            and not (has_expected and CONTEXTUAL_RECIPIENT_RE.search(window))
         ):
             return 0.0
         return 0.95 if has_expected else 0.80
