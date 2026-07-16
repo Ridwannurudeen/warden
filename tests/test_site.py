@@ -1,5 +1,6 @@
 """Static multi-page site, documentation, and deployment routing tests."""
 
+import hashlib
 import json
 import re
 import subprocess
@@ -666,14 +667,27 @@ def test_home_playground_badges_integrations_and_status_are_real_surfaces():
 
 def test_status_and_marketplace_metadata_are_dated_and_honest():
     status = json.loads((SITE / "data" / "site-status.json").read_text(encoding="utf-8"))
+    product_proof = json.loads(
+        (SITE / "data" / "product-proof.json").read_text(encoding="utf-8")
+    )
     marketplace = json.loads(
         (SITE / "data" / "marketplace-summary.json").read_text(encoding="utf-8")
     )
+    corpus_bytes = (ROOT / "corpus" / "attacks.jsonl").read_bytes() + (
+        ROOT / "corpus" / "benign.jsonl"
+    ).read_bytes()
 
     assert status["agentId"] == "3808"
     assert status["listingStatus"] == "Listed"
     assert status["listingVerifiedAt"] == "2026-07-13"
-    assert status["repositoryTests"] >= 110
+    assert status["repositoryTests"] == 683
+    assert status["repositoryTestsVerifiedAt"] == "2026-07-16"
+    assert "539 Python" in status["repositoryTestsNote"]
+    assert "113 site JavaScript" in status["repositoryTestsNote"]
+    assert "31 TypeScript SDK" in status["repositoryTestsNote"]
+    assert "1 Python test skipped" in status["repositoryTestsNote"]
+    assert status["corpusCount"] == product_proof["evaluationCorpus"]["total"]
+    assert status["corpusFingerprint"] == f"sha256:{hashlib.sha256(corpus_bytes).hexdigest()}"
     assert status["paymentActivity"]["transactionSpecific"] is False
     assert "does not contain" in status["paymentActivity"]["note"]
     assert status["paymentActivity"]["url"].startswith("https://www.oklink.com/xlayer/address/")

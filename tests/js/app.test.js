@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
@@ -16,9 +17,17 @@ const {
   marketplaceCoverageText,
   normalizeEvidenceCount,
   normalizeMarketplaceSummary,
+  normalizeProductProof,
   resolveTheme,
   summaryToRestoreOnEscape,
 } = appApi;
+
+const productProof = JSON.parse(
+  fs.readFileSync(
+    path.join(__dirname, "..", "..", "site", "data", "product-proof.json"),
+    "utf8",
+  ),
+);
 
 test("theme resolution respects a stored choice and otherwise defaults to light", () => {
   assert.equal(resolveTheme("light", false), "light");
@@ -248,5 +257,28 @@ test("marketplace summary rejects inconsistent counts and non-UTC timestamps", (
         auditedCount: 0,
       }),
     /query/,
+  );
+});
+
+test("product proof normalizes the dated marketplace and corpus evidence", () => {
+  assert.deepEqual(normalizeProductProof(productProof), productProof);
+});
+
+test("product proof rejects corpus, benchmark, and marketplace drift", () => {
+  assert.throws(
+    () =>
+      normalizeProductProof({
+        ...productProof,
+        evaluationCorpus: { ...productProof.evaluationCorpus, total: 122 },
+      }),
+    /corpus counts/,
+  );
+  assert.throws(
+    () =>
+      normalizeProductProof({
+        ...productProof,
+        marketplace: { ...productProof.marketplace, sold: "15" },
+      }),
+    /sold count/,
   );
 });

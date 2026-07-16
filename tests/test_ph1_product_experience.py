@@ -118,6 +118,14 @@ def test_homepage_uses_proof_and_catalog_data_without_stale_number_literals():
     assert "data-service-price" in page
 
 
+def test_showcase_uses_the_same_product_proof_for_the_corpus_count():
+    showcase = (SITE / "showcase.html").read_text(encoding="utf-8")
+
+    assert "data-product-proof" in showcase
+    assert 'data-proof-field="corpus-total"' in showcase
+    assert "<strong>122</strong>" not in showcase
+
+
 def test_okx_cta_is_honest_about_the_missing_direct_listing_url():
     page = (SITE / "index.html").read_text(encoding="utf-8")
 

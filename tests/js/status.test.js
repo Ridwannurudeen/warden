@@ -55,9 +55,17 @@ test("metadata view exposes separate listing and repository verification dates",
     ),
   );
   const view = metadataView(status);
-  assert.equal(view.verifiedAt, "2026-07-13");
+  assert.equal(view.verifiedAt, "2026-07-16");
   assert.equal(view.listingVerifiedAt, "2026-07-13");
-  assert.equal(view.repositoryTestsVerifiedAt, "2026-07-13");
+  assert.equal(view.repositoryTests, 683);
+  assert.equal(view.repositoryTestsVerifiedAt, "2026-07-16");
+  assert.match(view.repositoryTestsNote, /539 Python/);
+  assert.match(view.repositoryTestsNote, /113 site JavaScript/);
+  assert.match(view.repositoryTestsNote, /31 TypeScript SDK/);
+  assert.equal(
+    view.corpusFingerprint,
+    "sha256:a3d4b413301dd86ea20da9e6a830e5f676b122ca4c0c266e08a1191a3b6bfc38",
+  );
   assert.equal(view.services, "33460 / 33461");
 });
 
