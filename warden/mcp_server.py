@@ -13,6 +13,8 @@ from warden.models import (
     AuditResponse,
     Depth,
     MAX_PAYLOAD_LENGTH,
+    MAX_SAMPLE_PROMPTS,
+    MAX_TARGET_URL_LENGTH,
     ScanContext,
     ScanRequest,
     ScanResponse,
@@ -43,8 +45,15 @@ async def scan_payload(
 
 @mcp.tool(output_schema=AuditResponse.model_json_schema())
 async def audit_agent(
-    target_url: str,
-    sample_prompts: list[str] | None = None,
+    target_url: Annotated[
+        str,
+        Field(min_length=1, max_length=MAX_TARGET_URL_LENGTH),
+    ],
+    sample_prompts: Annotated[
+        list[Annotated[str, Field(max_length=MAX_PAYLOAD_LENGTH)]],
+        Field(max_length=MAX_SAMPLE_PROMPTS),
+    ]
+    | None = None,
 ) -> dict[str, object]:
     """Run the Warden fixed attack battery against an HTTP agent endpoint."""
     request = AuditRequest.model_validate(

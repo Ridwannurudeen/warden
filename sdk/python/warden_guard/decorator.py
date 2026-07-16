@@ -46,6 +46,7 @@ def guard(
             @functools.wraps(fn)
             async def async_wrapper(*args: object, **kwargs: object) -> object:
                 bound = signature.bind(*args, **kwargs)
+                bound.apply_defaults()
                 bound.arguments[field] = await guard_client.guard(str(bound.arguments[field]))
                 return await fn(*bound.args, **bound.kwargs)
 
@@ -58,6 +59,7 @@ def guard(
         @functools.wraps(fn)
         def wrapper(*args: object, **kwargs: object) -> object:
             bound = signature.bind(*args, **kwargs)
+            bound.apply_defaults()
             bound.arguments[field] = sync_client.guard(str(bound.arguments[field]))
             return fn(*bound.args, **bound.kwargs)
 
