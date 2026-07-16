@@ -169,6 +169,29 @@ def test_committed_snapshot_has_honest_schema_v2_coverage():
     assert len(snapshot.agents) == 730
 
 
+def test_committed_warden_marketplace_numbers_are_explicitly_snapshot_dated():
+    agent_html = (ROOT / "site" / "agents" / "3808.html").read_text(encoding="utf-8")
+    index_html = (ROOT / "site" / "agents" / "index.html").read_text(encoding="utf-8")
+
+    assert "<span>Sold at snapshot</span><strong class=\"num\">14</strong>" in agent_html
+    assert (
+        "<span>Buyer review at snapshot</span><strong class=\"num\">4 / 5</strong>"
+        in agent_html
+    )
+    assert "<span>Sold at 2026-07-16 snapshot</span>" in index_html
+    assert "<span>Buyer review at 2026-07-16 snapshot</span>" in index_html
+    assert (
+        "Agent: Warden; Agent ID: 3808; Category: SOFTWARE_SERVICES; "
+        "Sold at 2026-07-16 snapshot: 14;"
+    ) in index_html
+    assert "Buyer review at 2026-07-16 snapshot: 4 / 5" in index_html
+    assert '<span class="num" data-label="Sold at 2026-07-16 snapshot">14</span>' in index_html
+    assert (
+        '<span class="num" data-label="Buyer review at 2026-07-16 snapshot">4 / 5</span>'
+        in index_html
+    )
+
+
 def test_fetch_paginates_until_empty_and_persists_snapshot(tmp_path):
     outputs = iter(
         [
@@ -371,7 +394,8 @@ def test_renderer_escapes_content_handles_zero_services_and_verifies_badge(tmp_p
     assert "Verified audit badge" in agent_html
     assert f"/badges/{badge['audit_id']}" in agent_html
     assert "No services listed" in agent_html
-    assert "Buyer review average" in agent_html
+    assert "<span>Sold at snapshot</span>" in agent_html
+    assert "<span>Buyer review at snapshot</span>" in agent_html
     assert "1</span> agent indexed" in index_html
     assert 'src="http' not in agent_html
     assert 'rel="canonical" href="https://warden.gudman.xyz/agents/3808"' in agent_html
@@ -483,6 +507,8 @@ def test_marketplace_index_renders_search_filters_sorting_and_separate_evidence_
     assert 'data-audit="audited"' in index_html
     assert 'data-audit="not-audited"' in index_html
     assert "Public listing text only" in index_html
+    assert "<span>Sold at 2026-07-13 snapshot</span>" in index_html
+    assert "<span>Buyer review at 2026-07-13 snapshot</span>" in index_html
     assert "What this does not mean" in index_html
     assert 'id="methodology"' in index_html
     assert "Linked signed audit" in index_html

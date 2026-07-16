@@ -17,6 +17,7 @@ APA_ISSUER = "warden"
 APA_PROTECTOR = "warden"
 APA_ATTESTATION_TTL_SECONDS = 3_600
 MAX_SAFE_UNIX_SECONDS = 9_007_199_254_740_991
+WARDEN_MARKETPLACE_AGENT_ID = "3808"
 
 
 @dataclass(frozen=True)
@@ -377,6 +378,16 @@ def _render_agent_page(
     threats = ", ".join(indexed.threat_classes) or "No public-text signals"
     verdict = indexed.verdict or "NOT_SCANNED"
     _, public_text_label = _public_text_status(indexed)
+    sold_label = (
+        "Sold at snapshot"
+        if agent.agent_id == WARDEN_MARKETPLACE_AGENT_ID
+        else "Sold count"
+    )
+    buyer_review_label = (
+        "Buyer review at snapshot"
+        if agent.agent_id == WARDEN_MARKETPLACE_AGENT_ID
+        else "Buyer review average"
+    )
     body = f"""
 <section class="agent-hero">
   <div class="agent-avatar" aria-hidden="true">{_escape(_initials(agent.name))}</div>
@@ -389,9 +400,9 @@ def _render_agent_page(
 </section>
 <section class="data-grid" aria-label="Marketplace statistics">
   <div><span>Category</span><strong>{_escape(categories)}</strong></div>
-  <div><span>Sold count</span><strong class="num">{_number(agent.sold_count)}</strong></div>
+  <div><span>{sold_label}</span><strong class="num">{_number(agent.sold_count)}</strong></div>
   <div><span>Feedback rate</span><strong class="num">{_raw_stat(agent.feedback_rate)}</strong></div>
-  <div><span>Buyer review average</span><strong class="num">{_buyer_review(agent.security_rate)}</strong></div>
+  <div><span>{buyer_review_label}</span><strong class="num">{_buyer_review(agent.security_rate)}</strong></div>
 </section>
 <section class="feature-panel">
   <p class="eyebrow">Public listing text only</p>
@@ -437,6 +448,7 @@ def _render_index_page(
     audited_agent_ids: set[str],
     attested_agent_ids: set[str],
 ) -> str:
+    snapshot_date = coverage.captured_at[:10]
     categories = sorted(
         {category for indexed in indexed_agents for category in indexed.agent.category_codes}
     )
@@ -477,23 +489,38 @@ def _render_index_page(
         )
         sold_sort = "" if agent.sold_count is None else str(agent.sold_count)
         review_sort = "" if agent.security_rate is None else str(agent.security_rate)
+        sold_label = (
+            f"Sold at {snapshot_date} snapshot"
+            if agent.agent_id == WARDEN_MARKETPLACE_AGENT_ID
+            else "Sold"
+        )
+        buyer_review_label = (
+            f"Buyer review at {snapshot_date} snapshot"
+            if agent.agent_id == WARDEN_MARKETPLACE_AGENT_ID
+            else "Buyer review average"
+        )
+        buyer_review_data_label = (
+            buyer_review_label
+            if agent.agent_id == WARDEN_MARKETPLACE_AGENT_ID
+            else "Buyer reviews"
+        )
         row_label = (
             f"Agent: {agent.name or 'Unnamed agent'}; Agent ID: {agent.agent_id}; "
-            f"Category: {categories_text}; Sold: {_number(agent.sold_count)}; "
+            f"Category: {categories_text}; {sold_label}: {_number(agent.sold_count)}; "
             f"Public listing text: {public_text_label}; "
             f"Verdict: {indexed.verdict or 'NOT_SCANNED'}; "
             f"Endpoint audit: {audit_label}; "
             f"APA attestation: {apa_label}; "
-            f"Buyer review average: {_buyer_review(agent.security_rate)}"
+            f"{buyer_review_label}: {_buyer_review(agent.security_rate)}"
         )
         rows.append(
             f"""<a class="agent-row" href="/agents/{_escape(agent.agent_id)}" aria-label="{_escape(row_label)}" data-agent-row data-search="{_escape(search_text)}" data-category="{_escape(category_data)}" data-match="{match_state}" data-audit="{audit_state}" data-name="{_escape(agent.name.casefold())}" data-agent-id="{_escape(agent.agent_id)}" data-sold="{sold_sort}" data-review="{review_sort}">
   <span><strong>{_escape(agent.name or "Unnamed agent")}</strong><small>Agent #{_escape(agent.agent_id)}</small></span>
   <span data-label="Category">{_escape(categories_text)}</span>
-  <span class="num" data-label="Sold">{_number(agent.sold_count)}</span>
+  <span class="num" data-label="{_escape(sold_label)}">{_number(agent.sold_count)}</span>
   <span data-label="Public text"><strong>{_escape(public_text_label)}</strong><small>{_escape(indexed.verdict or "NOT_SCANNED")}</small></span>
   <span data-label="Endpoint evidence"><strong>{audit_label}</strong><small>{apa_label}</small></span>
-  <span class="num" data-label="Buyer reviews">{_buyer_review(agent.security_rate)}</span>
+  <span class="num" data-label="{_escape(buyer_review_data_label)}">{_buyer_review(agent.security_rate)}</span>
 </a>"""
         )
 
@@ -531,7 +558,7 @@ def _render_index_page(
 <section>
   <p class="snapshot-note" aria-live="polite" aria-atomic="true">Showing <span class="num" data-agent-rendered>{summary.sampled}</span> of <span class="num" data-agent-visible>{summary.sampled}</span> matching agents.</p>
   <noscript><p class="snapshot-note">Search and filter controls require JavaScript. All agents in this dated snapshot are listed below.</p></noscript>
-  <div class="agent-row agent-row--header" aria-hidden="true"><span>Agent</span><span>Category</span><span>Sold</span><span>Public listing text</span><span>Endpoint evidence</span><span>Buyer review average</span></div>
+  <div class="agent-row agent-row--header" aria-hidden="true"><span>Agent</span><span>Category</span><span>Sold at {snapshot_date} snapshot</span><span>Public listing text</span><span>Endpoint evidence</span><span>Buyer review at {snapshot_date} snapshot</span></div>
   <div data-agent-results>{"".join(rows)}</div>
   <button class="button secondary" type="button" data-agent-more hidden>Show more agents</button>
   <p class="empty-state" data-agent-empty hidden>No marketplace listings match these filters. Clear a filter to restore the full dated snapshot.</p>
