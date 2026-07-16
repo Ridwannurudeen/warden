@@ -24,8 +24,18 @@ Directly lifts Best Product ("experience/completeness/value") and kills the toy/
   `Labs` / `Trust` section — keep them reachable, off the primary journey.
 - **Fix number drift** across every surface (prices, corpus counts, sales, test counts) — one source of truth.
 - Unify brand: black/gold/red; drop the purple/glass card-heavy look where it conflicts.
+- **Creative-Genius framing (do these too — the on-site half of the trust story):**
+  - **Hero headline = one novelty sentence**, verbatim intent: *"The first agent-security service that issues
+    cryptographic, independently-verifiable attestations of what it blocked — trust you can check, not trust
+    you're told."* Frame the hero around **verifiable trust / provable safety**, NOT detection breadth.
+  - **"Verify it yourself" proof block on the homepage:** use the EXISTING browser verifier (WebCrypto, client
+    side) to re-check a real Warden-signed attestation live, AND show the transparency-log hash chain visibly
+    catching a tampered entry (flip one byte → verification fails on-page). Self-contained, no server call, no
+    external request. This is the on-page version of the demo's killer beat.
 - **Accept:** homepage tells the one journey with a live verdict; proof is above the fold; experimental
-  surfaces moved to Labs; numbers consistent site-wide; light+dark; no external requests (test asserts it).
+  surfaces moved to Labs; numbers consistent site-wide; light+dark; no external requests (test asserts it);
+  hero leads with the novelty sentence + verifiable-trust framing; the "verify it yourself" block re-checks a
+  real attestation client-side and demonstrates tamper-detection (test asserts both work offline).
 
 ## PH2 — Real semantic detection layer  [Best-Product detection lift — GATED, higher risk]
 The `HttpSemanticAnalyzer` scaffolding exists (`warden/scanner/semantic.py`) but is disabled. Make it real.
