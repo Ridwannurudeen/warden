@@ -36,6 +36,7 @@ MIN_NONCE_BITS = 128
 ATTESTATION_SCOPE = "Endpoint-signed count; local counter state is not independently audited."
 MAX_SAFE_UNIX_SECONDS = 9_007_199_254_740_991
 DEFAULT_ISSUER_KID = "warden-issuer-1"
+LOG_CHECKPOINT_VERSION = "apa-log/0.1"
 
 # Global cap on concurrent outbound probes, independent of per-IP rate limits
 # (APA-SPEC §10 SSRF/DoS). Single-worker deployment, so a process-wide
@@ -184,6 +185,73 @@ def issuer_document() -> dict[str, object]:
         "issuer": ISSUER_NAME,
         "keys": issuer_keys(),
     }
+
+
+def issue_log_checkpoint(
+    seq: int,
+    head_hash: str,
+    *,
+    issued_at: int | None = None,
+) -> dict[str, object]:
+    """Sign the exact persisted transparency-log head."""
+    current = int(time.time()) if issued_at is None else issued_at
+    if type(seq) is not int or not 0 <= seq <= MAX_SAFE_UNIX_SECONDS:
+        raise ValueError("log checkpoint seq must be a non-negative safe integer")
+    if (
+        not isinstance(head_hash, str)
+        or len(head_hash) != 64
+        or any(character not in "0123456789abcdef" for character in head_hash)
+    ):
+        raise ValueError("log checkpoint head_hash must be lowercase SHA-256 hex")
+    if type(current) is not int or not 0 <= current <= MAX_SAFE_UNIX_SECONDS:
+        raise ValueError("log checkpoint issued_at must be non-negative safe Unix seconds")
+    checkpoint = {
+        "spec_version": LOG_CHECKPOINT_VERSION,
+        "issuer": ISSUER_NAME,
+        "seq": seq,
+        "head_hash": head_hash,
+        "issued_at": current,
+    }
+    return ed25519_sign_record(checkpoint, issuer_private_key(), "issuer_sig")
+
+
+def verify_log_checkpoint(checkpoint: dict[str, object]) -> bool:
+    """Verify a signed log head against the applicable issuer key history."""
+    if not isinstance(checkpoint, dict):
+        return False
+    if set(checkpoint) != {
+        "spec_version",
+        "issuer",
+        "seq",
+        "head_hash",
+        "issued_at",
+        "issuer_sig",
+    }:
+        return False
+    if checkpoint.get("spec_version") != LOG_CHECKPOINT_VERSION:
+        return False
+    if checkpoint.get("issuer") != ISSUER_NAME:
+        return False
+    seq = checkpoint.get("seq")
+    issued_at = checkpoint.get("issued_at")
+    head_hash = checkpoint.get("head_hash")
+    if type(seq) is not int or not 0 <= seq <= MAX_SAFE_UNIX_SECONDS:
+        return False
+    if type(issued_at) is not int or not 0 <= issued_at <= MAX_SAFE_UNIX_SECONDS:
+        return False
+    if not isinstance(head_hash, str) or len(head_hash) != 64:
+        return False
+    if any(character not in "0123456789abcdef" for character in head_hash):
+        return False
+    try:
+        keys = issuer_keys()
+    except ValueError:
+        return False
+    return any(
+        issued_at <= int(key["not_after"])
+        and ed25519_verify_record(checkpoint, str(key["pub"]), "issuer_sig")
+        for key in keys
+    )
 
 
 async def _fetch_proof(endpoint: str) -> tuple[str, dict[str, object]]:

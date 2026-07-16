@@ -3,6 +3,7 @@
 
   const GENESIS_PREV_HASH = "0".repeat(64);
   const HEX_HASH = /^[0-9a-f]{64}$/;
+  const LOG_CHECKPOINT_VERSION = "apa-log/0.1";
 
   function canonicalValue(value) {
     if (Array.isArray(value)) {
@@ -74,6 +75,125 @@
     return payload.entries.map(normalizeLogEntry);
   }
 
+  function decodeBase64Url(value, prefix, expectedLength) {
+    const marker = `${prefix}:`;
+    if (typeof value !== "string" || !value.startsWith(marker)) {
+      throw new Error(`Expected a ${prefix}: base64url value`);
+    }
+    const encoded = value.slice(marker.length);
+    if (!encoded || !/^[A-Za-z0-9_-]+$/.test(encoded)) {
+      throw new Error("Value is not unpadded base64url");
+    }
+    const padded =
+      encoded.replace(/-/g, "+").replace(/_/g, "/") +
+      "=".repeat((4 - (encoded.length % 4)) % 4);
+    let binary;
+    try {
+      binary = root.atob(padded);
+    } catch (error) {
+      throw new Error("Value is not valid base64url", { cause: error });
+    }
+    const bytes = Uint8Array.from(binary, (character) =>
+      character.charCodeAt(0),
+    );
+    if (bytes.length !== expectedLength) {
+      throw new Error(`${prefix} value must decode to ${expectedLength} bytes`);
+    }
+    const canonical = root
+      .btoa(String.fromCharCode(...bytes))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+    if (canonical !== encoded) {
+      throw new Error("Value is not canonical base64url");
+    }
+    return bytes;
+  }
+
+  function normalizeLogCheckpoint(checkpoint) {
+    if (
+      checkpoint === null ||
+      typeof checkpoint !== "object" ||
+      Array.isArray(checkpoint) ||
+      Object.keys(checkpoint).length !== 6
+    ) {
+      throw new Error("Log checkpoint must be a six-field object");
+    }
+    if (checkpoint.spec_version !== LOG_CHECKPOINT_VERSION) {
+      throw new Error("Log checkpoint spec_version is unsupported");
+    }
+    if (typeof checkpoint.issuer !== "string" || !checkpoint.issuer) {
+      throw new Error("Log checkpoint issuer must be a non-empty string");
+    }
+    if (!Number.isSafeInteger(checkpoint.seq) || checkpoint.seq < 0) {
+      throw new Error("Log checkpoint seq must be a non-negative safe integer");
+    }
+    if (!HEX_HASH.test(checkpoint.head_hash)) {
+      throw new Error("Log checkpoint head_hash must be lowercase SHA-256 hex");
+    }
+    if (
+      !Number.isSafeInteger(checkpoint.issued_at) ||
+      checkpoint.issued_at < 0
+    ) {
+      throw new Error(
+        "Log checkpoint issued_at must be non-negative safe Unix seconds",
+      );
+    }
+    decodeBase64Url(checkpoint.issuer_sig, "sig", 64);
+    return { ...checkpoint };
+  }
+
+  function issuerKeysForCheckpoint(checkpoint, issuerDocument) {
+    if (
+      issuerDocument === null ||
+      typeof issuerDocument !== "object" ||
+      Array.isArray(issuerDocument) ||
+      Object.keys(issuerDocument).length !== 2 ||
+      issuerDocument.issuer !== checkpoint.issuer ||
+      !Array.isArray(issuerDocument.keys) ||
+      issuerDocument.keys.length === 0
+    ) {
+      throw new Error("Issuer document does not match the log checkpoint");
+    }
+    const kids = new Set();
+    const pubs = new Set();
+    let previousNotAfter = Number.MAX_SAFE_INTEGER;
+    const keys = issuerDocument.keys.map((key, index) => {
+      if (
+        key === null ||
+        typeof key !== "object" ||
+        Array.isArray(key) ||
+        Object.keys(key).length !== 3 ||
+        typeof key.kid !== "string" ||
+        !key.kid ||
+        key.kid.trim() !== key.kid ||
+        !Number.isSafeInteger(key.not_after) ||
+        key.not_after < 0 ||
+        key.not_after > previousNotAfter
+      ) {
+        throw new Error("Issuer document contains a malformed key");
+      }
+      const pub = decodeBase64Url(key.pub, "ed25519", 32);
+      if (index === 0 && key.not_after !== Number.MAX_SAFE_INTEGER) {
+        throw new Error(
+          "Current issuer key must use the safe-integer sentinel",
+        );
+      }
+      if (index > 0 && key.not_after === Number.MAX_SAFE_INTEGER) {
+        throw new Error("Retired issuer key must have a finite cutoff");
+      }
+      const pubIdentity = Array.from(pub).join(",");
+      if (kids.has(key.kid) || pubs.has(pubIdentity)) {
+        throw new Error("Issuer document contains a duplicate key");
+      }
+      kids.add(key.kid);
+      pubs.add(pubIdentity);
+      previousNotAfter = key.not_after;
+      return key;
+    });
+    return keys.filter((key) => checkpoint.issued_at <= key.not_after);
+  }
+
   async function sha256Hex(value, cryptoImpl = root.crypto) {
     if (!cryptoImpl?.subtle || typeof root.TextEncoder !== "function") {
       throw new Error("SHA-256 verification is unavailable in this browser");
@@ -119,6 +239,83 @@
     };
   }
 
+  async function verifyLogCheckpoint(
+    checkpoint,
+    issuerDocument,
+    cryptoImpl = root.crypto,
+  ) {
+    const normalized = normalizeLogCheckpoint(checkpoint);
+    const keys = issuerKeysForCheckpoint(normalized, issuerDocument);
+    if (!cryptoImpl?.subtle) {
+      throw new Error("Ed25519 verification is unavailable in this browser");
+    }
+    const signature = decodeBase64Url(normalized.issuer_sig, "sig", 64);
+    const core = Object.fromEntries(
+      Object.entries(normalized).filter(([key]) => key !== "issuer_sig"),
+    );
+    const signedBytes = new root.TextEncoder().encode(canonicalJson(core));
+    for (const key of keys) {
+      const publicKey = await cryptoImpl.subtle.importKey(
+        "raw",
+        decodeBase64Url(key.pub, "ed25519", 32),
+        { name: "Ed25519" },
+        false,
+        ["verify"],
+      );
+      if (
+        await cryptoImpl.subtle.verify(
+          { name: "Ed25519" },
+          publicKey,
+          signature,
+          signedBytes,
+        )
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  async function verifySignedLog(
+    entries,
+    checkpoint,
+    issuerDocument,
+    cryptoImpl = root.crypto,
+  ) {
+    const chain = await verifyLogChain(entries, cryptoImpl);
+    if (!chain.ok) {
+      return chain;
+    }
+    let normalized;
+    let signatureValid;
+    try {
+      normalized = normalizeLogCheckpoint(checkpoint);
+      signatureValid = await verifyLogCheckpoint(
+        normalized,
+        issuerDocument,
+        cryptoImpl,
+      );
+    } catch (error) {
+      return {
+        ok: false,
+        reason: `Signed checkpoint is invalid: ${error.message}`,
+      };
+    }
+    if (!signatureValid) {
+      return { ok: false, reason: "Signed checkpoint signature is invalid." };
+    }
+    if (
+      normalized.seq !== chain.total ||
+      normalized.head_hash !== chain.headHash
+    ) {
+      return {
+        ok: false,
+        reason: "Log entries do not match the issuer-signed checkpoint.",
+      };
+    }
+    return { ...chain, checkpoint: normalized };
+  }
+
   function formatTimestamp(seconds) {
     const date = new Date(seconds * 1000);
     if (Number.isNaN(date.getTime())) {
@@ -130,9 +327,12 @@
   const api = {
     GENESIS_PREV_HASH,
     canonicalJson,
+    normalizeLogCheckpoint,
     normalizeLogPayload,
     sha256Hex,
     verifyLogChain,
+    verifyLogCheckpoint,
+    verifySignedLog,
   };
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
@@ -208,15 +408,30 @@
     text("[data-apa-log-status]", "Fetching the current JSON log…");
     text("[data-apa-log-chain]", "Checking");
     try {
-      const response = await root.fetch("/apa/log", {
+      const requestOptions = {
         headers: { accept: "application/json" },
         cache: "no-store",
-      });
-      if (!response.ok) {
-        throw new Error(`Log request failed with HTTP ${response.status}`);
+      };
+      const [response, checkpointResponse, issuerResponse] = await Promise.all([
+        root.fetch("/apa/log", requestOptions),
+        root.fetch("/apa/log/checkpoint", requestOptions),
+        root.fetch("/.well-known/apa-issuer.json", requestOptions),
+      ]);
+      for (const [label, fetched] of [
+        ["Log", response],
+        ["Checkpoint", checkpointResponse],
+        ["Issuer document", issuerResponse],
+      ]) {
+        if (!fetched.ok) {
+          throw new Error(
+            `${label} request failed with HTTP ${fetched.status}`,
+          );
+        }
       }
       const entries = normalizeLogPayload(await response.json());
-      const result = await verifyLogChain(entries);
+      const checkpoint = await checkpointResponse.json();
+      const issuerDocument = await issuerResponse.json();
+      const result = await verifySignedLog(entries, checkpoint, issuerDocument);
       const observedAt = new Date().toISOString();
 
       renderEntries(entries);

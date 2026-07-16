@@ -623,6 +623,14 @@ async def apa_log(request: Request) -> Response:
     return JSONResponse(content={"entries": entries, "total": len(entries)})
 
 
+@app.get("/apa/log/checkpoint")
+async def apa_log_checkpoint() -> dict[str, object]:
+    try:
+        return protection_store.read_log_checkpoint()
+    except protection_store.LogCheckpointMissing as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @app.post("/apa/revoke")
 async def apa_revoke(req: ApaRevokeRequest) -> dict[str, object]:
     record = protection_store.get_attestation(req.attestation_id)

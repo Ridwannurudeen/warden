@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS log (
     seq INTEGER PRIMARY KEY AUTOINCREMENT,
     entry_json TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS log_checkpoint (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    checkpoint_json TEXT NOT NULL
+);
 """
 
 
@@ -59,6 +63,10 @@ class ProtectionStateConflict(ValueError):
 
 class NonceReplay(ValueError):
     """A signed request reused a nonce within the replay window."""
+
+
+class LogCheckpointMissing(RuntimeError):
+    """A non-empty transparency log has no signed head and must not be trusted."""
 
 
 def _db_path() -> Path:
@@ -244,18 +252,85 @@ def list_reprobe_targets() -> list[dict[str, object]]:
     ]
 
 
+def _verified_log_head(entries: list[dict[str, object]]) -> str | None:
+    previous_hash = GENESIS_PREV_HASH
+    for expected_seq, entry in enumerate(entries, start=1):
+        if type(entry.get("seq")) is not int or entry["seq"] != expected_seq:
+            return None
+        if entry.get("prev_hash") != previous_hash:
+            return None
+        previous_hash = hashlib.sha256(_canonical_json(entry).encode("utf-8")).hexdigest()
+    return previous_hash
+
+
+def _write_log_checkpoint(
+    connection: sqlite3.Connection,
+    seq: int,
+    head_hash: str,
+    issued_at: int,
+) -> dict[str, object]:
+    from warden import protection
+
+    checkpoint = protection.issue_log_checkpoint(
+        seq,
+        head_hash,
+        issued_at=issued_at,
+    )
+    connection.execute(
+        "INSERT INTO log_checkpoint (singleton, checkpoint_json) VALUES (1, ?) "
+        "ON CONFLICT(singleton) DO UPDATE SET checkpoint_json = excluded.checkpoint_json",
+        (_canonical_json(checkpoint),),
+    )
+    return checkpoint
+
+
 def _append_log(
     connection: sqlite3.Connection,
     event: str,
     record: dict[str, object],
 ) -> dict[str, object]:
-    row = connection.execute("SELECT seq, entry_json FROM log ORDER BY seq DESC LIMIT 1").fetchone()
-    if row is None:
+    rows = connection.execute("SELECT seq, entry_json FROM log ORDER BY seq ASC").fetchall()
+    entries = [json.loads(row[1]) for row in rows]
+    head_hash = _verified_log_head(entries)
+    if head_hash is None or any(row[0] != index for index, row in enumerate(rows, start=1)):
+        raise ProtectionStateConflict("transparency log chain is not contiguous")
+
+    checkpoint_row = connection.execute(
+        "SELECT checkpoint_json FROM log_checkpoint WHERE singleton = 1"
+    ).fetchone()
+    if rows:
+        if checkpoint_row is None:
+            raise LogCheckpointMissing(
+                "non-empty transparency log has no signed checkpoint; run explicit migration"
+            )
+        from warden import protection
+
+        checkpoint = json.loads(checkpoint_row[0])
+        if (
+            not protection.verify_log_checkpoint(checkpoint)
+            or checkpoint.get("seq") != len(entries)
+            or checkpoint.get("head_hash") != head_hash
+        ):
+            raise ProtectionStateConflict(
+                "transparency log checkpoint does not match the current head"
+            )
+        next_seq = len(entries) + 1
+        prev_hash = head_hash
+    else:
+        if checkpoint_row is not None:
+            from warden import protection
+
+            checkpoint = json.loads(checkpoint_row[0])
+            if (
+                not protection.verify_log_checkpoint(checkpoint)
+                or checkpoint.get("seq") != 0
+                or checkpoint.get("head_hash") != GENESIS_PREV_HASH
+            ):
+                raise ProtectionStateConflict(
+                    "transparency log checkpoint does not match the empty log"
+                )
         next_seq = 1
         prev_hash = GENESIS_PREV_HASH
-    else:
-        next_seq = row[0] + 1
-        prev_hash = hashlib.sha256(row[1].encode("utf-8")).hexdigest()
     entry = {
         "seq": next_seq,
         "ts": int(time.time()),
@@ -269,6 +344,12 @@ def _append_log(
     connection.execute(
         "INSERT INTO log (seq, entry_json) VALUES (?, ?)",
         (next_seq, _canonical_json(entry)),
+    )
+    _write_log_checkpoint(
+        connection,
+        next_seq,
+        hashlib.sha256(_canonical_json(entry).encode("utf-8")).hexdigest(),
+        int(entry["ts"]),
     )
     return entry
 
@@ -459,11 +540,68 @@ def read_log() -> list[dict[str, object]]:
     return [json.loads(row[0]) for row in rows]
 
 
-def verify_log_chain(entries: list[dict[str, object]]) -> bool:
-    """Recompute the hash chain over canonical entry bytes; True iff unbroken."""
-    prev_hash = GENESIS_PREV_HASH
-    for entry in entries:
-        if entry.get("prev_hash") != prev_hash:
-            return False
-        prev_hash = hashlib.sha256(_canonical_json(entry).encode("utf-8")).hexdigest()
-    return True
+def read_log_checkpoint() -> dict[str, object]:
+    """Return the stored signed head; never sign a non-empty log on read."""
+    with _LOCK, _connect() as connection:
+        row = connection.execute(
+            "SELECT checkpoint_json FROM log_checkpoint WHERE singleton = 1"
+        ).fetchone()
+        if row is not None:
+            return json.loads(row[0])
+
+        if connection.execute("SELECT 1 FROM log LIMIT 1").fetchone() is not None:
+            raise LogCheckpointMissing(
+                "non-empty transparency log has no signed checkpoint; run explicit migration"
+            )
+        return _write_log_checkpoint(
+            connection,
+            0,
+            GENESIS_PREV_HASH,
+            int(time.time()),
+        )
+
+
+def migrate_log_checkpoint() -> dict[str, object]:
+    """Explicitly establish one signed head for a verified pre-checkpoint database."""
+    with _LOCK, _connect() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        existing = connection.execute(
+            "SELECT 1 FROM log_checkpoint WHERE singleton = 1"
+        ).fetchone()
+        if existing is not None:
+            raise ProtectionStateConflict("transparency log checkpoint already exists")
+        rows = connection.execute("SELECT seq, entry_json FROM log ORDER BY seq ASC").fetchall()
+        entries = [json.loads(row[1]) for row in rows]
+        head_hash = _verified_log_head(entries)
+        if head_hash is None or any(
+            row[0] != index for index, row in enumerate(rows, start=1)
+        ):
+            raise ProtectionStateConflict("legacy transparency log chain is not contiguous")
+        issued_at = int(entries[-1]["ts"]) if entries else int(time.time())
+        return _write_log_checkpoint(
+            connection,
+            len(entries),
+            head_hash,
+            issued_at,
+        )
+
+
+def verify_log_chain(
+    entries: list[dict[str, object]],
+    checkpoint: dict[str, object] | None = None,
+) -> bool:
+    """Verify contiguous entries against the issuer-signed stored head."""
+    head_hash = _verified_log_head(entries)
+    if head_hash is None:
+        return False
+    try:
+        signed_head = read_log_checkpoint() if checkpoint is None else checkpoint
+    except LogCheckpointMissing:
+        return False
+    from warden import protection
+
+    return (
+        protection.verify_log_checkpoint(signed_head)
+        and signed_head.get("seq") == len(entries)
+        and signed_head.get("head_hash") == head_hash
+    )
