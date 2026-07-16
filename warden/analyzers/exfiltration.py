@@ -27,6 +27,23 @@ SECRET_DOCUMENT_SUFFIX_RE = re.compile(
     r"(?i)^\s+(?:(?:rotation|security)\s+)?"
     r"(?:notice|documentation|docs?|guide|manual|policy|procedure|report)\b"
 )
+# Distinctive API-key/token shapes with near-zero benign collision rates.
+# Only flagged when an exfil verb appears near the token (or a full exfil
+# instruction is present elsewhere), so documentation and benign prose that
+# merely mention such prefixes stay clean.
+SECRET_TOKEN_RES = [
+    re.compile(r"(?<![A-Za-z0-9])sk-(?:live|test|ant|proj)-[A-Za-z0-9-]{8,}"),
+    re.compile(r"(?<![A-Za-z0-9])sk-[A-Za-z0-9-]{12,}"),
+    re.compile(r"(?<![A-Za-z0-9])gh[posru]_[A-Za-z0-9]{20,}(?![A-Za-z0-9])"),
+    re.compile(r"(?<![A-Za-z0-9])AKIA[0-9A-Z]{16}(?![A-Za-z0-9])"),
+    re.compile(r"(?<![A-Za-z0-9])xox[baprs]-[A-Za-z0-9-]{10,}"),
+    re.compile(r"(?<![A-Za-z0-9])AIza[0-9A-Za-z_-]{35}(?![0-9A-Za-z_-])"),
+]
+EXFIL_VERB_RE = re.compile(
+    r"(?i)\b(?:send|paste|share|upload|post|leak|ship|smuggle|forward|exfiltrate"
+    r"|output|return|reveal|give|provide|print|dump|echo|disclose|expose|show"
+    r"|transfer|wire|transmit|reply\s+with|respond\s+with)\b"
+)
 EXFIL_INSTRUCTION_RES = [
     re.compile(
         r"(?i)\b(?:send|paste|share|upload|post|exfiltrate|leak)\s+(?:your\s+)?"
@@ -76,6 +93,11 @@ class ExfiltrationAnalyzer(Analyzer):
             if has_context:
                 detections.append(self._detection(private_key.group(), 0.95))
 
+        for token, start, end in self._secret_tokens(payload):
+            window = payload[max(0, start - 80) : min(len(payload), end + 80)]
+            if instruction is not None or EXFIL_VERB_RE.search(window):
+                detections.append(self._detection(token, 0.90))
+
         for seed_phrase in self._seed_phrases(payload):
             detections.append(self._detection(seed_phrase, 0.95))
 
@@ -90,6 +112,19 @@ class ExfiltrationAnalyzer(Analyzer):
             flags=["Secret exfiltration signal detected"] if detections else [],
             data={"detections": detections},
         )
+
+    @staticmethod
+    def _secret_tokens(payload: str) -> list[tuple[str, int, int]]:
+        tokens: list[tuple[str, int, int]] = []
+        claimed: list[tuple[int, int]] = []
+        for pattern in SECRET_TOKEN_RES:
+            for match in pattern.finditer(payload):
+                span = (match.start(), match.end())
+                if any(span[0] < end and start < span[1] for start, end in claimed):
+                    continue
+                claimed.append(span)
+                tokens.append((match.group(), *span))
+        return tokens
 
     @staticmethod
     def _seed_phrases(payload: str) -> list[str]:

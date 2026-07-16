@@ -23,8 +23,13 @@ HIGH_RISK_DRAIN_INTENT_RE = re.compile(
     r"(?:remaining|entire|all)\s+(?:funds|balance|holdings|assets|tokens?)\b"
 )
 # A payment instruction paired with a malformed (non-40-char) 0x token.
-# The strict EVM path cannot see a truncated recipient, so inspect it separately.
-MALFORMED_ADDR_RE = re.compile(r"0x[a-fA-F0-9]{20,39}(?![a-fA-F0-9])")
+# The strict EVM path cannot see a truncated or overlong recipient, so inspect
+# it separately. Exactly 40 hex is a valid EVM address (EVM_ADDRESS_RE) and
+# exactly 64 hex is a tx hash / private key (exfiltration analyzer), so both
+# lengths are excluded here.
+MALFORMED_ADDR_RE = re.compile(
+    r"0x[a-fA-F0-9]{20,39}(?![a-fA-F0-9])|0x[a-fA-F0-9]{41,63}(?![a-fA-F0-9])"
+)
 
 
 class DrainAddressAnalyzer(Analyzer):
