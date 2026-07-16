@@ -24,7 +24,7 @@ Use only `certbot certonly --webroot` for certificate issuance.
 ## Files
 
 - App path: `/opt/warden/current` (atomic symlink to `/opt/warden/releases/<commit>`)
-- Persistent app state: `/opt/warden/.env`, `/opt/warden/badges`, `/opt/warden/gauntlet`, and `/opt/warden/data`; none live inside a release
+- Persistent app state: `/opt/warden/.env`, `/opt/warden/badges`, `/opt/warden/gauntlet`, `/opt/warden/data`, and `/opt/warden/logs`; none live inside a release
 - Static site path: `/opt/warden-site/current` (atomic symlink to `/opt/warden-site/releases/<commit>`)
 - Live index path: `/opt/warden-index`; immutable captures live under `/opt/warden-index/releases/<capture>`
 - Public snapshot handoff: `/opt/warden-snapshot/agents-v1.jsonl`, atomically replaced by the secretless fetch service and read by the index builder
@@ -124,6 +124,7 @@ reject_symlink /var/lib/warden-fetch
 reject_symlink /opt/warden/badges
 reject_symlink /opt/warden/gauntlet
 reject_symlink /opt/warden/data
+reject_symlink /opt/warden/logs
 reject_symlink /opt/warden/data/apa_issuer.key
 reject_symlink /opt/warden/issuer-history.json
 reject_symlink /opt/warden/.env
@@ -190,11 +191,11 @@ if id -nG warden-fetch | tr ' ' '\n' | grep -Fxq warden; then
   exit 1
 fi
 install -d -o root -g root -m 0755 /opt/warden /opt/warden/releases /opt/warden-site /opt/warden-site/releases
-install -d -o warden -g warden -m 0750 /opt/warden/badges /opt/warden/gauntlet /opt/warden/data
+install -d -o warden -g warden -m 0750 /opt/warden/badges /opt/warden/gauntlet /opt/warden/data /opt/warden/logs
 install -d -o warden -g warden -m 0755 /opt/warden-index /opt/warden-index/releases /opt/warden-index/candidates
 install -d -o warden-fetch -g warden-fetch -m 0755 /opt/warden-snapshot
 install -d -o warden-fetch -g warden-fetch -m 0700 /var/lib/warden-fetch
-chown -hR warden:warden /opt/warden/badges /opt/warden/gauntlet /opt/warden/data
+chown -hR warden:warden /opt/warden/badges /opt/warden/gauntlet /opt/warden/data /opt/warden/logs
 if test -e /opt/warden/data/apa_issuer.key; then
   test -f /opt/warden/data/apa_issuer.key
   chown warden:warden /opt/warden/data/apa_issuer.key
@@ -601,6 +602,7 @@ reject_symlink /opt/warden-index/releases
 reject_symlink /opt/warden/badges
 reject_symlink /opt/warden/gauntlet
 reject_symlink /opt/warden/data
+reject_symlink /opt/warden/logs
 reject_symlink /opt/warden/issuer-history.json
 validate_current_link /opt/warden/current /opt/warden/releases
 validate_current_link /opt/warden-site/current /opt/warden-site/releases

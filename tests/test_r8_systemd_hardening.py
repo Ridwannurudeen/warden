@@ -46,6 +46,15 @@ def test_flat_upgrade_quiesces_writers_before_guarded_checkpoint_migration() -> 
 def test_blue_green_runbook_rewrites_only_flat_unit_code_paths() -> None:
     runbook = (ROOT / "deploy" / "DEPLOY.md").read_text(encoding="utf-8")
 
+    assert runbook.count("reject_symlink /opt/warden/logs") == 2
+    assert (
+        "install -d -o warden -g warden -m 0750 /opt/warden/badges "
+        "/opt/warden/gauntlet /opt/warden/data /opt/warden/logs"
+    ) in runbook
+    assert (
+        "chown -hR warden:warden /opt/warden/badges /opt/warden/gauntlet "
+        "/opt/warden/data /opt/warden/logs"
+    ) in runbook
     assert 's#^WorkingDirectory=/opt/warden\\$#WorkingDirectory=$app_root#' in runbook
     assert 's#^ExecStart=/opt/warden/.venv/#ExecStart=$app_root/.venv/#' in runbook
     renderer = runbook[runbook.index("render_app_service() {") :]
