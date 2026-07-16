@@ -707,7 +707,7 @@ def verify_log_chain(
         return False
     try:
         signed_head = read_log_checkpoint() if checkpoint is None else checkpoint
-    except LogCheckpointMissing:
+    except (LogCheckpointMissing, ProtectionStateConflict):
         return False
     from warden import protection
 

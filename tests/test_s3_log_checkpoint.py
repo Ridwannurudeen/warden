@@ -130,3 +130,17 @@ def test_deleting_log_and_checkpoint_cannot_reset_an_initialized_anchor():
 
     with protection_store._connect() as connection:
         assert connection.execute("SELECT COUNT(*) FROM log_checkpoint").fetchone()[0] == 0
+
+
+def test_corrupted_local_anchor_returns_failed_verification():
+    entries, _ = _append_two_entries()
+    with protection_store._connect() as connection:
+        connection.execute(
+            "UPDATE log_anchor SET checkpoint_hash = ? WHERE singleton = 1",
+            ("0" * 64,),
+        )
+
+    assert protection_store.verify_log_chain(entries) is False
+    with TestClient(app) as client:
+        response = client.get("/apa/log/checkpoint")
+    assert response.status_code == 503
