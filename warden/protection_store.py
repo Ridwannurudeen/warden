@@ -587,7 +587,7 @@ def commit_revocation(
     with _LOCK, _connect() as connection:
         connection.execute("BEGIN IMMEDIATE")
         binding = connection.execute(
-            "SELECT pub FROM bindings WHERE endpoint_host = ?",
+            "SELECT pub, pending_replacement_pub FROM bindings WHERE endpoint_host = ?",
             (endpoint_host,),
         ).fetchone()
         if binding is None or binding[0] != bound_pub:
@@ -610,6 +610,10 @@ def commit_revocation(
             )
         if not _record_nonce(connection, endpoint_host, nonce):
             raise NonceReplay("revocation nonce was replayed")
+        if record.get("status") == "revoked" and (
+            replacement_pub is None or binding[1] == replacement_pub
+        ):
+            return record
 
         updated = status_signer(record, "revoked")
         _store_attestation(connection, updated)
