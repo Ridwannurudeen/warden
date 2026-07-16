@@ -193,8 +193,8 @@ class VerdictEngine:
 
         checks["risk_band"] = f"sanitize - score {score:.1f} in review band or detections present"
         risk_level = self._risk_level(score, scanner_risk, hard_block=False)
-        if detections and risk_level == "NONE":
-            risk_level = "LOW"
+        if detections and risk_level in {"NONE", "LOW"}:
+            risk_level = "MEDIUM"
         return Verdict(
             verdict="SANITIZE",
             risk_level=risk_level,

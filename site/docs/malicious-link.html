@@ -52,13 +52,13 @@
       <div class="result-grid">
       <div><span>Fast-path result</span><strong>SANITIZE</strong></div>
       <div><span>Thorough result</span><strong>SANITIZE</strong></div>
-      <div><span>Documented risk</span><strong>NONE</strong></div>
+      <div><span>Documented risk</span><strong>MEDIUM</strong></div>
       <div><span>Threat classes</span><strong>MALICIOUS_LINK</strong></div>
       </div>
     </section>
     <section id="detector-behavior"><h2>What Warden detects <a class="heading-anchor" href="#detector-behavior" aria-label="Link to detector behavior">#</a></h2><p>Warden heuristically flags data URLs, punycode, IP literals, and mixed-script hostnames.</p></section>
     <section id="commerce-impact"><h2>Why it matters in agent commerce <a class="heading-anchor" href="#commerce-impact" aria-label="Link to commerce impact">#</a></h2><p>An active or deceptive URL can move a buyer from trusted workflow into attacker-controlled content.</p></section>
-    <section id="detector-boundary"><h2>Detector boundary <a class="heading-anchor" href="#detector-boundary" aria-label="Link to detector boundary">#</a></h2><aside class="callout"><strong>Boundary:</strong> This is heuristic analysis, not reputation intelligence. SANITIZE can coexist with risk_level NONE.</aside></section>
+    <section id="detector-boundary"><h2>Detector boundary <a class="heading-anchor" href="#detector-boundary" aria-label="Link to detector boundary">#</a></h2><aside class="callout"><strong>Boundary:</strong> This is heuristic analysis, not reputation intelligence. A detection is calibrated to at least MEDIUM even when the composite score is lower.</aside></section>
     <div class="hero-actions"><a class="button primary" href="/playground">Test the fast path</a><a class="button secondary" href="/integrate">Integrate Warden</a></div>
     <nav class="doc-pagination" aria-label="Reason-code pagination"><a class="button secondary" rel="prev" href="/docs/secret-exfil"><span>Previous</span><strong>SECRET_EXFIL</strong></a><span></span></nav>
   </article>

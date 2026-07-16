@@ -54,7 +54,7 @@
         <article><h3>Confidence and score</h3><p>Detection confidence and the composite score are evidence used by the decision engine, not probabilities of safety.</p></article>
         <article><h3>Detector boundary</h3><p>Fast and thorough depth do not run identical checks. CORPUS_MATCH is thorough-only.</p></article>
       </div>
-      <aside class="callout"><strong>Why SANITIZE can show risk NONE:</strong> a low-scoring detection can still require redaction or review. Decision answers what to do; risk reports the score band. The malicious-link regression below demonstrates this implemented behavior.</aside>
+      <aside class="callout"><strong>Detected threats start at risk MEDIUM:</strong> a finding that changes or withholds an action is never presented as low severity. Decision answers what to do; risk communicates the calibrated review floor.</aside>
     </section>
     <section id="reason-matrix">
       <div class="section-heading">

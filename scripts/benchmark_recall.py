@@ -17,6 +17,7 @@ from warden.engine import WardenEngine  # noqa: E402
 
 DEFAULT_ATTACKS = ROOT / "benchmark" / "held_out_attacks.jsonl"
 DEFAULT_BENIGN = ROOT / "benchmark" / "held_out_benign.jsonl"
+PUBLISHED_RESULTS = ROOT / "benchmark" / "results.json"
 
 
 def load_jsonl(path: Path) -> list[dict[str, object]]:
@@ -43,10 +44,17 @@ def _percent(numerator: int, denominator: int) -> float:
 async def evaluate_benchmark(
     attacks_path: Path = DEFAULT_ATTACKS,
     benign_path: Path = DEFAULT_BENIGN,
+    *,
+    semantic: bool = False,
+    engine: WardenEngine | None = None,
 ) -> dict[str, object]:
     attacks = load_jsonl(attacks_path)
     benign = load_jsonl(benign_path)
-    engine = WardenEngine()
+    engine = engine or WardenEngine()
+    if semantic and not engine.semantic_enabled:
+        raise RuntimeError(
+            "semantic benchmark requires a fully configured paid semantic runtime"
+        )
     detected_attacks = 0
     attack_misses: list[str] = []
     category_totals: dict[str, int] = defaultdict(int)
@@ -58,8 +66,9 @@ async def evaluate_benchmark(
         category_totals[category] += 1
         verdict = await engine.scan(
             str(entry["payload"]),
-            depth=str(entry.get("depth", "fast")),
+            depth="thorough" if semantic else str(entry.get("depth", "fast")),
             context=entry.get("context") if isinstance(entry.get("context"), dict) else None,
+            allow_paid_semantic=semantic,
         )
         classes = {reason.value for reason in verdict.threat_classes}
         detected = verdict.verdict != "ALLOW" and category in classes
@@ -73,8 +82,9 @@ async def evaluate_benchmark(
     for entry in benign:
         verdict = await engine.scan(
             str(entry["payload"]),
-            depth=str(entry.get("depth", "fast")),
+            depth="thorough" if semantic else str(entry.get("depth", "fast")),
             context=entry.get("context") if isinstance(entry.get("context"), dict) else None,
+            allow_paid_semantic=semantic,
         )
         if verdict.verdict != "ALLOW":
             false_positive_ids.append(str(entry["id"]))
@@ -87,10 +97,14 @@ async def evaluate_benchmark(
         }
         for category in sorted(category_totals)
     }
-    return {
+    result: dict[str, object] = {
         "schema_version": 1,
         "benchmark": "warden-held-out-v1",
-        "mode": "deterministic fast path; thorough only where declared; semantic disabled",
+        "mode": (
+            "paid thorough path; semantic after deterministic layers"
+            if semantic
+            else "deterministic fast path; thorough only where declared; semantic disabled"
+        ),
         "attack_cases": len(attacks),
         "detected_attacks": detected_attacks,
         "attack_recall_percent": _percent(detected_attacks, len(attacks)),
@@ -101,6 +115,18 @@ async def evaluate_benchmark(
         "false_positive_ids": false_positive_ids,
         "per_category": per_category,
     }
+    if semantic:
+        published = json.loads(PUBLISHED_RESULTS.read_text(encoding="utf-8"))
+        baseline_recall = float(published["attack_recall_percent"])
+        result["semantic_enablement_gate"] = {
+            "baseline_recall_percent": baseline_recall,
+            "requires_zero_false_positives": True,
+            "passed": (
+                result["attack_recall_percent"] > baseline_recall
+                and result["false_positive_rate_percent"] == 0
+            ),
+        }
+    return result
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -108,12 +134,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--attacks", type=Path, default=DEFAULT_ATTACKS)
     parser.add_argument("--benign", type=Path, default=DEFAULT_BENIGN)
     parser.add_argument("--json", action="store_true", help="Emit the full result as JSON.")
+    parser.add_argument(
+        "--semantic",
+        action="store_true",
+        help="Evaluate the configured paid semantic model in thorough mode.",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
-    result = asyncio.run(evaluate_benchmark(args.attacks, args.benign))
+    try:
+        result = asyncio.run(
+            evaluate_benchmark(args.attacks, args.benign, semantic=args.semantic)
+        )
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
     if args.json:
         print(json.dumps(result, sort_keys=True))
         return
@@ -127,6 +163,12 @@ def main(argv: list[str] | None = None) -> None:
     )
     if result["attack_misses"]:
         print(f"Missed attack IDs: {', '.join(result['attack_misses'])}")
+    gate = result.get("semantic_enablement_gate")
+    if isinstance(gate, dict):
+        print(
+            "Semantic enablement gate: "
+            + ("PASS" if gate.get("passed") is True else "FAIL; keep disabled")
+        )
 
 
 if __name__ == "__main__":

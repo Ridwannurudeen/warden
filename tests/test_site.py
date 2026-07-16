@@ -113,7 +113,7 @@ def test_docs_renderer_writes_index_and_one_page_per_reason(tmp_path):
 
     assert "Decision model" in index_page
     assert "Reason-code matrix" in index_page
-    assert "Why SANITIZE can show risk NONE" in index_page
+    assert "Detected threats start at risk MEDIUM" in index_page
     assert "data-doc-search" in index_page
     assert "data-doc-decision" in index_page
     assert "data-doc-availability" in index_page

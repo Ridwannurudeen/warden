@@ -63,7 +63,8 @@ class CountingResponseStream(httpx.AsyncByteStream):
 def semantic_environment() -> dict[str, str]:
     return {
         "WARDEN_SEMANTIC_ENABLED": "true",
-        "WARDEN_SEMANTIC_ENDPOINT": "https://semantic.example/v1/classify",
+        "WARDEN_SEMANTIC_ENDPOINT": "https://semantic.example/v1/chat/completions",
+        "WARDEN_SEMANTIC_MODEL": "security-classifier-v1",
         "WARDEN_SEMANTIC_API_KEY": "test-semantic-key",
         "OKX_API_KEY": "test-paywall-key",
     }
@@ -74,6 +75,7 @@ def semantic_environment() -> dict[str, str]:
     [
         "WARDEN_SEMANTIC_ENABLED",
         "WARDEN_SEMANTIC_ENDPOINT",
+        "WARDEN_SEMANTIC_MODEL",
         "WARDEN_SEMANTIC_API_KEY",
         "OKX_API_KEY",
     ],
@@ -274,16 +276,28 @@ async def test_http_semantic_adapter_uses_provider_neutral_contract():
     async def handler(request: httpx.Request) -> httpx.Response:
         assert request.headers["Authorization"] == "Bearer test-semantic-key"
         assert request.headers["Content-Type"] == "application/json"
-        assert request.content == (
-            b'{"task":"prompt_injection_detection","content":"untrusted payload"}'
-        )
+        body = request.read().decode("utf-8")
+        assert '"model":"security-classifier-v1"' in body
+        assert '"role":"user","content":"untrusted payload"' in body
         return httpx.Response(
             200,
-            json={"flagged": True, "confidence": 0.91, "reason": "Instruction override."},
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": (
+                                '{"flagged":true,"confidence":0.91,'
+                                '"reason":"Instruction override."}'
+                            )
+                        }
+                    }
+                ]
+            },
         )
 
     analyzer = HttpSemanticAnalyzer(
-        endpoint="https://semantic.example/v1/classify",
+        endpoint="https://semantic.example/v1/chat/completions",
+        model="security-classifier-v1",
         api_key="test-semantic-key",
         transport=httpx.MockTransport(handler),
     )
@@ -303,11 +317,20 @@ async def test_http_semantic_adapter_enforces_hard_timeout():
         await asyncio.sleep(0.05)
         return httpx.Response(
             200,
-            json={"flagged": False, "confidence": 0.1, "reason": "Clean."},
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": '{"flagged":false,"confidence":0.1,"reason":"Clean."}'
+                        }
+                    }
+                ]
+            },
         )
 
     analyzer = HttpSemanticAnalyzer(
-        endpoint="https://semantic.example/v1/classify",
+        endpoint="https://semantic.example/v1/chat/completions",
+        model="security-classifier-v1",
         api_key="test-semantic-key",
         timeout_seconds=0.001,
         transport=httpx.MockTransport(handler),
@@ -322,11 +345,23 @@ async def test_invalid_provider_response_fails_open():
     async def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
-            json={"flagged": "yes", "confidence": 0.99, "reason": "Invalid flag type."},
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": (
+                                '{"flagged":"yes","confidence":0.99,'
+                                '"reason":"Invalid flag type."}'
+                            )
+                        }
+                    }
+                ]
+            },
         )
 
     analyzer = HttpSemanticAnalyzer(
-        endpoint="https://semantic.example/v1/classify",
+        endpoint="https://semantic.example/v1/chat/completions",
+        model="security-classifier-v1",
         api_key="test-semantic-key",
         transport=httpx.MockTransport(handler),
     )
@@ -346,7 +381,8 @@ async def test_oversized_stream_stops_early_and_semantic_scan_fails_open():
         return httpx.Response(200, stream=stream)
 
     analyzer = HttpSemanticAnalyzer(
-        endpoint="https://semantic.example/v1/classify",
+        endpoint="https://semantic.example/v1/chat/completions",
+        model="security-classifier-v1",
         api_key="test-semantic-key",
         transport=httpx.MockTransport(handler),
     )

@@ -54,7 +54,10 @@ async def test_published_benchmark_exactly_matches_a_fresh_run():
 @pytest.mark.asyncio
 async def test_benchmark_stays_deterministic_when_semantic_runtime_is_configured(monkeypatch):
     monkeypatch.setenv("WARDEN_SEMANTIC_ENABLED", "true")
-    monkeypatch.setenv("WARDEN_SEMANTIC_ENDPOINT", "https://semantic.example/v1/classify")
+    monkeypatch.setenv(
+        "WARDEN_SEMANTIC_ENDPOINT", "https://semantic.example/v1/chat/completions"
+    )
+    monkeypatch.setenv("WARDEN_SEMANTIC_MODEL", "security-classifier-v1")
     monkeypatch.setenv("WARDEN_SEMANTIC_API_KEY", "test-semantic-key")
     monkeypatch.setenv("OKX_API_KEY", "test-paywall-key")
 

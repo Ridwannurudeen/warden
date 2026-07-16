@@ -29,5 +29,16 @@ python scripts/benchmark_recall.py
 python scripts/benchmark_recall.py --json
 ```
 
+The optional paid semantic runtime has a separate guarded evaluation mode:
+
+```powershell
+python scripts/benchmark_recall.py --semantic --json
+```
+
+That command requires the complete semantic environment documented in the repository README, forces every
+case through paid `thorough` orchestration, and reports an enablement gate. The feature must stay disabled
+unless model-backed recall exceeds this 64.29% baseline while the held-out benign set remains at zero false
+positives. No model endpoint was called and no semantic after-result is claimed in this repository state.
+
 `tests/test_d4_benchmark.py` reruns the evaluation and requires byte-equivalent JSON data after
 parsing, so detector changes must update the published result intentionally.

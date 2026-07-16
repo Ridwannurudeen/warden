@@ -167,7 +167,8 @@ WardenClient(local=True, fail_open=False)
 
 - **Runtime:** Python 3.11+, FastAPI 0.137.1, Pydantic 2.13.4, httpx 0.28.1, and FastMCP 3.4.2.
 - **Decision path:** deterministic scanner categories plus drain-address, tool-hijack, exfiltration, and
-  malicious-link analyzers. The verdict path does not call an LLM.
+  malicious-link analyzers. The free, local, and fast paths are always deterministic. A separately
+  configured model can inspect otherwise-undetected paid `thorough` requests after those layers.
 - **Proof path:** an endpoint self-signs `/.well-known/agent-protection`; the issuer verifies freshness,
   nonce uniqueness, and Ed25519 ownership before TOFU-binding `endpoint_host` to the key.
 - **Transparency:** issuance and status changes append to a SHA-256 hash chain at `/apa/log`.
@@ -175,6 +176,20 @@ WardenClient(local=True, fail_open=False)
 - **Clients:** the Python SDK supports in-process enforcement; the source-built TypeScript SDK is a typed
   hosted fetch client with Express-style middleware and no local engine.
 - **Frontend:** dependency-free HTML, CSS, and JavaScript with self-hosted fonts and a self-only CSP.
+
+### Optional paid semantic layer
+
+The semantic layer is disabled unless all of `WARDEN_SEMANTIC_ENABLED=true`,
+`WARDEN_SEMANTIC_ENDPOINT`, `WARDEN_SEMANTIC_MODEL`, `WARDEN_SEMANTIC_API_KEY`, and the paid-runtime
+`OKX_API_KEY` are present. The endpoint must be HTTPS and accept a chat-style model-inference request.
+Warden applies a two-second timeout, caps the response at 16 KiB, validates the model's JSON, and falls
+back to the deterministic verdict on every transport, timeout, or schema failure. Only paid `/scan`
+requests with `depth=thorough` can opt in; deterministic findings short-circuit the model call.
+
+Before enabling it, run `python scripts/benchmark_recall.py --semantic --json` in the configured runtime.
+The result includes `semantic_enablement_gate.passed`; keep the feature disabled unless recall beats the
+committed deterministic baseline and the held-out benign set remains at zero false positives. No semantic
+runtime is enabled by repository configuration.
 
 ### APA and legacy audit badges
 
@@ -246,6 +261,8 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
   depth, truncation, and network failure can prevent enforcement.
 - Local deterministic analysis is intentionally conservative and cannot claim semantic coverage beyond
   the implemented scanner categories, analyzers, and corpus.
+- The optional paid semantic path has no published model-backed recall result in this repository state and
+  remains disabled. Its fail-open behavior preserves the deterministic verdict when inference is unavailable.
 - The endpoint auditor assumes the target accepts `POST` JSON with a `payload` field. It rejects internal
   network targets, redirects, oversized responses, and slow endpoints.
 - Marketplace evidence reports dated schema-v2 `sampled`, `expected`, and `dropped` coverage. Re-check

@@ -22,6 +22,7 @@ class WardenEngine:
             if semantic_analyzer is not None
             else build_semantic_analyzer_from_env()
         )
+        self.semantic_enabled = configured_analyzer is not None
         self.scanner = InjectionScanner(ai_analyzer=configured_analyzer)
         self.registry = AnalyzerRegistry()
         self.registry.register(DrainAddressAnalyzer())

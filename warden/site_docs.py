@@ -36,7 +36,7 @@ _DOCUMENT_METADATA: dict[ReasonCode, dict[str, object]] = {
         "slug": "prompt-injection",
         "title": "Prompt injection",
         "example_id": "prompt-002",
-        "risk_level": "LOW",
+        "risk_level": "MEDIUM",
         "threat_classes": ("PROMPT_INJECTION",),
         "fast_result": "SANITIZE",
         "thorough_result": "SANITIZE",
@@ -50,7 +50,7 @@ _DOCUMENT_METADATA: dict[ReasonCode, dict[str, object]] = {
         "slug": "role-override",
         "title": "Role override",
         "example_id": "role-001",
-        "risk_level": "LOW",
+        "risk_level": "MEDIUM",
         "threat_classes": ("ROLE_OVERRIDE",),
         "fast_result": "SANITIZE",
         "thorough_result": "SANITIZE",
@@ -64,7 +64,7 @@ _DOCUMENT_METADATA: dict[ReasonCode, dict[str, object]] = {
         "slug": "web3-injection",
         "title": "Web3 injection",
         "example_id": "web3-002",
-        "risk_level": "LOW",
+        "risk_level": "MEDIUM",
         "threat_classes": ("WEB3_INJECTION",),
         "fast_result": "SANITIZE",
         "thorough_result": "SANITIZE",
@@ -78,7 +78,7 @@ _DOCUMENT_METADATA: dict[ReasonCode, dict[str, object]] = {
         "slug": "hidden-unicode",
         "title": "Hidden Unicode",
         "example_id": "unicode-001",
-        "risk_level": "LOW",
+        "risk_level": "MEDIUM",
         "threat_classes": ("HIDDEN_UNICODE",),
         "fast_result": "SANITIZE",
         "thorough_result": "SANITIZE",
@@ -92,7 +92,7 @@ _DOCUMENT_METADATA: dict[ReasonCode, dict[str, object]] = {
         "slug": "encoding-trick",
         "title": "Encoding trick",
         "example_id": "encoding-001",
-        "risk_level": "LOW",
+        "risk_level": "MEDIUM",
         "threat_classes": ("ENCODING_TRICK",),
         "fast_result": "SANITIZE",
         "thorough_result": "SANITIZE",
@@ -106,7 +106,7 @@ _DOCUMENT_METADATA: dict[ReasonCode, dict[str, object]] = {
         "slug": "statistical-anomaly",
         "title": "Statistical anomaly",
         "example_id": "stat-001",
-        "risk_level": "LOW",
+        "risk_level": "MEDIUM",
         "threat_classes": ("HIDDEN_UNICODE", "STATISTICAL_ANOMALY"),
         "fast_result": "SANITIZE",
         "thorough_result": "SANITIZE",
@@ -120,7 +120,7 @@ _DOCUMENT_METADATA: dict[ReasonCode, dict[str, object]] = {
         "slug": "corpus-match",
         "title": "Corpus similarity match",
         "example_id": "corpus-001",
-        "risk_level": "LOW",
+        "risk_level": "MEDIUM",
         "threat_classes": ("CORPUS_MATCH",),
         "fast_result": "ALLOW",
         "thorough_result": "SANITIZE",
@@ -148,7 +148,7 @@ _DOCUMENT_METADATA: dict[ReasonCode, dict[str, object]] = {
         "slug": "tool-hijack",
         "title": "Tool-call hijack",
         "example_id": "tool-002",
-        "risk_level": "LOW",
+        "risk_level": "MEDIUM",
         "threat_classes": ("TOOL_HIJACK",),
         "fast_result": "SANITIZE",
         "thorough_result": "SANITIZE",
@@ -177,7 +177,7 @@ _DOCUMENT_METADATA: dict[ReasonCode, dict[str, object]] = {
         "slug": "malicious-link",
         "title": "Malicious link",
         "example_id": "link-002",
-        "risk_level": "NONE",
+        "risk_level": "MEDIUM",
         "threat_classes": ("MALICIOUS_LINK",),
         "fast_result": "SANITIZE",
         "thorough_result": "SANITIZE",
@@ -185,7 +185,7 @@ _DOCUMENT_METADATA: dict[ReasonCode, dict[str, object]] = {
         "intended_action": "Do not follow the flagged link; use the sanitized payload.",
         "commerce_impact": "An active or deceptive URL can move a buyer from trusted workflow into attacker-controlled content.",
         "behavior": "Warden heuristically flags data URLs, punycode, IP literals, and mixed-script hostnames.",
-        "caveat": "This is heuristic analysis, not reputation intelligence. SANITIZE can coexist with risk_level NONE.",
+        "caveat": "This is heuristic analysis, not reputation intelligence. A detection is calibrated to at least MEDIUM even when the composite score is lower.",
     },
 }
 
@@ -287,7 +287,7 @@ def _render_index(documents: list[ReasonDocument]) -> str:
         <article><h3>Confidence and score</h3><p>Detection confidence and the composite score are evidence used by the decision engine, not probabilities of safety.</p></article>
         <article><h3>Detector boundary</h3><p>Fast and thorough depth do not run identical checks. CORPUS_MATCH is thorough-only.</p></article>
       </div>
-      <aside class="callout"><strong>Why SANITIZE can show risk NONE:</strong> a low-scoring detection can still require redaction or review. Decision answers what to do; risk reports the score band. The malicious-link regression below demonstrates this implemented behavior.</aside>
+      <aside class="callout"><strong>Detected threats start at risk MEDIUM:</strong> a finding that changes or withholds an action is never presented as low severity. Decision answers what to do; risk communicates the calibrated review floor.</aside>
     </section>
     <section id="reason-matrix">
       <div class="section-heading">
