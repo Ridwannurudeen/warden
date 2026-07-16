@@ -5,7 +5,7 @@
     if (storedTheme === "light" || storedTheme === "dark") {
       return storedTheme;
     }
-    return "light";
+    return "dark";
   }
 
   function cycleFocusIndex(currentIndex, direction, count) {
@@ -315,6 +315,15 @@
       }
     }
   }
+  const siteHeader = document.querySelector(".site-header");
+  if (siteHeader) {
+    const syncHeaderScroll = () => {
+      siteHeader.classList.toggle("is-scrolled", root.scrollY > 8);
+    };
+    syncHeaderScroll();
+    root.addEventListener("scroll", syncHeaderScroll, { passive: true });
+  }
+
   const themeButtons = Array.from(
     document.querySelectorAll("[data-theme-toggle]"),
   );

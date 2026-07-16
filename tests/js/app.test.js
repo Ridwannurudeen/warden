@@ -29,11 +29,11 @@ const productProof = JSON.parse(
   ),
 );
 
-test("theme resolution respects a stored choice and otherwise defaults to light", () => {
+test("theme resolution respects a stored choice and otherwise defaults to dark", () => {
   assert.equal(resolveTheme("light", false), "light");
   assert.equal(resolveTheme("dark", true), "dark");
-  assert.equal(resolveTheme(null, true), "light");
-  assert.equal(resolveTheme(null, false), "light");
+  assert.equal(resolveTheme(null, true), "dark");
+  assert.equal(resolveTheme(null, false), "dark");
 });
 
 test("header reachability accepts only the documented healthy response", () => {
