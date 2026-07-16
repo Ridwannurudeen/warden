@@ -31,8 +31,12 @@ class ScanRequest(BaseModel):
 
     @field_validator("payload")
     @classmethod
-    def truncate_payload(cls, value: str) -> str:
-        return value[:MAX_PAYLOAD_LENGTH]
+    def validate_payload(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("payload must not be blank")
+        if len(value) > MAX_PAYLOAD_LENGTH:
+            raise ValueError(f"payload must not exceed {MAX_PAYLOAD_LENGTH} characters")
+        return value
 
 
 class DemoScanContext(ScanContext):

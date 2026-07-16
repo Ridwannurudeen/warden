@@ -43,6 +43,8 @@ SCANNER_RISK_SCORE = {
     "CRITICAL": 100.0,
 }
 
+REDACTED_SECRET_MATCH = "[REDACTED SECRET]"
+
 
 @dataclass
 class Verdict:
@@ -78,14 +80,30 @@ class VerdictEngine:
         checks: dict[str, str] = {"input_validation": "pass - payload provided"}
         scanner_detections = self._scanner_detections(scanner_result)
         analyzer_detections = self._analyzer_detections(analyzer_results)
-        detections = scanner_detections + analyzer_detections
+        raw_detections = scanner_detections + analyzer_detections
+        detections = self._redact_secret_matches(raw_detections)
         threat_classes = self._dedupe_reason_codes(
             self._reason_code_from_detection(detection) for detection in detections
         )
         sanitized_payload = self._sanitize(
             str(scanner_result.get("sanitized_content", payload)) if scanner_result else payload,
-            detections,
+            raw_detections,
         )
+
+        analyzer_errors = [result for result in analyzer_results if result.error]
+        if analyzer_errors:
+            for result in analyzer_errors:
+                checks[f"analyzer_{result.name}"] = "fail - analysis unavailable"
+            return Verdict(
+                verdict="BLOCK",
+                risk_level="CRITICAL",
+                threat_classes=threat_classes,
+                detections=detections,
+                sanitized_payload=sanitized_payload,
+                recommendation="Block this payload. A Warden analyzer did not complete.",
+                checks=checks,
+                failed_checks=threat_classes,
+            )
 
         scanner_risk = str(scanner_result.get("risk_level", "NONE")) if scanner_result else "NONE"
         scanner_score = SCANNER_RISK_SCORE.get(scanner_risk, 100.0)
@@ -247,6 +265,18 @@ class VerdictEngine:
         return None
 
     @staticmethod
+    def _redact_secret_matches(
+        detections: Sequence[Mapping[str, object]],
+    ) -> list[dict[str, object]]:
+        redacted: list[dict[str, object]] = []
+        for detection in detections:
+            public_detection = dict(detection)
+            if public_detection.get("class") == ReasonCode.SECRET_EXFIL.value:
+                public_detection["match"] = REDACTED_SECRET_MATCH
+            redacted.append(public_detection)
+        return redacted
+
+    @staticmethod
     def _dedupe_reason_codes(codes: Sequence[ReasonCode | None]) -> list[ReasonCode]:
         seen: set[ReasonCode] = set()
         deduped: list[ReasonCode] = []
@@ -313,14 +343,7 @@ class VerdictEngine:
     @staticmethod
     def _sanitize(payload: str, detections: Sequence[Mapping[str, object]]) -> str:
         sanitized = payload
-        removable = {
-            ReasonCode.DRAIN_ADDRESS.value,
-            ReasonCode.MALICIOUS_LINK.value,
-            ReasonCode.SECRET_EXFIL.value,
-        }
         for detection in detections:
-            if detection.get("class") not in removable:
-                continue
             match = str(detection.get("match", ""))
             if match:
                 sanitized = sanitized.replace(match, "[REDACTED]")

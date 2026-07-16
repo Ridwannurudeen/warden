@@ -48,6 +48,41 @@ class WardenEngine:
         )
         analyzer_results = await self.registry.run_all(analyzer_context)
         verdict = self.verdict_engine.decide(payload, scanner_result, analyzer_results)
+        if verdict.verdict == "SANITIZE":
+            sanitized_scanner_result = await self.scanner.scan(
+                verdict.sanitized_payload,
+                depth=depth,
+            )
+            sanitized_analyzer_context = AnalysisContext(
+                address="",
+                extra={
+                    "payload": verdict.sanitized_payload,
+                    "expected_addresses": (
+                        expected_addresses if isinstance(expected_addresses, list) else []
+                    ),
+                },
+            )
+            sanitized_analyzer_results = await self.registry.run_all(sanitized_analyzer_context)
+            sanitized_verdict = self.verdict_engine.decide(
+                verdict.sanitized_payload,
+                sanitized_scanner_result,
+                sanitized_analyzer_results,
+            )
+            if sanitized_verdict.verdict == "ALLOW":
+                verdict.checks["sanitization_validation"] = "pass - sanitized payload rescanned clean"
+            else:
+                verdict.verdict = "BLOCK"
+                if verdict.risk_level in {"NONE", "LOW", "MEDIUM"}:
+                    verdict.risk_level = "HIGH"
+                verdict.recommendation = (
+                    "Block this payload. Dangerous content remained after sanitization."
+                )
+                verdict.checks["sanitization_validation"] = (
+                    "fail - sanitized payload still triggers Warden"
+                )
+                for reason in sanitized_verdict.failed_checks:
+                    if reason not in verdict.failed_checks:
+                        verdict.failed_checks.append(reason)
         verdict.latency_ms = self._elapsed_ms(started)
         return verdict
 
