@@ -45,14 +45,18 @@ class AnalyzerRegistry:
         final = []
         for analyzer, result in zip(self._analyzers, results):
             if isinstance(result, Exception):
-                logger.error(f"Analyzer {analyzer.name} failed: {result}")
+                logger.error(
+                    "Analyzer %s failed (%s)",
+                    analyzer.name,
+                    type(result).__name__,
+                )
                 # Cautious neutral score (not 0/safe) — fail-closed on missing data
                 final.append(AnalyzerResult(
                     name=analyzer.name,
                     weight=analyzer.weight,
                     score=50,
                     flags=[f"{analyzer.name} analysis unavailable"],
-                    error=str(result),
+                    error="analysis unavailable",
                 ))
             else:
                 final.append(result)
