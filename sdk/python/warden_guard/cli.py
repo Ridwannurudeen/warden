@@ -109,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("proxy command requires the 'proxy' package extra")
         client = AsyncWardenClient(
             base_url=args.warden_url or "https://warden.gudman.xyz",
+            paid=args.warden_url is not None,
             local=args.warden_url is None,
             fail_open=False,
         )

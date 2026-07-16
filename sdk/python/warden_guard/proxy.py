@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from warden_guard.aio import AsyncWardenClient
-from warden_guard.client import WardenBlocked, WardenClient, WardenError
+from warden_guard.client import FREE_PATH, WardenBlocked, WardenClient, WardenError
 
 _HOP_BY_HOP_HEADERS = {
     b"connection",
@@ -88,9 +88,16 @@ class WardenReverseProxy:
         if not 0 < upstream_timeout <= 60:
             raise ValueError("upstream_timeout must be greater than zero and no more than 60")
 
-        configured_client = client or AsyncWardenClient(fail_open=False)
+        if client is None:
+            raise ValueError("reverse-proxy enforcement requires an explicit enforcement client")
+        configured_client = client
         if configured_client.fail_open:
             raise ValueError("reverse-proxy enforcement requires a client with fail_open=False")
+        if (
+            getattr(configured_client, "path", None) == FREE_PATH
+            and not getattr(configured_client, "local", False)
+        ):
+            raise ValueError("reverse-proxy enforcement cannot use the free hosted demo client")
         self.client = configured_client
         upstream_host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
         self.upstream = httpx.URL(

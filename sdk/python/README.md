@@ -85,8 +85,9 @@ python -m pip install -e '/path/to/warden/sdk/python[proxy]'
 warden-guard proxy --upstream http://127.0.0.1:9000 --listen 127.0.0.1 --port 8787
 ```
 
-Passing `--warden-url` explicitly selects a hosted scanner with `fail_open=False`.
-The free hosted route remains rate-limited and truncates long payloads, so that mode
+Passing `--warden-url` explicitly selects that origin's protected `/scan` route with
+`fail_open=False`; the SDK does not settle x402 payment challenges. The free hosted
+demo is rejected as a reverse-proxy scanner because it truncates long payloads and
 is not an enforcement-grade substitute for the default local scanner.
 
 ## Decorator
