@@ -680,10 +680,10 @@ def test_status_and_marketplace_metadata_are_dated_and_honest():
     assert status["agentId"] == "3808"
     assert status["listingStatus"] == "Listed"
     assert status["listingVerifiedAt"] == "2026-07-13"
-    assert status["repositoryTests"] == 683
+    assert status["repositoryTests"] == 719
     assert status["repositoryTestsVerifiedAt"] == "2026-07-16"
-    assert "539 Python" in status["repositoryTestsNote"]
-    assert "113 site JavaScript" in status["repositoryTestsNote"]
+    assert "566 Python" in status["repositoryTestsNote"]
+    assert "122 site JavaScript" in status["repositoryTestsNote"]
     assert "31 TypeScript SDK" in status["repositoryTestsNote"]
     assert "1 Python test skipped" in status["repositoryTestsNote"]
     assert status["corpusCount"] == product_proof["evaluationCorpus"]["total"]

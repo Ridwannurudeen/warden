@@ -4,9 +4,9 @@
   "agentId": "3808",
   "listingStatus": "Listed",
   "listingVerifiedAt": "2026-07-13",
-  "repositoryTests": 683,
+  "repositoryTests": 719,
   "repositoryTestsVerifiedAt": "2026-07-16",
-  "repositoryTestsNote": "539 Python + 113 site JavaScript + 31 TypeScript SDK tests passed in this checkout; 1 Python test skipped; this is not a live CI signal.",
+  "repositoryTestsNote": "566 Python + 122 site JavaScript + 31 TypeScript SDK tests passed in this checkout; 1 Python test skipped; this is not a live CI signal.",
   "corpusCount": 124,
   "corpusFingerprint": "sha256:a3d4b413301dd86ea20da9e6a830e5f676b122ca4c0c266e08a1191a3b6bfc38",
   "services": [

@@ -57,10 +57,10 @@ test("metadata view exposes separate listing and repository verification dates",
   const view = metadataView(status);
   assert.equal(view.verifiedAt, "2026-07-16");
   assert.equal(view.listingVerifiedAt, "2026-07-13");
-  assert.equal(view.repositoryTests, 683);
+  assert.equal(view.repositoryTests, 719);
   assert.equal(view.repositoryTestsVerifiedAt, "2026-07-16");
-  assert.match(view.repositoryTestsNote, /539 Python/);
-  assert.match(view.repositoryTestsNote, /113 site JavaScript/);
+  assert.match(view.repositoryTestsNote, /566 Python/);
+  assert.match(view.repositoryTestsNote, /122 site JavaScript/);
   assert.match(view.repositoryTestsNote, /31 TypeScript SDK/);
   assert.equal(
     view.corpusFingerprint,
