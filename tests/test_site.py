@@ -264,6 +264,53 @@ def test_trust_evidence_pages_mark_the_correct_navigation_item_current():
         assert source.count('aria-current="page"') == 1
 
 
+def test_top_nav_is_curated_and_utility_pages_live_in_footer():
+    curated_groups = {
+        "Product": ["/playground", "/theater", "/agents"],
+        "Developers": ["/docs", "/integrate"],
+        "Evidence": ["/verify", "/apa/log", "/trust"],
+    }
+    relocated_to_footer = ("/gauntlet", "/showcase", "/status", "/badges")
+    top_level_pages = [
+        "index.html",
+        "theater.html",
+        "playground.html",
+        "gauntlet.html",
+        "showcase.html",
+        "hire.html",
+        "badges.html",
+        "badge.html",
+        "integrate.html",
+        "trust.html",
+        "verify.html",
+        "log.html",
+        "status.html",
+        "privacy.html",
+        "terms.html",
+    ]
+
+    for filename in top_level_pages:
+        source = (SITE / filename).read_text(encoding="utf-8")
+        for group_name, expected_hrefs in curated_groups.items():
+            block = re.search(
+                rf'<details class="nav-group[^"]*">\s*<summary>{group_name}</summary>'
+                r'\s*<div class="nav-menu">(?P<body>.*?)</div>',
+                source,
+                re.DOTALL,
+            )
+            assert block, (filename, group_name)
+            hrefs = re.findall(r'href="([^"]+)"', block.group("body"))
+            assert hrefs == expected_hrefs, (filename, group_name, hrefs)
+        footer = re.search(
+            r'<footer class="site-footer page-shell">(?P<body>.*?)</footer>',
+            source,
+            re.DOTALL,
+        )
+        assert footer, filename
+        for href in relocated_to_footer:
+            assert f'href="{href}"' in footer.group("body"), (filename, href)
+
+
 def test_site_is_csp_clean_and_makes_no_external_resource_requests():
     html_files = list(SITE.rglob("*.html"))
     assert html_files
