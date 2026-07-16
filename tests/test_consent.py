@@ -1,5 +1,6 @@
 """Consent gate tests for the audit endpoint."""
 
+import gzip
 from urllib.parse import urlparse
 
 from fastapi.testclient import TestClient
@@ -8,13 +9,31 @@ from warden.api import app
 
 
 class _ConsentResponse:
-    def __init__(self, status_code: int, text: str):
+    def __init__(
+        self,
+        status_code: int,
+        text: str,
+        *,
+        headers: dict[str, str] | None = None,
+        raw_body: bytes | None = None,
+    ):
         self.status_code = status_code
-        self.text = text
-        self.headers = {"content-type": "text/plain"}
+        self.headers = headers or {"content-type": "text/plain"}
+        self.raw_body = raw_body if raw_body is not None else text.encode()
 
-    def json(self):
-        raise ValueError("invalid json")
+    async def aiter_raw(self):
+        yield self.raw_body
+
+
+class _ResponseStream:
+    def __init__(self, response: _ConsentResponse):
+        self.response = response
+
+    async def __aenter__(self):
+        return self.response
+
+    async def __aexit__(self, *args):
+        return False
 
 
 class _FakeAsyncClient:
@@ -27,8 +46,8 @@ class _FakeAsyncClient:
     async def __aexit__(self, *args):
         return None
 
-    async def get(self, *args, **kwargs):
-        return self.response
+    def stream(self, *args, **kwargs):
+        return _ResponseStream(self.response)
 
 
 def _stubbed_audit_requests(monkeypatch, response: _ConsentResponse):
@@ -95,6 +114,60 @@ def test_audit_passes_with_consent_file(monkeypatch):
         response = client.post("/audit", json={"target_url": "https://example.org/scan"})
     assert response.status_code == 200
     assert response.json()["consent_verified"] is True
+
+
+def test_audit_rejects_negated_consent_marker(monkeypatch):
+    _stubbed_audit_requests(
+        monkeypatch,
+        _ConsentResponse(status_code=200, text="not-warden-audit-allowed"),
+    )
+    monkeypatch.setenv("WARDEN_REQUIRE_CONSENT", "false")
+    monkeypatch.setenv("WARDEN_RATE_LIMIT_PER_MIN", "0")
+    monkeypatch.setenv("WARDEN_BADGE_SECRET", "consent-test-secret")
+    with TestClient(app) as client:
+        response = client.post("/audit", json={"target_url": "https://example.org/scan"})
+    assert response.status_code == 200
+    assert response.json()["consent_verified"] is False
+
+
+def test_audit_rejects_oversized_consent_body(monkeypatch):
+    _stubbed_audit_requests(
+        monkeypatch,
+        _ConsentResponse(
+            status_code=200,
+            text=f"{'x' * 4096}warden-audit-allowed",
+        ),
+    )
+    monkeypatch.setenv("WARDEN_REQUIRE_CONSENT", "false")
+    monkeypatch.setenv("WARDEN_RATE_LIMIT_PER_MIN", "0")
+    monkeypatch.setenv("WARDEN_BADGE_SECRET", "consent-test-secret")
+    with TestClient(app) as client:
+        response = client.post("/audit", json={"target_url": "https://example.org/scan"})
+    assert response.status_code == 200
+    assert response.json()["consent_verified"] is False
+
+
+def test_audit_rejects_compressed_consent_body(monkeypatch):
+    expanded = f"{'x' * 5_000_000}warden-audit-allowed"
+    _stubbed_audit_requests(
+        monkeypatch,
+        _ConsentResponse(
+            status_code=200,
+            text=expanded,
+            headers={
+                "content-type": "text/plain",
+                "content-encoding": "gzip",
+            },
+            raw_body=gzip.compress(expanded.encode()),
+        ),
+    )
+    monkeypatch.setenv("WARDEN_REQUIRE_CONSENT", "false")
+    monkeypatch.setenv("WARDEN_RATE_LIMIT_PER_MIN", "0")
+    monkeypatch.setenv("WARDEN_BADGE_SECRET", "consent-test-secret")
+    with TestClient(app) as client:
+        response = client.post("/audit", json={"target_url": "https://example.org/scan"})
+    assert response.status_code == 200
+    assert response.json()["consent_verified"] is False
 
 
 def test_echoed_payload_does_not_count_as_blocked():

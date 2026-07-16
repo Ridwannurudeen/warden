@@ -23,6 +23,7 @@ AUDIT_BATTERY_SIZE = 20
 AUDIT_TIMEOUT_SECONDS = 5.0
 CONSENT_TIMEOUT_SECONDS = 1.5
 MAX_AUDIT_RESPONSE_BYTES = 100_000
+MAX_CONSENT_RESPONSE_BYTES = 4_096
 EXPLICIT_REFUSAL_PATTERN = re.compile(
     r"\b(?:request|payload|content|action|transaction)\s+"
     r"(?:has\s+been\s+|was\s+|is\s+)?(?:blocked|denied|refused|rejected)\b"
@@ -344,45 +345,66 @@ class AgentAuditor:
             host_header_with_port = f"{host_header_with_port}:{parsed_target.port}"
         consent_url = self._build_consent_url(connect_url)
         try:
-            response = await client.get(
+            async with client.stream(
+                "GET",
                 consent_url,
                 headers={"Host": host_header_with_port},
                 extensions={"sni_hostname": host_header},
                 timeout=CONSENT_TIMEOUT_SECONDS,
-            )
+            ) as response:
+                if response.status_code != 200:
+                    if require_consent:
+                        raise ValueError("target_url did not pass consent check")
+                    return False
+                content_encoding = response.headers.get("content-encoding", "").strip().lower()
+                if content_encoding and content_encoding != "identity":
+                    if require_consent:
+                        raise ValueError("target_url did not pass consent check")
+                    return False
+                chunks: list[bytes] = []
+                total = 0
+                async for chunk in response.aiter_raw():
+                    total += len(chunk)
+                    if total > MAX_CONSENT_RESPONSE_BYTES:
+                        if require_consent:
+                            raise ValueError("target_url did not pass consent check")
+                        return False
+                    chunks.append(chunk)
         except httpx.HTTPError:
             if require_consent:
                 raise ValueError("target_url did not pass consent check")
             return False
 
-        if response.status_code != 200:
-            if require_consent:
-                raise ValueError("target_url did not pass consent check")
-            return False
-        raw_body = response.text.strip()
+        raw_body = b"".join(chunks).decode("utf-8", errors="ignore").strip()
+        consent_verified = False
         if self._is_json_header(response):
             try:
-                body = response.json()
-            except ValueError:
-                body = raw_body.lower()
-            else:
-                if isinstance(body, dict):
-                    consent_field = body.get("consent")
-                    if isinstance(consent_field, bool):
-                        return bool(consent_field)
+                body = json.loads(raw_body)
+            except (ValueError, RecursionError):
+                body = None
+            if isinstance(body, bool):
+                consent_verified = body
+            elif isinstance(body, str):
+                consent_verified = body.strip().casefold() == "warden-audit-allowed"
+            elif isinstance(body, dict):
+                consent_field = body.get("consent")
+                if isinstance(consent_field, bool):
+                    consent_verified = consent_field
+                else:
                     if isinstance(consent_field, str):
-                        return "warden-audit-allowed" in consent_field.lower()
-                    if str(body.get("status", "")).lower() == "warden-audit-allowed":
-                        return True
-                if isinstance(body, str):
-                    if "warden-audit-allowed" in body.lower():
-                        return True
-                if isinstance(body, bool):
-                    return bool(body)
-                raw_body = str(body)
+                        consent_verified = (
+                            consent_field.strip().casefold() == "warden-audit-allowed"
+                        )
+                    if not consent_verified:
+                        status = body.get("status")
+                        consent_verified = (
+                            isinstance(status, str)
+                            and status.strip().casefold() == "warden-audit-allowed"
+                        )
+        else:
+            consent_verified = raw_body.casefold() == "warden-audit-allowed"
 
-        body = str(raw_body).lower()
-        if "warden-audit-allowed" in body:
+        if consent_verified:
             return True
         if require_consent:
             raise ValueError("target_url did not pass consent check")
