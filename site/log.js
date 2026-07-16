@@ -75,6 +75,91 @@
     return payload.entries.map(normalizeLogEntry);
   }
 
+  function normalizeLogPage(payload, cursor) {
+    if (
+      payload === null ||
+      typeof payload !== "object" ||
+      Array.isArray(payload) ||
+      !Array.isArray(payload.entries)
+    ) {
+      throw new Error("Transparency log page must be an object with entries");
+    }
+    if (!Number.isSafeInteger(payload.total) || payload.total < 0) {
+      throw new Error(
+        "Transparency log total must be a non-negative safe integer",
+      );
+    }
+    if (
+      payload.next_cursor !== null &&
+      (!Number.isSafeInteger(payload.next_cursor) ||
+        payload.next_cursor <= cursor)
+    ) {
+      throw new Error("Transparency log next_cursor must advance");
+    }
+    const entries = payload.entries.map((entry, index) =>
+      normalizeLogEntry(entry, cursor + index),
+    );
+    for (const [index, entry] of entries.entries()) {
+      if (entry.seq !== cursor + index + 1) {
+        throw new Error("Transparency log page sequence is not contiguous");
+      }
+    }
+    if (
+      payload.next_cursor !== null &&
+      (entries.length === 0 ||
+        payload.next_cursor !== entries[entries.length - 1].seq)
+    ) {
+      throw new Error(
+        "Transparency log next_cursor does not match the page tail",
+      );
+    }
+    return {
+      entries,
+      total: payload.total,
+      nextCursor: payload.next_cursor,
+    };
+  }
+
+  async function fetchLogPages(fetchImpl, pageSize = 100) {
+    if (typeof fetchImpl !== "function") {
+      throw new Error("Transparency log fetch is unavailable");
+    }
+    if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 500) {
+      throw new Error("Transparency log page size must be between 1 and 500");
+    }
+    const entries = [];
+    let cursor = 0;
+    let expectedTotal = null;
+    while (true) {
+      const response = await fetchImpl(
+        `/apa/log?cursor=${cursor}&limit=${pageSize}`,
+        {
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        },
+      );
+      if (!response.ok) {
+        throw new Error(`Log request failed with HTTP ${response.status}`);
+      }
+      const page = normalizeLogPage(await response.json(), cursor);
+      if (expectedTotal === null) {
+        expectedTotal = page.total;
+      } else if (page.total !== expectedTotal) {
+        throw new Error("Transparency log changed while pages were being read");
+      }
+      entries.push(...page.entries);
+      if (page.nextCursor === null) {
+        if (entries.length !== expectedTotal) {
+          throw new Error(
+            "Transparency log pages do not match the published total",
+          );
+        }
+        return entries;
+      }
+      cursor = page.nextCursor;
+    }
+  }
+
   function decodeBase64Url(value, prefix, expectedLength) {
     const marker = `${prefix}:`;
     if (typeof value !== "string" || !value.startsWith(marker)) {
@@ -327,7 +412,9 @@
   const api = {
     GENESIS_PREV_HASH,
     canonicalJson,
+    fetchLogPages,
     normalizeLogCheckpoint,
+    normalizeLogPage,
     normalizeLogPayload,
     sha256Hex,
     verifyLogChain,
@@ -412,13 +499,12 @@
         headers: { accept: "application/json" },
         cache: "no-store",
       };
-      const [response, checkpointResponse, issuerResponse] = await Promise.all([
-        root.fetch("/apa/log", requestOptions),
+      const [entries, checkpointResponse, issuerResponse] = await Promise.all([
+        fetchLogPages(root.fetch?.bind(root)),
         root.fetch("/apa/log/checkpoint", requestOptions),
         root.fetch("/.well-known/apa-issuer.json", requestOptions),
       ]);
       for (const [label, fetched] of [
-        ["Log", response],
         ["Checkpoint", checkpointResponse],
         ["Issuer document", issuerResponse],
       ]) {
@@ -428,7 +514,6 @@
           );
         }
       }
-      const entries = normalizeLogPayload(await response.json());
       const checkpoint = await checkpointResponse.json();
       const issuerDocument = await issuerResponse.json();
       const result = await verifySignedLog(entries, checkpoint, issuerDocument);

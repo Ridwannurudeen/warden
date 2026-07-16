@@ -560,6 +560,23 @@ def read_log() -> list[dict[str, object]]:
     return [json.loads(row[0]) for row in rows]
 
 
+def read_log_page(
+    cursor: int,
+    limit: int,
+) -> tuple[list[dict[str, object]], int, int | None]:
+    with _LOCK, _connect() as connection:
+        total = int(connection.execute("SELECT COUNT(*) FROM log").fetchone()[0])
+        rows = connection.execute(
+            "SELECT seq, entry_json FROM log WHERE seq > ? ORDER BY seq ASC LIMIT ?",
+            (cursor, limit + 1),
+        ).fetchall()
+    has_more = len(rows) > limit
+    page_rows = rows[:limit]
+    entries = [json.loads(row[1]) for row in page_rows]
+    next_cursor = int(page_rows[-1][0]) if has_more and page_rows else None
+    return entries, total, next_cursor
+
+
 def read_log_checkpoint() -> dict[str, object]:
     """Return the stored signed head; never sign a non-empty log on read."""
     with _LOCK, _connect() as connection:
