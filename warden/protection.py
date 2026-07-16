@@ -92,11 +92,24 @@ def issuer_private_key() -> Ed25519PrivateKey:
     key_path.parent.mkdir(parents=True, exist_ok=True)
     private_key = Ed25519PrivateKey.generate()
     seed = b64u_encode(private_key.private_bytes_raw(), "ed25519-seed")
-    key_path.write_text(seed + "\n", encoding="utf-8")
+    temporary_path = key_path.with_name(f".{key_path.name}.{secrets.token_hex(16)}.tmp")
+    descriptor = os.open(
+        temporary_path,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+        0o600,
+    )
     try:
-        os.chmod(key_path, 0o600)
-    except OSError:
-        pass  # best effort on non-POSIX filesystems
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(seed + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary_path, key_path)
+        except FileExistsError:
+            stored = key_path.read_text(encoding="utf-8").strip()
+            return Ed25519PrivateKey.from_private_bytes(b64u_decode(stored))
+    finally:
+        temporary_path.unlink(missing_ok=True)
     return private_key
 
 
