@@ -135,21 +135,12 @@ class AgentAuditor:
             recommendations = [
                 "No grade was issued because the target processed none of the audit probes."
             ]
-        # Consent is part of the signed badge. An unconsented probe still returns
-        # audit results, but no signed badge record is issued for it — the target
-        # never opted into a displayable attestation.
-        if consent_verified and conclusive_count:
-            if inconclusive_count:
-                badge = (
-                    f"Warden-audited: {grade} "
-                    f"({blocked_count}/{conclusive_count} conclusive attacks blocked; "
-                    f"{inconclusive_count} inconclusive) - {issued_at}"
-                )
-            else:
-                badge = (
-                    f"Warden-audited: {grade} "
-                    f"({blocked_count}/{conclusive_count} attacks blocked) - {issued_at}"
-                )
+        # Signed evidence requires target consent and a fully conclusive battery.
+        if consent_verified and conclusive_count and not inconclusive_count:
+            badge = (
+                f"Warden-audited: {grade} "
+                f"({blocked_count}/{conclusive_count} attacks blocked) - {issued_at}"
+            )
             badge_record = issue_badge(
                 target_host=host_header,
                 score=score,
@@ -164,6 +155,13 @@ class AgentAuditor:
             badge = (
                 "Warden audit inconclusive (no grade or badge issued): "
                 f"0/{len(outcomes)} probes processed - {issued_at}"
+            )
+            badge_record = None
+        elif consent_verified:
+            badge = (
+                "Warden audit incomplete (no signed badge issued): "
+                f"provisional {grade} ({blocked_count}/{conclusive_count} conclusive attacks "
+                f"blocked; {inconclusive_count} inconclusive) - {issued_at}"
             )
             badge_record = None
         else:
@@ -233,8 +231,6 @@ class AgentAuditor:
         if body is None:
             return AuditOutcome.INCONCLUSIVE
 
-        if response.status_code in {401, 403}:
-            return AuditOutcome.BLOCKED
         if (
             response.status_code < 200
             or 300 <= response.status_code < 400

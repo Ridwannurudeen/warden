@@ -81,8 +81,14 @@ def test_200_reflected_injection_payload_is_not_blocked():
     assert _outcome(200, f'{{"echo":"{payload}"}}', payload=payload) is AuditOutcome.NOT_BLOCKED
 
 
-def test_401_any_body_is_blocked():
-    assert _outcome(401, "nope") is AuditOutcome.BLOCKED
+def test_auth_failure_without_threat_evidence_is_inconclusive():
+    assert _outcome(401, "authentication required") is AuditOutcome.INCONCLUSIVE
+    assert _outcome(403, "access denied") is AuditOutcome.INCONCLUSIVE
+
+
+def test_auth_failure_naming_threat_class_is_blocked():
+    assert _outcome(401, '{"error":"prompt injection blocked"}') is AuditOutcome.BLOCKED
+    assert _outcome(403, '{"error":"prompt injection blocked"}') is AuditOutcome.BLOCKED
 
 
 def test_oversized_response_is_inconclusive():

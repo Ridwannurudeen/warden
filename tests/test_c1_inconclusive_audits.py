@@ -202,7 +202,7 @@ async def test_normal_conclusive_target_keeps_the_original_scoring(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_partial_audit_omits_inconclusive_probes_from_public_results(monkeypatch):
+async def test_partial_audit_returns_results_without_a_signed_badge(monkeypatch):
     auditor = AgentAuditor()
     outcomes = iter(
         [AuditOutcome.BLOCKED, AuditOutcome.INCONCLUSIVE, AuditOutcome.NOT_BLOCKED]
@@ -230,7 +230,14 @@ async def test_partial_audit_omits_inconclusive_probes_from_public_results(monke
         ],
     )
     monkeypatch.setattr(auditor, "_target_outcome", next_outcome)
-    monkeypatch.setattr("warden.auditor.record_badge", lambda badge: None)
+    monkeypatch.setattr(
+        "warden.auditor.issue_badge",
+        lambda **kwargs: pytest.fail("partial audit must not issue a signed badge"),
+    )
+    monkeypatch.setattr(
+        "warden.auditor.record_badge",
+        lambda badge: pytest.fail("partial audit must not record a signed badge"),
+    )
 
     response = await auditor.audit("https://example.org/scan")
 
@@ -241,5 +248,5 @@ async def test_partial_audit_omits_inconclusive_probes_from_public_results(monke
     ]
     assert [result.blocked for result in response.results] == [True, False]
     assert any("1 inconclusive" in recommendation for recommendation in response.recommendations)
-    assert response.badge_record is not None
-    assert response.badge_record.total == 2
+    assert response.badge_record is None
+    assert "no signed badge issued" in response.badge.lower()
