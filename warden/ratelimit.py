@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import threading
 import time
 
@@ -16,15 +17,23 @@ _STATE_LOCK = threading.Lock()
 
 
 def _client_ip(request: object) -> str:
-    headers = request.headers
-    real_ip = headers.get("x-real-ip", "").strip()
-    if real_ip:
-        return real_ip
-
     request_client = request.client
-    if request_client and request_client.host:
-        return request_client.host
-    return "unknown"
+    if not request_client or not request_client.host:
+        return "unknown"
+
+    peer = request_client.host.strip()
+    try:
+        peer_ip = ipaddress.ip_address(peer)
+    except ValueError:
+        return peer
+
+    if peer_ip.is_loopback:
+        real_ip = request.headers.get("x-real-ip", "").strip()
+        try:
+            return str(ipaddress.ip_address(real_ip))
+        except ValueError:
+            return str(peer_ip)
+    return str(peer_ip)
 
 
 def _window_id(timestamp: float) -> int:
