@@ -30,6 +30,10 @@ def test_flat_upgrade_quiesces_writers_before_guarded_checkpoint_migration() -> 
     assert "! systemctl is-active --quiet warden.service" in runbook[stop:migration]
     assert ". /opt/warden/.env" in runbook[stop:migration]
     assert "SELECT name FROM sqlite_master" in runbook[stop:migration]
+    assert "name = 'log_anchor'" in runbook[stop:migration]
+    assert "SELECT 1 FROM log_anchor WHERE singleton = 1" in runbook[stop:migration]
+    assert "if has_anchor:" in runbook[stop:migration]
+    assert "has_checkpoint" not in runbook[stop:migration]
     assert "verify_log_chain(entries, checkpoint)" in runbook[stop:start]
     assert (
         "install -d -o warden -g warden -m 0750 /opt/warden/data "

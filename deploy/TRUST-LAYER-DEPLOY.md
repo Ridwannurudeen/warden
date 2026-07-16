@@ -82,15 +82,15 @@ db_path = os.environ["WARDEN_PROTECTION_DB"]
 connection = sqlite3.connect(f"file:{db_path}?mode=rw", uri=True)
 try:
     table_exists = connection.execute(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'log_checkpoint'"
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'log_anchor'"
     ).fetchone()
-    has_checkpoint = table_exists is not None and connection.execute(
-        "SELECT 1 FROM log_checkpoint WHERE singleton = 1"
+    has_anchor = table_exists is not None and connection.execute(
+        "SELECT 1 FROM log_anchor WHERE singleton = 1"
     ).fetchone() is not None
 finally:
     connection.close()
 
-if has_checkpoint:
+if has_anchor:
     checkpoint = read_log_checkpoint()
 else:
     checkpoint = migrate_log_checkpoint()
@@ -111,10 +111,10 @@ if systemctl cat warden-apa-reprobe.timer >/dev/null 2>&1; then
 fi
 ```
 
-The guard calls `migrate_log_checkpoint()` only when the legacy database has no checkpoint row. That function
-validates the complete contiguous legacy chain before signing it and refuses to overwrite an existing
-checkpoint. On re-run, the existing signed checkpoint is verified against the full log instead, making the
-overall gate idempotent without weakening either failure mode.
+The guard calls `migrate_log_checkpoint()` until the database has a local anchor row. That function validates
+the complete contiguous legacy chain, adopts a matching pre-anchor signed checkpoint when present, or signs a
+legacy head that has no checkpoint. Once anchored, the read path verifies the anchor, checkpoint, signature,
+and full log together. Missing or malformed partial state fails closed, and re-running the gate is idempotent.
 
 ---
 
