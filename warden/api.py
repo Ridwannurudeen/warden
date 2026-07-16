@@ -341,7 +341,7 @@ async def payment_required_schema_middleware(request: Request, call_next):
         encoded_challenge = base64.b64encode(
             json.dumps(challenge, separators=(",", ":")).encode("utf-8")
         ).decode("ascii")
-    except (KeyError, TypeError, UnicodeError, ValueError):
+    except (KeyError, RecursionError, TypeError, UnicodeError, ValueError):
         return response
 
     response.headers["PAYMENT-REQUIRED"] = encoded_challenge

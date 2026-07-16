@@ -19,6 +19,7 @@ def _encoded(value: str) -> str:
     [
         "not-base64%%",
         _encoded("not-json"),
+        _encoded("[" * 3000 + "]" * 3000),
         _encoded("[]"),
         _encoded('{"resource":{}}'),
         _encoded('{"resource":{"url":1},"accepts":[]}'),
