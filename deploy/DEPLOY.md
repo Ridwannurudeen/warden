@@ -124,6 +124,7 @@ reject_symlink /var/lib/warden-fetch
 reject_symlink /opt/warden/badges
 reject_symlink /opt/warden/gauntlet
 reject_symlink /opt/warden/data
+reject_symlink /opt/warden/data/apa_issuer.key
 reject_symlink /opt/warden/issuer-history.json
 reject_symlink /opt/warden/.env
 reject_symlink /opt/warden/index.env
@@ -194,6 +195,11 @@ install -d -o warden -g warden -m 0755 /opt/warden-index /opt/warden-index/relea
 install -d -o warden-fetch -g warden-fetch -m 0755 /opt/warden-snapshot
 install -d -o warden-fetch -g warden-fetch -m 0700 /var/lib/warden-fetch
 chown -hR warden:warden /opt/warden/badges /opt/warden/gauntlet /opt/warden/data
+if test -e /opt/warden/data/apa_issuer.key; then
+  test -f /opt/warden/data/apa_issuer.key
+  chown warden:warden /opt/warden/data/apa_issuer.key
+  chmod 0600 /opt/warden/data/apa_issuer.key
+fi
 test -f /opt/warden/.env
 test -f /opt/warden/index.env
 test -f /opt/warden/issuer-history.json
@@ -203,6 +209,7 @@ chmod 0640 /opt/warden/.env /opt/warden/index.env
 chmod 0640 /opt/warden/issuer-history.json
 runuser -u warden-fetch -- test ! -r /opt/warden/.env
 runuser -u warden-fetch -- test ! -r /opt/warden/index.env
+test "$(grep -Ec '^[[:space:]]*WARDEN_ISSUER_KEY=(ed25519-seed:)?[A-Za-z0-9_-]{43}[[:space:]]*$' /opt/warden/.env)" -eq 1
 test "$(grep -Ec '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=' /opt/warden/index.env)" -eq 3
 grep -Eq '^[[:space:]]*WARDEN_BADGE_SECRET=.{20,}$' /opt/warden/index.env
 grep -Eq '^[[:space:]]*WARDEN_ISSUER_PUBLIC_KEY=ed25519:[A-Za-z0-9_-]{43}[[:space:]]*$' /opt/warden/index.env
@@ -341,6 +348,9 @@ systemctl start warden-index-candidate.service
 test -L "$index_candidate/current"
 candidate_index_release="$(readlink -f -- "$index_candidate/current")"
 test "$(dirname -- "$candidate_index_release")" = "$index_candidate/releases"
+chmod 0644 "$candidate_index_release/data/marketplace-summary.json" "$candidate_index_release/data/warden-services.json"
+test "$(stat -c '%a' "$candidate_index_release/data/marketplace-summary.json")" = 644
+test "$(stat -c '%a' "$candidate_index_release/data/warden-services.json")" = 644
 capture="$(basename -- "$candidate_index_release")"
 test "${#capture}" -eq 16
 capture_digits="${capture:0:8}${capture:9:6}"

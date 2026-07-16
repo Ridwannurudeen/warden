@@ -63,6 +63,7 @@ def _write_json_atomic(path: Path, document: dict[str, object]) -> None:
         ) as handle:
             temporary_path = Path(handle.name)
             handle.write(serialized)
+        os.chmod(temporary_path, 0o644)
         os.replace(temporary_path, path)
     finally:
         if temporary_path is not None and temporary_path.exists():
