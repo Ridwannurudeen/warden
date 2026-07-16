@@ -43,6 +43,7 @@ from warden.models import (
 )
 
 MAX_REQUEST_BODY_BYTES = 1_000_000
+MAX_JSON_NESTING_DEPTH = 64
 APA_LOG_DEFAULT_PAGE_SIZE = 100
 APA_LOG_MAX_PAGE_SIZE = 500
 APA_LOG_PAGE = Path(__file__).resolve().parents[1] / "site" / "log.html"
@@ -90,23 +91,46 @@ class RequestBodyLimitMiddleware:
 
         received_bytes = 0
         too_large = False
+        json_depth = 0
+        json_in_string = False
+        json_escaped = False
+        json_too_deep = False
         response_started = False
 
         async def receive_limited() -> Message:
             nonlocal received_bytes, too_large
-            if too_large:
+            nonlocal json_depth, json_in_string, json_escaped, json_too_deep
+            if too_large or json_too_deep:
                 return {"type": "http.disconnect"}
             message = await receive()
             if message["type"] == "http.request":
-                received_bytes += len(message.get("body", b""))
+                body = message.get("body", b"")
+                received_bytes += len(body)
                 if received_bytes > self.max_body_bytes:
                     too_large = True
                     return {"type": "http.disconnect"}
+                for byte in body:
+                    if json_in_string:
+                        if json_escaped:
+                            json_escaped = False
+                        elif byte == ord("\\"):
+                            json_escaped = True
+                        elif byte == ord('"'):
+                            json_in_string = False
+                    elif byte == ord('"'):
+                        json_in_string = True
+                    elif byte in (ord("{"), ord("[")):
+                        json_depth += 1
+                        if json_depth > MAX_JSON_NESTING_DEPTH:
+                            json_too_deep = True
+                            return {"type": "http.disconnect"}
+                    elif byte in (ord("}"), ord("]")) and json_depth:
+                        json_depth -= 1
             return message
 
         async def send_limited(message: Message) -> None:
             nonlocal response_started
-            if too_large:
+            if too_large or json_too_deep:
                 return
             if message["type"] == "http.response.start":
                 response_started = True
@@ -117,6 +141,12 @@ class RequestBodyLimitMiddleware:
             response = JSONResponse(
                 status_code=413,
                 content={"detail": "Request body too large"},
+            )
+            await response(scope, receive, send)
+        elif json_too_deep and not response_started:
+            response = JSONResponse(
+                status_code=400,
+                content={"detail": "JSON nesting is too deep"},
             )
             await response(scope, receive, send)
 
