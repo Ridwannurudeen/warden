@@ -257,6 +257,50 @@
         </div>
       </section>
 
+      <section aria-labelledby="evaluation-title">
+        <div class="section-heading">
+          <p class="eyebrow">Measured security</p>
+          <h2 id="evaluation-title">Held-out recall, with the misses left visible.</h2>
+          <p class="section-copy">
+            Attack success requires a non-ALLOW decision with the expected threat
+            class. Any non-ALLOW decision on the held-out benign set is a false
+            positive. These authored cases are excluded from the scanner's training
+            corpus and similarity examples.
+          </p>
+        </div>
+        <div class="data-grid" aria-label="Current held-out evaluation">
+          <div>
+            <span>Attack recall</span
+            ><strong class="num" data-evaluation-recall>Loading</strong>
+          </div>
+          <div>
+            <span>Attacks detected</span
+            ><strong class="num" data-evaluation-attacks>Loading</strong>
+          </div>
+          <div>
+            <span>Benign false positives</span
+            ><strong class="num" data-evaluation-false-positives>Loading</strong>
+          </div>
+          <div>
+            <span>False-positive rate</span
+            ><strong class="num" data-evaluation-fp-rate>Loading</strong>
+          </div>
+          <div>
+            <span>Measured at</span
+            ><strong class="num" data-evaluation-measured-at>Loading</strong>
+          </div>
+          <div>
+            <span>Evaluation mode</span
+            ><strong data-evaluation-mode>Loading</strong>
+          </div>
+        </div>
+        <aside class="callout">
+          The semantic model is disabled for the published run. Human-confirmed
+          Gauntlet bypasses enter this held-out set through an explicit review tool;
+          they are never copied into the training corpus by that workflow.
+        </aside>
+      </section>
+
       <section aria-labelledby="payment-evidence-title">
         <div class="section-heading">
           <p class="eyebrow">Payment evidence boundary</p>

@@ -27,7 +27,22 @@ Run it from the repository root:
 ```powershell
 python scripts/benchmark_recall.py
 python scripts/benchmark_recall.py --json
+python scripts/benchmark_recall.py --record --json
 ```
+
+`--record` appends an exact UTC result to `history.jsonl` and atomically refreshes the public
+`site/data/evaluation.json` consumed by `/status`. It does not conceal misses or mutate detector inputs.
+
+Human-reviewed Gauntlet candidates enter evaluation only through an operator action:
+
+```powershell
+python scripts/review_gauntlet.py CLAIM_ID PROMPT_INJECTION --confirm-human-review
+```
+
+The reviewer assigns one existing reason code after inspecting the retained candidate. Promotion is
+idempotent, appends the case only to `held_out_attacks.jsonl`, and refuses payloads already present in the
+training corpus. After promotion, rerun the benchmark, intentionally update the published result, and record
+the dated measurement. There is no public confirmation API and no automatic training-corpus mutation.
 
 The optional paid semantic runtime has a separate guarded evaluation mode:
 

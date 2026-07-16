@@ -66,7 +66,97 @@
     };
   }
 
-  const api = { formatCheckedAt, metadataView, normalizeHealth };
+  function normalizeEvaluation(payload) {
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      payload.schema_version !== 1 ||
+      !payload.current ||
+      typeof payload.current !== "object" ||
+      !payload.methodology ||
+      typeof payload.methodology !== "object"
+    ) {
+      throw new Error("Evaluation data must be a schema-v1 object");
+    }
+    const current = payload.current;
+    const methodology = payload.methodology;
+    const integerFields = [
+      "attack_cases",
+      "detected_attacks",
+      "benign_cases",
+      "false_positives",
+    ];
+    for (const field of integerFields) {
+      if (!Number.isInteger(current[field]) || current[field] < 0) {
+        throw new Error(`Evaluation ${field} must be a nonnegative integer`);
+      }
+    }
+    if (
+      current.detected_attacks > current.attack_cases ||
+      current.false_positives > current.benign_cases
+    ) {
+      throw new Error("Evaluation counts are inconsistent");
+    }
+    for (const field of [
+      "attack_recall_percent",
+      "false_positive_rate_percent",
+    ]) {
+      if (
+        !Number.isFinite(current[field]) ||
+        current[field] < 0 ||
+        current[field] > 100
+      ) {
+        throw new Error(`Evaluation ${field} must be a percentage`);
+      }
+    }
+    const recall = current.attack_cases
+      ? Math.round((current.detected_attacks / current.attack_cases) * 10000) /
+        100
+      : 0;
+    const falsePositiveRate = current.benign_cases
+      ? Math.round((current.false_positives / current.benign_cases) * 10000) /
+        100
+      : 0;
+    if (
+      recall !== current.attack_recall_percent ||
+      falsePositiveRate !== current.false_positive_rate_percent
+    ) {
+      throw new Error("Evaluation recall or false-positive rate is inconsistent");
+    }
+    if (
+      typeof current.measured_at !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(current.measured_at) ||
+      Number.isNaN(Date.parse(current.measured_at))
+    ) {
+      throw new Error("Evaluation measured_at must be exact UTC seconds");
+    }
+    if (
+      methodology.held_out !== true ||
+      methodology.attack_success !==
+        "non-ALLOW decision with the expected threat class" ||
+      methodology.benign_false_positive !== "any non-ALLOW decision" ||
+      typeof methodology.semantic_enabled !== "boolean"
+    ) {
+      throw new Error("Evaluation methodology must describe the held-out contract");
+    }
+    return {
+      recall: `${current.attack_recall_percent.toFixed(2)}%`,
+      attacks: `${current.detected_attacks}/${current.attack_cases}`,
+      falsePositives: `${current.false_positives}/${current.benign_cases}`,
+      falsePositiveRate: `${current.false_positive_rate_percent.toFixed(2)}%`,
+      measuredAt: current.measured_at,
+      mode: methodology.semantic_enabled
+        ? "Paid thorough with semantic model"
+        : "Deterministic; semantic model disabled",
+    };
+  }
+
+  const api = {
+    formatCheckedAt,
+    metadataView,
+    normalizeEvaluation,
+    normalizeHealth,
+  };
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   }
@@ -230,7 +320,38 @@
     }
   }
 
+  async function loadEvaluation() {
+    try {
+      const response = await root.fetch("/data/evaluation.json", {
+        headers: { accept: "application/json" },
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const evaluation = normalizeEvaluation(await response.json());
+      text("[data-evaluation-recall]", evaluation.recall);
+      text("[data-evaluation-attacks]", evaluation.attacks);
+      text("[data-evaluation-false-positives]", evaluation.falsePositives);
+      text("[data-evaluation-fp-rate]", evaluation.falsePositiveRate);
+      text("[data-evaluation-measured-at]", evaluation.measuredAt);
+      text("[data-evaluation-mode]", evaluation.mode);
+    } catch (error) {
+      for (const selector of [
+        "[data-evaluation-recall]",
+        "[data-evaluation-attacks]",
+        "[data-evaluation-false-positives]",
+        "[data-evaluation-fp-rate]",
+        "[data-evaluation-measured-at]",
+        "[data-evaluation-mode]",
+      ]) {
+        text(selector, "Evaluation unavailable");
+      }
+    }
+  }
+
   healthRetry?.addEventListener("click", loadHealth);
   loadHealth();
   loadBuildMetadata();
+  loadEvaluation();
 })(typeof globalThis === "undefined" ? this : globalThis);

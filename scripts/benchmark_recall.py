@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import sys
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +20,8 @@ from warden.engine import WardenEngine  # noqa: E402
 DEFAULT_ATTACKS = ROOT / "benchmark" / "held_out_attacks.jsonl"
 DEFAULT_BENIGN = ROOT / "benchmark" / "held_out_benign.jsonl"
 PUBLISHED_RESULTS = ROOT / "benchmark" / "results.json"
+DEFAULT_HISTORY = ROOT / "benchmark" / "history.jsonl"
+DEFAULT_PUBLIC_RESULT = ROOT / "site" / "data" / "evaluation.json"
 
 
 def load_jsonl(path: Path) -> list[dict[str, object]]:
@@ -39,6 +43,61 @@ def normalized_payload(payload: object) -> str:
 
 def _percent(numerator: int, denominator: int) -> float:
     return round((numerator / denominator) * 100, 2) if denominator else 0.0
+
+
+def record_benchmark(
+    result: dict[str, object],
+    *,
+    measured_at: str | None = None,
+    history_path: Path = DEFAULT_HISTORY,
+    public_path: Path = DEFAULT_PUBLIC_RESULT,
+) -> dict[str, object]:
+    measured_at = measured_at or (
+        datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
+    try:
+        parsed = datetime.fromisoformat(measured_at.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("measured_at must be an exact UTC timestamp") from exc
+    if parsed.tzinfo != timezone.utc or parsed.microsecond or not measured_at.endswith("Z"):
+        raise ValueError("measured_at must be an exact UTC timestamp")
+
+    canonical = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    record = {
+        "schema_version": 1,
+        "measured_at": measured_at,
+        "benchmark": result["benchmark"],
+        "mode": result["mode"],
+        "attack_cases": result["attack_cases"],
+        "detected_attacks": result["detected_attacks"],
+        "attack_recall_percent": result["attack_recall_percent"],
+        "benign_cases": result["benign_cases"],
+        "false_positives": result["false_positives"],
+        "false_positive_rate_percent": result["false_positive_rate_percent"],
+        "result_sha256": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+    }
+    history_path.parent.mkdir(parents=True, exist_ok=True)
+    with history_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+
+    public_payload = {
+        "schema_version": 1,
+        "current": record,
+        "methodology": {
+            "attack_success": "non-ALLOW decision with the expected threat class",
+            "benign_false_positive": "any non-ALLOW decision",
+            "held_out": True,
+            "semantic_enabled": "semantic_enablement_gate" in result,
+        },
+    }
+    public_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = public_path.with_suffix(public_path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(public_payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(public_path)
+    return record
 
 
 async def evaluate_benchmark(
@@ -139,6 +198,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Evaluate the configured paid semantic model in thorough mode.",
     )
+    parser.add_argument(
+        "--record",
+        action="store_true",
+        help="Append a dated history record and refresh the public evaluation data.",
+    )
     return parser.parse_args(argv)
 
 
@@ -150,6 +214,8 @@ def main(argv: list[str] | None = None) -> None:
         )
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
+    if args.record:
+        record_benchmark(result)
     if args.json:
         print(json.dumps(result, sort_keys=True))
         return

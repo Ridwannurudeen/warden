@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "current": {
+    "schema_version": 1,
+    "measured_at": "2026-07-16T15:31:23Z",
+    "benchmark": "warden-held-out-v1",
+    "mode": "deterministic fast path; thorough only where declared; semantic disabled",
+    "attack_cases": 28,
+    "detected_attacks": 18,
+    "attack_recall_percent": 64.29,
+    "benign_cases": 16,
+    "false_positives": 0,
+    "false_positive_rate_percent": 0.0,
+    "result_sha256": "0a8c6ff9165cfc0841658ac6e329e9d2ff3dc9416b887e156b45f3b97aceda00"
+  },
+  "methodology": {
+    "attack_success": "non-ALLOW decision with the expected threat class",
+    "benign_false_positive": "any non-ALLOW decision",
+    "held_out": true,
+    "semantic_enabled": false
+  }
+}
