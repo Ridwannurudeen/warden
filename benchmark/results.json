@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "benchmark": "warden-held-out-v1",
+  "mode": "deterministic fast path; thorough only where declared; semantic disabled",
+  "attack_cases": 28,
+  "detected_attacks": 18,
+  "attack_recall_percent": 64.29,
+  "attack_misses": [
+    "held-prompt-002",
+    "held-prompt-003",
+    "held-role-002",
+    "held-web3-002",
+    "held-encoding-002",
+    "held-corpus-002",
+    "held-drain-002",
+    "held-tool-003",
+    "held-secret-002",
+    "held-link-002"
+  ],
+  "benign_cases": 16,
+  "false_positives": 0,
+  "false_positive_rate_percent": 0.0,
+  "false_positive_ids": [],
+  "per_category": {
+    "CORPUS_MATCH": {
+      "cases": 2,
+      "detected": 1,
+      "recall_percent": 50.0
+    },
+    "DRAIN_ADDRESS": {
+      "cases": 3,
+      "detected": 2,
+      "recall_percent": 66.67
+    },
+    "ENCODING_TRICK": {
+      "cases": 2,
+      "detected": 1,
+      "recall_percent": 50.0
+    },
+    "HIDDEN_UNICODE": {
+      "cases": 2,
+      "detected": 2,
+      "recall_percent": 100.0
+    },
+    "MALICIOUS_LINK": {
+      "cases": 2,
+      "detected": 1,
+      "recall_percent": 50.0
+    },
+    "PROMPT_INJECTION": {
+      "cases": 3,
+      "detected": 1,
+      "recall_percent": 33.33
+    },
+    "ROLE_OVERRIDE": {
+      "cases": 3,
+      "detected": 2,
+      "recall_percent": 66.67
+    },
+    "SECRET_EXFIL": {
+      "cases": 3,
+      "detected": 2,
+      "recall_percent": 66.67
+    },
+    "STATISTICAL_ANOMALY": {
+      "cases": 2,
+      "detected": 2,
+      "recall_percent": 100.0
+    },
+    "TOOL_HIJACK": {
+      "cases": 3,
+      "detected": 2,
+      "recall_percent": 66.67
+    },
+    "WEB3_INJECTION": {
+      "cases": 3,
+      "detected": 2,
+      "recall_percent": 66.67
+    }
+  }
+}
+

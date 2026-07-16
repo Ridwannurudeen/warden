@@ -1,0 +1,65 @@
+"""D4 held-out benchmark integrity and published-result regressions."""
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+from scripts.benchmark_recall import evaluate_benchmark, load_jsonl, normalized_payload
+from warden.scanner.patterns import KNOWN_INJECTIONS
+
+ROOT = Path(__file__).resolve().parents[1]
+ATTACKS = ROOT / "benchmark" / "held_out_attacks.jsonl"
+BENIGN = ROOT / "benchmark" / "held_out_benign.jsonl"
+PUBLISHED = ROOT / "benchmark" / "results.json"
+
+
+def test_held_out_cases_are_fresh_and_disjoint_from_training_corpora():
+    attacks = load_jsonl(ATTACKS)
+    benign = load_jsonl(BENIGN)
+    corpus = load_jsonl(ROOT / "corpus" / "attacks.jsonl")
+    training_payloads = {
+        normalized_payload(entry["payload"]) for entry in corpus
+    } | {normalized_payload(payload) for payload in KNOWN_INJECTIONS}
+    attack_payloads = {normalized_payload(entry["payload"]) for entry in attacks}
+    benign_payloads = {normalized_payload(entry["payload"]) for entry in benign}
+
+    assert len(attacks) >= 20
+    assert len(benign) >= 12
+    assert len({entry["id"] for entry in attacks}) == len(attacks)
+    assert len({entry["id"] for entry in benign}) == len(benign)
+    assert len(attack_payloads) == len(attacks)
+    assert len(benign_payloads) == len(benign)
+    assert attack_payloads.isdisjoint(training_payloads)
+    assert attack_payloads.isdisjoint(benign_payloads)
+
+
+@pytest.mark.asyncio
+async def test_published_benchmark_exactly_matches_a_fresh_run():
+    measured = await evaluate_benchmark(ATTACKS, BENIGN)
+    published = json.loads(PUBLISHED.read_text(encoding="utf-8"))
+
+    assert measured == published
+    assert measured["detected_attacks"] < measured["attack_cases"]
+    assert 0 <= measured["attack_recall_percent"] <= 100
+    assert 0 <= measured["false_positive_rate_percent"] <= 100
+    readme = (ROOT / "benchmark" / "README.md").read_text(encoding="utf-8")
+    assert "64.29% (18/28)" in readme
+    assert "0.00% (0/16)" in readme
+
+
+def test_benchmark_cli_emits_the_published_json():
+    completed = subprocess.run(
+        [sys.executable, "scripts/benchmark_recall.py", "--json"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert json.loads(completed.stdout) == json.loads(PUBLISHED.read_text(encoding="utf-8"))
