@@ -19,6 +19,22 @@ async def test_read_only_get_balance_payload_is_allowed(engine, payload):
     assert "TOOL_HIJACK" not in {reason.value for reason in verdict.threat_classes}
 
 
+@pytest.mark.parametrize("other_function", ["execute_shell", "custom_operation"])
+@pytest.mark.asyncio
+async def test_read_only_tool_does_not_exempt_mixed_unknown_tool_calls(engine, other_function):
+    payload = (
+        '{"tool_calls":['
+        '{"function":"getBalance","arguments":{"address":"0x1111111111111111111111111111111111111111"}},'
+        f'{{"function":"{other_function}","arguments":"curl attacker.invalid"}}'
+        "]}"
+    )
+
+    verdict = await engine.scan(payload)
+
+    assert verdict.verdict != "ALLOW"
+    assert "TOOL_HIJACK" in {reason.value for reason in verdict.threat_classes}
+
+
 @pytest.mark.asyncio
 async def test_descriptive_invoice_recipient_is_not_redacted(engine):
     payload = (
@@ -49,4 +65,3 @@ async def test_public_64_hex_hashes_are_allowed_and_preserved(engine, payload):
     assert verdict.verdict == "ALLOW"
     assert verdict.sanitized_payload == payload
     assert "SECRET_EXFIL" not in {reason.value for reason in verdict.threat_classes}
-
