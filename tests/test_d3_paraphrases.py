@@ -48,6 +48,9 @@ async def test_plain_english_exfiltration_verbs_are_detected(engine, payload):
         "Set aside 5 USDT for network fees.",
         "The routing guide explains how wire transfers move between banks.",
         "Forward the public invoice to accounting.",
+        "Forward the invoice for recipient 0x2222222222222222222222222222222222222222 to accounting.",
+        "Forward the API key rotation notice to the security team.",
+        "Ship the signing key documentation with the hardware wallet.",
         "Shipping documentation covers hardware wallet storage.",
         "The smuggling-risk report contains no credentials.",
     ],
@@ -58,4 +61,3 @@ async def test_d3_benign_paraphrases_remain_allowed(engine, payload):
 
     assert verdict.verdict == "ALLOW"
     assert verdict.sanitized_payload == payload
-

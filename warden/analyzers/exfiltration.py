@@ -23,6 +23,10 @@ PUBLIC_HASH_CONTEXT_RE = re.compile(
 NEGATED_INSTRUCTION_RE = re.compile(
     r"(?i)\b(?:do\s+not|don't|never|must\s+not|should\s+not|cannot|can't|avoid)\s+$"
 )
+SECRET_DOCUMENT_SUFFIX_RE = re.compile(
+    r"(?i)^\s+(?:(?:rotation|security)\s+)?"
+    r"(?:notice|documentation|docs?|guide|manual|policy|procedure|report)\b"
+)
 EXFIL_INSTRUCTION_RES = [
     re.compile(
         r"(?i)\b(?:send|paste|share|upload|post|exfiltrate|leak)\s+(?:your\s+)?"
@@ -106,7 +110,10 @@ class ExfiltrationAnalyzer(Analyzer):
         for pattern in EXFIL_INSTRUCTION_RES:
             for instruction in pattern.finditer(payload):
                 prefix = payload[max(0, instruction.start() - 24) : instruction.start()]
-                if not NEGATED_INSTRUCTION_RE.search(prefix):
+                suffix = payload[instruction.end() : instruction.end() + 48]
+                if not NEGATED_INSTRUCTION_RE.search(
+                    prefix
+                ) and not SECRET_DOCUMENT_SUFFIX_RE.search(suffix):
                     return instruction
         return None
 

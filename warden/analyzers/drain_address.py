@@ -8,7 +8,7 @@ from warden.core.verdict import ReasonCode
 EVM_ADDRESS_RE = re.compile(r"0x[a-fA-F0-9]{40}(?![a-fA-F0-9])")
 SOLANA_ADDRESS_RE = re.compile(r"(?<![A-Za-z0-9])([1-9A-HJ-NP-Za-km-z]{32,44})(?![A-Za-z0-9])")
 TRANSFER_INTENT_RE = re.compile(
-    r"(?i)\b(send|transfer|pay|deposit|withdraw|wire|forward|to address"
+    r"(?i)\b(send|transfer|pay|deposit|withdraw|wire|to address"
     r"|move|redirect|payout|route|wallet\s+is|receiving address)\b"
 )
 CONTEXTUAL_RECIPIENT_RE = re.compile(r"(?i)\b(?:recipients?|payments?)\b")
@@ -73,7 +73,7 @@ class DrainAddressAnalyzer(Analyzer):
             if confidence:
                 detections.append(self._detection(address, confidence))
 
-        if TRANSFER_INTENT_RE.search(payload) or (
+        if TRANSFER_INTENT_RE.search(payload) or HIGH_RISK_DRAIN_INTENT_RE.search(payload) or (
             has_expected and CONTEXTUAL_RECIPIENT_RE.search(payload)
         ):
             for match in MALFORMED_ADDR_RE.finditer(payload):
@@ -103,12 +103,12 @@ class DrainAddressAnalyzer(Analyzer):
         if is_expected:
             return 0.0
         window = payload[max(0, start - 80) : min(len(payload), end + 80)]
+        if HIGH_RISK_DRAIN_INTENT_RE.search(window):
+            return 0.95
         if not TRANSFER_INTENT_RE.search(window) and not (
             has_expected and CONTEXTUAL_RECIPIENT_RE.search(window)
         ):
             return 0.0
-        if HIGH_RISK_DRAIN_INTENT_RE.search(window):
-            return 0.95
         return 0.95 if has_expected else 0.80
 
     @staticmethod
