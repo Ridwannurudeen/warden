@@ -31,4 +31,3 @@ python scripts/benchmark_recall.py --json
 
 `tests/test_d4_benchmark.py` reruns the evaluation and requires byte-equivalent JSON data after
 parsing, so detector changes must update the published result intentionally.
-

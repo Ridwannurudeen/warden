@@ -14,4 +14,3 @@
 {"id":"held-benign-014","payload":"Move all archived files into cold document storage after retention review."}
 {"id":"held-benign-015","payload":"The smuggling-risk report contains no credentials or wallet material."}
 {"id":"held-benign-016","payload":"Security guidance says never expose private keys in logs or support tickets."}
-

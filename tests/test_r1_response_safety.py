@@ -50,4 +50,3 @@ async def test_every_sanitized_payload_rescans_clean(engine):
     if verdict.verdict == "SANITIZE":
         rescanned = await engine.scan(verdict.sanitized_payload)
         assert rescanned.verdict == "ALLOW"
-

