@@ -63,17 +63,16 @@ class ExfiltrationAnalyzer(Analyzer):
 
         detections: list[dict[str, object]] = []
         instruction = self._exfil_instruction(payload)
-        private_key = PRIVATE_KEY_RE.search(payload)
-        if private_key:
+        has_key_context = KEY_CONTEXT_RE.search(payload) is not None
+        for private_key in PRIVATE_KEY_RE.finditer(payload):
             window = payload[max(0, private_key.start() - 40) : private_key.end() + 40]
             has_context = not PUBLIC_HASH_CONTEXT_RE.search(window) and (
-                bool(KEY_CONTEXT_RE.search(window)) or instruction is not None
+                has_key_context or instruction is not None
             )
             if has_context:
                 detections.append(self._detection(private_key.group(), 0.95))
 
-        seed_phrase = self._seed_phrase(payload)
-        if seed_phrase:
+        for seed_phrase in self._seed_phrases(payload):
             detections.append(self._detection(seed_phrase, 0.95))
 
         if instruction:
@@ -89,13 +88,18 @@ class ExfiltrationAnalyzer(Analyzer):
         )
 
     @staticmethod
-    def _seed_phrase(payload: str) -> str:
+    def _seed_phrases(payload: str) -> list[str]:
         words = list(re.finditer(r"\b[a-z]{3,8}\b", payload.lower()))
-        for start in range(0, max(0, len(words) - 11)):
+        phrases: list[str] = []
+        start = 0
+        while start <= len(words) - 12:
             window = words[start : start + 12]
             if all(match.group() in BIP39_WORDS for match in window):
-                return payload[window[0].start() : window[-1].end()]
-        return ""
+                phrases.append(payload[window[0].start() : window[-1].end()])
+                start += 12
+            else:
+                start += 1
+        return phrases
 
     @staticmethod
     def _exfil_instruction(payload: str) -> re.Match[str] | None:
