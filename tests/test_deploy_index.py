@@ -99,24 +99,20 @@ def test_index_timer_is_persistent_six_hour_calendar_with_jitter():
     assert "WantedBy=timers.target" in timer
 
 
-def test_nginx_routes_only_live_index_artifacts_to_atomic_current_release():
+def test_nginx_routes_index_artifacts_from_the_flat_site_layout():
     nginx = (ROOT / "deploy" / "nginx-warden.conf").read_text(encoding="utf-8")
 
-    assert "root /opt/warden-site/current;" in nginx
-    for location, target in (
-        ("location = /agents", "/agents/index.html"),
-        ("location = /agents/", "/agents/index.html"),
-        ("location = /data/marketplace-summary.json", "/data/marketplace-summary.json"),
-        ("location = /data/warden-services.json", "/data/warden-services.json"),
-    ):
+    assert "root /opt/warden-site;" in nginx
+    assert "/opt/warden-site/current" not in nginx
+    assert "/opt/warden-index" not in nginx
+    for location in ("location = /agents", "location = /agents/"):
         block = re.search(
             rf"{re.escape(location)}\s*\{{(?P<body>.*?)\n    \}}",
             nginx,
             re.DOTALL,
         )
         assert block, location
-        assert "root /opt/warden-index/current;" in block.group("body")
-        assert f"try_files {target} =404;" in block.group("body")
+        assert "try_files /agents/index.html =404;" in block.group("body")
 
     numeric = re.search(
         r"location ~ \^/agents/\(\[0-9\]\+\)/\?\$ \{(?P<body>.*?)\n    \}",
@@ -124,31 +120,13 @@ def test_nginx_routes_only_live_index_artifacts_to_atomic_current_release():
         re.DOTALL,
     )
     assert numeric
-    assert "root /opt/warden-index/current;" in numeric.group("body")
     assert "try_files /agents/$1.html =404;" in numeric.group("body")
-
-    for location in ("location = /agents/index.html",):
-        block = re.search(
-            rf"{re.escape(location)}\s*\{{(?P<body>.*?)\n    \}}",
-            nginx,
-            re.DOTALL,
-        )
-        assert block, location
-        assert "root /opt/warden-index/current;" in block.group("body")
-        assert "try_files /agents/index.html =404;" in block.group("body")
-
-    numeric_html = re.search(
-        r"location ~ \^/agents/\(\[0-9\]\+\)\\\.html\$ \{(?P<body>.*?)\n    \}",
-        nginx,
-        re.DOTALL,
-    )
-    assert numeric_html
-    assert "root /opt/warden-index/current;" in numeric_html.group("body")
-    assert "try_files /agents/$1.html =404;" in numeric_html.group("body")
 
     generic_data = re.search(r"location /data/ \{(?P<body>.*?)\n    \}", nginx, re.DOTALL)
     assert generic_data
-    assert "/opt/warden-index" not in generic_data.group("body")
+    assert "try_files $uri =404;" in generic_data.group("body")
+    for artifact in ("marketplace-summary.json", "warden-services.json"):
+        assert (ROOT / "site" / "data" / artifact).is_file()
 
 
 def test_deploy_runbook_requires_cli_preflight_units_verification_logs_and_rollback():
