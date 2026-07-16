@@ -326,7 +326,10 @@ async def payment_required_schema_middleware(request: Request, call_next):
         challenge = json.loads(
             base64.b64decode(payment_required.encode("ascii"), validate=True).decode("utf-8")
         )
-        resource_path = urlsplit(challenge["resource"]["url"]).path.rstrip("/")
+        resource_url = challenge["resource"]["url"]
+        if not isinstance(resource_url, str):
+            return response
+        resource_path = urlsplit(resource_url).path.rstrip("/")
         output_schema = _PAYMENT_OUTPUT_SCHEMAS.get(resource_path)
         if output_schema is None:
             return response

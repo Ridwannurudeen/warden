@@ -21,6 +21,7 @@ def _encoded(value: str) -> str:
         _encoded("not-json"),
         _encoded("[]"),
         _encoded('{"resource":{}}'),
+        _encoded('{"resource":{"url":1},"accepts":[]}'),
         _encoded(
             '{"resource":{"url":"https://warden.gudman.xyz/scan"},"accepts":null}'
         ),
