@@ -14,6 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SNAPSHOT_SCHEMA_VERSION = 2
+MAX_MARKETPLACE_PAGES = 100
 
 CommandRunner = Callable[[list[str]], str]
 
@@ -108,9 +109,9 @@ class MarketplaceAgent(BaseModel):
 class SearchPageData(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    agents: list[MarketplaceAgent] = Field(alias="list")
-    page: int
-    page_size: int = Field(alias="pageSize")
+    agents: list[MarketplaceAgent] = Field(alias="list", max_length=100)
+    page: int = Field(ge=1)
+    page_size: int = Field(alias="pageSize", ge=1, le=100)
     total: int | None = Field(default=None, ge=0)
 
 
@@ -211,12 +212,16 @@ def fetch_snapshot(
     captured_at: str | None = None,
     command_runner: CommandRunner | None = None,
 ) -> MarketplaceSnapshot:
+    if not 1 <= page_size <= 100:
+        raise ValueError("page_size must be between 1 and 100")
     runner = command_runner or _run_cli
     agents_by_id: dict[str, MarketplaceAgent] = {}
     reported_totals: list[int] = []
     page_number = 1
 
     while True:
+        if page_number > MAX_MARKETPLACE_PAGES:
+            raise RuntimeError("marketplace search exceeded page limit")
         command = [
             "onchainos",
             "agent",
@@ -229,6 +234,8 @@ def fetch_snapshot(
             str(page_size),
         ]
         page = parse_search_output(runner(command))
+        if page.page != page_number or page.page_size != page_size or len(page.agents) > page_size:
+            raise RuntimeError("marketplace page returned inconsistent pagination metadata")
         if page.total is not None:
             reported_totals.append(page.total)
         if not page.agents:

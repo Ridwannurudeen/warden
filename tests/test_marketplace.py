@@ -266,12 +266,80 @@ def test_fetch_uses_unique_agents_and_maximum_reported_total_for_coverage(tmp_pa
 def test_fetch_rejects_nonempty_page_without_new_agents(tmp_path):
     output = _fixture("onchainos_agent_search_page.json")
 
+    def run_command(command: list[str]) -> str:
+        payload = json.loads(output)
+        payload["data"]["page"] = int(command[command.index("--page") + 1])
+        return json.dumps(payload)
+
     with pytest.raises(RuntimeError, match="no new agent IDs"):
         fetch_snapshot(
             tmp_path / "agents-v1.jsonl",
             query="Warden",
             page_size=10,
-            command_runner=lambda command: output,
+            command_runner=run_command,
+        )
+
+
+@pytest.mark.parametrize(("field", "value"), [("page", 2), ("pageSize", 11)])
+def test_fetch_rejects_inconsistent_pagination_metadata(tmp_path, field, value):
+    payload = json.loads(_fixture("onchainos_agent_search_page.json"))
+    payload["data"][field] = value
+    snapshot_path = tmp_path / "agents-v1.jsonl"
+
+    with pytest.raises(RuntimeError, match="pagination metadata"):
+        fetch_snapshot(
+            snapshot_path,
+            query="Warden",
+            page_size=10,
+            command_runner=lambda command: json.dumps(payload),
+        )
+
+    assert not snapshot_path.exists()
+
+
+def test_fetch_stops_at_the_page_limit(tmp_path, monkeypatch):
+    calls: list[int] = []
+
+    def run_command(command: list[str]) -> str:
+        page_number = int(command[command.index("--page") + 1])
+        calls.append(page_number)
+        if page_number > 2:
+            raise AssertionError("runner called past page limit")
+        return json.dumps(
+            {
+                "ok": True,
+                "data": {
+                    "list": [
+                        {
+                            "agentId": str(page_number),
+                            "name": f"Agent {page_number}",
+                            "services": [],
+                        }
+                    ],
+                    "page": page_number,
+                    "pageSize": 1,
+                    "total": 10,
+                },
+            }
+        )
+
+    monkeypatch.setattr(marketplace_fetch, "MAX_MARKETPLACE_PAGES", 2)
+    snapshot_path = tmp_path / "agents-v1.jsonl"
+
+    with pytest.raises(RuntimeError, match="page limit"):
+        fetch_snapshot(snapshot_path, page_size=1, command_runner=run_command)
+
+    assert calls == [1, 2]
+    assert not snapshot_path.exists()
+
+
+@pytest.mark.parametrize("page_size", [0, 101])
+def test_fetch_rejects_invalid_page_size_before_running_command(tmp_path, page_size):
+    with pytest.raises(ValueError, match="page_size"):
+        fetch_snapshot(
+            tmp_path / "agents-v1.jsonl",
+            page_size=page_size,
+            command_runner=lambda command: pytest.fail("command must not run"),
         )
 
 
@@ -312,6 +380,7 @@ def test_fetch_makes_completed_public_snapshot_readable_before_promotion(tmp_pat
 
     fetch_snapshot(
         snapshot_path,
+        page_size=10,
         captured_at="2026-07-13T15:30:00Z",
         command_runner=lambda command: next(outputs),
     )
