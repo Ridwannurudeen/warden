@@ -558,6 +558,7 @@ async def apa_register(req: ApaRegisterRequest) -> dict[str, object]:
                 scans,
                 status=status,
             ),
+            record_refresher=lambda record: protection.refresh_attestation(record, scans),
             record_validator=protection.verify_attestation_record,
             status_signer=protection.resign_attestation_status,
         )

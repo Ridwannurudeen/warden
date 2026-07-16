@@ -386,6 +386,7 @@ def commit_registration(
     endpoint_host: str,
     probed_pub: str,
     record_factory: Callable[[str], dict[str, object]],
+    record_refresher: Callable[[dict[str, object]], dict[str, object]],
     record_validator: Callable[[dict[str, object]], bool],
     status_signer: Callable[[dict[str, object], str], dict[str, object]],
 ) -> dict[str, object]:
@@ -425,6 +426,25 @@ def commit_registration(
             record = record_factory("active")
             event = "rotated"
         elif binding[0] == probed_pub and not bool(binding[1]):
+            active_priors = _active_attestations(connection, endpoint_host)
+            if any(
+                not record_validator(prior) or prior.get("pub") != probed_pub
+                for prior in active_priors
+            ):
+                raise ProtectionStateConflict(
+                    "active attestation failed issuer verification during registration"
+                )
+            if active_priors:
+                record = max(
+                    active_priors,
+                    key=lambda prior: int(prior["verified_at"]),
+                )
+                if int(time.time()) <= int(record["expires_at"]):
+                    return record
+                record = record_refresher(record)
+                _store_attestation(connection, record)
+                _append_log(connection, "refreshed", record)
+                return record
             record = record_factory("active")
             event = "issued"
         else:

@@ -517,7 +517,7 @@ def test_transparency_log_hash_chain_verifies(monkeypatch, endpoint_key):
         log = client.get("/apa/log").json()
 
     entries = log["entries"]
-    assert log["total"] == len(entries) == 2
+    assert log["total"] == len(entries) == 1
     assert entries[0]["prev_hash"] == protection_store.GENESIS_PREV_HASH
     assert protection_store.verify_log_chain(entries) is True
 

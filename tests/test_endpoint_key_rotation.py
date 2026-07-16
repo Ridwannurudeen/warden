@@ -161,9 +161,7 @@ def test_old_key_authorizes_exact_replacement_and_live_probe_completes_rotation(
     assert binding["key_changed"] is False
     assert [entry["event"] for entry in protection_store.read_log()] == [
         "issued",
-        "issued",
         "rotation-authorized",
-        "revoked",
         "rotated",
     ]
 
@@ -407,7 +405,7 @@ def test_rotation_transactions_roll_back_binding_record_log_and_nonce(
         assert binding is not None
         assert binding["pub"] == _pub(old_key)
         assert binding["pending_replacement_pub"] == _pub(new_key)
-        assert protection_store.get_attestation(str(second["attestation_id"]))["status"] == "active"
+        assert protection_store.get_attestation(str(second["attestation_id"]))["status"] == "revoked"
 
         with protection_store._connect() as connection:
             connection.execute("DROP TRIGGER fail_log")
