@@ -13,8 +13,9 @@ or sanitized before synthesis:
     guard = WardenNodePostprocessor(WardenClient(local=True, fail_open=False))
     engine = index.as_query_engine(node_postprocessors=[guard])
 
-Per node: BLOCK drops the node from the result, SANITIZE replaces its content
-with the cleaned text, ALLOW leaves it unchanged.
+Per node: BLOCK drops the node from the result, SANITIZE replaces the exact
+LLM-visible text and excludes the original metadata from synthesis, and ALLOW
+leaves it unchanged.
 """
 
 from __future__ import annotations
@@ -52,11 +53,20 @@ class WardenNodePostprocessor(BaseNodePostprocessor):
     ) -> list[NodeWithScore]:
         guarded: list[NodeWithScore] = []
         for node in nodes:
-            content = node.node.get_content(metadata_mode=MetadataMode.NONE)
+            content = node.node.get_content(metadata_mode=MetadataMode.LLM)
             try:
                 safe = self._client.guard(content)
             except WardenBlocked:
                 continue
-            node.node.set_content(safe)
+            if safe != content:
+                node.node.set_content(safe)
+                node.node.excluded_llm_metadata_keys = list(
+                    dict.fromkeys(
+                        [
+                            *node.node.excluded_llm_metadata_keys,
+                            *node.node.metadata,
+                        ]
+                    )
+                )
             guarded.append(node)
         return guarded
