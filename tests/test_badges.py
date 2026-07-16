@@ -1,10 +1,16 @@
 """Badge issuance, verification, and lookup tests."""
 
+import pytest
 from fastapi.testclient import TestClient
 
 from warden.api import app
 from warden.badge_store import get_badge, record_badge
 from warden.badges import issue_badge, verify_badge
+
+
+@pytest.fixture(autouse=True)
+def _badge_secret(monkeypatch):
+    monkeypatch.setenv("WARDEN_BADGE_SECRET", "badge-test-secret")
 
 
 def test_issue_badge_verify_round_trip():

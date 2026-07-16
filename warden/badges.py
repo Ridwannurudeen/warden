@@ -15,8 +15,11 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 )
 
 
-def _badge_secret() -> str:
-    return os.getenv("WARDEN_BADGE_SECRET", "warden-dev-key")
+def _badge_secret(secret: str | None = None) -> str:
+    configured = secret if secret is not None else os.getenv("WARDEN_BADGE_SECRET")
+    if configured is None or not configured.strip():
+        raise RuntimeError("WARDEN_BADGE_SECRET is required for badge integrity")
+    return configured
 
 
 def _canonical_json(record: dict[str, object]) -> str:
@@ -68,6 +71,8 @@ def issue_badge(
     total: int,
     issued_at: str,
     consent_verified: bool = True,
+    *,
+    secret: str | None = None,
 ) -> dict[str, object]:
     """
     Issue a signed badge record for a completed audit.
@@ -92,13 +97,15 @@ def issue_badge(
     canonical_payload = dict(payload)
     canonical_json = _canonical_json(canonical_payload)
     payload["signature"] = hmac.new(
-        _badge_secret().encode("utf-8"), canonical_json.encode("utf-8"), hashlib.sha256
+        _badge_secret(secret).encode("utf-8"),
+        canonical_json.encode("utf-8"),
+        hashlib.sha256,
     ).hexdigest()
 
     return payload
 
 
-def verify_badge(badge: dict[str, object]) -> bool:
+def verify_badge(badge: dict[str, object], *, secret: str | None = None) -> bool:
     """
     Verify a badge record's integrity.
     """
@@ -110,7 +117,9 @@ def verify_badge(badge: dict[str, object]) -> bool:
     expected.pop("signature", None)
     canonical_json = _canonical_json(expected)
     expected_signature = hmac.new(
-        _badge_secret().encode("utf-8"), canonical_json.encode("utf-8"), hashlib.sha256
+        _badge_secret(secret).encode("utf-8"),
+        canonical_json.encode("utf-8"),
+        hashlib.sha256,
     ).hexdigest()
 
     return hmac.compare_digest(signature, expected_signature)

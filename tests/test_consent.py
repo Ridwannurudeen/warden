@@ -90,6 +90,7 @@ def test_audit_passes_with_consent_file(monkeypatch):
     )
     monkeypatch.setenv("WARDEN_REQUIRE_CONSENT", "true")
     monkeypatch.setenv("WARDEN_RATE_LIMIT_PER_MIN", "0")
+    monkeypatch.setenv("WARDEN_BADGE_SECRET", "consent-test-secret")
     with TestClient(app) as client:
         response = client.post("/audit", json={"target_url": "https://example.org/scan"})
     assert response.status_code == 200
