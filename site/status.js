@@ -139,6 +139,12 @@
     ) {
       throw new Error("Evaluation methodology must describe the held-out contract");
     }
+    const expectedMode = methodology.semantic_enabled
+      ? "paid thorough path; semantic after deterministic layers"
+      : "deterministic fast path; thorough only where declared; semantic disabled";
+    if (current.mode !== expectedMode) {
+      throw new Error("Evaluation mode contradicts its methodology");
+    }
     return {
       recall: `${current.attack_recall_percent.toFixed(2)}%`,
       attacks: `${current.detected_attacks}/${current.attack_cases}`,
