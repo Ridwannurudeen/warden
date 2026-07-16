@@ -322,21 +322,26 @@ async def payment_required_schema_middleware(request: Request, call_next):
     if payment_required is None:
         return response
 
-    challenge = json.loads(
-        base64.b64decode(payment_required.encode("ascii"), validate=True).decode("utf-8")
-    )
-    resource_path = urlsplit(challenge["resource"]["url"]).path.rstrip("/")
-    output_schema = _PAYMENT_OUTPUT_SCHEMAS.get(resource_path)
-    if output_schema is None:
+    try:
+        challenge = json.loads(
+            base64.b64decode(payment_required.encode("ascii"), validate=True).decode("utf-8")
+        )
+        resource_path = urlsplit(challenge["resource"]["url"]).path.rstrip("/")
+        output_schema = _PAYMENT_OUTPUT_SCHEMAS.get(resource_path)
+        if output_schema is None:
+            return response
+
+        challenge["outputSchema"] = output_schema
+        for requirements in challenge["accepts"]:
+            requirements["outputSchema"] = output_schema
+
+        encoded_challenge = base64.b64encode(
+            json.dumps(challenge, separators=(",", ":")).encode("utf-8")
+        ).decode("ascii")
+    except (KeyError, TypeError, UnicodeError, ValueError):
         return response
 
-    challenge["outputSchema"] = output_schema
-    for requirements in challenge["accepts"]:
-        requirements["outputSchema"] = output_schema
-
-    response.headers["PAYMENT-REQUIRED"] = base64.b64encode(
-        json.dumps(challenge, separators=(",", ":")).encode("utf-8")
-    ).decode("ascii")
+    response.headers["PAYMENT-REQUIRED"] = encoded_challenge
     return response
 
 
