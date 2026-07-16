@@ -6,6 +6,7 @@ import httpx
 
 from warden_guard.client import (
     DEFAULT_BASE_URL,
+    Depth,
     FREE_PATH,
     PAID_PATH,
     LocalEngine,
@@ -13,6 +14,7 @@ from warden_guard.client import (
     WardenBlocked,
     WardenError,
     build_scan_body,
+    validate_scan_depth,
 )
 from warden_guard.state import increment_scan_count
 
@@ -47,9 +49,10 @@ class AsyncWardenClient:
         payload: str,
         *,
         expected_addresses: list[str] | None = None,
-        depth: str = "fast",
+        depth: Depth = "fast",
     ) -> ScanResult:
         """Scan one untrusted payload and return a Warden verdict."""
+        depth = validate_scan_depth(depth, local=self.local, path=self.path)
         if self._engine is not None:
             data = await self._engine.scan(
                 payload, depth=depth, expected_addresses=expected_addresses

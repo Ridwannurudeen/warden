@@ -37,6 +37,7 @@ from __future__ import annotations
 import asyncio
 import math
 from dataclasses import dataclass, field
+from typing import Literal
 
 import httpx
 
@@ -45,6 +46,7 @@ from warden_guard.state import increment_scan_count
 DEFAULT_BASE_URL = "https://warden.gudman.xyz"
 FREE_PATH = "/api/demo/scan"
 PAID_PATH = "/scan"
+Depth = Literal["fast", "thorough"]
 
 
 @dataclass
@@ -147,13 +149,25 @@ class WardenError(RuntimeError):
 
 
 def build_scan_body(
-    payload: str, *, depth: str, expected_addresses: list[str] | None
+    payload: str, *, depth: Depth, expected_addresses: list[str] | None
 ) -> dict[str, object]:
     """Request body shared by the free and paid hosted endpoints."""
     body: dict[str, object] = {"payload": payload, "depth": depth}
     if expected_addresses:
         body["context"] = {"expected_addresses": expected_addresses}
     return body
+
+
+def validate_scan_depth(depth: str, *, local: bool, path: str) -> Depth:
+    if depth == "fast":
+        return depth
+    if depth == "thorough":
+        if not local and path == FREE_PATH:
+            raise WardenError(
+                "The free hosted endpoint supports only fast depth; use local=True or paid=True"
+            )
+        return depth
+    raise WardenError("depth must be 'fast' or 'thorough'")
 
 
 class LocalEngine:
@@ -173,7 +187,7 @@ class LocalEngine:
         self._response_model = ScanResponse
 
     async def scan(
-        self, payload: str, *, depth: str, expected_addresses: list[str] | None
+        self, payload: str, *, depth: Depth, expected_addresses: list[str] | None
     ) -> dict[str, object]:
         request = self._request_model.model_validate(
             {
@@ -229,9 +243,10 @@ class WardenClient:
         payload: str,
         *,
         expected_addresses: list[str] | None = None,
-        depth: str = "fast",
+        depth: Depth = "fast",
     ) -> ScanResult:
         """Scan one untrusted payload and return a Warden verdict."""
+        depth = validate_scan_depth(depth, local=self.local, path=self.path)
         if self._engine is not None:
             data = asyncio.run(
                 self._engine.scan(payload, depth=depth, expected_addresses=expected_addresses)
