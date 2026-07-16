@@ -201,6 +201,7 @@ if test -e /opt/warden/data/apa_issuer.key; then
   chmod 0600 /opt/warden/data/apa_issuer.key
 fi
 test -f /opt/warden/.env
+test "$(grep -Ec '^[[:space:]]*WARDEN_ISSUER_KEY=(ed25519-seed:)?[A-Za-z0-9_-]{43}[[:space:]]*$' /opt/warden/.env)" -eq 1
 test -f /opt/warden/index.env
 test -f /opt/warden/issuer-history.json
 chown root:warden /opt/warden/.env /opt/warden/index.env
@@ -209,7 +210,6 @@ chmod 0640 /opt/warden/.env /opt/warden/index.env
 chmod 0640 /opt/warden/issuer-history.json
 runuser -u warden-fetch -- test ! -r /opt/warden/.env
 runuser -u warden-fetch -- test ! -r /opt/warden/index.env
-test "$(grep -Ec '^[[:space:]]*WARDEN_ISSUER_KEY=(ed25519-seed:)?[A-Za-z0-9_-]{43}[[:space:]]*$' /opt/warden/.env)" -eq 1
 test "$(grep -Ec '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=' /opt/warden/index.env)" -eq 3
 grep -Eq '^[[:space:]]*WARDEN_BADGE_SECRET=.{20,}$' /opt/warden/index.env
 grep -Eq '^[[:space:]]*WARDEN_ISSUER_PUBLIC_KEY=ed25519:[A-Za-z0-9_-]{43}[[:space:]]*$' /opt/warden/index.env
