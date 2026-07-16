@@ -401,6 +401,150 @@
     return { ...chain, checkpoint: normalized };
   }
 
+  function normalizeAnchorPublication(publication) {
+    if (
+      publication === null ||
+      typeof publication !== "object" ||
+      Array.isArray(publication) ||
+      Object.keys(publication).sort().join(",") !==
+        "checkpoint,schema_version,status"
+    ) {
+      throw new Error(
+        "External checkpoint publication must be a three-field object",
+      );
+    }
+    if (publication.schema_version !== 1) {
+      throw new Error("External checkpoint publication schema is unsupported");
+    }
+    if (publication.status === "unpublished") {
+      if (publication.checkpoint !== null) {
+        throw new Error(
+          "Unpublished checkpoint publication must not contain a checkpoint",
+        );
+      }
+      return { schema_version: 1, status: "unpublished", checkpoint: null };
+    }
+    if (publication.status !== "published") {
+      throw new Error("External checkpoint publication status is invalid");
+    }
+    return {
+      schema_version: 1,
+      status: "published",
+      checkpoint: normalizeLogCheckpoint(publication.checkpoint),
+    };
+  }
+
+  async function verifyPublishedAnchor(
+    entries,
+    publication,
+    issuerDocument,
+    cryptoImpl = root.crypto,
+  ) {
+    if (publication === null || publication === undefined) {
+      return {
+        ok: false,
+        status: "missing",
+        reason: "An external checkpoint publication is not available.",
+      };
+    }
+
+    let normalized;
+    try {
+      normalized = normalizeAnchorPublication(publication);
+    } catch (error) {
+      return {
+        ok: false,
+        status: "invalid",
+        reason: `External checkpoint publication is invalid: ${error.message}`,
+      };
+    }
+    if (normalized.status === "unpublished") {
+      return {
+        ok: false,
+        status: "unpublished",
+        reason: "An external checkpoint has not been published yet.",
+      };
+    }
+
+    let signatureValid;
+    try {
+      signatureValid = await verifyLogCheckpoint(
+        normalized.checkpoint,
+        issuerDocument,
+        cryptoImpl,
+      );
+    } catch (error) {
+      return {
+        ok: false,
+        status: "invalid",
+        reason: `Published checkpoint is invalid: ${error.message}`,
+      };
+    }
+    if (!signatureValid) {
+      return {
+        ok: false,
+        status: "invalid",
+        reason: "Published checkpoint signature is invalid.",
+      };
+    }
+
+    const pinnedSeq = normalized.checkpoint.seq;
+    if (!Array.isArray(entries) || pinnedSeq > entries.length) {
+      return {
+        ok: false,
+        status: "rejected",
+        reason: "The current log is truncated before the published checkpoint.",
+      };
+    }
+    let prefix;
+    try {
+      prefix = await verifyLogChain(entries.slice(0, pinnedSeq), cryptoImpl);
+    } catch (error) {
+      return {
+        ok: false,
+        status: "rejected",
+        reason: `The published log prefix is invalid: ${error.message}`,
+      };
+    }
+    if (
+      !prefix.ok ||
+      prefix.total !== pinnedSeq ||
+      prefix.headHash !== normalized.checkpoint.head_hash
+    ) {
+      return {
+        ok: false,
+        status: "rejected",
+        reason: "The log prefix does not match the published checkpoint.",
+      };
+    }
+    return {
+      ok: true,
+      status: "verified",
+      pinnedSeq,
+      headHash: prefix.headHash,
+      checkpoint: normalized.checkpoint,
+    };
+  }
+
+  async function fetchAnchorPublication(fetchImpl) {
+    if (typeof fetchImpl !== "function") {
+      throw new Error("External checkpoint fetch is unavailable");
+    }
+    const response = await fetchImpl("/data/apa-log-anchor.json", {
+      headers: { accept: "application/json" },
+      cache: "no-store",
+    });
+    if (response.status === 404) {
+      return null;
+    }
+    if (!response.ok) {
+      throw new Error(
+        `External checkpoint request failed with HTTP ${response.status}`,
+      );
+    }
+    return response.json();
+  }
+
   function formatTimestamp(seconds) {
     const date = new Date(seconds * 1000);
     if (Number.isNaN(date.getTime())) {
@@ -412,13 +556,16 @@
   const api = {
     GENESIS_PREV_HASH,
     canonicalJson,
+    fetchAnchorPublication,
     fetchLogPages,
+    normalizeAnchorPublication,
     normalizeLogCheckpoint,
     normalizeLogPage,
     normalizeLogPayload,
     sha256Hex,
     verifyLogChain,
     verifyLogCheckpoint,
+    verifyPublishedAnchor,
     verifySignedLog,
   };
   if (typeof module !== "undefined" && module.exports) {
@@ -499,11 +646,13 @@
         headers: { accept: "application/json" },
         cache: "no-store",
       };
-      const [entries, checkpointResponse, issuerResponse] = await Promise.all([
-        fetchLogPages(root.fetch?.bind(root)),
-        root.fetch("/apa/log/checkpoint", requestOptions),
-        root.fetch("/.well-known/apa-issuer.json", requestOptions),
-      ]);
+      const [entries, checkpointResponse, issuerResponse, publication] =
+        await Promise.all([
+          fetchLogPages(root.fetch?.bind(root)),
+          root.fetch("/apa/log/checkpoint", requestOptions),
+          root.fetch("/.well-known/apa-issuer.json", requestOptions),
+          fetchAnchorPublication(root.fetch?.bind(root)),
+        ]);
       for (const [label, fetched] of [
         ["Checkpoint", checkpointResponse],
         ["Issuer document", issuerResponse],
@@ -526,6 +675,7 @@
         container.dataset.state = "tampered";
         text("[data-apa-log-chain]", "Chain break detected");
         text("[data-apa-log-head]", "Not accepted");
+        text("[data-apa-log-anchor]", "Not evaluated");
         text(
           "[data-apa-log-status]",
           `${result.reason} No continuity result is accepted.`,
@@ -533,13 +683,43 @@
         return;
       }
 
+      const anchorResult = await verifyPublishedAnchor(
+        entries,
+        publication,
+        issuerDocument,
+      );
+      if (
+        !anchorResult.ok &&
+        !["missing", "unpublished"].includes(anchorResult.status)
+      ) {
+        container.dataset.state = "tampered";
+        text("[data-apa-log-chain]", "Published pin rejected");
+        text("[data-apa-log-head]", "Not accepted");
+        text("[data-apa-log-anchor]", "Rejected");
+        text(
+          "[data-apa-log-status]",
+          `${anchorResult.reason} No continuity result is accepted.`,
+        );
+        return;
+      }
+
+      const anchorSummary = anchorResult.ok
+        ? `Signed prefix through entry ${anchorResult.pinnedSeq.toLocaleString()} verified.`
+        : anchorResult.reason;
+      text(
+        "[data-apa-log-anchor]",
+        anchorResult.ok
+          ? `Verified through #${anchorResult.pinnedSeq.toLocaleString()}`
+          : "Not independently published",
+      );
+
       if (entries.length === 0) {
         container.dataset.state = "empty";
         text("[data-apa-log-chain]", "No chain (empty log)");
         text("[data-apa-log-head]", "No entries");
         text(
           "[data-apa-log-status]",
-          `The empty log was fetched at ${observedAt}. There is no entry chain to verify.`,
+          `The empty log was fetched at ${observedAt}. There is no entry chain to verify. ${anchorSummary}`,
         );
         return;
       }
@@ -549,7 +729,7 @@
       text("[data-apa-log-head]", result.headHash);
       text(
         "[data-apa-log-status]",
-        `${entries.length.toLocaleString()} entries formed one continuous SHA-256 chain at ${observedAt}.`,
+        `${entries.length.toLocaleString()} entries formed one continuous SHA-256 chain at ${observedAt}. ${anchorSummary}`,
       );
     } catch (error) {
       container.dataset.state = "error";
@@ -557,6 +737,7 @@
       text("[data-apa-log-total]", "Unavailable");
       text("[data-apa-log-chain]", "Not verified");
       text("[data-apa-log-head]", "Unavailable");
+      text("[data-apa-log-anchor]", "Unavailable");
       text("[data-apa-log-observed]", new Date().toISOString());
       text(
         "[data-apa-log-status]",

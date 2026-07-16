@@ -126,7 +126,7 @@
         <div><span>Source</span><strong>Live JSON log</strong></div>
         <div><span>Chain</span><strong>SHA-256</strong></div>
         <div><span>Genesis</span><strong class="num">64 zeroes</strong></div>
-        <div><span>Result</span><strong>Continuity only</strong></div>
+        <div><span>Result</span><strong>Continuity + prefix pin</strong></div>
       </section>
 
       <section class="status-live-panel" aria-labelledby="log-status-title">
@@ -157,6 +157,10 @@
             <span>Computed head hash</span
             ><strong class="num" data-apa-log-head>Checking</strong>
           </div>
+          <div>
+            <span>External-to-database checkpoint</span
+            ><strong data-apa-log-anchor>Checking</strong>
+          </div>
         </div>
       </section>
 
@@ -182,12 +186,15 @@
       </section>
 
       <aside class="callout">
-        A continuous chain plus the issuer-signed checkpoint detects changes
-        relative to Warden's locally stored latest head. The log, checkpoint,
-        and rollback marker live in the same local database; they are not
-        independently timestamped or witnessed. A coherent database rollback
-        remains outside this proof. It also does not prove log completeness or
-        independently verify each <code>record_hash</code>.
+        The live signed head detects changes relative to Warden's locally stored
+        latest state. An operator-published checkpoint can additionally pin an
+        older prefix outside that database; this page verifies the pin when one
+        is present and says explicitly when it is unpublished. The static site
+        copy is still not independently timestamped or witnessed.
+        A coherent database rollback remains outside this proof when accompanied
+        by the older static copy. It also does not prove log completeness or
+        independently verify each <code>record_hash</code>. Anyone may preserve
+        a published checkpoint as an independent witness.
       </aside>
     </main>
 

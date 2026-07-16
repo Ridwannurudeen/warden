@@ -11,6 +11,7 @@ from collections.abc import Awaitable, Callable, Mapping
 import httpx
 
 from warden import protection, protection_store
+from warden.badges import ed25519_verify_record
 
 ProbeGuard = Callable[[str], Awaitable[tuple[str, str, int | None]]]
 SUMMARY_FIELDS = (
@@ -22,6 +23,10 @@ SUMMARY_FIELDS = (
     "key_changed",
     "skipped",
 )
+
+
+class RotationIncomplete(RuntimeError):
+    """The rotation candidate did not re-sign every initially eligible record."""
 
 
 def _endpoint_url(endpoint_host: str) -> str:
@@ -38,12 +43,54 @@ def _status_event(record: Mapping[str, object], status: str) -> str | None:
     return None if record.get("status") == status else status
 
 
+def _require_current_issuer_records(
+    targets: list[dict[str, object]],
+    summary: Mapping[str, int],
+) -> None:
+    completed = sum(summary[field] for field in ("active", "stale", "invalid", "key_changed"))
+    if summary["skipped"] or completed != summary["targets"]:
+        raise RotationIncomplete(
+            "issuer rotation incomplete: every eligible attestation must be updated with zero skipped"
+        )
+
+    current_pub = protection.issuer_public_key()
+    attestation_ids = []
+    for target in targets:
+        record = target.get("record")
+        attestation_id = record.get("attestation_id") if isinstance(record, dict) else None
+        if not isinstance(attestation_id, str) or not attestation_id:
+            raise RotationIncomplete(
+                "issuer rotation incomplete: eligible attestation identities are invalid"
+            )
+        attestation_ids.append(attestation_id)
+    if len(set(attestation_ids)) != len(targets):
+        raise RotationIncomplete(
+            "issuer rotation incomplete: eligible attestation identities are invalid"
+        )
+
+    invalid = 0
+    for attestation_id in attestation_ids:
+        record = protection_store.get_attestation(attestation_id)
+        if (
+            not isinstance(record, dict)
+            or not protection.verify_attestation_record(record)
+            or not ed25519_verify_record(record, current_pub, "issuer_sig")
+        ):
+            invalid += 1
+    if invalid:
+        raise RotationIncomplete(
+            f"issuer rotation incomplete: {invalid} eligible attestation(s) are not signed "
+            "by the current issuer"
+        )
+
+
 async def reprobe_protections(
     *,
     probe_guard: ProbeGuard | None = None,
     now: int | None = None,
     probe_timeout_seconds: float = protection.PROBE_TIMEOUT_SECONDS,
     max_concurrency: int = 4,
+    require_complete_current_issuer: bool = False,
 ) -> dict[str, int]:
     """Re-probe each bound endpoint once, oldest first, with bounded concurrency."""
     if probe_timeout_seconds <= 0:
@@ -168,6 +215,9 @@ async def reprobe_protections(
     worker_count = min(max_concurrency, len(grouped))
     await asyncio.gather(*(worker() for _ in range(worker_count)))
 
+    if require_complete_current_issuer:
+        _require_current_issuer_records(targets, summary)
+
     return summary
 
 
@@ -178,12 +228,21 @@ def format_summary_log(summary: Mapping[str, int]) -> str:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Re-probe stored APA protection heartbeats.")
+    parser.add_argument(
+        "--require-complete-current-issuer",
+        action="store_true",
+        help="fail unless every initially eligible record is re-signed by the current issuer",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
-    parse_args(argv)
-    summary = asyncio.run(reprobe_protections())
+    args = parse_args(argv)
+    summary = asyncio.run(
+        reprobe_protections(
+            require_complete_current_issuer=args.require_complete_current_issuer,
+        )
+    )
     print(format_summary_log(summary))
 
 

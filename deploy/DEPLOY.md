@@ -654,6 +654,12 @@ The manual procedure above is for an operator-requested rollback after a success
 
 ## Issuer Key Rotation
 
+The canonical, fail-closed source procedure is
+[`docs/ISSUER_KEY_ROTATION.md`](../docs/ISSUER_KEY_ROTATION.md). It uses an isolated candidate database and
+requires every initially eligible persisted attestation to be re-signed by the current issuer with zero
+skips before any state is promoted. The older release-layout sketch below is retained as design context; do
+not use it as the rotation procedure.
+
 Rotate the issuer only as a quiesced application-and-index change. Prepare these three regular files on the
 same filesystem as their final paths, owned by `root:warden` and mode `0640`, without putting secret values
 in shell history:

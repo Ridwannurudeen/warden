@@ -17,10 +17,19 @@ from contextlib import contextmanager
 from pathlib import Path
 from threading import Lock
 
-from warden.badges import _canonical_json
+from warden.badges import _canonical_json, b64u_decode, b64u_encode
 
 NONCE_TTL_SECONDS = 3600
 GENESIS_PREV_HASH = "0" * 64
+MAX_SAFE_UNIX_SECONDS = 9_007_199_254_740_991
+LOG_CHECKPOINT_FIELDS = {
+    "spec_version",
+    "issuer",
+    "seq",
+    "head_hash",
+    "issued_at",
+    "issuer_sig",
+}
 
 _LOCK = Lock()
 
@@ -259,7 +268,11 @@ def list_reprobe_targets() -> list[dict[str, object]]:
 def _verified_log_head(entries: list[dict[str, object]]) -> str | None:
     previous_hash = GENESIS_PREV_HASH
     for expected_seq, entry in enumerate(entries, start=1):
-        if type(entry.get("seq")) is not int or entry["seq"] != expected_seq:
+        if (
+            not isinstance(entry, dict)
+            or type(entry.get("seq")) is not int
+            or entry["seq"] != expected_seq
+        ):
             return None
         if entry.get("prev_hash") != previous_hash:
             return None
@@ -285,6 +298,34 @@ def _read_log_head(
 
 def _checkpoint_hash(checkpoint: dict[str, object]) -> str:
     return hashlib.sha256(_canonical_json(checkpoint).encode("utf-8")).hexdigest()
+
+
+def _is_exportable_log_checkpoint(checkpoint: dict[str, object]) -> bool:
+    if set(checkpoint) != LOG_CHECKPOINT_FIELDS:
+        return False
+    if checkpoint.get("spec_version") != "apa-log/0.1" or checkpoint.get("issuer") != "warden":
+        return False
+    seq = checkpoint.get("seq")
+    issued_at = checkpoint.get("issued_at")
+    head_hash = checkpoint.get("head_hash")
+    signature = checkpoint.get("issuer_sig")
+    if type(seq) is not int or not 0 <= seq <= MAX_SAFE_UNIX_SECONDS:
+        return False
+    if type(issued_at) is not int or not 0 <= issued_at <= MAX_SAFE_UNIX_SECONDS:
+        return False
+    if (
+        not isinstance(head_hash, str)
+        or len(head_hash) != 64
+        or any(character not in "0123456789abcdef" for character in head_hash)
+    ):
+        return False
+    if not isinstance(signature, str) or not signature.startswith("sig:"):
+        return False
+    try:
+        decoded = b64u_decode(signature)
+    except ValueError:
+        return False
+    return len(decoded) == 64 and b64u_encode(decoded, "sig") == signature
 
 
 def _write_log_anchor(
@@ -327,6 +368,8 @@ def _read_anchored_checkpoint(
     connection: sqlite3.Connection,
     entry_count: int,
     head_hash: str,
+    *,
+    verify_signature: bool = True,
 ) -> dict[str, object]:
     anchor_row = connection.execute(
         "SELECT checkpoint_hash FROM log_anchor WHERE singleton = 1"
@@ -349,17 +392,22 @@ def _read_anchored_checkpoint(
     if not isinstance(checkpoint, dict):
         raise ProtectionStateConflict("transparency log checkpoint is not an object")
 
-    from warden import protection
-
     if (
         anchor_row[0] != _checkpoint_hash(checkpoint)
-        or not protection.verify_log_checkpoint(checkpoint)
+        or not _is_exportable_log_checkpoint(checkpoint)
         or checkpoint.get("seq") != entry_count
         or checkpoint.get("head_hash") != head_hash
     ):
         raise ProtectionStateConflict(
             "transparency log checkpoint does not match the locally anchored head"
         )
+    if verify_signature:
+        from warden import protection
+
+        if not protection.verify_log_checkpoint(checkpoint):
+            raise ProtectionStateConflict(
+                "transparency log checkpoint does not match the locally anchored head"
+            )
     return checkpoint
 
 
@@ -643,6 +691,18 @@ def read_log_checkpoint() -> dict[str, object]:
         return _read_anchored_checkpoint(connection, len(entries), head_hash)
 
 
+def read_log_checkpoint_for_external_publish() -> dict[str, object]:
+    """Read the exact locally anchored head without loading signing material."""
+    with _LOCK, _connect() as connection:
+        _, entries, head_hash = _read_log_head(connection)
+        return _read_anchored_checkpoint(
+            connection,
+            len(entries),
+            head_hash,
+            verify_signature=False,
+        )
+
+
 def migrate_log_checkpoint() -> dict[str, object]:
     """Explicitly initialize or anchor one verified pre-anchor database."""
     with _LOCK, _connect() as connection:
@@ -716,3 +776,22 @@ def verify_log_chain(
         and signed_head.get("seq") == len(entries)
         and signed_head.get("head_hash") == head_hash
     )
+
+
+def verify_log_prefix(
+    entries: list[dict[str, object]],
+    checkpoint: dict[str, object],
+) -> bool:
+    """Verify that a signed historical checkpoint is the prefix of a later log."""
+    from warden import protection
+
+    seq = checkpoint.get("seq") if isinstance(checkpoint, dict) else None
+    if (
+        type(seq) is not int
+        or seq < 0
+        or seq > len(entries)
+        or not protection.verify_log_checkpoint(checkpoint)
+    ):
+        return False
+    prefix_head = _verified_log_head(entries[:seq])
+    return prefix_head is not None and checkpoint.get("head_hash") == prefix_head
