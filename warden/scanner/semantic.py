@@ -25,6 +25,18 @@ HOST_RE = re.compile(
 )
 
 
+def _strip_code_fence(text: str) -> str:
+    """Return the JSON body from a model reply, tolerating a markdown code fence."""
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        newline = stripped.find("\n")
+        if newline != -1:
+            stripped = stripped[newline + 1 :]
+        if stripped.rstrip().endswith("```"):
+            stripped = stripped.rstrip()[:-3]
+    return stripped.strip()
+
+
 @dataclass(frozen=True)
 class SemanticClassification:
     flagged: bool
@@ -84,8 +96,7 @@ class HttpSemanticAnalyzer:
                             {"role": "user", "content": content},
                         ],
                         "temperature": 0,
-                        "max_tokens": 160,
-                        "response_format": {"type": "json_object"},
+                        "max_tokens": 256,
                     },
                 ) as response:
                     response.raise_for_status()
@@ -106,7 +117,7 @@ class HttpSemanticAnalyzer:
         message = choices[0].get("message")
         if not isinstance(message, dict) or not isinstance(message.get("content"), str):
             raise ValueError("semantic response choice must contain text content")
-        data = json.loads(message["content"])
+        data = json.loads(_strip_code_fence(message["content"]))
         if not isinstance(data, dict):
             raise ValueError("semantic model content must be a JSON object")
 
@@ -143,7 +154,22 @@ def build_semantic_analyzer_from_env(
     if enabled not in ENABLED_VALUES or not endpoint or not model or not api_key or not paywall_key:
         return None
 
+    timeout_seconds = SEMANTIC_TIMEOUT_SECONDS
+    raw_timeout = values.get("WARDEN_SEMANTIC_TIMEOUT_SECONDS", "").strip()
+    if raw_timeout:
+        try:
+            parsed_timeout = float(raw_timeout)
+        except ValueError:
+            parsed_timeout = None
+        if parsed_timeout is not None and math.isfinite(parsed_timeout) and parsed_timeout > 0:
+            timeout_seconds = parsed_timeout
+
     try:
-        return HttpSemanticAnalyzer(endpoint=endpoint, model=model, api_key=api_key)
+        return HttpSemanticAnalyzer(
+            endpoint=endpoint,
+            model=model,
+            api_key=api_key,
+            timeout_seconds=timeout_seconds,
+        )
     except ValueError:
         return None
