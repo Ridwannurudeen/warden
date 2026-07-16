@@ -117,6 +117,13 @@ def _rate_limit_per_minute() -> int:
         return 60
 
 
+def _payment_rate_limit_per_minute() -> int:
+    try:
+        return int(os.getenv("WARDEN_PAYMENT_RATE_LIMIT_PER_MIN", "600") or "600")
+    except ValueError:
+        return 600
+
+
 def _demo_rate_limit_per_minute() -> int:
     try:
         return int(os.getenv("WARDEN_DEMO_RATE_LIMIT_PER_MIN", "20") or "20")
@@ -268,18 +275,15 @@ async def request_size_limit_middleware(request: Request, call_next):
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     path = request.url.path.rstrip("/")
-    # A request that already carries an x402 payment authorization has paid its
-    # own way — never rate-limit it. OKX's paid auto-replay and its x402-check
-    # probe share OKX egress IPs, so counting them risks 429-ing a real paid
-    # settlement (money signed, no deliverable) or making the listing read as an
-    # invalid x402 service. Unpaid challenges are still limited below.
+    # Payment-carrying requests use a separate generous bucket. This preserves
+    # normal paid replays without letting a forged header disable limits.
     carries_payment = bool(
         request.headers.get("payment-signature") or request.headers.get("x-payment")
     )
     if carries_payment and path in {"/scan", "/audit"}:
-        return await call_next(request)
-
-    if path.startswith("/api/demo/"):
+        limit_per_minute = _payment_rate_limit_per_minute()
+        rate_limited = check_rate_limit(request, limit_per_minute, scope="payment")
+    elif path.startswith("/api/demo/"):
         limit_per_minute = _demo_rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute, scope="demo")
     elif path in {"/apa/register", "/apa/revoke"}:
