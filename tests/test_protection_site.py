@@ -50,7 +50,8 @@ def test_log_page_is_csp_compatible_and_states_the_verification_boundary():
     assert "data-apa-log-entries" in page
     assert "data-apa-log-retry" in page
     assert '<script src="/log.js" defer></script>' in page
-    assert "independently anchored checkpoint" in page
+    assert "independently timestamped or witnessed" in page
+    assert "coherent database rollback" in page
     assert "fetchLogPages" in script
     assert "`/apa/log?cursor=${cursor}&limit=${pageSize}`" in script
     assert 'accept: "application/json"' in script

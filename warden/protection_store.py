@@ -54,6 +54,10 @@ CREATE TABLE IF NOT EXISTS log_checkpoint (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     checkpoint_json TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS log_anchor (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    checkpoint_hash TEXT NOT NULL
+);
 """
 
 
@@ -66,7 +70,7 @@ class NonceReplay(ValueError):
 
 
 class LogCheckpointMissing(RuntimeError):
-    """A non-empty transparency log has no signed head and must not be trusted."""
+    """The transparency log has no complete locally anchored signed head."""
 
 
 def _db_path() -> Path:
@@ -263,6 +267,40 @@ def _verified_log_head(entries: list[dict[str, object]]) -> str | None:
     return previous_hash
 
 
+def _read_log_head(
+    connection: sqlite3.Connection,
+) -> tuple[list[tuple[int, str]], list[dict[str, object]], str]:
+    rows = connection.execute("SELECT seq, entry_json FROM log ORDER BY seq ASC").fetchall()
+    try:
+        entries = [json.loads(row[1]) for row in rows]
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise ProtectionStateConflict("transparency log contains invalid JSON") from exc
+    if not all(isinstance(entry, dict) for entry in entries):
+        raise ProtectionStateConflict("transparency log contains a non-object entry")
+    head_hash = _verified_log_head(entries)
+    if head_hash is None or any(row[0] != index for index, row in enumerate(rows, start=1)):
+        raise ProtectionStateConflict("transparency log chain is not contiguous")
+    return rows, entries, head_hash
+
+
+def _checkpoint_hash(checkpoint: dict[str, object]) -> str:
+    return hashlib.sha256(_canonical_json(checkpoint).encode("utf-8")).hexdigest()
+
+
+def _write_log_anchor(
+    connection: sqlite3.Connection,
+    checkpoint: dict[str, object],
+) -> None:
+    # This rollback marker is deliberately separate from the mutable head row,
+    # but remains local SQLite state. A coherent replacement of the whole
+    # database still needs an external witness to detect it.
+    connection.execute(
+        "INSERT INTO log_anchor (singleton, checkpoint_hash) VALUES (1, ?) "
+        "ON CONFLICT(singleton) DO UPDATE SET checkpoint_hash = excluded.checkpoint_hash",
+        (_checkpoint_hash(checkpoint),),
+    )
+
+
 def _write_log_checkpoint(
     connection: sqlite3.Connection,
     seq: int,
@@ -281,6 +319,47 @@ def _write_log_checkpoint(
         "ON CONFLICT(singleton) DO UPDATE SET checkpoint_json = excluded.checkpoint_json",
         (_canonical_json(checkpoint),),
     )
+    _write_log_anchor(connection, checkpoint)
+    return checkpoint
+
+
+def _read_anchored_checkpoint(
+    connection: sqlite3.Connection,
+    entry_count: int,
+    head_hash: str,
+) -> dict[str, object]:
+    anchor_row = connection.execute(
+        "SELECT checkpoint_hash FROM log_anchor WHERE singleton = 1"
+    ).fetchone()
+    if anchor_row is None:
+        raise LogCheckpointMissing(
+            "transparency log anchor is uninitialized; run explicit migration"
+        )
+    checkpoint_row = connection.execute(
+        "SELECT checkpoint_json FROM log_checkpoint WHERE singleton = 1"
+    ).fetchone()
+    if checkpoint_row is None:
+        raise LogCheckpointMissing(
+            "locally anchored transparency checkpoint is missing; restore trusted state"
+        )
+    try:
+        checkpoint = json.loads(checkpoint_row[0])
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise ProtectionStateConflict("transparency log checkpoint contains invalid JSON") from exc
+    if not isinstance(checkpoint, dict):
+        raise ProtectionStateConflict("transparency log checkpoint is not an object")
+
+    from warden import protection
+
+    if (
+        anchor_row[0] != _checkpoint_hash(checkpoint)
+        or not protection.verify_log_checkpoint(checkpoint)
+        or checkpoint.get("seq") != entry_count
+        or checkpoint.get("head_hash") != head_hash
+    ):
+        raise ProtectionStateConflict(
+            "transparency log checkpoint does not match the locally anchored head"
+        )
     return checkpoint
 
 
@@ -289,48 +368,28 @@ def _append_log(
     event: str,
     record: dict[str, object],
 ) -> dict[str, object]:
-    rows = connection.execute("SELECT seq, entry_json FROM log ORDER BY seq ASC").fetchall()
-    entries = [json.loads(row[1]) for row in rows]
-    head_hash = _verified_log_head(entries)
-    if head_hash is None or any(row[0] != index for index, row in enumerate(rows, start=1)):
-        raise ProtectionStateConflict("transparency log chain is not contiguous")
-
+    rows, entries, head_hash = _read_log_head(connection)
+    anchor_exists = (
+        connection.execute("SELECT 1 FROM log_anchor WHERE singleton = 1").fetchone()
+        is not None
+    )
     checkpoint_row = connection.execute(
-        "SELECT checkpoint_json FROM log_checkpoint WHERE singleton = 1"
+        "SELECT 1 FROM log_checkpoint WHERE singleton = 1"
     ).fetchone()
-    if rows:
-        if checkpoint_row is None:
+    pristine = not rows and not anchor_exists and checkpoint_row is None
+    if pristine:
+        prior_sequence = connection.execute(
+            "SELECT seq FROM sqlite_sequence WHERE name = 'log'"
+        ).fetchone()
+        if prior_sequence is not None:
             raise LogCheckpointMissing(
-                "non-empty transparency log has no signed checkpoint; run explicit migration"
+                "empty transparency log retains prior sequence state; restore trusted state"
             )
-        from warden import protection
-
-        checkpoint = json.loads(checkpoint_row[0])
-        if (
-            not protection.verify_log_checkpoint(checkpoint)
-            or checkpoint.get("seq") != len(entries)
-            or checkpoint.get("head_hash") != head_hash
-        ):
-            raise ProtectionStateConflict(
-                "transparency log checkpoint does not match the current head"
-            )
-        next_seq = len(entries) + 1
-        prev_hash = head_hash
     else:
-        if checkpoint_row is not None:
-            from warden import protection
+        _read_anchored_checkpoint(connection, len(entries), head_hash)
 
-            checkpoint = json.loads(checkpoint_row[0])
-            if (
-                not protection.verify_log_checkpoint(checkpoint)
-                or checkpoint.get("seq") != 0
-                or checkpoint.get("head_hash") != GENESIS_PREV_HASH
-            ):
-                raise ProtectionStateConflict(
-                    "transparency log checkpoint does not match the empty log"
-                )
-        next_seq = 1
-        prev_hash = GENESIS_PREV_HASH
+    next_seq = len(entries) + 1
+    prev_hash = head_hash
     entry = {
         "seq": next_seq,
         "ts": int(time.time()),
@@ -578,48 +637,63 @@ def read_log_page(
 
 
 def read_log_checkpoint() -> dict[str, object]:
-    """Return the stored signed head; never sign a non-empty log on read."""
+    """Return the verified local head; reads never initialize or re-sign it."""
     with _LOCK, _connect() as connection:
-        row = connection.execute(
-            "SELECT checkpoint_json FROM log_checkpoint WHERE singleton = 1"
-        ).fetchone()
-        if row is not None:
-            return json.loads(row[0])
-
-        if connection.execute("SELECT 1 FROM log LIMIT 1").fetchone() is not None:
-            raise LogCheckpointMissing(
-                "non-empty transparency log has no signed checkpoint; run explicit migration"
-            )
-        return _write_log_checkpoint(
-            connection,
-            0,
-            GENESIS_PREV_HASH,
-            int(time.time()),
-        )
+        _, entries, head_hash = _read_log_head(connection)
+        return _read_anchored_checkpoint(connection, len(entries), head_hash)
 
 
 def migrate_log_checkpoint() -> dict[str, object]:
-    """Explicitly establish one signed head for a verified pre-checkpoint database."""
+    """Explicitly initialize or anchor one verified pre-anchor database."""
     with _LOCK, _connect() as connection:
         connection.execute("BEGIN IMMEDIATE")
+        anchor = connection.execute(
+            "SELECT 1 FROM log_anchor WHERE singleton = 1"
+        ).fetchone()
+        if anchor is not None:
+            raise ProtectionStateConflict("transparency log anchor already exists")
+
+        rows, entries, head_hash = _read_log_head(connection)
         existing = connection.execute(
-            "SELECT 1 FROM log_checkpoint WHERE singleton = 1"
+            "SELECT checkpoint_json FROM log_checkpoint WHERE singleton = 1"
         ).fetchone()
         if existing is not None:
-            raise ProtectionStateConflict("transparency log checkpoint already exists")
-        rows = connection.execute("SELECT seq, entry_json FROM log ORDER BY seq ASC").fetchall()
-        entries = [json.loads(row[1]) for row in rows]
-        head_hash = _verified_log_head(entries)
-        if head_hash is None or any(
-            row[0] != index for index, row in enumerate(rows, start=1)
-        ):
-            raise ProtectionStateConflict("legacy transparency log chain is not contiguous")
-        issued_at = int(entries[-1]["ts"]) if entries else int(time.time())
+            try:
+                checkpoint = json.loads(existing[0])
+            except (json.JSONDecodeError, TypeError) as exc:
+                raise ProtectionStateConflict(
+                    "legacy transparency log checkpoint contains invalid JSON"
+                ) from exc
+            if not isinstance(checkpoint, dict):
+                raise ProtectionStateConflict(
+                    "legacy transparency log checkpoint is not an object"
+                )
+            from warden import protection
+
+            if (
+                not protection.verify_log_checkpoint(checkpoint)
+                or checkpoint.get("seq") != len(entries)
+                or checkpoint.get("head_hash") != head_hash
+            ):
+                raise ProtectionStateConflict(
+                    "legacy transparency log checkpoint does not match the current head"
+                )
+            _write_log_anchor(connection, checkpoint)
+            return checkpoint
+
+        if not rows:
+            prior_sequence = connection.execute(
+                "SELECT seq FROM sqlite_sequence WHERE name = 'log'"
+            ).fetchone()
+            if prior_sequence is not None:
+                raise ProtectionStateConflict(
+                    "empty transparency log retains prior sequence state"
+                )
         return _write_log_checkpoint(
             connection,
             len(entries),
             head_hash,
-            issued_at,
+            int(time.time()),
         )
 
 

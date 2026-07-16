@@ -670,7 +670,10 @@ async def apa_log(
 async def apa_log_checkpoint() -> dict[str, object]:
     try:
         return protection_store.read_log_checkpoint()
-    except protection_store.LogCheckpointMissing as exc:
+    except (
+        protection_store.LogCheckpointMissing,
+        protection_store.ProtectionStateConflict,
+    ) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 

@@ -79,6 +79,7 @@ def test_missing_checkpoint_on_a_nonempty_log_fails_closed_until_explicit_migrat
     entries, _ = _append_two_entries()
     with protection_store._connect() as connection:
         connection.execute("DELETE FROM log_checkpoint")
+        connection.execute("DELETE FROM log_anchor")
 
     with pytest.raises(protection_store.LogCheckpointMissing):
         protection_store.read_log_checkpoint()
@@ -91,3 +92,41 @@ def test_missing_checkpoint_on_a_nonempty_log_fails_closed_until_explicit_migrat
 
     assert protection.verify_log_checkpoint(migrated) is True
     assert protection_store.verify_log_chain(entries, migrated) is True
+
+
+def test_checkpoint_read_never_initializes_pristine_state():
+    with pytest.raises(protection_store.LogCheckpointMissing):
+        protection_store.read_log_checkpoint()
+
+    with protection_store._connect() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM log_checkpoint").fetchone()[0] == 0
+        assert connection.execute("SELECT COUNT(*) FROM log_anchor").fetchone()[0] == 0
+
+    protection_store.commit_attestation_events([("issued", _record("first"))])
+
+    assert protection.verify_log_checkpoint(protection_store.read_log_checkpoint()) is True
+
+
+def test_deleting_log_and_checkpoint_cannot_reset_an_initialized_anchor():
+    _append_two_entries()
+    with protection_store._connect() as connection:
+        anchor = connection.execute(
+            "SELECT checkpoint_hash FROM log_anchor WHERE singleton = 1"
+        ).fetchone()
+        connection.execute("DELETE FROM log")
+        connection.execute("DELETE FROM log_checkpoint")
+
+    assert anchor is not None
+    with pytest.raises(protection_store.LogCheckpointMissing):
+        protection_store.read_log_checkpoint()
+    assert protection_store.verify_log_chain([]) is False
+    with TestClient(app) as client:
+        response = client.get("/apa/log/checkpoint")
+    assert response.status_code == 503
+    with pytest.raises(protection_store.LogCheckpointMissing):
+        protection_store.commit_attestation_events([("issued", _record("replacement"))])
+    with pytest.raises(protection_store.ProtectionStateConflict):
+        protection_store.migrate_log_checkpoint()
+
+    with protection_store._connect() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM log_checkpoint").fetchone()[0] == 0
