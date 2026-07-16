@@ -1,10 +1,18 @@
 """FastMCP server exposing Warden's A2MCP tools."""
 
+from urllib.parse import urlparse
+
 from fastmcp import FastMCP
 
 from warden.auditor import AgentAuditor
 from warden.engine import WardenEngine
-from warden.models import AuditResponse, ScanContext, ScanResponse
+from warden.models import (
+    MAX_PAYLOAD_LENGTH,
+    AuditRequest,
+    AuditResponse,
+    ScanContext,
+    ScanResponse,
+)
 
 mcp = FastMCP("Warden")
 engine = WardenEngine()
@@ -21,7 +29,7 @@ async def scan_payload(
     scan_depth = depth if depth in {"fast", "thorough"} else "fast"
     scan_context = ScanContext.model_validate(context or {})
     verdict = await engine.scan(
-        payload,
+        payload[:MAX_PAYLOAD_LENGTH],
         depth=scan_depth,
         context=scan_context.model_dump(),
     )
@@ -34,7 +42,21 @@ async def audit_agent(
     sample_prompts: list[str] | None = None,
 ) -> dict[str, object]:
     """Run the Warden fixed attack battery against an HTTP agent endpoint."""
-    response: AuditResponse = await auditor.audit(target_url, sample_prompts or [])
+    request = AuditRequest.model_validate(
+        {"target_url": target_url, "sample_prompts": sample_prompts or []}
+    )
+    parsed_target = urlparse(request.target_url)
+    if parsed_target.scheme not in {"http", "https"}:
+        raise ValueError("target_url must use http or https")
+    if not parsed_target.hostname:
+        raise ValueError("target_url must include a hostname")
+    if parsed_target.username or parsed_target.password:
+        raise ValueError("target_url must not include credentials")
+
+    response: AuditResponse = await auditor.audit(
+        request.target_url,
+        request.sample_prompts,
+    )
     return response.model_dump()
 
 
