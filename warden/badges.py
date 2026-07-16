@@ -92,15 +92,11 @@ def issue_badge(
     """
     Issue a signed badge record for a completed audit.
 
-    The audit id is stable for the same target host, score, and issued date.
+    The audit id is stable for the same complete unsigned audit result.
     `consent_verified` is part of the signed payload so an unconsented audit
     can never be re-labeled as consented after issuance.
     """
-    short_hash_input = f"{target_host}|{issued_at}|{score}"
-    audit_id = hashlib.sha256(short_hash_input.encode("utf-8")).hexdigest()[:16]
-
-    payload = {
-        "audit_id": audit_id,
+    result = {
         "target_host": target_host,
         "grade": grade,
         "score": score,
@@ -109,6 +105,8 @@ def issue_badge(
         "issued_at": issued_at,
         "consent_verified": consent_verified,
     }
+    audit_id = hashlib.sha256(_canonical_json(result).encode("utf-8")).hexdigest()[:16]
+    payload = {"audit_id": audit_id, **result}
     canonical_payload = dict(payload)
     canonical_json = _canonical_json(canonical_payload)
     payload["signature"] = hmac.new(

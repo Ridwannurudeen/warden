@@ -18,6 +18,17 @@ def record_badge(badge: dict[str, object]) -> None:
     _ensure_store()
     record = json.dumps(badge, ensure_ascii=False, sort_keys=True)
     with _LOCK:
+        if _STORE_PATH.exists():
+            with _STORE_PATH.open(encoding="utf-8") as handle:
+                for line in handle:
+                    if not line.strip():
+                        continue
+                    existing = json.loads(line)
+                    if existing.get("audit_id") != badge.get("audit_id"):
+                        continue
+                    if existing == badge:
+                        return
+                    raise ValueError("badge audit_id conflicts with an existing record")
         with _STORE_PATH.open("a", encoding="utf-8") as handle:
             handle.write(record + "\n")
 
