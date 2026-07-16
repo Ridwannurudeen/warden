@@ -14,9 +14,9 @@ from warden.models import ClaimStatus, GauntletRequest, ScanResponse
 
 _STORE_PATH = Path(__file__).resolve().parents[1] / "gauntlet" / "attempts.jsonl"
 _LOCK = Lock()
-# Cap on-disk growth from the unauthenticated public demo route. Pending/confirmed
-# candidate bypasses are always retained; only routine attempts are trimmed.
+# Cap on-disk growth from the unauthenticated public demo route.
 _MAX_RECORDS = 5000
+_MAX_PENDING_RECORDS = 500
 
 
 def _timestamp() -> str:
@@ -41,12 +41,22 @@ def _read_records_locked() -> list[dict[str, object]]:
 
 
 def _prune_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
-    if len(records) <= _MAX_RECORDS:
-        return records
-    kept = [r for r in records if r.get("status") in {"pending", "confirmed"}]
-    routine = [r for r in records if r.get("status") not in {"pending", "confirmed"}]
-    budget = max(0, _MAX_RECORDS - len(kept))
-    return kept + routine[-budget:]
+    pending = [
+        index for index, record in enumerate(records) if record.get("status") == "pending"
+    ]
+    retained = set(pending[-_MAX_PENDING_RECORDS:]) if _MAX_PENDING_RECORDS > 0 else set()
+    retained.update(
+        index for index, record in enumerate(records) if record.get("status") == "confirmed"
+    )
+    routine = [
+        index
+        for index, record in enumerate(records)
+        if record.get("status") not in {"pending", "confirmed"}
+    ]
+    budget = max(0, _MAX_RECORDS - len(retained))
+    if budget:
+        retained.update(routine[-budget:])
+    return [record for index, record in enumerate(records) if index in retained]
 
 
 def _claim_id(request: GauntletRequest) -> str:
@@ -113,9 +123,9 @@ def record_attempt(
             claim_id = None
         record["status"] = status
 
-        if len(records) + 1 > _MAX_RECORDS:
-            # Rare path: over cap → rewrite the pruned store atomically.
-            pruned = _prune_records([*records, record])
+        updated = [*records, record]
+        pruned = _prune_records(updated)
+        if len(pruned) != len(updated):
             tmp = _STORE_PATH.with_suffix(".jsonl.tmp")
             with tmp.open("w", encoding="utf-8") as handle:
                 for item in pruned:
