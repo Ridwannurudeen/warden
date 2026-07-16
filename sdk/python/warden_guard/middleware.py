@@ -6,7 +6,9 @@ Works on any ASGI app (FastAPI, Starlette, Quart, ...):
 
 For each request with a body, the configured `extract` callable pulls the
 untrusted text; a BLOCK verdict short-circuits with HTTP 400 + the verdict
-JSON. ALLOW and SANITIZE pass through to the app unchanged.
+JSON. ALLOW passes through unchanged; SANITIZE replaces the replayed body with
+the scanner's sanitized payload or blocks when a custom extractor cannot be
+safely mapped back to the body.
 """
 
 from __future__ import annotations
@@ -70,7 +72,19 @@ class WardenGuard:
         payload = self.extract(body_bytes, scope)
         if payload:
             result = await self._scan(payload)
-            if result.blocked:
+            if result.sanitized:
+                if self.extract is not _default_extract or result.sanitized_payload is None:
+                    await self._reject(send, result)
+                    return
+                body_bytes = result.sanitized_payload.encode("utf-8")
+                headers = [
+                    (name, value)
+                    for name, value in scope.get("headers", [])
+                    if name.lower() != b"content-length"
+                ]
+                headers.append((b"content-length", str(len(body_bytes)).encode()))
+                scope = {**scope, "headers": headers}
+            elif result.blocked:
                 await self._reject(send, result)
                 return
 

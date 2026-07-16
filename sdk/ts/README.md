@@ -69,7 +69,7 @@ app.use(
 );
 ```
 
-The middleware skips `GET`, `HEAD`, and `OPTIONS`. By default it scans a string request body or `request.body.payload`. A `BLOCK` returns HTTP 400 JSON; `ALLOW` and `SANITIZE` call `next()` without rewriting the request body. Use `guard()` directly when downstream code must receive sanitized text.
+The middleware skips `GET`, `HEAD`, and `OPTIONS`. By default it scans a string request body or `request.body.payload`. A `BLOCK` returns HTTP 400 JSON, `ALLOW` passes the body through, and `SANITIZE` replaces the string body or `request.body.payload` before calling `next()`. A custom extractor cannot identify where its text belongs in the original body, so `SANITIZE` blocks; use `guard()` directly and forward its returned safe text for custom body shapes.
 
 Custom extraction and block detail are supported without importing Express types:
 

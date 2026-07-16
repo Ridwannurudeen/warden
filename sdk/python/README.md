@@ -57,6 +57,10 @@ app.add_middleware(WardenGuard, client=WardenClient(local=True, fail_open=False)
 # BLOCK verdicts short-circuit with HTTP 400 + the verdict JSON
 ```
 
+With the default whole-body extractor, `SANITIZE` replaces the body replayed to the application.
+A custom extractor cannot identify where its text belongs in the original body, so `SANITIZE` blocks
+unless the application uses `guard()` directly and forwards its returned safe text.
+
 ## Decorator
 
 ```python

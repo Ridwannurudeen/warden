@@ -92,7 +92,7 @@ describe("wardenGuard", () => {
     expect(next).toHaveBeenCalledOnce();
   });
 
-  it("does not rewrite the request body for SANITIZE", async () => {
+  it("rewrites request.body.payload for SANITIZE", async () => {
     fetchMock.mockResolvedValue(jsonResponse(scanResponse("SANITIZE")));
     const request = { method: "POST", body: { payload: "dirty" } };
     const originalBody = request.body;
@@ -100,8 +100,8 @@ describe("wardenGuard", () => {
 
     await wardenGuard()(request, new TestResponse(), next);
 
-    expect(request.body).toBe(originalBody);
-    expect(request.body.payload).toBe("dirty");
+    expect(request.body).not.toBe(originalBody);
+    expect(request.body.payload).toBe("clean payload");
     expect(next).toHaveBeenCalledOnce();
   });
 

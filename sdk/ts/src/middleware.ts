@@ -32,6 +32,7 @@ export type WardenMiddleware = (
 export function wardenGuard(options: WardenGuardOptions = {}): WardenMiddleware {
   const client = options.client ?? new WardenClient();
   const extract = options.extract ?? extractPayload;
+  const usesDefaultExtract = options.extract === undefined;
 
   return async (request, response, next) => {
     const method = (request.method ?? "").toUpperCase();
@@ -49,7 +50,22 @@ export function wardenGuard(options: WardenGuardOptions = {}): WardenMiddleware 
       }
 
       result = await client.scan(payload);
-      if (!result.blocked) {
+      let mustBlock = result.blocked;
+      if (result.sanitized) {
+        if (!usesDefaultExtract) {
+          mustBlock = true;
+        } else if (typeof request.body === "string") {
+          request.body = result.sanitizedPayload;
+        } else if (isPayloadBody(request.body)) {
+          request.body = {
+            ...request.body,
+            payload: result.sanitizedPayload,
+          };
+        } else {
+          mustBlock = true;
+        }
+      }
+      if (!mustBlock) {
         next();
         return;
       }
@@ -71,14 +87,19 @@ function extractPayload(request: WardenRequest): string | null {
   if (typeof request.body === "string") {
     return request.body;
   }
-  if (
-    typeof request.body === "object" &&
-    request.body !== null &&
-    "payload" in request.body &&
-    typeof request.body.payload === "string"
-  ) {
+  if (isPayloadBody(request.body)) {
     return request.body.payload;
   }
   return null;
 }
 
+function isPayloadBody(
+  body: unknown,
+): body is Record<string, unknown> & { payload: string } {
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    "payload" in body &&
+    typeof body.payload === "string"
+  );
+}
