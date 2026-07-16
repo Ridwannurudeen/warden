@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from warden.badge_store import get_badge, list_badges
 from warden.badges import verify_badge
@@ -45,6 +46,79 @@ MAX_REQUEST_BODY_BYTES = 1_000_000
 APA_LOG_DEFAULT_PAGE_SIZE = 100
 APA_LOG_MAX_PAGE_SIZE = 500
 APA_LOG_PAGE = Path(__file__).resolve().parents[1] / "site" / "log.html"
+
+
+class RequestBodyLimitMiddleware:
+    def __init__(self, app: ASGIApp, max_body_bytes: int) -> None:
+        self.app = app
+        self.max_body_bytes = max_body_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        content_lengths = [
+            value
+            for name, value in scope.get("headers", [])
+            if name.lower() == b"content-length"
+        ]
+        if content_lengths:
+            try:
+                parsed_lengths = [int(value.decode("ascii")) for value in content_lengths]
+            except (UnicodeDecodeError, ValueError):
+                response = JSONResponse(
+                    status_code=400,
+                    content={"detail": "Invalid Content-Length header"},
+                )
+                await response(scope, receive, send)
+                return
+            if len(set(parsed_lengths)) != 1 or parsed_lengths[0] < 0:
+                response = JSONResponse(
+                    status_code=400,
+                    content={"detail": "Invalid Content-Length header"},
+                )
+                await response(scope, receive, send)
+                return
+            if parsed_lengths[0] > self.max_body_bytes:
+                response = JSONResponse(
+                    status_code=413,
+                    content={"detail": "Request body too large"},
+                )
+                await response(scope, receive, send)
+                return
+
+        received_bytes = 0
+        too_large = False
+        response_started = False
+
+        async def receive_limited() -> Message:
+            nonlocal received_bytes, too_large
+            if too_large:
+                return {"type": "http.disconnect"}
+            message = await receive()
+            if message["type"] == "http.request":
+                received_bytes += len(message.get("body", b""))
+                if received_bytes > self.max_body_bytes:
+                    too_large = True
+                    return {"type": "http.disconnect"}
+            return message
+
+        async def send_limited(message: Message) -> None:
+            nonlocal response_started
+            if too_large:
+                return
+            if message["type"] == "http.response.start":
+                response_started = True
+            await send(message)
+
+        await self.app(scope, receive_limited, send_limited)
+        if too_large and not response_started:
+            response = JSONResponse(
+                status_code=413,
+                content={"detail": "Request body too large"},
+            )
+            await response(scope, receive, send)
 
 _SCAN_INPUT = {
     "type": "http",
@@ -269,18 +343,7 @@ if os.getenv("OKX_API_KEY"):
     app.add_middleware(PaymentMiddlewareASGI, routes=_paid_routes, server=_server)
 
 
-@app.middleware("http")
-async def request_size_limit_middleware(request: Request, call_next):
-    content_length = request.headers.get("content-length")
-    if content_length:
-        try:
-            if int(content_length) > MAX_REQUEST_BODY_BYTES:
-                return JSONResponse(status_code=413, content={"detail": "Request body too large"})
-        except ValueError:
-            return JSONResponse(
-                status_code=400, content={"detail": "Invalid Content-Length header"}
-            )
-    return await call_next(request)
+app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=MAX_REQUEST_BODY_BYTES)
 
 
 @app.middleware("http")
