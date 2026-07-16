@@ -7,10 +7,9 @@ from fastmcp import FastMCP
 from warden.auditor import AgentAuditor
 from warden.engine import WardenEngine
 from warden.models import (
-    MAX_PAYLOAD_LENGTH,
     AuditRequest,
     AuditResponse,
-    ScanContext,
+    ScanRequest,
     ScanResponse,
 )
 
@@ -27,11 +26,13 @@ async def scan_payload(
 ) -> dict[str, object]:
     """Scan untrusted agent payload content and return a Warden verdict."""
     scan_depth = depth if depth in {"fast", "thorough"} else "fast"
-    scan_context = ScanContext.model_validate(context or {})
+    request = ScanRequest.model_validate(
+        {"payload": payload, "depth": scan_depth, "context": context or {}}
+    )
     verdict = await engine.scan(
-        payload[:MAX_PAYLOAD_LENGTH],
-        depth=scan_depth,
-        context=scan_context.model_dump(),
+        request.payload,
+        depth=request.depth,
+        context=request.context.model_dump(),
     )
     return ScanResponse.from_verdict(verdict).model_dump(by_alias=True)
 

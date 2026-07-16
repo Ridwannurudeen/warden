@@ -14,7 +14,7 @@ from warden.models import (
 
 
 @pytest.mark.asyncio
-async def test_scan_payload_truncates_before_engine(monkeypatch):
+async def test_scan_payload_preserves_an_input_at_the_maximum_length(monkeypatch):
     captured: dict[str, object] = {}
 
     class RecordingEngine:
@@ -27,13 +27,13 @@ async def test_scan_payload_truncates_before_engine(monkeypatch):
             )
 
     monkeypatch.setattr(mcp_server, "engine", RecordingEngine())
-    payload = "x" * MAX_PAYLOAD_LENGTH + "tail attack"
+    payload = "x" * MAX_PAYLOAD_LENGTH
 
     response = await mcp_server.scan_payload(payload, depth="thorough")
 
-    assert captured["payload"] == payload[:MAX_PAYLOAD_LENGTH]
+    assert captured["payload"] == payload
     assert captured["depth"] == "thorough"
-    assert response["sanitized_payload"] == payload[:MAX_PAYLOAD_LENGTH]
+    assert response["sanitized_payload"] == payload
 
 
 @pytest.mark.asyncio
