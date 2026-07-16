@@ -33,6 +33,7 @@ SCANNER_CATEGORY_REASON_CODES: dict[str, ReasonCode] = {
     "encoding_tricks": ReasonCode.ENCODING_TRICK,
     "statistical_analysis": ReasonCode.STATISTICAL_ANOMALY,
     "corpus_match": ReasonCode.CORPUS_MATCH,
+    "ai_analysis": ReasonCode.PROMPT_INJECTION,
 }
 
 SCANNER_RISK_SCORE = {

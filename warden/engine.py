@@ -12,11 +12,17 @@ from warden.core.analyzer import AnalysisContext
 from warden.core.registry import AnalyzerRegistry
 from warden.core.verdict import Verdict, VerdictEngine
 from warden.scanner.scanner import InjectionScanner
+from warden.scanner.semantic import SemanticAnalyzer, build_semantic_analyzer_from_env
 
 
 class WardenEngine:
-    def __init__(self):
-        self.scanner = InjectionScanner(ai_analyzer=None)
+    def __init__(self, semantic_analyzer: SemanticAnalyzer | None = None):
+        configured_analyzer = (
+            semantic_analyzer
+            if semantic_analyzer is not None
+            else build_semantic_analyzer_from_env()
+        )
+        self.scanner = InjectionScanner(ai_analyzer=configured_analyzer)
         self.registry = AnalyzerRegistry()
         self.registry.register(DrainAddressAnalyzer())
         self.registry.register(ToolHijackAnalyzer())
@@ -38,7 +44,6 @@ class WardenEngine:
 
         scan_context = context or {}
         expected_addresses = scan_context.get("expected_addresses", [])
-        scanner_result = await self.scanner.scan(payload, depth=depth)
         analyzer_context = AnalysisContext(
             address="",
             extra={
@@ -47,12 +52,16 @@ class WardenEngine:
             },
         )
         analyzer_results = await self.registry.run_all(analyzer_context)
+        semantic_allowed = not any(
+            result.error or result.flags or result.score > 0 for result in analyzer_results
+        )
+        scanner_result = await self.scanner.scan(
+            payload,
+            depth=depth,
+            allow_semantic=semantic_allowed,
+        )
         verdict = self.verdict_engine.decide(payload, scanner_result, analyzer_results)
         if verdict.verdict == "SANITIZE":
-            sanitized_scanner_result = await self.scanner.scan(
-                verdict.sanitized_payload,
-                depth=depth,
-            )
             sanitized_analyzer_context = AnalysisContext(
                 address="",
                 extra={
@@ -63,6 +72,15 @@ class WardenEngine:
                 },
             )
             sanitized_analyzer_results = await self.registry.run_all(sanitized_analyzer_context)
+            sanitized_semantic_allowed = semantic_allowed and not any(
+                result.error or result.flags or result.score > 0
+                for result in sanitized_analyzer_results
+            )
+            sanitized_scanner_result = await self.scanner.scan(
+                verdict.sanitized_payload,
+                depth=depth,
+                allow_semantic=sanitized_semantic_allowed,
+            )
             sanitized_verdict = self.verdict_engine.decide(
                 verdict.sanitized_payload,
                 sanitized_scanner_result,

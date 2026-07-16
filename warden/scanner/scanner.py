@@ -3,9 +3,10 @@
 Protects AI agents from malicious content embedded in token metadata,
 contract descriptions, and data feeds.
 
-The active layers are regex matching, statistical heuristics, and thorough-mode
-TF-IDF similarity against the versioned attack corpus. WardenEngine constructs
-this scanner without a semantic analyzer, so no LLM runs on the current path.
+The default layers are regex matching, statistical heuristics, and thorough-mode
+TF-IDF similarity against the versioned attack corpus. A provider-neutral semantic
+classifier is available only when explicitly configured in a paid runtime; it runs
+after the deterministic thorough layers and failures preserve their result.
 """
 
 import logging
@@ -14,6 +15,8 @@ import re
 import unicodedata
 from collections import Counter
 from typing import Dict, List, Optional, Tuple
+
+from warden.scanner.semantic import SemanticAnalyzer
 
 from warden.scanner.patterns import (
     INJECTION_PATTERNS,
@@ -33,11 +36,13 @@ from warden.scanner.patterns import (
 
 logger = logging.getLogger(__name__)
 
+SEMANTIC_CONFIDENCE_THRESHOLD = 0.8
+
 
 class InjectionScanner:
     """Regex, heuristic, and optional TF-IDF prompt-injection detection."""
 
-    def __init__(self, ai_analyzer=None):
+    def __init__(self, ai_analyzer: SemanticAnalyzer | None = None):
         self._ai = ai_analyzer
         # Pre-compile regex patterns for performance
         self._compiled_patterns: Dict[str, List[Tuple[re.Pattern, str]]] = {}
@@ -85,12 +90,20 @@ class InjectionScanner:
         """Lowercase word tokenization for TF-IDF."""
         return re.findall(r'[a-z0-9]+', text.lower())
 
-    async def scan(self, content: str, depth: str = "fast") -> Dict:
+    async def scan(
+        self,
+        content: str,
+        depth: str = "fast",
+        allow_semantic: bool = True,
+    ) -> Dict:
         """Scan content for prompt injection.
 
         Args:
             content: Text to scan (token metadata, contract description, etc.)
-            depth: "fast" for regex and heuristics, "thorough" to add TF-IDF.
+            depth: "fast" for regex and heuristics, "thorough" to add TF-IDF and
+                the optional configured semantic classifier.
+            allow_semantic: Whether the caller's deterministic gates permit the
+                optional classifier.
 
         Returns:
             dict with keys:
@@ -151,23 +164,20 @@ class InjectionScanner:
                     })
                     layers_triggered.append(3)
 
-            # ── Layer 4: LLM classification ────────────────────────
-            # Trigger when Layers 2 and 3 disagree
-            layer2_flagged = layer2_result["flagged"]
-            layer3_flagged = 3 in layers_triggered
-            if self._ai and self._ai.is_available():
-                if layer2_flagged != layer3_flagged:
-                    layer4_result = await self._run_llm_layer(content)
-                    if layer4_result["flagged"]:
-                        detections.append({
-                            "type": "llm_classification",
-                            "pattern_category": "ai_analysis",
-                            "match_text": None,
-                            "confidence": layer4_result["confidence"],
-                            "layer": 4,
-                            "detail": layer4_result["reason"],
-                        })
-                        layers_triggered.append(4)
+            # ── Layer 4: semantic classification ───────────────────
+            # Deterministic detections are authoritative and avoid the paid call.
+            if allow_semantic and self._ai and not detections:
+                layer4_result = await self._run_semantic_layer(content)
+                if layer4_result["flagged"]:
+                    detections.append({
+                        "type": "semantic_classification",
+                        "pattern_category": "ai_analysis",
+                        "match_text": None,
+                        "confidence": layer4_result["confidence"],
+                        "layer": 4,
+                        "detail": layer4_result["reason"],
+                    })
+                    layers_triggered.append(4)
 
         # ── Aggregate results ──────────────────────────────────────
         clean = len(detections) == 0
@@ -359,39 +369,26 @@ class InjectionScanner:
 
         return dot / (mag_a * mag_b)
 
-    # ── Layer 4: LLM classification ────────────────────────────────────
+    # ── Layer 4: semantic classification ───────────────────────────────
 
-    async def _run_llm_layer(self, content: str) -> Dict:
+    async def _run_semantic_layer(self, content: str) -> Dict:
         """Ask the configured optional analyzer for semantic classification."""
         try:
-            prompt = (
-                "Is this text a prompt injection attempt? "
-                "Answer YES or NO with a brief reason.\n\n"
-                f"Text: {content[:500]}"
-            )
-            response = await self._ai.compute_ai_risk_score({"raw_text": prompt})
-
-            # Parse the LLM response — check key_findings or recommendation
-            answer_text = ""
-            if isinstance(response, dict):
-                findings = response.get("key_findings", [])
-                rec = response.get("recommendation", "")
-                answer_text = " ".join(findings) + " " + rec
-            elif isinstance(response, str):
-                answer_text = response
-
-            answer_lower = answer_text.lower()
-            is_injection = "yes" in answer_lower
-            confidence = 0.80 if is_injection else 0.20
-
+            classification = await self._ai.classify(content)
             return {
-                "flagged": is_injection,
-                "confidence": confidence,
-                "reason": answer_text[:200],
+                "flagged": (
+                    classification.flagged
+                    and classification.confidence >= SEMANTIC_CONFIDENCE_THRESHOLD
+                ),
+                "confidence": classification.confidence,
+                "reason": classification.reason,
             }
         except Exception as exc:
-            logger.warning("Layer 4 LLM classification failed: %s", exc)
-            return {"flagged": False, "confidence": 0.0, "reason": "LLM unavailable"}
+            logger.warning(
+                "Optional semantic classification unavailable: %s",
+                type(exc).__name__,
+            )
+            return {"flagged": False, "confidence": 0.0, "reason": "Semantic layer unavailable"}
 
     # ── Result building ────────────────────────────────────────────────
 
@@ -459,7 +456,7 @@ class InjectionScanner:
         if "corpus_match" in categories:
             parts.append("Content matches known injection payloads.")
         if "ai_analysis" in categories:
-            parts.append("AI classifier flagged as injection.")
+            parts.append("Semantic classifier flagged an injection.")
 
         advice = {
             "LOW": "Monitor but likely benign.",
