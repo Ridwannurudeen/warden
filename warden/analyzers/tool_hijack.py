@@ -8,7 +8,10 @@ from warden.core.verdict import ReasonCode
 
 TOOL_KEYS = {"tool_call", "tool_calls", "tool_result", "function", "arguments"}
 FINANCIAL_ACTION_RE = re.compile(
-    r"(?i)\b(transfer|approve|setApproval|sign|sendTransaction|withdraw|deposit|pay)\b"
+    r"(?i)\b(transfer|approve|setApproval(?:ForAll)?|sign|sendTransaction|withdraw|deposit|pay)\b"
+)
+READ_ONLY_TOOL_RE = re.compile(
+    r'(?i)"(?:function|name|method)"\s*:\s*"(?:eth_)?getBalance"'
 )
 TOOL_SHAPE_RE = re.compile(
     r"(?i)(\"(?:tool_call|tool_calls|tool_result|function|arguments)\"|"
@@ -37,6 +40,8 @@ class ToolHijackAnalyzer(Analyzer):
         fenced_tool = any(self._has_tool_shape(block) for block in FENCED_BLOCK_RE.findall(payload))
 
         if not tool_shape and not fenced_tool:
+            return AnalyzerResult(name=self.name, weight=self.weight, score=0, data={"detections": []})
+        if financial_action is None and READ_ONLY_TOOL_RE.search(payload):
             return AnalyzerResult(name=self.name, weight=self.weight, score=0, data={"detections": []})
 
         confidence = 0.88 if financial_action else 0.60

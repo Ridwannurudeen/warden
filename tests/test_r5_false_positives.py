@@ -1,0 +1,52 @@
+"""R5 benign payload regressions for tool, recipient, and hex-hash text."""
+
+import pytest
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        '{"tool_call":{"function":"getBalance","arguments":{"address":"0x1111111111111111111111111111111111111111"}}}',
+        '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x1111111111111111111111111111111111111111","latest"]}',
+    ],
+)
+@pytest.mark.asyncio
+async def test_read_only_get_balance_payload_is_allowed(engine, payload):
+    verdict = await engine.scan(payload)
+
+    assert verdict.verdict == "ALLOW"
+    assert verdict.sanitized_payload == payload
+    assert "TOOL_HIJACK" not in {reason.value for reason in verdict.threat_classes}
+
+
+@pytest.mark.asyncio
+async def test_descriptive_invoice_recipient_is_not_redacted(engine):
+    payload = (
+        "Invoice recipient 0x2222222222222222222222222222222222222222 "
+        "matches the approved billing record."
+    )
+
+    verdict = await engine.scan(payload)
+
+    assert verdict.verdict == "ALLOW"
+    assert verdict.sanitized_payload == payload
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "Swap settled; transaction hash 0x" + "a1b2c3d4" * 8 + " is confirmed.",
+        "Security docs: never expose private keys. Example transaction hash 0x"
+        + "b2c3d4e5" * 8
+        + " may appear in logs.",
+        "Artifact checksum sha256: " + "c3d4e5f6" * 8 + ".",
+    ],
+)
+@pytest.mark.asyncio
+async def test_public_64_hex_hashes_are_allowed_and_preserved(engine, payload):
+    verdict = await engine.scan(payload)
+
+    assert verdict.verdict == "ALLOW"
+    assert verdict.sanitized_payload == payload
+    assert "SECRET_EXFIL" not in {reason.value for reason in verdict.threat_classes}
+

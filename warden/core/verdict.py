@@ -117,6 +117,10 @@ class VerdictEngine:
         hard_block = self._hard_block_reason(detections, scanner_risk)
         if hard_block is not None:
             checks[hard_block.value.lower()] = "fail - hard block gate fired"
+            if hard_block is ReasonCode.TOOL_HIJACK:
+                checks["sanitization_validation"] = (
+                    "fail - executable tool payload cannot be safely rewritten"
+                )
             return Verdict(
                 verdict="BLOCK",
                 risk_level="CRITICAL",
@@ -317,6 +321,10 @@ class VerdictEngine:
             if detection.get("class") == ReasonCode.SECRET_EXFIL.value:
                 if float(detection.get("confidence", 0.0)) >= 0.9:
                     return ReasonCode.SECRET_EXFIL
+        for detection in detections:
+            if detection.get("class") == ReasonCode.TOOL_HIJACK.value:
+                if float(detection.get("confidence", 0.0)) >= 0.8:
+                    return ReasonCode.TOOL_HIJACK
         if scanner_risk == "CRITICAL":
             return VerdictEngine._highest_confidence_scanner_reason(detections)
         return None
@@ -344,6 +352,8 @@ class VerdictEngine:
     def _sanitize(payload: str, detections: Sequence[Mapping[str, object]]) -> str:
         sanitized = payload
         for detection in detections:
+            if detection.get("class") == ReasonCode.TOOL_HIJACK.value:
+                continue
             match = str(detection.get("match", ""))
             if match:
                 sanitized = sanitized.replace(match, "[REDACTED]")

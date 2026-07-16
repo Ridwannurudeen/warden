@@ -10,10 +10,19 @@ BIP39_WORDS = frozenset(
     Path(__file__).with_name("bip39_words.txt").read_text(encoding="utf-8").splitlines()
 )
 PRIVATE_KEY_RE = re.compile(r"(?<![A-Fa-f0-9])(?:0x)?[A-Fa-f0-9]{64}(?![A-Fa-f0-9])")
-# A bare 64-hex string is format-identical to an Ethereum tx hash or a SHA-256
-# digest, so it is only treated as a hard-block secret when secret/key context
-# sits next to it; otherwise it is flagged at low confidence (SANITIZE, not BLOCK).
-KEY_CONTEXT_RE = re.compile(r"(?i)(?:\bkeys?\b|seed(?:\s*phrase)?|mnemonic|\bprivkey\b|credential)")
+# A bare 64-hex string is format-identical to an Ethereum tx hash or SHA-256
+# digest, so only explicit secret context can classify it as key material.
+KEY_CONTEXT_RE = re.compile(
+    r"(?i)(?:\b(?:private|secret|signing)\s+keys?\b|\bkey\s+material\b|"
+    r"seed(?:\s*phrase)?|mnemonic|\bprivkey\b|credential)"
+)
+PUBLIC_HASH_CONTEXT_RE = re.compile(
+    r"(?i)(?:\b(?:tx|transaction)\s+(?:id|hash)\b|\b(?:sha-?256|keccak)\b|"
+    r"\b(?:digest|checksum|bytes32|storage\s+slot)\b)"
+)
+NEGATED_INSTRUCTION_RE = re.compile(
+    r"(?i)\b(?:do\s+not|don't|never|must\s+not|should\s+not|cannot|can't|avoid)\s+$"
+)
 EXFIL_INSTRUCTION_RES = [
     re.compile(
         r"(?i)\b(?:send|paste|share|upload|post|exfiltrate|leak)\s+(?:your\s+)?"
@@ -51,23 +60,22 @@ class ExfiltrationAnalyzer(Analyzer):
             )
 
         detections: list[dict[str, object]] = []
+        instruction = self._exfil_instruction(payload)
         private_key = PRIVATE_KEY_RE.search(payload)
         if private_key:
             window = payload[max(0, private_key.start() - 40) : private_key.end() + 40]
-            has_context = bool(KEY_CONTEXT_RE.search(window)) or any(
-                pattern.search(payload) for pattern in EXFIL_INSTRUCTION_RES
+            has_context = not PUBLIC_HASH_CONTEXT_RE.search(window) and (
+                bool(KEY_CONTEXT_RE.search(window)) or instruction is not None
             )
-            detections.append(self._detection(private_key.group(), 0.95 if has_context else 0.5))
+            if has_context:
+                detections.append(self._detection(private_key.group(), 0.95))
 
         seed_phrase = self._seed_phrase(payload)
         if seed_phrase:
             detections.append(self._detection(seed_phrase, 0.95))
 
-        for pattern in EXFIL_INSTRUCTION_RES:
-            instruction = pattern.search(payload)
-            if instruction:
-                detections.append(self._detection(instruction.group(), 0.80))
-                break
+        if instruction:
+            detections.append(self._detection(instruction.group(), 0.80))
 
         score = max((detection["confidence"] for detection in detections), default=0.0) * 100
         return AnalyzerResult(
@@ -86,6 +94,15 @@ class ExfiltrationAnalyzer(Analyzer):
             if all(match.group() in BIP39_WORDS for match in window):
                 return payload[window[0].start() : window[-1].end()]
         return ""
+
+    @staticmethod
+    def _exfil_instruction(payload: str) -> re.Match[str] | None:
+        for pattern in EXFIL_INSTRUCTION_RES:
+            for instruction in pattern.finditer(payload):
+                prefix = payload[max(0, instruction.start() - 24) : instruction.start()]
+                if not NEGATED_INSTRUCTION_RE.search(prefix):
+                    return instruction
+        return None
 
     @staticmethod
     def _detection(match: str, confidence: float) -> dict[str, object]:
