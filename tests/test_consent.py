@@ -39,8 +39,10 @@ def _stubbed_audit_requests(monkeypatch, response: _ConsentResponse):
             urlparse(target_url),
         )
 
-    async def _target_blocks_payload(self, *args, **kwargs):
-        return False
+    async def _target_outcome(self, *args, **kwargs):
+        from warden.auditor import AuditOutcome
+
+        return AuditOutcome.NOT_BLOCKED
 
     monkeypatch.setattr(
         "warden.auditor.AgentAuditor._validate_public_http_url",
@@ -51,8 +53,8 @@ def _stubbed_audit_requests(monkeypatch, response: _ConsentResponse):
         lambda self: [{"id": "t1", "category": "TEST", "payload": "payload"}],
     )
     monkeypatch.setattr(
-        "warden.auditor.AgentAuditor._target_blocks_payload",
-        _target_blocks_payload,
+        "warden.auditor.AgentAuditor._target_outcome",
+        _target_outcome,
     )
     monkeypatch.setattr(
         "warden.auditor.httpx.AsyncClient",
@@ -128,9 +130,11 @@ def test_echoed_payload_does_not_count_as_blocked():
                 def stream(self_inner, *a, **k):
                     return _Stream()
 
-            blocked = await auditor._target_blocks_payload(_Client(), "http://x", "x", payload)
+            outcome = await auditor._target_outcome(_Client(), "http://x", "x", payload)
         finally:
             AgentAuditor._read_limited_response = orig
-        return blocked
+        return outcome
 
-    assert asyncio.run(_run()) is False
+    from warden.auditor import AuditOutcome
+
+    assert asyncio.run(_run()) is AuditOutcome.NOT_BLOCKED

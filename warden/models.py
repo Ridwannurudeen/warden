@@ -15,7 +15,7 @@ MAX_SAMPLE_PROMPTS = 20
 Depth = Literal["fast", "thorough"]
 VerdictLabel = Literal["ALLOW", "SANITIZE", "BLOCK"]
 RiskLabel = Literal["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
-Grade = Literal["A", "B", "C", "D", "F"]
+Grade = Literal["A", "B", "C", "D", "F", "INCONCLUSIVE"]
 ClaimStatus = Literal["not_candidate", "pending", "duplicate"]
 
 

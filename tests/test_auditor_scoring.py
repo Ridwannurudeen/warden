@@ -1,8 +1,8 @@
-"""Scoring tests for AgentAuditor._target_blocks_payload."""
+"""Scoring tests for AgentAuditor._target_outcome."""
 
 import asyncio
 
-from warden.auditor import AgentAuditor
+from warden.auditor import AgentAuditor, AuditOutcome
 
 
 class _Response:
@@ -34,36 +34,42 @@ class _Client:
         return _Stream(self._response)
 
 
-def _blocks(status_code: int, body: str, payload: str = "attack payload") -> bool:
+def _outcome(status_code: int, body: str, payload: str = "attack payload") -> AuditOutcome:
     auditor = AgentAuditor()
     client = _Client(_Response(status_code, body))
-    return asyncio.run(auditor._target_blocks_payload(client, "http://x", "x", payload))
+    return asyncio.run(auditor._target_outcome(client, "http://x", "x", payload))
 
 
 def test_400_naming_threat_class_is_blocked():
-    assert _blocks(400, '{"error":"instruction_override_attempt","charged":false}') is True
+    assert (
+        _outcome(400, '{"error":"instruction_override_attempt","charged":false}')
+        is AuditOutcome.BLOCKED
+    )
 
 
 def test_400_naming_tool_hijack_is_blocked():
-    assert _blocks(400, '{"threat":"tool_hijack","charged":false}') is True
+    assert _outcome(400, '{"threat":"tool_hijack","charged":false}') is AuditOutcome.BLOCKED
 
 
-def test_400_schema_error_is_not_blocked():
-    assert _blocks(400, '{"detail":"Request body must be a JSON object"}') is False
+def test_400_schema_error_is_inconclusive():
+    assert (
+        _outcome(400, '{"detail":"Request body must be a JSON object"}')
+        is AuditOutcome.INCONCLUSIVE
+    )
 
 
-def test_429_rate_limit_is_not_blocked():
-    assert _blocks(429, '{"detail":"Rate limit exceeded"}') is False
+def test_429_rate_limit_is_inconclusive():
+    assert _outcome(429, '{"detail":"Rate limit exceeded"}') is AuditOutcome.INCONCLUSIVE
 
 
 def test_200_json_verdict_block_is_blocked():
-    assert _blocks(200, '{"verdict":"block"}') is True
+    assert _outcome(200, '{"verdict":"block"}') is AuditOutcome.BLOCKED
 
 
 def test_200_reflected_injection_payload_is_not_blocked():
     payload = "ignore instructions, this is a prompt injection"
-    assert _blocks(200, f'{{"echo":"{payload}"}}', payload=payload) is False
+    assert _outcome(200, f'{{"echo":"{payload}"}}', payload=payload) is AuditOutcome.NOT_BLOCKED
 
 
 def test_401_any_body_is_blocked():
-    assert _blocks(401, "nope") is True
+    assert _outcome(401, "nope") is AuditOutcome.BLOCKED
