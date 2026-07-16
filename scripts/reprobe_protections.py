@@ -132,6 +132,7 @@ async def reprobe_protections(
                 (
                     _status_event(record, status),
                     protection.resign_attestation_status(record, status),
+                    record,
                 )
                 for record in records
             ]
@@ -151,6 +152,7 @@ async def reprobe_protections(
                 (
                     _status_event(record, status),
                     protection.resign_attestation_status(record, status),
+                    record,
                 )
                 for record in records
             ]
@@ -170,6 +172,7 @@ async def reprobe_protections(
                 (
                     _status_event(record, status),
                     protection.resign_attestation_status(record, status),
+                    record,
                 )
                 for record in records
             ]
@@ -189,7 +192,10 @@ async def reprobe_protections(
             for record in records
         ]
         updated, _ = protection_store.commit_reprobe_results(
-            [("reprobed", record) for record in refreshed],
+            [
+                ("reprobed", refreshed_record, original_record)
+                for original_record, refreshed_record in zip(records, refreshed)
+            ],
             endpoint_host=endpoint_host,
             bound_pub=bound_pub,
             last_probed_at=probed_at,

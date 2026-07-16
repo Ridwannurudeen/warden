@@ -624,7 +624,9 @@ def commit_revocation(
 
 
 def commit_reprobe_results(
-    results: list[tuple[str | None, dict[str, object]]],
+    results: list[
+        tuple[str | None, dict[str, object], dict[str, object]]
+    ],
     *,
     endpoint_host: str,
     bound_pub: str,
@@ -640,24 +642,28 @@ def commit_reprobe_results(
         ).fetchone()
         if binding is None or binding[0] != bound_pub or bool(binding[1]):
             return 0, []
-        if key_changed_host is not None:
-            connection.execute(
-                "UPDATE bindings SET key_changed = 1 WHERE endpoint_host = ?",
-                (key_changed_host,),
-            )
         entries = []
         updated = 0
-        for event, record in results:
+        for event, record, expected_record in results:
             current = connection.execute(
-                "SELECT status FROM attestations WHERE attestation_id = ?",
+                "SELECT status, record_json FROM attestations WHERE attestation_id = ?",
                 (str(record["attestation_id"]),),
             ).fetchone()
-            if current is None or current[0] not in {"active", "stale", "invalid"}:
+            if (
+                current is None
+                or current[0] not in {"active", "stale", "invalid"}
+                or current[1] != _canonical_json(expected_record)
+            ):
                 continue
             _store_attestation(connection, record, last_probed_at=last_probed_at)
             updated += 1
             if event is not None:
                 entries.append(_append_log(connection, event, record))
+        if key_changed_host is not None and updated:
+            connection.execute(
+                "UPDATE bindings SET key_changed = 1 WHERE endpoint_host = ?",
+                (key_changed_host,),
+            )
     return updated, entries
 
 
