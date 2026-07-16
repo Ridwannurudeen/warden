@@ -61,3 +61,14 @@ def test_blue_green_runbook_rewrites_only_flat_unit_code_paths() -> None:
     renderer = renderer[: renderer.index("candidate_service=")]
     assert "s#/opt/warden/current#" not in renderer
     assert 'render_app_service "$app/deploy/warden.service" "$candidate_service" "$app"' in runbook
+
+    rollback = runbook[runbook.index("## Application Rollback") :]
+    assert 'render_app_service "$app/deploy/warden.service" "$rollback_service" /opt/warden/current' in rollback
+    assert (
+        'install -m 0644 "$rollback_service" /etc/systemd/system/warden.service'
+        in rollback
+    )
+    assert (
+        'install -m 0644 "$app/deploy/warden.service" /etc/systemd/system/warden.service'
+        not in rollback
+    )

@@ -306,7 +306,6 @@ def test_rollback_installs_matching_versioned_configs_before_restart():
     rollback = runbook.split("## Application Rollback", 1)[1].split("## Nginx Shape", 1)[0]
 
     for source, destination in (
-        ("deploy/warden.service", "/etc/systemd/system/warden.service"),
         ("deploy/systemd/warden-index.service", "/etc/systemd/system/warden-index.service"),
         (
             "deploy/systemd/warden-index-fetch.service",
@@ -316,6 +315,14 @@ def test_rollback_installs_matching_versioned_configs_before_restart():
         ("deploy/nginx-warden.conf", "/etc/nginx/sites-available/warden.gudman.xyz.conf"),
     ):
         assert f'install -m 0644 "$app/{source}" {destination}' in rollback
+    assert (
+        'render_app_service "$app/deploy/warden.service" "$rollback_service" '
+        "/opt/warden/current"
+    ) in rollback
+    assert (
+        'install -m 0644 "$rollback_service" /etc/systemd/system/warden.service'
+        in rollback
+    )
     assert rollback.index("install -m 0644") < rollback.index("systemctl daemon-reload")
     assert rollback.index("nginx -t") < rollback.index(
         'mv -Tf "/opt/warden/.current-rollback-$release" /opt/warden/current'

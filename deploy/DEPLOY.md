@@ -593,6 +593,14 @@ validate_current_link() {
   test "${#version}" -eq 40
   case "$version" in (*[!0-9a-f]*|'') exit 1 ;; esac
 }
+render_app_service() {
+  source_service="$1"
+  target_service="$2"
+  app_root="$3"
+  sed -e "s#^WorkingDirectory=/opt/warden\$#WorkingDirectory=$app_root#" \
+      -e "s#^ExecStart=/opt/warden/.venv/#ExecStart=$app_root/.venv/#" \
+      "$source_service" >"$target_service"
+}
 reject_symlink /opt/warden
 reject_symlink /opt/warden/releases
 reject_symlink /opt/warden-site
@@ -616,7 +624,12 @@ test ! -e "/opt/warden/.current-rollback-$release"
 test ! -L "/opt/warden/.current-rollback-$release"
 test ! -e "/opt/warden-site/.current-rollback-$release"
 test ! -L "/opt/warden-site/.current-rollback-$release"
-install -m 0644 "$app/deploy/warden.service" /etc/systemd/system/warden.service
+rollback_service="$(mktemp)"
+trap 'rm -f -- "$rollback_service"' EXIT
+render_app_service "$app/deploy/warden.service" "$rollback_service" /opt/warden/current
+install -m 0644 "$rollback_service" /etc/systemd/system/warden.service
+rm -f -- "$rollback_service"
+trap - EXIT
 install -m 0644 "$app/deploy/systemd/warden-index-fetch.service" /etc/systemd/system/warden-index-fetch.service
 install -m 0644 "$app/deploy/systemd/warden-index.service" /etc/systemd/system/warden-index.service
 install -m 0644 "$app/deploy/systemd/warden-index.timer" /etc/systemd/system/warden-index.timer
