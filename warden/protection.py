@@ -446,8 +446,63 @@ def refresh_attestation(
     return _issuer_sign_attestation(updated)
 
 
+def _signed_json_values_are_safe(value: object) -> bool:
+    if value is None or type(value) is bool:
+        return True
+    if type(value) is int:
+        return -MAX_SAFE_UNIX_SECONDS <= value <= MAX_SAFE_UNIX_SECONDS
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8")
+        except UnicodeError:
+            return False
+        return True
+    if isinstance(value, list):
+        return all(_signed_json_values_are_safe(item) for item in value)
+    if isinstance(value, dict):
+        return all(
+            isinstance(key, str)
+            and _signed_json_values_are_safe(key)
+            and _signed_json_values_are_safe(item)
+            for key, item in value.items()
+        )
+    return False
+
+
 def verify_attestation_record(record: dict[str, object]) -> bool:
     """Verify against each issuer key valid at the record's signed verification time."""
+    if not isinstance(record, dict) or not _signed_json_values_are_safe(record):
+        return False
+    attestation_id = record.get("attestation_id")
+    endpoint_host = record.get("endpoint_host")
+    scans = record.get("scans_24h")
+    if record.get("spec_version") != SPEC_VERSION:
+        return False
+    if record.get("predicate_type") != PREDICATE_TYPE:
+        return False
+    if (
+        not isinstance(attestation_id, str)
+        or len(attestation_id) != 32
+        or any(character not in "0123456789abcdef" for character in attestation_id)
+    ):
+        return False
+    if record.get("issuer") != ISSUER_NAME or record.get("protector") != ISSUER_NAME:
+        return False
+    if not isinstance(endpoint_host, str) or not endpoint_host:
+        return False
+    try:
+        validate_endpoint_public_key(record.get("pub"), "attestation pub")
+    except ValueError:
+        return False
+    if record.get("tier") not in {"guard-live", "audited"}:
+        return False
+    if record.get("status") not in {"active", "stale", "key-changed", "revoked", "invalid"}:
+        return False
+    if "scans_24h" not in record or (
+        scans is not None
+        and (type(scans) is not int or not 0 <= scans <= MAX_SAFE_UNIX_SECONDS)
+    ):
+        return False
     verified_at = record.get("verified_at")
     expires_at = record.get("expires_at")
     if (

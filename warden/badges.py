@@ -51,14 +51,29 @@ def ed25519_sign_record(
 def ed25519_verify_record(record: dict[str, object], pub: str, sig_field: str) -> bool:
     """Verify an Ed25519 `sig_field` over canonical(record - sig_field) against `pub`."""
     signature = record.get(sig_field)
-    if not isinstance(signature, str):
+    if (
+        not isinstance(signature, str)
+        or not signature.startswith("sig:")
+        or not isinstance(pub, str)
+        or not pub.startswith("ed25519:")
+    ):
         return False
     core = {key: value for key, value in record.items() if key != sig_field}
     try:
-        Ed25519PublicKey.from_public_bytes(b64u_decode(pub)).verify(
-            b64u_decode(signature), _canonical_json(core).encode("utf-8")
+        public_key = b64u_decode(pub)
+        signature_bytes = b64u_decode(signature)
+        if (
+            len(public_key) != 32
+            or b64u_encode(public_key, "ed25519") != pub
+            or len(signature_bytes) != 64
+            or b64u_encode(signature_bytes, "sig") != signature
+        ):
+            return False
+        Ed25519PublicKey.from_public_bytes(public_key).verify(
+            signature_bytes,
+            _canonical_json(core).encode("utf-8"),
         )
-    except (InvalidSignature, ValueError):
+    except (InvalidSignature, TypeError, UnicodeError, ValueError):
         return False
     return True
 
