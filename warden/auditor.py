@@ -75,6 +75,7 @@ class AgentAuditor:
                 )
         except TimeoutError as exc:
             raise ValueError("target_url validation timed out") from exc
+        host_authority = self._host_authority(host_header, parsed_target.port)
         issued_at = date.today().isoformat()
         attacks = self._load_representative_attacks()
         for index, prompt in enumerate(sample_prompts or [], start=1):
@@ -98,8 +99,9 @@ class AgentAuditor:
                 outcome = await self._target_outcome(
                     client,
                     connect_url,
-                    host_header,
+                    host_authority,
                     str(attack["payload"]),
+                    sni_hostname=host_header,
                 )
                 outcomes.append(outcome)
                 if outcome is not AuditOutcome.INCONCLUSIVE:
@@ -212,16 +214,18 @@ class AgentAuditor:
         self,
         client: httpx.AsyncClient,
         connect_url: str,
-        host_header: str,
+        host_authority: str,
         payload: str,
+        *,
+        sni_hostname: str,
     ) -> AuditOutcome:
         try:
             async with client.stream(
                 "POST",
                 connect_url,
                 json={"payload": payload},
-                headers={"Host": host_header},
-                extensions={"sni_hostname": host_header},
+                headers={"Host": host_authority},
+                extensions={"sni_hostname": sni_hostname},
             ) as response:
                 body = await self._read_limited_response(response)
         except httpx.HTTPError:
@@ -344,6 +348,11 @@ class AgentAuditor:
         return f"{parts.scheme}://{parts.netloc}/.well-known/warden-consent"
 
     @staticmethod
+    def _host_authority(hostname: str, port: int | None) -> str:
+        host = f"[{hostname}]" if ":" in hostname else hostname
+        return f"{host}:{port}" if port is not None else host
+
+    @staticmethod
     def _require_consent() -> bool:
         return os.getenv("WARDEN_REQUIRE_CONSENT", "false").lower() in {
             "1",
@@ -360,15 +369,13 @@ class AgentAuditor:
         connect_url: str,
     ) -> bool:
         require_consent = self._require_consent()
-        host_header_with_port = host_header
-        if parsed_target.port and f":{parsed_target.port}" not in host_header_with_port:
-            host_header_with_port = f"{host_header_with_port}:{parsed_target.port}"
+        host_authority = self._host_authority(host_header, parsed_target.port)
         consent_url = self._build_consent_url(connect_url)
         try:
             async with client.stream(
                 "GET",
                 consent_url,
-                headers={"Host": host_header_with_port},
+                headers={"Host": host_authority},
                 extensions={"sni_hostname": host_header},
                 timeout=CONSENT_TIMEOUT_SECONDS,
             ) as response:

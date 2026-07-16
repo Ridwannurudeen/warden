@@ -222,7 +222,7 @@ def test_echoed_payload_does_not_count_as_blocked():
             def stream(self_inner, *a, **k):
                 return _Stream()
 
-        return await auditor._target_outcome(_Client(), "http://x", "x", payload)
+        return await auditor._target_outcome(_Client(), "http://x", "x", payload, sni_hostname="x")
 
     from warden.auditor import AuditOutcome
 

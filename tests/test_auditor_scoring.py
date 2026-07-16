@@ -47,7 +47,7 @@ def _outcome(
 ) -> AuditOutcome:
     auditor = AgentAuditor()
     client = _Client(_Response(status_code, body, headers))
-    return asyncio.run(auditor._target_outcome(client, "http://x", "x", payload))
+    return asyncio.run(auditor._target_outcome(client, "http://x", "x", payload, sni_hostname="x"))
 
 
 def test_400_naming_threat_class_is_blocked():

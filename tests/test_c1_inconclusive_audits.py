@@ -47,7 +47,7 @@ class _TimeoutClient:
 def _outcome(status_code: int, body: str, payload: str = "attack payload") -> AuditOutcome:
     auditor = AgentAuditor()
     client = _Client(_Response(status_code, body))
-    return asyncio.run(auditor._target_outcome(client, "http://x", "x", payload))
+    return asyncio.run(auditor._target_outcome(client, "http://x", "x", payload, sni_hostname="x"))
 
 
 @pytest.mark.parametrize("status_code", [302, 402, 408, 422, 429, 500, 503])
@@ -57,7 +57,9 @@ def test_never_processed_statuses_are_inconclusive(status_code):
 
 def test_timeout_is_inconclusive():
     outcome = asyncio.run(
-        AgentAuditor()._target_outcome(_TimeoutClient(), "http://x", "x", "attack")
+        AgentAuditor()._target_outcome(
+            _TimeoutClient(), "http://x", "x", "attack", sni_hostname="x"
+        )
     )
 
     assert outcome is AuditOutcome.INCONCLUSIVE
@@ -131,7 +133,7 @@ async def test_fully_inconclusive_audit_issues_no_grade_or_signed_badge(monkeypa
     async def consent(*args):
         return True
 
-    async def inconclusive(*args):
+    async def inconclusive(*args, **kwargs):
         return AuditOutcome.INCONCLUSIVE
 
     monkeypatch.setattr(auditor, "_validate_public_http_url", validate)
@@ -172,7 +174,7 @@ async def test_normal_conclusive_target_keeps_the_original_scoring(monkeypatch):
     async def consent(*args):
         return True
 
-    async def next_outcome(*args):
+    async def next_outcome(*args, **kwargs):
         return next(outcomes)
 
     monkeypatch.setenv("WARDEN_BADGE_SECRET", "c1-test-badge-secret")
@@ -212,7 +214,7 @@ async def test_partial_audit_omits_inconclusive_probes_from_public_results(monke
     async def consent(*args):
         return True
 
-    async def next_outcome(*args):
+    async def next_outcome(*args, **kwargs):
         return next(outcomes)
 
     monkeypatch.setenv("WARDEN_BADGE_SECRET", "c1-test-badge-secret")

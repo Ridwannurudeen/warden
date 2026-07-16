@@ -2,6 +2,7 @@
 
 import asyncio
 import ipaddress
+from urllib.parse import urlparse
 
 import pytest
 
@@ -49,3 +50,79 @@ async def test_audit_url_validation_has_a_deadline(monkeypatch):
 
     with pytest.raises(ValueError, match="target_url validation timed out"):
         await asyncio.wait_for(auditor.audit("https://example.org/scan"), timeout=0.1)
+
+
+@pytest.mark.parametrize(
+    ("target_url", "hostname", "expected_authority"),
+    [
+        ("https://example.org:8443/scan", "example.org", "example.org:8443"),
+        (
+            "https://[2001:4860:4860::8888]:8443/scan",
+            "2001:4860:4860::8888",
+            "[2001:4860:4860::8888]:8443",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_audit_preserves_target_authority_for_requests(
+    monkeypatch,
+    target_url,
+    hostname,
+    expected_authority,
+):
+    auditor = AgentAuditor()
+    captured: dict[str, object] = {}
+
+    async def validate(candidate: str):
+        return "https://93.184.216.34:8443/scan", hostname, urlparse(candidate)
+
+    async def verify_consent(*args, **kwargs):
+        return False
+
+    class _Response:
+        status_code = 200
+        headers: dict[str, str] = {}
+
+        async def aiter_raw(self, chunk_size: int | None = None):
+            yield b"{}"
+
+    class _Stream:
+        async def __aenter__(self):
+            return _Response()
+
+        async def __aexit__(self, *args):
+            return False
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            assert kwargs["follow_redirects"] is False
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        def stream(self, method, url, **kwargs):
+            captured["method"] = method
+            captured["host_header"] = kwargs["headers"]["Host"]
+            captured["sni_hostname"] = kwargs["extensions"]["sni_hostname"]
+            return _Stream()
+
+    monkeypatch.setattr(auditor, "_validate_public_http_url", validate)
+    monkeypatch.setattr(auditor, "_verify_target_consent", verify_consent)
+    monkeypatch.setattr(
+        auditor,
+        "_load_representative_attacks",
+        lambda: [{"id": "t1", "category": "TEST", "payload": "payload"}],
+    )
+    monkeypatch.setattr("warden.auditor.httpx.AsyncClient", _Client)
+
+    response = await auditor.audit(target_url)
+
+    assert response.consent_verified is False
+    assert captured == {
+        "method": "POST",
+        "host_header": expected_authority,
+        "sni_hostname": hostname,
+    }
