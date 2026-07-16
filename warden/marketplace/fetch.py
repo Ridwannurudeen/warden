@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 from collections.abc import Callable
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Literal
 
@@ -15,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 SNAPSHOT_SCHEMA_VERSION = 2
 MAX_MARKETPLACE_PAGES = 100
+MAX_FEE_TEXT_LENGTH = 64
 
 CommandRunner = Callable[[list[str]], str]
 
@@ -38,6 +40,31 @@ class MarketplaceService(BaseModel):
             raise ValueError("serviceId must be a decimal identifier")
         return normalized
 
+    @field_validator("fee_amount", mode="before")
+    @classmethod
+    def validate_fee_amount(cls, value: object) -> object:
+        if value is None:
+            return None
+        text = str(value)
+        if len(text) > MAX_FEE_TEXT_LENGTH:
+            raise ValueError("feeAmount is too long")
+        try:
+            amount = Decimal(text)
+        except InvalidOperation as exc:
+            raise ValueError("feeAmount must be numeric") from exc
+        if not amount.is_finite():
+            raise ValueError("feeAmount must be finite")
+        sign, digits, exponent = amount.as_tuple()
+        if exponent >= 0:
+            fixed_length = len(digits) + exponent
+        else:
+            fixed_length = max(len(digits) + exponent, 1) + 1 - exponent
+        if sign:
+            fixed_length += 1
+        if fixed_length > MAX_FEE_TEXT_LENGTH:
+            raise ValueError("feeAmount fixed-point representation is too long")
+        return value
+
     @field_validator(
         "service_name",
         "endpoint",
@@ -59,8 +86,8 @@ class MarketplaceAgent(BaseModel):
     profile_description: str = Field(default="", alias="profileDescription")
     category_codes: list[str] = Field(default_factory=list, alias="categoryCode")
     sold_count: int | None = Field(default=None, alias="soldCount")
-    feedback_rate: float | None = Field(default=None, alias="feedbackRate")
-    security_rate: float | None = Field(default=None, alias="securityRate")
+    feedback_rate: float | None = Field(default=None, alias="feedbackRate", allow_inf_nan=False)
+    security_rate: float | None = Field(default=None, alias="securityRate", allow_inf_nan=False)
     online_status: int | None = Field(default=None, alias="onlineStatus")
     profile_picture: str = Field(default="", alias="profilePicture")
     communication_address: str = Field(default="", alias="communicationAddress")

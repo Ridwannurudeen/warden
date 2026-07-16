@@ -426,6 +426,36 @@ def test_marketplace_agent_rejects_unsafe_file_id():
         _agent(agentId="../3808")
 
 
+@pytest.mark.parametrize("field", ["feedbackRate", "securityRate"])
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_marketplace_agent_rejects_nonfinite_rates(field, value):
+    with pytest.raises(ValidationError):
+        _agent(**{field: value})
+
+
+@pytest.mark.parametrize(
+    "fee_amount",
+    [
+        float("nan"),
+        float("inf"),
+        float("-inf"),
+        "NaN",
+        "Infinity",
+        "-Infinity",
+        "1e1000000",
+        "1e-1000000",
+    ],
+)
+def test_marketplace_service_rejects_unsafe_fee_amounts(fee_amount):
+    with pytest.raises(ValidationError):
+        MarketplaceService.model_validate(
+            {
+                "serviceId": "1",
+                "feeAmount": fee_amount,
+            }
+        )
+
+
 def test_renderer_escapes_content_handles_zero_services_and_verifies_badge(tmp_path, monkeypatch):
     monkeypatch.setenv("WARDEN_BADGE_SECRET", "marketplace-render-test-key")
     badge = issue_badge(
