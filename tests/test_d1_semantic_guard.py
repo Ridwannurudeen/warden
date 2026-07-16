@@ -13,6 +13,7 @@ from warden.models import ScanRequest
 from warden.scanner.scanner import InjectionScanner
 from warden.scanner.semantic import (
     HttpSemanticAnalyzer,
+    MAX_SEMANTIC_RESPONSE_BYTES,
     SemanticClassification,
     build_semantic_analyzer_from_env,
 )
@@ -41,6 +42,22 @@ class RecordingSemanticAnalyzer:
         if self.error is not None:
             raise self.error
         return self.classification
+
+
+class CountingResponseStream(httpx.AsyncByteStream):
+    def __init__(self) -> None:
+        self.chunk = b"x" * (MAX_SEMANTIC_RESPONSE_BYTES // 2)
+        self.chunk_count = 10
+        self.bytes_yielded = 0
+        self.closed = False
+
+    async def __aiter__(self):
+        for _ in range(self.chunk_count):
+            self.bytes_yielded += len(self.chunk)
+            yield self.chunk
+
+    async def aclose(self) -> None:
+        self.closed = True
 
 
 def semantic_environment() -> dict[str, str]:
@@ -319,3 +336,26 @@ async def test_invalid_provider_response_fails_open():
 
     assert result["clean"] is True
     assert result["layers_triggered"] == []
+
+
+@pytest.mark.asyncio
+async def test_oversized_stream_stops_early_and_semantic_scan_fails_open():
+    stream = CountingResponseStream()
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, stream=stream)
+
+    analyzer = HttpSemanticAnalyzer(
+        endpoint="https://semantic.example/v1/classify",
+        api_key="test-semantic-key",
+        transport=httpx.MockTransport(handler),
+    )
+    scanner = InjectionScanner(ai_analyzer=analyzer)
+
+    result = await scanner.scan(NOVEL_INJECTION, depth="thorough")
+
+    assert result["clean"] is True
+    assert result["layers_triggered"] == []
+    assert stream.bytes_yielded == MAX_SEMANTIC_RESPONSE_BYTES * 3 // 2
+    assert stream.bytes_yielded < len(stream.chunk) * stream.chunk_count
+    assert stream.closed is True

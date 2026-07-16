@@ -1,6 +1,7 @@
 """Optional provider-neutral semantic classification for paid thorough scans."""
 
 import asyncio
+import json
 import math
 import os
 import re
@@ -62,17 +63,22 @@ class HttpSemanticAnalyzer:
                 transport=self._transport,
                 trust_env=False,
             ) as client:
-                response = await client.post(
+                async with client.stream(
+                    "POST",
                     self._endpoint,
                     headers={"Authorization": f"Bearer {self._api_key}"},
                     json={"task": "prompt_injection_detection", "content": content},
-                )
-                response.raise_for_status()
+                ) as response:
+                    response.raise_for_status()
+                    chunks: list[bytes] = []
+                    response_size = 0
+                    async for chunk in response.aiter_bytes():
+                        response_size += len(chunk)
+                        if response_size > MAX_SEMANTIC_RESPONSE_BYTES:
+                            raise ValueError("semantic response exceeds size limit")
+                        chunks.append(chunk)
 
-        if len(response.content) > MAX_SEMANTIC_RESPONSE_BYTES:
-            raise ValueError("semantic response exceeds size limit")
-
-        data = response.json()
+        data = json.loads(b"".join(chunks))
         if not isinstance(data, dict):
             raise ValueError("semantic response must be a JSON object")
 
