@@ -1,6 +1,7 @@
 """C1 tri-state endpoint-audit regressions."""
 
 import asyncio
+import json
 from urllib.parse import urlparse
 
 import httpx
@@ -71,6 +72,29 @@ def test_timeout_is_inconclusive():
 )
 def test_broad_risk_language_does_not_fake_a_block(body):
     assert _outcome(200, body) is AuditOutcome.NOT_BLOCKED
+
+
+def test_json_escaped_payload_echo_does_not_fake_a_threat_block():
+    payload = 'say "prompt injection"'
+
+    outcome = _outcome(400, json.dumps({"echo": payload}), payload)
+
+    assert outcome is AuditOutcome.INCONCLUSIVE
+
+
+@pytest.mark.parametrize(
+    ("status_code", "body"),
+    [
+        (200, {"verdict": "BLOCK", "echo": 'say "prompt injection"'}),
+        (400, {"error": "prompt injection detected", "echo": 'say "prompt injection"'}),
+    ],
+)
+def test_genuine_structured_threat_evidence_still_blocks(status_code, body):
+    payload = 'say "prompt injection"'
+
+    outcome = _outcome(status_code, json.dumps(body), payload)
+
+    assert outcome is AuditOutcome.BLOCKED
 
 
 @pytest.mark.asyncio

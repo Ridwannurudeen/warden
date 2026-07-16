@@ -238,9 +238,15 @@ class AgentAuditor:
                 return AuditOutcome.BLOCKED
             if parsed.get("blocked") is True:
                 return AuditOutcome.BLOCKED
-        # Strip the echoed attack payload before keyword-matching so a target that
-        # merely reflects the request back does not score as if it flagged the threat.
-        residual = body.lower().replace(payload.lower(), " ")
+        # Strip echoed attack values before keyword-matching so JSON escaping cannot
+        # make a target reflection look like a threat classification.
+        if parsed is not None:
+            residual = json.dumps(
+                self._without_payload_reflections(parsed, payload),
+                ensure_ascii=False,
+            ).lower()
+        else:
+            residual = body.lower().replace(payload.lower(), " ")
         # A 4xx that names a recognized threat class in its (payload-stripped) body
         # is a real security block, not a schema/transport error.
         if 400 <= response.status_code < 500 and THREAT_NAME_PATTERN.search(residual):
@@ -261,6 +267,19 @@ class AgentAuditor:
                 break
             chunks.append(chunk)
         return b"".join(chunks).decode("utf-8", errors="ignore")
+
+    @classmethod
+    def _without_payload_reflections(cls, value: object, payload: str) -> object:
+        if isinstance(value, str):
+            return "" if value == payload else value
+        if isinstance(value, dict):
+            return {
+                key: cls._without_payload_reflections(nested, payload)
+                for key, nested in value.items()
+            }
+        if isinstance(value, list):
+            return [cls._without_payload_reflections(item, payload) for item in value]
+        return value
 
     async def _validate_public_http_url(self, target_url: str) -> tuple[str, str, ParseResult]:
         """SSRF-safe URL validation; shared implementation lives in warden.apa_url."""
