@@ -11,6 +11,9 @@ TRANSFER_INTENT_RE = re.compile(
     r"(?i)\b(send|transfer|pay|deposit|withdraw|recipient|payment|funds|to address"
     r"|move|redirect|payout|route|wallet\s+is|receiving address)\b"
 )
+# A payment instruction paired with a malformed (non-40-char) 0x token.
+# The strict EVM path cannot see a truncated recipient, so inspect it separately.
+MALFORMED_ADDR_RE = re.compile(r"0x[a-fA-F0-9]{20,39}(?![a-fA-F0-9])")
 
 
 class DrainAddressAnalyzer(Analyzer):
@@ -64,6 +67,13 @@ class DrainAddressAnalyzer(Analyzer):
             )
             if confidence:
                 detections.append(self._detection(address, confidence))
+
+        if TRANSFER_INTENT_RE.search(payload):
+            for match in MALFORMED_ADDR_RE.finditer(payload):
+                token = match.group()
+                if token.lower() in expected_evm:
+                    continue
+                detections.append(self._detection(token, 0.60))
 
         score = max((detection["confidence"] for detection in detections), default=0.0) * 100
         flags = [f"Payment redirection candidate: {detection['match']}" for detection in detections]

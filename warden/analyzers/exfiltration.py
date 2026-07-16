@@ -21,6 +21,16 @@ EXFIL_INSTRUCTION_RES = [
     ),
     re.compile(r"(?i)\breveal\s+(?:the\s+)?system\s+prompt\b"),
     re.compile(r"(?i)\bPOST\b.{0,80}\bhttps?://"),
+    # Broader verbs ("output/return/give/print/…") over credential/key tokens only,
+    # including underscored/prefixed forms like OKX_API_KEY. Kept off wallet/context
+    # to avoid false positives on benign "provide the wallet balance" phrasing.
+    re.compile(
+        r"(?i)\b(?:send|paste|share|upload|post|leak|output|return|reveal|give|provide"
+        r"|print|dump|echo|disclose|expose|show|reply\s+with|respond\s+with)\s+"
+        r"(?:me\s+|us\s+)?(?:your|the|all|any)?\s*"
+        r"(?:credentials?|mnemonic|seed\s*phrase|system\s*prompt|"
+        r"(?:[a-z0-9]+[_-])?(?:api|secret|access|private|signing|auth)[_ -]?keys?)\b"
+    ),
 ]
 
 
