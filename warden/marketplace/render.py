@@ -41,8 +41,21 @@ def _escape(value: object) -> str:
 
 
 def _safe_external_url(value: str) -> str | None:
-    parsed = urlparse(value)
-    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+    try:
+        parsed = urlparse(value)
+        hostname = parsed.hostname
+        username = parsed.username
+        password = parsed.password
+        port = parsed.port
+    except ValueError:
+        return None
+    if (
+        parsed.scheme != "https"
+        or not hostname
+        or username
+        or password
+        or (port is not None and not 1 <= port <= 65_535)
+    ):
         return None
     return value
 
@@ -120,19 +133,17 @@ def _listed_service_hosts(
     service_hosts_by_agent: dict[str, set[str]] = {}
     for indexed in indexed_agents:
         for service in indexed.agent.services:
-            endpoint = urlparse(service.endpoint)
-            if (
-                endpoint.scheme not in {"http", "https"}
-                or not endpoint.hostname
-                or endpoint.username
-                or endpoint.password
-            ):
-                continue
             try:
+                endpoint = urlparse(service.endpoint)
+                hostname = endpoint.hostname
+                username = endpoint.username
+                password = endpoint.password
                 port = endpoint.port
             except ValueError:
                 continue
-            host = endpoint.hostname.rstrip(".").casefold()
+            if endpoint.scheme not in {"http", "https"} or not hostname or username or password:
+                continue
+            host = hostname.rstrip(".").casefold()
             default_port = 443 if endpoint.scheme == "https" else 80
             if include_non_default_port and port not in (None, default_port):
                 host = f"{host}:{port}"
@@ -148,22 +159,25 @@ def _normalize_apa_endpoint_host(value: object) -> str | None:
         or any(character.isspace() or character in "/?#@" for character in value)
     ):
         return None
-    parsed = urlparse(f"//{value}")
+    try:
+        parsed = urlparse(f"//{value}")
+        hostname = parsed.hostname
+        username = parsed.username
+        password = parsed.password
+        port = parsed.port
+    except ValueError:
+        return None
     if (
-        not parsed.hostname
-        or parsed.username
-        or parsed.password
+        not hostname
+        or username
+        or password
         or parsed.path
         or parsed.params
         or parsed.query
         or parsed.fragment
     ):
         return None
-    try:
-        port = parsed.port
-    except ValueError:
-        return value.casefold()
-    host = parsed.hostname.rstrip(".").casefold()
+    host = hostname.rstrip(".").casefold()
     return host if port is None else f"{host}:{port}"
 
 

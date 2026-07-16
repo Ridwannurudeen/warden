@@ -500,6 +500,27 @@ def test_renderer_escapes_content_handles_zero_services_and_verifies_badge(tmp_p
     assert 'rel="canonical" href="https://warden.gudman.xyz/agents/3808"' in agent_html
 
 
+@pytest.mark.parametrize(
+    "profile_picture",
+    ["https://[", "https://example.org:not-a-port/avatar.png"],
+)
+def test_renderer_ignores_malformed_avatar_urls(tmp_path, profile_picture):
+    indexed = IndexedAgent(
+        agent=_agent(profilePicture=profile_picture),
+        verdict="ALLOW",
+        risk_level="NONE",
+        threat_classes=[],
+        fields_scanned=1,
+        rationale="No injection patterns were detected.",
+    )
+
+    render_marketplace([indexed], tmp_path, coverage=_coverage(sampled=1))
+
+    agent_html = (tmp_path / "3808.html").read_text(encoding="utf-8")
+    assert "Marketplace avatar unavailable" in agent_html
+    assert "View marketplace avatar" not in agent_html
+
+
 def test_renderer_does_not_attach_tampered_badge(tmp_path, monkeypatch):
     monkeypatch.setenv("WARDEN_BADGE_SECRET", "marketplace-render-test-key")
     badge = issue_badge(
@@ -797,6 +818,36 @@ def test_badge_association_requires_an_explicit_reviewed_link(monkeypatch):
     assert associate_badges(indexed, [badge], {str(badge["audit_id"]): "3808"}) == {"3808": [badge]}
 
 
+def test_badge_association_ignores_malformed_service_url(monkeypatch):
+    monkeypatch.setenv("WARDEN_BADGE_SECRET", "marketplace-association-test-key")
+    service = MarketplaceService.model_validate(
+        {"serviceId": "1", "endpoint": "https://["}
+    )
+    indexed = [
+        IndexedAgent(
+            agent=_agent(services=[service]),
+            verdict="ALLOW",
+            risk_level="NONE",
+            threat_classes=[],
+            fields_scanned=1,
+            rationale="No injection patterns were detected.",
+        )
+    ]
+    badge = issue_badge(
+        target_host="example.org",
+        score=100,
+        grade="A",
+        blocked=20,
+        total=20,
+        issued_at="2026-07-13",
+    )
+
+    assert (
+        associate_badges(indexed, [badge], {str(badge["audit_id"]): "3808"})
+        == {}
+    )
+
+
 def test_badge_link_manifest_rejects_conflicting_agent_ownership(tmp_path):
     audit_id = "0123456789abcdef"
     manifest = tmp_path / "badge-links-v1.json"
@@ -931,6 +982,18 @@ def test_apa_association_requires_valid_signature_reviewed_link_and_matching_ser
 
     host_mismatch = _signed_attestation(issuer_key, endpoint_host="other.example.org")
     assert associate_attestations(indexed, [host_mismatch], link, issuer_pub) == {}
+
+    malformed_host = _signed_attestation(
+        issuer_key,
+        attestation_id="fedcba9876543210fedcba9876543210",
+        endpoint_host="[",
+    )
+    assert associate_attestations(
+        indexed,
+        [malformed_host],
+        {str(malformed_host["attestation_id"]): "3808"},
+        issuer_pub,
+    ) == {}
 
     overlong = _signed_attestation(
         issuer_key,
