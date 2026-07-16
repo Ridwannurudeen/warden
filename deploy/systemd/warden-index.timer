@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh Warden live Safety Index every six hours
+
+[Timer]
+OnCalendar=*-*-* 00/6:00:00 UTC
+RandomizedDelaySec=15m
+Persistent=true
+Unit=warden-index.service
+
+[Install]
+WantedBy=timers.target

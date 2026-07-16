@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Inspect Warden's APA issuance and status-change log and verify its SHA-256 chain continuity in your browser."
+    />
+    <meta name="color-scheme" content="dark light" />
+    <title>APA Transparency Log | Warden</title>
+    <link rel="canonical" href="https://warden.gudman.xyz/apa/log" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Warden" />
+    <meta property="og:title" content="APA Transparency Log | Warden" />
+    <meta
+      property="og:description"
+      content="Inspect the current APA log and independently recompute its internal SHA-256 chain."
+    />
+    <meta property="og:url" content="https://warden.gudman.xyz/apa/log" />
+    <meta
+      property="og:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <link rel="icon" href="/assets/warden-avatar.png" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header page-shell">
+      <a class="brand" href="/" aria-label="Warden home"
+        ><img
+          src="/assets/warden-avatar.png"
+          alt=""
+          width="36"
+          height="36"
+        /><span>Warden</span></a
+      >
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-nav"
+        data-nav-toggle
+      >
+        Menu
+      </button>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
+        <details class="nav-group">
+          <summary>Product</summary>
+          <div class="nav-menu">
+            <a href="/theater">Attack Theater</a>
+            <a href="/playground">Playground</a>
+            <a href="/agents">Marketplace index</a>
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/showcase">Judge showcase</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Developers</summary>
+          <div class="nav-menu">
+            <a href="/docs">Documentation</a>
+            <a href="/integrate">Integrate</a>
+            <a href="/trust">Trust Layer</a>
+            <a href="/status">API status</a>
+          </div>
+        </details>
+        <details class="nav-group has-current">
+          <summary>Evidence</summary>
+          <div class="nav-menu">
+            <a href="/verify">Verify APA</a>
+            <a href="/apa/log" aria-current="page">Transparency log</a>
+            <a href="/badges">Audit badges</a>
+            <a href="/agents#methodology">Public-text methodology</a>
+            <a href="/gauntlet#policy">Adversarial challenge</a>
+          </div>
+        </details>
+        <div class="nav-mobile-actions">
+          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
+          <a class="button primary" href="/playground">Run a live scan</a>
+        </div>
+      </nav>
+      <div class="header-actions">
+        <a class="status-pill" href="/status" aria-label="Open API status"
+          ><span class="live-dot" data-health-dot aria-hidden="true"></span
+          ><span data-health-label>Checking API</span></a
+        >
+        <a class="header-hire" href="/hire">Hire</a>
+        <a class="header-scan" href="/playground">Run scan</a>
+        <button
+          class="theme-toggle"
+          type="button"
+          data-theme-toggle
+          aria-label="Switch color theme"
+        >
+          Theme
+        </button>
+      </div>
+    </header>
+
+    <main
+      id="main"
+      class="page-shell site-main"
+      data-apa-log
+      data-state="loading"
+    >
+      <section class="page-hero">
+        <p class="eyebrow">APA issuer transparency</p>
+        <h1>Verify the published history, not a screenshot.</h1>
+        <p class="hero-text">
+          This page re-fetches <code>GET /apa/log</code> as JSON and recomputes
+          every SHA-256 <code>prev_hash</code> link locally. Issuance and status
+          changes remain visible in sequence.
+        </p>
+      </section>
+
+      <section
+        class="proof-strip"
+        aria-label="Transparency verification boundaries"
+      >
+        <div><span>Source</span><strong>Live JSON log</strong></div>
+        <div><span>Chain</span><strong>SHA-256</strong></div>
+        <div><span>Genesis</span><strong class="num">64 zeroes</strong></div>
+        <div><span>Result</span><strong>Continuity only</strong></div>
+      </section>
+
+      <section class="status-live-panel" aria-labelledby="log-status-title">
+        <div class="section-heading">
+          <p class="eyebrow">Browser verification</p>
+          <h2 id="log-status-title">Current chain result</h2>
+          <p data-apa-log-status role="status" aria-live="polite">
+            Fetching the current JSON log…
+          </p>
+          <button class="button secondary" type="button" data-apa-log-retry>
+            Re-fetch and verify
+          </button>
+        </div>
+        <div class="status-grid" aria-label="Current transparency log facts">
+          <div>
+            <span>Published entries</span
+            ><strong class="num" data-apa-log-total>Checking</strong>
+          </div>
+          <div>
+            <span>Chain result</span
+            ><strong data-apa-log-chain>Checking</strong>
+          </div>
+          <div>
+            <span>Observed at</span
+            ><strong class="num" data-apa-log-observed>Not checked yet</strong>
+          </div>
+          <div>
+            <span>Computed head hash</span
+            ><strong class="num" data-apa-log-head>Checking</strong>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="log-entries-title">
+        <div class="section-heading">
+          <p class="eyebrow">Append sequence</p>
+          <h2 id="log-entries-title">Issuance and status-change entries</h2>
+          <p class="section-copy">
+            Each entry includes the hash of its associated signed record and the
+            canonical hash of the preceding log entry.
+          </p>
+        </div>
+        <ol class="command-flow" data-apa-log-entries>
+          <li class="empty-state">Loading transparency entries…</li>
+        </ol>
+        <noscript
+          ><p class="empty-state">
+            JavaScript is required to recompute the log's SHA-256 chain in this
+            browser. Request <code>/apa/log</code> with
+            <code>Accept: application/json</code> for the raw data.
+          </p></noscript
+        >
+      </section>
+
+      <aside class="callout">
+        A continuous chain shows that this response is internally consistent. It
+        does not prove log completeness, independently verify each
+        <code>record_hash</code>, or detect a fully rewritten history without an
+        independently anchored checkpoint.
+      </aside>
+    </main>
+
+    <footer class="site-footer page-shell">
+      <div>
+        <strong>Warden</strong
+        ><span>The immune system of the agent economy.</span
+        ><span>Independent service listed on OKX.AI.</span>
+      </div>
+      <nav aria-label="Footer">
+        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
+        ><a href="/showcase">Showcase</a><a href="/docs">Docs</a
+        ><a href="/badges">Evidence</a><a href="/status">Status</a
+        ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
+        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+      </nav>
+    </footer>
+    <script src="/app.js" defer></script>
+    <script src="/log.js" defer></script>
+  </body>
+</html>

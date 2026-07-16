@@ -8,6 +8,10 @@ import socket
 from urllib.parse import ParseResult, urlparse
 
 
+class PublicUrlUnavailable(ValueError):
+    """The public URL is valid in shape but cannot currently be resolved."""
+
+
 async def validate_public_http_url(target_url: str) -> tuple[str, str, ParseResult]:
     """
     Validate target_url and pin it to one resolved IP.
@@ -27,7 +31,7 @@ async def validate_public_http_url(target_url: str) -> tuple[str, str, ParseResu
 
     addresses = await resolve_host(parsed.hostname)
     if not addresses:
-        raise ValueError("target_url hostname did not resolve")
+        raise PublicUrlUnavailable("target_url hostname did not resolve")
     pinned_ip: str | None = None
     for address in addresses:
         ip = ipaddress.ip_address(address)

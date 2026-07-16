@@ -13,10 +13,74 @@
     return `'${String(value).replaceAll("'", `'"'"'`)}'`;
   }
 
+  function isRecord(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+
+  function isAuditResult(value) {
+    return (
+      isRecord(value) &&
+      typeof value.attack_class === "string" &&
+      typeof value.sent === "string" &&
+      typeof value.blocked === "boolean"
+    );
+  }
+
+  function isBadgeRecord(value) {
+    return (
+      isRecord(value) &&
+      typeof value.audit_id === "string" &&
+      typeof value.target_host === "string" &&
+      typeof value.grade === "string" &&
+      typeof value.score === "number" &&
+      Number.isFinite(value.score) &&
+      Number.isInteger(value.blocked) &&
+      Number.isInteger(value.total) &&
+      typeof value.issued_at === "string" &&
+      (typeof value.consent_verified === "boolean" ||
+        value.consent_verified === null) &&
+      typeof value.signature === "string"
+    );
+  }
+
+  function validateAuditResponse(value) {
+    if (!isRecord(value)) {
+      throw new Error("Malformed Warden audit response: expected object");
+    }
+    if (typeof value.score !== "number" || !Number.isFinite(value.score)) {
+      throw new Error("Malformed Warden audit response: finite score required");
+    }
+    if (value.score < 0 || value.score > 100) {
+      throw new Error("Malformed Warden audit response: score range is 0..100");
+    }
+    if (!["A", "B", "C", "D", "F"].includes(value.grade)) {
+      throw new Error("Malformed Warden audit response: grade");
+    }
+    if (!Array.isArray(value.results) || !value.results.every(isAuditResult)) {
+      throw new Error("Malformed Warden audit response: results");
+    }
+    if (typeof value.badge !== "string") {
+      throw new Error("Malformed Warden audit response: badge");
+    }
+    if (
+      !Array.isArray(value.recommendations) ||
+      !value.recommendations.every((item) => typeof item === "string")
+    ) {
+      throw new Error("Malformed Warden audit response: recommendations");
+    }
+    if (value.badge_record !== null && !isBadgeRecord(value.badge_record)) {
+      throw new Error("Malformed Warden audit response: badge_record");
+    }
+    if (typeof value.consent_verified !== "boolean") {
+      throw new Error("Malformed Warden audit response: consent_verified");
+    }
+    return value;
+  }
+
   function buildIntegrationExamples({ providerAgentId, service }) {
     const provider = decimalIdentifier(providerAgentId, "provider agent ID");
     const serviceId = decimalIdentifier(service?.serviceId, "service ID");
-    const endpoint = String(service?.endpoint || "");
+    const rawEndpoint = String(service?.endpoint || "");
     const serviceName = String(service?.serviceName || "").trim();
     const price = String(service?.feeAmount || "").trim();
     const serviceKey = String(service?.key || "").trim();
@@ -28,12 +92,16 @@
     }
     let endpointUrl;
     try {
-      endpointUrl = new URL(endpoint);
+      endpointUrl = new URL(rawEndpoint);
     } catch (error) {
       throw new Error("Service endpoint must be a valid URL", { cause: error });
     }
     if (endpointUrl.protocol !== "https:") {
       throw new Error("Service endpoint must use HTTPS");
+    }
+    const endpoint = `https://warden.gudman.xyz/${serviceKey}`;
+    if (endpointUrl.href !== endpoint) {
+      throw new Error("Service endpoint must match the canonical Warden route");
     }
     if (
       !service.requestBody ||
@@ -45,6 +113,8 @@
 
     const requestJson = JSON.stringify(service.requestBody);
     const requestPretty = JSON.stringify(service.requestBody, null, 2);
+    const shellEndpoint = shellSingleQuote(endpoint);
+    const endpointLiteral = JSON.stringify(endpoint);
     const pythonResult =
       serviceKey === "audit"
         ? `score = result.get("score")
@@ -86,13 +156,98 @@ else:
   blocked: boolean;
 };
 
+type WardenBadgeRecord = {
+  audit_id: string;
+  target_host: string;
+  grade: string;
+  score: number;
+  blocked: number;
+  total: number;
+  issued_at: string;
+  consent_verified: boolean | null;
+  signature: string;
+};
+
 type WardenAuditResponse = {
   score: number;
-  grade: string;
+  grade: "A" | "B" | "C" | "D" | "F";
   results: WardenAuditResult[];
   badge: string;
   recommendations: string[];
-};`
+  badge_record: WardenBadgeRecord | null;
+  consent_verified: boolean;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isAuditResult(value: unknown): value is WardenAuditResult {
+  return (
+    isRecord(value) &&
+    typeof value.attack_class === "string" &&
+    typeof value.sent === "string" &&
+    typeof value.blocked === "boolean"
+  );
+}
+
+function isBadgeRecord(value: unknown): value is WardenBadgeRecord {
+  return (
+    isRecord(value) &&
+    typeof value.audit_id === "string" &&
+    typeof value.target_host === "string" &&
+    typeof value.grade === "string" &&
+    typeof value.score === "number" &&
+    Number.isFinite(value.score) &&
+    Number.isInteger(value.blocked) &&
+    Number.isInteger(value.total) &&
+    typeof value.issued_at === "string" &&
+    (typeof value.consent_verified === "boolean" ||
+      value.consent_verified === null) &&
+    typeof value.signature === "string"
+  );
+}
+
+function validateAuditResponse(
+  value: unknown,
+): asserts value is WardenAuditResponse {
+  if (!isRecord(value)) {
+    throw new Error("Malformed Warden audit response: expected object");
+  }
+  if (typeof value.score !== "number" || !Number.isFinite(value.score)) {
+    throw new Error("Malformed Warden audit response: finite score required");
+  }
+  if (value.score < 0 || value.score > 100) {
+    throw new Error("Malformed Warden audit response: score range is 0..100");
+  }
+  if (
+    value.grade !== "A" &&
+    value.grade !== "B" &&
+    value.grade !== "C" &&
+    value.grade !== "D" &&
+    value.grade !== "F"
+  ) {
+    throw new Error("Malformed Warden audit response: grade");
+  }
+  if (!Array.isArray(value.results) || !value.results.every(isAuditResult)) {
+    throw new Error("Malformed Warden audit response: results");
+  }
+  if (typeof value.badge !== "string") {
+    throw new Error("Malformed Warden audit response: badge");
+  }
+  if (
+    !Array.isArray(value.recommendations) ||
+    !value.recommendations.every((item) => typeof item === "string")
+  ) {
+    throw new Error("Malformed Warden audit response: recommendations");
+  }
+  if (value.badge_record !== null && !isBadgeRecord(value.badge_record)) {
+    throw new Error("Malformed Warden audit response: badge_record");
+  }
+  if (typeof value.consent_verified !== "boolean") {
+    throw new Error("Malformed Warden audit response: consent_verified");
+  }
+}`
         : `type WardenScanResult =
   | { verdict: "ALLOW"; recommendation: string; sanitized_payload: string }
   | { verdict: "SANITIZE"; recommendation: string; sanitized_payload: string }
@@ -118,18 +273,8 @@ function payloadForAction(result: WardenScanResult, original: string): string {
     const typescriptResult =
       serviceKey === "audit"
         ? `const result: unknown = await response.json();
-if (
-  !result ||
-  typeof result !== "object" ||
-  typeof (result as WardenAuditResponse).score !== "number" ||
-  typeof (result as WardenAuditResponse).grade !== "string" ||
-  !Array.isArray((result as WardenAuditResponse).results) ||
-  !Array.isArray((result as WardenAuditResponse).recommendations)
-) {
-  throw new Error("Malformed Warden audit response");
-}
-
-const audit = result as WardenAuditResponse;
+validateAuditResponse(result);
+const audit = result;
 const failedTests = audit.results.filter((item) => item.blocked !== true);
 console.log({
   score: audit.score,
@@ -146,17 +291,17 @@ const actionPayload = payloadForAction(
     return {
       onchainos: `Use the installed OnchainOS agent tools to create a reviewable task for Warden provider agent #${provider}, service #${serviceId} (${serviceName}, ${price} USDT). Fetch the x402 accepts terms from ${endpoint}, verify the endpoint, token, network, and amount, then pay through the task-402 flow. Return Warden's full result before completing the task. Do not submit feedback until I have reviewed the result.\n\nRequest body:\n${requestPretty}`,
       curl: `# The first request is free and returns the x402 challenge.
-curl -i ${endpoint}
+curl -i ${shellEndpoint}
 
 # Run only in the shell process that received an authorized payment signature.
 # This replay spends ${price} USDT for service #${serviceId}.
 test -n "$PAYMENT_SIGNATURE" || { echo "PAYMENT_SIGNATURE is required" >&2; exit 1; }
-curl --fail-with-body -sS ${endpoint} \\
+curl --fail-with-body -sS ${shellEndpoint} \\
   -H "content-type: application/json" \\
   -H "PAYMENT-SIGNATURE: $PAYMENT_SIGNATURE" \\
   --data ${shellSingleQuote(requestJson)}`,
-      python: `import os\n\nimport httpx\n\npayment_signature = os.environ.get("PAYMENT_SIGNATURE")\nif not payment_signature:\n    raise RuntimeError("PAYMENT_SIGNATURE is required in the server or agent runtime")\n\n# This request spends ${price} USDT for Warden service #${serviceId}.\nresponse = httpx.post(\n    "${endpoint}",\n    headers={"PAYMENT-SIGNATURE": payment_signature},\n    json=${requestPretty},\n    timeout=30,\n)\nif response.status_code == 402:\n    raise RuntimeError("Payment was not accepted; refresh and validate the x402 challenge")\nresponse.raise_for_status()\nresult = response.json()\n\n${pythonResult}`,
-      typescript: `${typescriptContract}\n\n// Server or agent runtime only. Never bundle this value into browser code.\nconst paymentSignature = process.env.PAYMENT_SIGNATURE;\nif (!paymentSignature) throw new Error("PAYMENT_SIGNATURE is required");\n\n// This request spends ${price} USDT for Warden service #${serviceId}.\nconst response = await fetch("${endpoint}", {\n  method: "POST",\n  headers: {\n    "content-type": "application/json",\n    "PAYMENT-SIGNATURE": paymentSignature,\n  },\n  body: JSON.stringify(${requestPretty}),\n});\nif (response.status === 402) {\n  throw new Error("Payment was not accepted; refresh and validate the x402 challenge");\n}\nif (!response.ok) throw new Error(\`Warden returned HTTP \${response.status}\`);\n\n${typescriptResult}`,
+      python: `import os\n\nimport httpx\n\npayment_signature = os.environ.get("PAYMENT_SIGNATURE")\nif not payment_signature:\n    raise RuntimeError("PAYMENT_SIGNATURE is required in the server or agent runtime")\n\n# This request spends ${price} USDT for Warden service #${serviceId}.\nresponse = httpx.post(\n    ${endpointLiteral},\n    headers={"PAYMENT-SIGNATURE": payment_signature},\n    json=${requestPretty},\n    timeout=30,\n)\nif response.status_code == 402:\n    raise RuntimeError("Payment was not accepted; refresh and validate the x402 challenge")\nresponse.raise_for_status()\nresult = response.json()\n\n${pythonResult}`,
+      typescript: `${typescriptContract}\n\n// Server or agent runtime only. Never bundle this value into browser code.\nconst paymentSignature = process.env.PAYMENT_SIGNATURE;\nif (!paymentSignature) throw new Error("PAYMENT_SIGNATURE is required");\n\n// This request spends ${price} USDT for Warden service #${serviceId}.\nconst response = await fetch(${endpointLiteral}, {\n  method: "POST",\n  headers: {\n    "content-type": "application/json",\n    "PAYMENT-SIGNATURE": paymentSignature,\n  },\n  body: JSON.stringify(${requestPretty}),\n});\nif (response.status === 402) {\n  throw new Error("Payment was not accepted; refresh and validate the x402 challenge");\n}\nif (!response.ok) throw new Error(\`Warden returned HTTP \${response.status}\`);\n\n${typescriptResult}`,
       mcp: `{
   "mcpServers": {
     "warden": {
@@ -220,6 +365,7 @@ Local MCP does not spend ${price} USDT or call marketplace service #${serviceId}
     decisionPayload,
     nextTabIndex,
     setIntegrationCopiesEnabled,
+    validateAuditResponse,
   };
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;

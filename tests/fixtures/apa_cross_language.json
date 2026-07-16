@@ -1,0 +1,79 @@
+{
+  "generated_by": "Python cryptography Ed25519 over json.dumps(sort_keys=True,separators=(\",\",\":\"),ensure_ascii=False)",
+  "issuer_document": {
+    "issuer": "warden",
+    "keys": [
+      {
+        "kid": "python-fixture-1",
+        "pub": "ed25519:WkgcE2NXdLijVH0vUuu0lWusnytkhpaM76frHY-qWrc",
+        "not_after": 9007199254740991
+      }
+    ]
+  },
+  "attestation": {
+    "spec_version": "apa/0.1",
+    "predicate_type": "https://warden.gudman.xyz/spec/protection/v1",
+    "attestation_id": "0123456789abcdef0123456789abcdef",
+    "issuer": "warden",
+    "protector": "warden",
+    "endpoint_host": "agent.example",
+    "pub": "ed25519:4-SkinOublbCA3LWjPcVWYNqx4y3A3wZK1gvOMP_rBg",
+    "tier": "guard-live",
+    "status": "active",
+    "scans_24h": 41207,
+    "verified_at": 1784000000,
+    "expires_at": 1784003600,
+    "evidence": {
+      "zeta": 7,
+      "alpha": {
+        "unicode": "\u03bb",
+        "labels": ["guard-live", "cross-language"]
+      }
+    },
+    "issuer_sig": "sig:A4LlXw9x0iNLTiWYVKgX66m5XfiJ9wvbsghwK-M0KwCFPYk4i1utTrX6CpwM0oTBofggA8fmEBIuNo3f5_UuAQ"
+  },
+  "expired_attestation": {
+    "spec_version": "apa/0.1",
+    "predicate_type": "https://warden.gudman.xyz/spec/protection/v1",
+    "attestation_id": "11111111111111111111111111111111",
+    "issuer": "warden",
+    "protector": "warden",
+    "endpoint_host": "agent.example",
+    "pub": "ed25519:4-SkinOublbCA3LWjPcVWYNqx4y3A3wZK1gvOMP_rBg",
+    "tier": "guard-live",
+    "status": "active",
+    "scans_24h": 41207,
+    "verified_at": 1600000000,
+    "expires_at": 1600003600,
+    "evidence": {
+      "zeta": 7,
+      "alpha": {
+        "unicode": "\u03bb",
+        "labels": ["guard-live", "cross-language"]
+      }
+    },
+    "issuer_sig": "sig:XxUQMA9Zw47dAZlX1dTPGPNBD3UQNnDJ71DvUhs-us6ryYnRR5vjNmMyX61goPJ9kYXrUVmL2Yzd-1a8xoBzDw"
+  },
+  "revoked_attestation": {
+    "spec_version": "apa/0.1",
+    "predicate_type": "https://warden.gudman.xyz/spec/protection/v1",
+    "attestation_id": "22222222222222222222222222222222",
+    "issuer": "warden",
+    "protector": "warden",
+    "endpoint_host": "agent.example",
+    "pub": "ed25519:4-SkinOublbCA3LWjPcVWYNqx4y3A3wZK1gvOMP_rBg",
+    "tier": "guard-live",
+    "status": "revoked",
+    "scans_24h": 41207,
+    "verified_at": 1784000000,
+    "expires_at": 1784003600,
+    "evidence": {
+      "zeta": 7,
+      "alpha": {
+        "unicode": "\u03bb",
+        "labels": ["guard-live", "cross-language"]
+      }
+    },
+    "issuer_sig": "sig:nn1ENQmTeP-F_CXWkHIk5l9oDteNPb-8rLbaHkIBuyseNkXYNEPDIer4d8G-IA8HJkxA0TL1DmgCkDv58YSZBg"
+  }
+}

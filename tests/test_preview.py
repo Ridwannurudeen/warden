@@ -20,12 +20,15 @@ def client():
 @pytest.mark.parametrize(
     ("path", "marker"),
     [
-        ("/", "Stop poisoned agent output before it moves money."),
+        ("/", "The immune system of the agent economy."),
+        ("/theater", "Watch Warden neutralize three live attacks."),
         ("/showcase", "One poisoned instruction. One stopped action."),
         ("/agents", "agents indexed"),
         ("/agents/3808", "Warden"),
         ("/docs", "Reason-code matrix"),
         ("/docs/drain-address", "DRAIN_ADDRESS"),
+        ("/trust", "Enforce locally. Attest openly. Inspect publicly."),
+        ("/verify", "Verify the signature. Keep the boundary."),
         ("/badges", "Inspect issued records and their current integrity result."),
         ("/badges/0123456789abcdef", "Verify one issued audit record."),
         ("/privacy", "Privacy"),
@@ -53,6 +56,14 @@ def test_preview_delegates_same_origin_api_routes(client):
     assert health.json()["status"] == "ok"
     assert scan.status_code == 200
     assert scan.json()["verdict"] == "BLOCK"
+
+
+def test_preview_keeps_apa_log_json_by_default(client):
+    response = client.get("/apa/log")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    assert set(response.json()) == {"entries", "total"}
 
 
 def test_preview_keeps_badge_api_distinct_from_static_badge_page(client):
@@ -86,7 +97,10 @@ def test_preview_keeps_explicit_trailing_slash_routes(path, client):
 @pytest.mark.parametrize(
     "path",
     (
+        "/theater/",
         "/showcase/",
+        "/trust/",
+        "/verify/",
         "/SHOWCASE",
         "/STYLES.CSS",
         "/Assets/warden-avatar.png",

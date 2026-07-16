@@ -1,10 +1,11 @@
 """Protection Proof — the signed APA heartbeat served at
 `GET /.well-known/agent-protection` (APA-SPEC §3).
 
-What this proves, precisely: the host controls the guard key and counter-signs
-a monotonic count of payloads actually screened (`scans_served` comes from
-:mod:`warden_guard.state` and cannot be set any other way). It does NOT prove
-every request is routed through the guard — never claim more.
+What this proves, precisely: the host controls the guard key and signs an exact
+rolling 24-hour count of payloads screened by this SDK, or signs `null` while a
+legacy counter completes its warmup (`scans_served` comes from
+:mod:`warden_guard.state`). It does NOT prove every request is routed through
+the guard or independently audit the endpoint owner's local state.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from warden_guard.apa import sign_document
 from warden_guard.keys import load_or_create_key, public_key_str
-from warden_guard.state import get_scan_count
+from warden_guard.state import get_window_scan_count
 
 SPEC_VERSION = "apa/0.1"
 PROTECTOR = "warden"
@@ -32,16 +33,20 @@ def protection_proof(
     window_s: int = DEFAULT_WINDOW_S,
 ) -> dict[str, object]:
     """Build one signed Protection Proof document (a fresh nonce every call)."""
+    if window_s != DEFAULT_WINDOW_S:
+        raise ValueError("APA v0.1 protection proofs require window_s=86400")
     guard_key = key or load_or_create_key()
+    now = int(time.time())
     doc: dict[str, object] = {
         "spec_version": SPEC_VERSION,
         "protector": PROTECTOR,
         "endpoint_host": endpoint_host,
         "pub": public_key_str(guard_key),
-        "ts": int(time.time()),
+        "ts": now,
         "nonce": secrets.token_urlsafe(16),  # 128 bits
         "window_s": window_s,
-        "scans_served": get_scan_count(),
+        "window_start": now - window_s,
+        "scans_served": get_window_scan_count(window_s=window_s, now=now),
     }
     return sign_document(doc, guard_key, sig_field="sig")
 

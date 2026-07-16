@@ -25,14 +25,15 @@ Tiers — read this before shipping:
 
 Latency honesty: verdict *compute* is sub-ms; the hosted paths add network RTT.
 
-Every real scan atomically increments the local monotonic scan counter
-(`warden_guard.state`), which the signed APA heartbeat publishes as
-`scans_served` — the honest usage number behind the Warden badge.
+Every valid scan result updates the lifetime counter and rolling 24-hour
+evidence in `warden_guard.state`. Failed or malformed hosted responses do not
+advance the signed APA count.
 """
 
 from __future__ import annotations
 
 import asyncio
+import math
 from dataclasses import dataclass, field
 
 import httpx
@@ -76,16 +77,67 @@ class ScanResult:
         return self.sanitized_payload if self.sanitized else None
 
     @classmethod
-    def from_response(cls, data: dict[str, object]) -> "ScanResult":
+    def from_response(cls, data: object) -> "ScanResult":
+        if not isinstance(data, dict):
+            raise WardenError("Invalid Warden response: expected an object")
+        verdict = data.get("verdict")
+        if verdict not in {"ALLOW", "SANITIZE", "BLOCK"}:
+            raise WardenError("Invalid Warden response: verdict")
+        risk_level = data.get("risk_level")
+        if risk_level not in {"NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"}:
+            raise WardenError("Invalid Warden response: risk_level")
+        threat_classes = data.get("threat_classes")
+        if not isinstance(threat_classes, list) or not all(
+            isinstance(value, str) for value in threat_classes
+        ):
+            raise WardenError("Invalid Warden response: threat_classes")
+        detections = data.get("detections")
+        if not isinstance(detections, list) or not all(
+            _valid_detection(value) for value in detections
+        ):
+            raise WardenError("Invalid Warden response: detections")
+        sanitized_payload = data.get("sanitized_payload")
+        if not isinstance(sanitized_payload, str):
+            raise WardenError("Invalid Warden response: sanitized_payload")
+        recommendation = data.get("recommendation")
+        if not isinstance(recommendation, str):
+            raise WardenError("Invalid Warden response: recommendation")
+        checks = data.get("checks")
+        if not isinstance(checks, dict) or not all(
+            isinstance(key, str) and isinstance(value, str) for key, value in checks.items()
+        ):
+            raise WardenError("Invalid Warden response: checks")
+        latency_ms = data.get("latency_ms")
+        if (
+            not isinstance(latency_ms, (int, float))
+            or isinstance(latency_ms, bool)
+            or not math.isfinite(latency_ms)
+        ):
+            raise WardenError("Invalid Warden response: latency_ms")
         return cls(
-            verdict=str(data.get("verdict", "ALLOW")),
-            risk_level=str(data.get("risk_level", "NONE")),
-            threat_classes=[str(t) for t in (data.get("threat_classes") or [])],
-            sanitized_payload=data.get("sanitized_payload"),  # type: ignore[arg-type]
-            recommendation=data.get("recommendation"),  # type: ignore[arg-type]
-            latency_ms=data.get("latency_ms"),  # type: ignore[arg-type]
+            verdict=verdict,
+            risk_level=risk_level,
+            threat_classes=threat_classes,
+            sanitized_payload=sanitized_payload,
+            recommendation=recommendation,
+            latency_ms=latency_ms,
             raw=data,
         )
+
+
+def _valid_detection(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    confidence = value.get("confidence")
+    return (
+        isinstance(value.get("class"), str)
+        and isinstance(value.get("match"), str)
+        and isinstance(confidence, (int, float))
+        and not isinstance(confidence, bool)
+        and math.isfinite(confidence)
+        and 0 <= confidence <= 1
+        and isinstance(value.get("source"), str)
+    )
 
 
 class WardenError(RuntimeError):
@@ -167,18 +219,25 @@ class WardenClient:
         depth: str = "fast",
     ) -> ScanResult:
         """Scan one untrusted payload and return a Warden verdict."""
-        increment_scan_count()
         if self._engine is not None:
             data = asyncio.run(
                 self._engine.scan(payload, depth=depth, expected_addresses=expected_addresses)
             )
-            return ScanResult.from_response(data)
+            result = ScanResult.from_response(data)
+            increment_scan_count()
+            return result
         body = build_scan_body(payload, depth=depth, expected_addresses=expected_addresses)
         try:
             with httpx.Client(timeout=self.timeout) as client:
                 response = client.post(self.base_url + self.path, json=body)
                 response.raise_for_status()
-                return ScanResult.from_response(response.json())
+                try:
+                    data = response.json()
+                except ValueError as exc:
+                    raise WardenError("Invalid Warden response: expected JSON") from exc
+                result = ScanResult.from_response(data)
+                increment_scan_count()
+                return result
         except httpx.HTTPError as exc:
             if self.fail_open:
                 return ScanResult(verdict="ALLOW", risk_level="NONE", raw={"error": str(exc)})

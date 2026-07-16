@@ -4,8 +4,8 @@ You are building the **Warden Trust Layer**. This file is the entry point. Read 
 
 ## Mission (one paragraph)
 Warden is repositioned as **"the immune system of the agent economy"** — an open, cryptographically-verifiable
-**Agent Protection Attestation (APA)** standard that any agent marketplace can adopt, deployment #1 being
-OKX.AI. The goal is the hackathon **Creative Genius ($10k)** track (novel, category-defining, *watchable*
+**Agent Protection Attestation (APA)** standard that any agent marketplace can adopt, designed first for
+OKX.AI and source-ready but not yet deployed there. The goal is the hackathon **Creative Genius ($10k)** track (novel, category-defining, *watchable*
 infrastructure — judges often don't run code) + the post-hackathon **OKX Super Nova grant**. Win by
 *out-inventing*, not out-selling. Lead every surface with the metaphor + the demo + the open standard.
 
@@ -22,7 +22,7 @@ infrastructure — judges often don't run code) + the post-hackathon **OKX Super
 ## What's already built & verified — DO NOT REBUILD (P1 + P2)
 48 tests green, ruff clean, verified end-to-end against the oracle:
 - `sdk/python/**` — the `warden-guard` SDK (client with free `fail_open=True` + `local=True` in-process mode,
-  async, middleware, decorator, monotonic scan counter, Ed25519 keygen, signed `/.well-known/agent-protection`
+  async, middleware, decorator, lifetime + rolling counters, Ed25519 keygen, signed `/.well-known/agent-protection`
   heartbeat, `warden-guard verify` CLI).
 - `warden/protection.py`, `warden/protection_store.py`, `warden/apa_url.py` — the Ed25519 issuer, TOFU
   registration, sqlite nonce store + hash-chained transparency log, SSRF-safe probe.

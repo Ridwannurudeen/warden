@@ -1,0 +1,27 @@
+[Unit]
+Description=Fetch Warden public marketplace snapshot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+TimeoutStartSec=20m
+WorkingDirectory=/opt/warden/current
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=HOME=/var/lib/warden-fetch
+Environment=PATH=/opt/warden/current/.venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/warden/current/.venv/bin/python scripts/fetch_marketplace_snapshot.py --snapshot /opt/warden-snapshot/agents-v1.jsonl --query a --page-size 100
+User=warden-fetch
+Group=warden-fetch
+UMask=0022
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectProc=invisible
+PrivateTmp=true
+PrivateDevices=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+InaccessiblePaths=/opt/warden/.env /opt/warden/index.env /opt/warden/badges /opt/warden/data /opt/warden/gauntlet
+ReadWritePaths=/opt/warden-snapshot /var/lib/warden-fetch

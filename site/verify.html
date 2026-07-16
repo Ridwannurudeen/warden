@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Verify a Warden Agent Protection Attestation independently in your browser with WebCrypto Ed25519."
+    />
+    <meta name="color-scheme" content="dark light" />
+    <title>Verify an APA Attestation | Warden</title>
+    <link rel="canonical" href="https://warden.gudman.xyz/verify" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Warden" />
+    <meta property="og:title" content="Verify an APA Attestation | Warden" />
+    <meta
+      property="og:description"
+      content="Verify a Warden Agent Protection Attestation independently in your browser with WebCrypto Ed25519."
+    />
+    <meta property="og:url" content="https://warden.gudman.xyz/verify" />
+    <meta
+      property="og:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <link rel="icon" href="/assets/warden-avatar.png" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header page-shell">
+      <a class="brand" href="/" aria-label="Warden home"
+        ><img
+          src="/assets/warden-avatar.png"
+          alt=""
+          width="36"
+          height="36"
+        /><span>Warden</span></a
+      >
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-nav"
+        data-nav-toggle
+      >
+        Menu
+      </button>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
+        <details class="nav-group">
+          <summary>Product</summary>
+          <div class="nav-menu">
+            <a href="/theater">Attack Theater</a>
+            <a href="/playground">Playground</a>
+            <a href="/agents">Marketplace index</a>
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/showcase">Judge showcase</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Developers</summary>
+          <div class="nav-menu">
+            <a href="/docs">Documentation</a>
+            <a href="/integrate">Integrate</a>
+            <a href="/trust">Trust Layer</a>
+            <a href="/status">API status</a>
+          </div>
+        </details>
+        <details class="nav-group has-current">
+          <summary>Evidence</summary>
+          <div class="nav-menu">
+            <a href="/verify" aria-current="page">Verify APA</a>
+            <a href="/apa/log">Transparency log</a>
+            <a href="/badges">Audit badges</a>
+            <a href="/agents#methodology">Public-text methodology</a>
+            <a href="/gauntlet#policy">Adversarial challenge</a>
+          </div>
+        </details>
+        <div class="nav-mobile-actions">
+          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
+          <a class="button primary" href="/playground">Run a live scan</a>
+        </div>
+      </nav>
+      <div class="header-actions">
+        <a class="status-pill" href="/status" aria-label="Open API status"
+          ><span class="live-dot" data-health-dot aria-hidden="true"></span
+          ><span data-health-label>Checking API</span></a
+        >
+        <a class="header-hire" href="/hire">Hire</a>
+        <a class="header-scan" href="/playground">Run scan</a>
+        <button
+          class="theme-toggle"
+          type="button"
+          data-theme-toggle
+          aria-label="Switch color theme"
+        >
+          Theme
+        </button>
+      </div>
+    </header>
+
+    <main id="main" class="page-shell site-main">
+      <section class="page-hero page-hero--compact">
+        <p class="eyebrow">Independent portable verification</p>
+        <h1>Verify the signature. Keep the boundary.</h1>
+        <p class="hero-text">
+          Paste an APA record, API envelope, attestation ID, same-origin
+          attestation URL, or same-origin <code>badge.svg</code> URL. This page
+          fetches the public issuer document and performs WebCrypto Ed25519
+          verification locally; it never trusts the API's
+          <code>verified</code> flag.
+        </p>
+      </section>
+
+      <aside class="scan-boundary" aria-label="Verifier properties">
+        <strong>Browser verifier</strong>
+        <span>APA v0.1 canonical JSON</span>
+        <span>WebCrypto Ed25519</span>
+        <span>Same-origin fetches only</span>
+        <span>Expiry and signed status enforced</span>
+      </aside>
+
+      <section class="scan-workspace" aria-label="APA verification workspace">
+        <form class="scan-input-panel" data-apa-verify-form novalidate>
+          <div class="scan-panel-heading">
+            <div>
+              <p class="eyebrow">01 / Public input</p>
+              <h2>Attestation, ID, or URL</h2>
+            </div>
+            <span class="status-label status-label--pending">No account</span>
+          </div>
+          <label for="apa-verify-input">Attestation material</label>
+          <textarea
+            id="apa-verify-input"
+            data-apa-verify-input
+            rows="14"
+            required
+            spellcheck="false"
+            aria-describedby="apa-input-hint apa-verify-status"
+            placeholder='{"attestation":{"spec_version":"apa/0.1",...}}'
+          ></textarea>
+          <p class="field-hint" id="apa-input-hint">
+            Remote lookups accept exactly 32 lowercase hexadecimal characters or
+            this origin's <code>/apa/attestation/&lt;id&gt;</code> and
+            <code>/apa/attestation/&lt;id&gt;/badge.svg</code> URLs.
+            Cross-origin URLs are rejected before fetch.
+          </p>
+          <div class="hero-actions">
+            <button class="button primary" type="submit">
+              Verify independently
+            </button>
+          </div>
+          <p
+            class="scan-status"
+            id="apa-verify-status"
+            data-apa-verify-status
+            aria-live="polite"
+          >
+            Ready. No verification result is implied until the browser checks
+            the signed bytes.
+          </p>
+          <div
+            class="scan-error"
+            data-apa-verify-error
+            role="alert"
+            tabindex="-1"
+            hidden
+          >
+            <p data-apa-verify-error-message></p>
+          </div>
+          <p class="privacy-note">
+            Raw JSON stays in this page. ID and URL inputs fetch only the
+            canonical same-origin attestation route and the public same-origin
+            issuer document.
+          </p>
+        </form>
+
+        <div class="scan-result-panel">
+          <div class="scan-empty-state" data-apa-verify-empty>
+            <p class="eyebrow">02 / Independent result</p>
+            <h2>Waiting for signed material.</h2>
+            <p>
+              The browser removes <code>issuer_sig</code>, recursively sorts the
+              remaining JSON keys, encodes compact UTF-8, and checks the
+              signature against every applicable current or recent key in the
+              issuer document, selected by the signed
+              <code>verified_at</code> cutoff.
+            </p>
+          </div>
+
+          <section
+            class="scan-result"
+            data-apa-verify-result
+            tabindex="-1"
+            aria-live="polite"
+            aria-labelledby="apa-result-heading"
+            hidden
+          >
+            <div class="verdict-summary">
+              <p class="eyebrow">02 / Independent result</p>
+              <div class="verdict-heading-row">
+                <h2 id="apa-result-heading" data-apa-result-heading>
+                  Verification pending
+                </h2>
+                <span
+                  class="status-label status-label--pending"
+                  data-apa-verification-label
+                  >Pending</span
+                >
+              </div>
+              <p data-apa-result-message></p>
+            </div>
+
+            <div class="badge-evidence-grid">
+              <section
+                class="badge-evidence"
+                aria-labelledby="apa-issuer-title"
+              >
+                <p class="eyebrow">Issuer</p>
+                <h3 id="apa-issuer-title">Published signing identity</h3>
+                <dl class="data-list">
+                  <div>
+                    <dt>Issuer</dt>
+                    <dd data-apa-issuer>--</dd>
+                  </div>
+                  <div>
+                    <dt>Matched key</dt>
+                    <dd data-apa-issuer-key>--</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section
+                class="badge-evidence"
+                aria-labelledby="apa-signature-title"
+              >
+                <p class="eyebrow">Signature</p>
+                <h3 id="apa-signature-title" data-apa-signature-state>
+                  Not checked
+                </h3>
+                <dl class="data-list">
+                  <div>
+                    <dt>Issuer signature</dt>
+                    <dd><code data-apa-signature>--</code></dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section
+                class="badge-evidence"
+                aria-labelledby="apa-subject-title"
+              >
+                <p class="eyebrow">Subject</p>
+                <h3 id="apa-subject-title">Guard claim</h3>
+                <dl class="data-list">
+                  <div>
+                    <dt>Endpoint host</dt>
+                    <dd data-apa-endpoint>--</dd>
+                  </div>
+                  <div>
+                    <dt>Tier</dt>
+                    <dd data-apa-tier>--</dd>
+                  </div>
+                  <div>
+                    <dt>Scans</dt>
+                    <dd data-apa-scans>--</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section class="badge-evidence" aria-labelledby="apa-state-title">
+                <p class="eyebrow">State</p>
+                <h3 id="apa-state-title">Signed and effective status</h3>
+                <dl class="data-list">
+                  <div>
+                    <dt>Signed status</dt>
+                    <dd data-apa-stored-status>--</dd>
+                  </div>
+                  <div>
+                    <dt>Effective status</dt>
+                    <dd data-apa-effective-status>--</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section class="badge-evidence" aria-labelledby="apa-time-title">
+                <p class="eyebrow">Time</p>
+                <h3 id="apa-time-title">Freshness window</h3>
+                <dl class="data-list">
+                  <div>
+                    <dt>Verified at</dt>
+                    <dd data-apa-verified-at>--</dd>
+                  </div>
+                  <div>
+                    <dt>Expires at</dt>
+                    <dd data-apa-expires-at>--</dd>
+                  </div>
+                </dl>
+              </section>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="feature-panel" aria-labelledby="apa-boundary-title">
+        <div class="section-heading">
+          <p class="eyebrow">Verification boundary</p>
+          <h2 id="apa-boundary-title">
+            What a valid signature does—and does not—prove
+          </h2>
+        </div>
+        <div class="badge-evidence-grid">
+          <section class="badge-evidence">
+            <h3>APA claim</h3>
+            <p data-apa-boundary>
+              A valid, fresh attestation proves that the host serving
+              endpoint_host controlled the key pub when the issuer verified a
+              live APA-conformant Protection Proof. The endpoint signed that
+              proof, including its rolling 24-hour screened-payload count or an explicit unavailable state; the
+              issuer separately signed the attestation. It does not prove that
+              every request is routed through the guard or independently audit
+              the endpoint owner's local counter state.
+            </p>
+          </section>
+          <section class="badge-evidence">
+            <h3>TOFU</h3>
+            <p data-tofu-boundary>
+              First registration is trust-on-first-use: the issuer records the
+              first valid endpoint key. An independently anchored log
+              checkpoint makes later silent re-binding detectable; an
+              unanchored chain cannot expose a complete rewrite or remove
+              first-use trust.
+            </p>
+          </section>
+          <section class="badge-evidence">
+            <h3>Key theft</h3>
+            <p data-key-theft-boundary>
+              A stolen endpoint private key can produce valid endpoint proofs
+              for the victim host. Revocation and key rotation can surface
+              compromise; signature validity alone cannot rule out key theft.
+            </p>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer page-shell">
+      <div>
+        <strong>Warden</strong
+        ><span>The immune system of the agent economy.</span
+        ><span>Independent service listed on OKX.AI.</span>
+      </div>
+      <nav aria-label="Footer">
+        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
+        ><a href="/showcase">Showcase</a><a href="/docs">Docs</a
+        ><a href="/badges">Evidence</a><a href="/status">Status</a
+        ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
+        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+      </nav>
+    </footer>
+    <script src="/app.js" defer></script>
+    <script src="/verify.js" defer></script>
+  </body>
+</html>

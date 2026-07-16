@@ -11,7 +11,9 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from warden_guard import ScanResult, WardenBlocked, WardenClient, WardenGuard, guard
 from warden_guard.apa import b64u_encode, sign_document
-from warden_guard.cli import main as cli_main
+from warden_guard.cli import main as cli_main, verify_endpoint
+from warden_guard.keys import load_or_create_key
+from warden_guard.proof import WELL_KNOWN_PATH, protection_proof
 
 
 class StubClient(WardenClient):
@@ -123,18 +125,82 @@ def test_cli_keygen(capsys: pytest.CaptureFixture[str]) -> None:
     assert "public key: ed25519:" in out
 
 
+def test_cli_live_proof_renders_null_scan_count_as_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    key = load_or_create_key()
+    proof = protection_proof("api.example.com", key=key)
+    proof["scans_served"] = None
+    proof = sign_document(proof, key, sig_field="sig")
+    payload = json.dumps(proof).encode("utf-8")
+
+    class Response:
+        def __enter__(self):  # noqa: ANN204
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            return None
+
+        def read(self, limit: int) -> bytes:
+            return payload[:limit]
+
+    monkeypatch.setattr(
+        "warden_guard.cli.urllib.request.urlopen", lambda *args, **kwargs: Response()
+    )
+
+    ok, message = verify_endpoint("https://api.example.com")
+
+    assert ok is True
+    assert "scans_served=unavailable" in message
+    assert "scans_served=None" not in message
+
+
+def test_cli_live_proof_canonicalizes_explicit_default_https_port(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    key = load_or_create_key()
+    payload = json.dumps(protection_proof("api.example.com", key=key)).encode("utf-8")
+    requested_urls: list[str] = []
+
+    class Response:
+        def __enter__(self):  # noqa: ANN204
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            return None
+
+        def read(self, limit: int) -> bytes:
+            return payload[:limit]
+
+    def urlopen(url: str, *, timeout: int) -> Response:
+        requested_urls.append(url)
+        return Response()
+
+    monkeypatch.setattr("warden_guard.cli.urllib.request.urlopen", urlopen)
+
+    ok, message = verify_endpoint("https://API.EXAMPLE.COM:443")
+
+    assert ok is True
+    assert "host=api.example.com" in message
+    assert requested_urls == [f"https://api.example.com{WELL_KNOWN_PATH}"]
+
+
 def test_cli_verify_attestation_roundtrip(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     issuer = Ed25519PrivateKey.generate()
     issuer_pub = b64u_encode(issuer.public_key().public_bytes_raw(), "ed25519")
+    endpoint_pub = b64u_encode(
+        Ed25519PrivateKey.generate().public_key().public_bytes_raw(), "ed25519"
+    )
     att = {
         "spec_version": "apa/0.1",
-        "attestation_id": "test-0001",
+        "predicate_type": "https://warden.gudman.xyz/spec/protection/v1",
+        "attestation_id": "00000000000000000000000000000001",
         "issuer": "warden",
         "protector": "warden",
         "endpoint_host": "api.example.com",
-        "pub": "ed25519:ENDPOINTKEY",
+        "pub": endpoint_pub,
         "tier": "guard-live",
         "status": "active",
         "scans_24h": 7,
@@ -148,6 +214,15 @@ def test_cli_verify_attestation_roundtrip(
     assert cli_main(["verify", str(path), "--issuer-pub", issuer_pub]) == 0
     assert "VALID" in capsys.readouterr().out
 
+    unavailable = dict(att)
+    unavailable["scans_24h"] = None
+    signed_unavailable = sign_document(unavailable, issuer, sig_field="issuer_sig")
+    path.write_text(json.dumps(signed_unavailable), encoding="utf-8")
+    assert cli_main(["verify", str(path), "--issuer-pub", issuer_pub]) == 0
+    unavailable_output = capsys.readouterr().out
+    assert "unavailable" in unavailable_output.lower()
+    assert "None scans/24h" not in unavailable_output
+
     tampered = dict(signed)
     tampered["scans_24h"] = 999_999
     path.write_text(json.dumps(tampered), encoding="utf-8")
@@ -158,14 +233,60 @@ def test_cli_verify_attestation_roundtrip(
 def test_cli_verify_expired_attestation(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     issuer = Ed25519PrivateKey.generate()
     issuer_pub = b64u_encode(issuer.public_key().public_bytes_raw(), "ed25519")
+    endpoint_pub = b64u_encode(
+        Ed25519PrivateKey.generate().public_key().public_bytes_raw(), "ed25519"
+    )
+    now = int(time.time())
     att = {
         "spec_version": "apa/0.1",
+        "predicate_type": "https://warden.gudman.xyz/spec/protection/v1",
+        "attestation_id": "00000000000000000000000000000002",
+        "issuer": "warden",
+        "protector": "warden",
         "endpoint_host": "api.example.com",
+        "pub": endpoint_pub,
+        "tier": "guard-live",
         "status": "active",
-        "expires_at": int(time.time()) - 10,
+        "scans_24h": 7,
+        "verified_at": now - 3600,
+        "expires_at": now - 10,
     }
     signed = sign_document(att, issuer, sig_field="issuer_sig")
     path = tmp_path / "expired.json"
     path.write_text(json.dumps(signed), encoding="utf-8")
     assert cli_main(["verify", str(path), "--issuer-pub", issuer_pub]) == 1
     assert "EXPIRED" in capsys.readouterr().out
+
+
+def test_cli_rejects_a_signed_malformed_attestation(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    issuer = Ed25519PrivateKey.generate()
+    issuer_pub = b64u_encode(issuer.public_key().public_bytes_raw(), "ed25519")
+    endpoint_pub = b64u_encode(
+        Ed25519PrivateKey.generate().public_key().public_bytes_raw(), "ed25519"
+    )
+    now = int(time.time())
+    malformed = sign_document(
+        {
+            "spec_version": "apa/0.1",
+            "predicate_type": "https://warden.gudman.xyz/spec/protection/v1",
+            "attestation_id": "00000000000000000000000000000003",
+            "issuer": "warden",
+            "protector": "warden",
+            "endpoint_host": "api.example.com",
+            "pub": endpoint_pub,
+            "tier": "guard-live",
+            "status": "active",
+            "scans_24h": True,
+            "verified_at": now,
+            "expires_at": now + 3600,
+        },
+        issuer,
+        sig_field="issuer_sig",
+    )
+    path = tmp_path / "malformed.json"
+    path.write_text(json.dumps(malformed), encoding="utf-8")
+
+    assert cli_main(["verify", str(path), "--issuer-pub", issuer_pub]) == 1
+    assert "INVALID" in capsys.readouterr().out

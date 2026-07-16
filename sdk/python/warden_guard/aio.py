@@ -49,18 +49,25 @@ class AsyncWardenClient:
         depth: str = "fast",
     ) -> ScanResult:
         """Scan one untrusted payload and return a Warden verdict."""
-        increment_scan_count()
         if self._engine is not None:
             data = await self._engine.scan(
                 payload, depth=depth, expected_addresses=expected_addresses
             )
-            return ScanResult.from_response(data)
+            result = ScanResult.from_response(data)
+            increment_scan_count()
+            return result
         body = build_scan_body(payload, depth=depth, expected_addresses=expected_addresses)
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(self.base_url + self.path, json=body)
                 response.raise_for_status()
-                return ScanResult.from_response(response.json())
+                try:
+                    data = response.json()
+                except ValueError as exc:
+                    raise WardenError("Invalid Warden response: expected JSON") from exc
+                result = ScanResult.from_response(data)
+                increment_scan_count()
+                return result
         except httpx.HTTPError as exc:
             if self.fail_open:
                 return ScanResult(verdict="ALLOW", risk_level="NONE", raw={"error": str(exc)})

@@ -1,0 +1,27 @@
+[Unit]
+Description=Refresh Warden live Safety Index
+Requires=warden-index-fetch.service
+After=network-online.target
+After=warden-index-fetch.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+TimeoutStartSec=30m
+WorkingDirectory=/opt/warden/current
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=HOME=/opt/warden-index
+Environment=PATH=/opt/warden/current/.venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=WARDEN_PROTECTION_DB=/opt/warden/data/protection.db
+EnvironmentFile=/opt/warden/index.env
+ExecStart=/usr/bin/flock --exclusive --nonblock /opt/warden-index/.refresh.lock /opt/warden/current/.venv/bin/python scripts/refresh_safety_index.py --index-root /opt/warden-index --snapshot /opt/warden-snapshot/agents-v1.jsonl --snapshot-owner warden-fetch --expected-query a
+User=warden
+Group=warden
+UMask=0022
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictSUIDSGID=true
+ReadWritePaths=/opt/warden-index

@@ -10,6 +10,7 @@ const {
   decisionPayload,
   nextTabIndex,
   setIntegrationCopiesEnabled,
+  validateAuditResponse,
 } = require(path.join(__dirname, "..", "..", "site", "integrate.js"));
 
 const catalog = JSON.parse(
@@ -18,6 +19,34 @@ const catalog = JSON.parse(
     "utf8",
   ),
 );
+
+function validAuditResponse() {
+  return {
+    score: 95,
+    grade: "A",
+    results: [
+      {
+        attack_class: "prompt_injection",
+        sent: "Ignore previous instructions",
+        blocked: true,
+      },
+    ],
+    badge: "verified",
+    recommendations: ["Keep the current policy enabled"],
+    badge_record: {
+      audit_id: "audit-123",
+      target_host: "agent.example",
+      grade: "A",
+      score: 95,
+      blocked: 1,
+      total: 1,
+      issued_at: "2026-07-16T00:00:00Z",
+      consent_verified: true,
+      signature: "signed-record",
+    },
+    consent_verified: true,
+  };
+}
 
 test("integration examples take service identifiers, prices, and endpoints from the catalog", () => {
   for (const service of catalog.services) {
@@ -50,6 +79,37 @@ test("raw x402 curl has valid continuation lines and required request fields", (
   assert.match(examples.curl, /--data/);
 });
 
+test("integration examples reject non-canonical endpoints before generating code", () => {
+  const service = catalog.services.find(
+    (candidate) => candidate.key === "scan",
+  );
+
+  for (const endpoint of [
+    "https://warden.gudman.xyz/scan; echo INJECTED",
+    "https://evil.example/scan",
+    "https://warden.gudman.xyz/scan?redirect=https://evil.example",
+  ]) {
+    assert.throws(
+      () =>
+        buildIntegrationExamples({
+          providerAgentId: catalog.providerAgentId,
+          service: { ...service, endpoint },
+        }),
+      /canonical Warden route/,
+    );
+  }
+
+  const examples = buildIntegrationExamples({
+    providerAgentId: catalog.providerAgentId,
+    service,
+  });
+  assert.match(examples.curl, /curl -i 'https:\/\/warden\.gudman\.xyz\/scan'/);
+  assert.match(
+    examples.curl,
+    /curl --fail-with-body -sS 'https:\/\/warden\.gudman\.xyz\/scan'/,
+  );
+});
+
 test("audit examples parse the audit contract instead of a scan verdict", () => {
   const service = catalog.services.find(
     (candidate) => candidate.key === "audit",
@@ -66,6 +126,72 @@ test("audit examples parse the audit contract instead of a scan verdict", () => 
     assert.match(example, /recommendations/);
     assert.doesNotMatch(example, /result\.verdict|result\.get\("verdict"\)/);
     assert.doesNotMatch(example, /Unknown Warden verdict/);
+  }
+  assert.match(
+    examples.typescript,
+    /function validateAuditResponse\([\s\S]*asserts value is WardenAuditResponse/,
+  );
+  assert.match(examples.typescript, /validateAuditResponse\(result\);/);
+  assert.doesNotMatch(examples.typescript, /result as WardenAuditResponse/);
+});
+
+test("audit response validation accepts the full contract and inert extra fields", () => {
+  const response = validAuditResponse();
+  response.extra = "ignored";
+  response.results[0].extra = "ignored";
+  response.badge_record.extra = "ignored";
+
+  assert.equal(validateAuditResponse(response), response);
+  assert.equal(
+    validateAuditResponse({
+      ...response,
+      badge_record: null,
+      consent_verified: false,
+    }).badge_record,
+    null,
+  );
+});
+
+test("audit response validation rejects malformed boundary fields", () => {
+  const cases = [
+    ["object", null],
+    ["finite score", { score: Number.NaN }],
+    ["score range", { score: 101 }],
+    ["grade", { grade: "E" }],
+    ["results", { results: [{ attack_class: 1, sent: "x", blocked: true }] }],
+    ["results", { results: [{ attack_class: "x", sent: 1, blocked: true }] }],
+    ["results", { results: [{ attack_class: "x", sent: "x", blocked: 1 }] }],
+    ["badge", { badge: null }],
+    ["recommendations", { recommendations: ["valid", 1] }],
+    ["badge_record", { badge_record: {} }],
+    [
+      "badge_record",
+      { badge_record: { ...validAuditResponse().badge_record, score: "95" } },
+    ],
+    [
+      "badge_record",
+      { badge_record: { ...validAuditResponse().badge_record, blocked: 0.5 } },
+    ],
+    [
+      "badge_record",
+      { badge_record: { ...validAuditResponse().badge_record, total: "1" } },
+    ],
+    [
+      "badge_record",
+      {
+        badge_record: {
+          ...validAuditResponse().badge_record,
+          consent_verified: "yes",
+        },
+      },
+    ],
+    ["consent_verified", { consent_verified: null }],
+  ];
+
+  for (const [label, replacement] of cases) {
+    const candidate =
+      replacement === null ? null : { ...validAuditResponse(), ...replacement };
+    assert.throws(() => validateAuditResponse(candidate), new RegExp(label));
   }
 });
 

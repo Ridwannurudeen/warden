@@ -1,6 +1,10 @@
 {
-  "agentCount": 579,
-  "auditedCount": 0,
-  "fetchedAt": "2026-07-14T14:50:30Z",
-  "matchedCount": 1
+  "schemaVersion": 2,
+  "capturedAt": "2026-07-16T02:47:26Z",
+  "query": "a",
+  "sampled": 730,
+  "expected": 752,
+  "dropped": 22,
+  "matchedCount": 3,
+  "auditedCount": 0
 }

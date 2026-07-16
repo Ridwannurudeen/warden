@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="The Warden Trust Layer combines local runtime enforcement, open Agent Protection Attestations, and a public safety fabric."
+    />
+    <meta name="color-scheme" content="dark light" />
+    <title>Trust Layer | Warden</title>
+    <link rel="canonical" href="https://warden.gudman.xyz/trust" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Warden" />
+    <meta property="og:title" content="Warden Trust Layer" />
+    <meta
+      property="og:description"
+      content="Local enforcement, open attestations, and a public safety fabric for the agent economy."
+    />
+    <meta property="og:url" content="https://warden.gudman.xyz/trust" />
+    <meta
+      property="og:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <link rel="icon" href="/assets/warden-avatar.png" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header page-shell">
+      <a class="brand" href="/" aria-label="Warden home"
+        ><img
+          src="/assets/warden-avatar.png"
+          alt=""
+          width="36"
+          height="36"
+        /><span>Warden</span></a
+      >
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-nav"
+        data-nav-toggle
+      >
+        Menu
+      </button>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
+        <details class="nav-group">
+          <summary>Product</summary>
+          <div class="nav-menu">
+            <a href="/theater">Attack Theater</a>
+            <a href="/playground">Playground</a>
+            <a href="/agents">Marketplace index</a>
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/showcase">Judge showcase</a>
+          </div>
+        </details>
+        <details class="nav-group has-current">
+          <summary>Developers</summary>
+          <div class="nav-menu">
+            <a href="/docs">Documentation</a>
+            <a href="/integrate">Integrate</a>
+            <a href="/trust" aria-current="page">Trust Layer</a>
+            <a href="/status">API status</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Evidence</summary>
+          <div class="nav-menu">
+            <a href="/verify">Verify APA</a>
+            <a href="/apa/log">Transparency log</a>
+            <a href="/badges">Audit badges</a>
+            <a href="/agents#methodology">Public-text methodology</a>
+            <a href="/gauntlet#policy">Adversarial challenge</a>
+          </div>
+        </details>
+        <div class="nav-mobile-actions">
+          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
+          <a class="button primary" href="/playground">Run a live scan</a>
+        </div>
+      </nav>
+      <div class="header-actions">
+        <a class="status-pill" href="/status" aria-label="Open API status"
+          ><span class="live-dot" data-health-dot aria-hidden="true"></span
+          ><span data-health-label>Checking API</span></a
+        >
+        <a class="header-hire" href="/hire">Hire</a>
+        <a class="header-scan" href="/playground">Run scan</a>
+        <button
+          class="theme-toggle"
+          type="button"
+          data-theme-toggle
+          aria-label="Switch color theme"
+        >
+          Theme
+        </button>
+      </div>
+    </header>
+
+    <main id="main" class="page-shell site-main">
+      <section class="page-hero">
+        <p class="eyebrow">Warden Trust Layer · APA v0.1</p>
+        <h1>The immune system of the agent economy.</h1>
+        <p class="hero-text">
+          Warden places deterministic enforcement before autonomous action,
+          publishes an open proof of guard state, and makes ecosystem evidence
+          visible without turning it into a trust seal.
+        </p>
+        <div class="hero-actions">
+          <a class="button primary" href="/theater">Watch Attack Theater</a>
+          <a class="button secondary" href="/spec/APA-SPEC.md"
+            >Read the open spec</a
+          >
+        </div>
+      </section>
+
+      <section aria-labelledby="pillars-title">
+        <div class="section-heading">
+          <p class="eyebrow">Three interoperable pillars</p>
+          <h2 id="pillars-title">
+            Enforce locally. Attest openly. Inspect publicly.
+          </h2>
+          <p>
+            Each pillar has a separate job and a visible boundary. None is
+            presented as proof that an endpoint is permanently safe.
+          </p>
+        </div>
+        <div class="decision-grid">
+          <article>
+            <strong>01 · Local enforcement</strong>
+            <p>
+              Run the deterministic engine in the agent process, without a
+              network dependency or hosted rate limit.
+            </p>
+            <pre><code>safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)</code></pre>
+          </article>
+          <article>
+            <strong>02 · Agent Protection Attestation</strong>
+            <p>
+              APA binds an endpoint host to an Ed25519 key, live guard state,
+              and a signed rolling 24-hour count or an explicit unavailable
+              state that anyone can verify offline.
+            </p>
+            <a class="text-link" href="/verify">Verify an attestation</a>
+          </article>
+          <article>
+            <strong>03 · Safety Map</strong>
+            <p>
+              The public fabric keeps marketplace coverage, matched listings,
+              and completed audits distinct instead of collapsing them into one
+              score.
+            </p>
+            <a class="text-link" href="/#safety-map">Open the Safety Map</a>
+          </article>
+        </div>
+      </section>
+
+      <section class="surface-callout" aria-labelledby="proof-title">
+        <div>
+          <p class="eyebrow">An honest proof boundary</p>
+          <h2 id="proof-title">
+            Guard-live means exactly what the signature proves.
+          </h2>
+          <p>
+            A valid, fresh APA attestation proves that the endpoint host
+            controls its key and signed the stated rolling 24-hour count or an
+            explicit unavailable state in its live guard proof. The issuer
+            verifies that proof and separately signs the attestation record. It
+            does not prove that every request traversed the guard or
+            independently audit local counter state.
+          </p>
+        </div>
+        <div class="hero-actions">
+          <a class="button primary" href="/verify">Open verifier</a>
+          <a class="button secondary" href="/apa/log"
+            >Inspect transparency log</a
+          >
+        </div>
+      </section>
+
+      <section class="snippet-card" aria-labelledby="badge-embed-title">
+        <header>
+          <div>
+            <p class="eyebrow">Status-aware embed</p>
+            <h2 id="badge-embed-title">Embed only an issued attestation ID.</h2>
+          </div>
+        </header>
+        <p>
+          Replace <code>ATTESTATION_ID</code> after issuance. The SVG route
+          renders the attestation's current status and is served with
+          <code>Cache-Control: no-store</code>; this page does not invent a live
+          ID.
+        </p>
+        <template id="apa-badge-template">
+          <img
+            src="https://warden.gudman.xyz/apa/attestation/ATTESTATION_ID/badge.svg"
+            alt="APA attestation status"
+          />
+        </template>
+        <pre><code>&lt;img src="https://warden.gudman.xyz/apa/attestation/ATTESTATION_ID/badge.svg" alt="APA attestation status"&gt;</code></pre>
+        <p>
+          The wire format, canonicalization rules, signature verification, TTL,
+          nonce, status, and log semantics are published in the
+          <a class="text-link" href="/spec/APA-SPEC.md"
+            >Agent Protection Attestation specification</a
+          >.
+        </p>
+      </section>
+    </main>
+
+    <footer class="site-footer page-shell">
+      <div>
+        <strong>Warden</strong
+        ><span>The immune system of the agent economy.</span
+        ><span>Independent service listed on OKX.AI.</span>
+      </div>
+      <nav aria-label="Footer">
+        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
+        ><a href="/showcase">Showcase</a><a href="/docs">Docs</a
+        ><a href="/badges">Evidence</a><a href="/status">Status</a
+        ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
+        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+      </nav>
+    </footer>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

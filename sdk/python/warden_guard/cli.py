@@ -12,8 +12,9 @@ import json
 import sys
 import time
 import urllib.request
+from urllib.parse import urlsplit
 
-from warden_guard.apa import TTL_SECONDS, verify_document
+from warden_guard.apa import validate_attestation, validate_protection_proof
 from warden_guard.keys import key_path, load_or_create_key, public_key_str
 from warden_guard.proof import WELL_KNOWN_PATH
 
@@ -21,24 +22,36 @@ from warden_guard.proof import WELL_KNOWN_PATH
 def verify_endpoint(url: str) -> tuple[bool, str]:
     """Fetch a live Protection Proof and verify its self-signature + freshness."""
     base = url if "://" in url else "https://" + url
-    proof_url = base.rstrip("/") + WELL_KNOWN_PATH
+    parsed = urlsplit(base)
+    if (
+        parsed.scheme.lower() != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+    ):
+        return False, "APA endpoints must use a valid HTTPS origin"
+    try:
+        port = parsed.port
+    except ValueError:
+        return False, "APA endpoints must use a valid HTTPS origin"
+    host = parsed.hostname.lower()
+    host_identity = f"[{host}]" if ":" in host else host
+    endpoint_host = host_identity if port in (None, 443) else f"{host_identity}:{port}"
+    proof_url = f"https://{endpoint_host}{WELL_KNOWN_PATH}"
     try:
         with urllib.request.urlopen(proof_url, timeout=5) as resp:  # noqa: S310
             proof = json.loads(resp.read(64_000))
     except Exception as exc:  # noqa: BLE001
         return False, f"cannot fetch proof at {proof_url}: {exc}"
-    pub = proof.get("pub")
-    if not isinstance(pub, str):
-        return False, "proof missing pub"
     try:
-        verify_document(proof, pub, sig_field="sig")
-    except Exception:  # noqa: BLE001
-        return False, "heartbeat signature INVALID"
-    if int(time.time()) - int(proof.get("ts", 0)) > TTL_SECONDS:
-        return False, "heartbeat signature valid but STALE"
+        validate_protection_proof(proof, expected_host=endpoint_host)
+    except Exception as exc:  # noqa: BLE001
+        return False, f"heartbeat INVALID ({exc})"
+    scans = proof.get("scans_served")
+    scans_label = "unavailable" if scans is None else str(scans)
     return True, (
         f"VALID live proof — host={proof.get('endpoint_host')}, "
-        f"protector={proof.get('protector')}, scans_served={proof.get('scans_served')}"
+        f"protector={proof.get('protector')}, scans_served={scans_label}"
     )
 
 
@@ -47,18 +60,19 @@ def verify_attestation_file(path: str, issuer_pub: str) -> tuple[bool, str]:
     with open(path, encoding="utf-8") as handle:
         att = json.load(handle)
     try:
-        verify_document(att, issuer_pub, sig_field="issuer_sig")
+        validate_attestation(att, issuer_pub)
     except Exception as exc:  # noqa: BLE001
-        return False, f"issuer signature INVALID ({exc})"
+        return False, f"attestation INVALID ({exc})"
     expires = att.get("expires_at")
     if isinstance(expires, int) and int(time.time()) > expires:
         return False, "signature valid but EXPIRED -> status: stale"
     status = att.get("status")
     if status and status != "active":
         return False, f"signature valid but status is '{status}'"
+    scans = att.get("scans_24h")
+    scans_label = "count unavailable" if scans is None else f"{scans} scans/24h"
     return True, (
-        f"VALID (endpoint={att.get('endpoint_host')}, "
-        f"{att.get('scans_24h')} scans/24h, tier={att.get('tier')})"
+        f"VALID (endpoint={att.get('endpoint_host')}, {scans_label}, tier={att.get('tier')})"
     )
 
 

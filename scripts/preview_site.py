@@ -34,6 +34,8 @@ def _is_api_path(path: str) -> bool:
     return (
         path in API_PATHS
         or path.startswith("/api/")
+        or path.startswith("/apa/")
+        or path == "/.well-known/apa-issuer.json"
         or re.fullmatch(r"/badge/[^/]+/?", path) is not None
     )
 

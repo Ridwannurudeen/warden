@@ -70,9 +70,11 @@ def handle(payload: str) -> str:
 ## Prove your guard is live (APA v0.1)
 
 Serve the signed Protection Proof heartbeat so any issuer or marketplace can verify —
-offline, cryptographically — that this guard is running and how many payloads it has
-actually screened (`scans_served` is a persistent monotonic counter incremented only by
-real `scan()` calls; it cannot be set via API, env, or config):
+offline, cryptographically — that this guard is running and either how many payloads it has
+screened in the signed rolling 24-hour window or an explicit unavailable state. Failed, fail-open, and malformed hosted
+responses do not advance `scans_served`. When lifetime-only state is migrated, the SDK
+signs `scans_served: null` through a persisted 24-hour warmup instead of misreporting the
+unknown rolling count as zero:
 
 ```python
 from warden_guard import ProtectionProofApp
@@ -82,9 +84,33 @@ app.mount("/.well-known/agent-protection", ProtectionProofApp("api.example.com")
 
 The heartbeat is Ed25519-signed by a keypair generated on first run and persisted at
 `$WARDEN_GUARD_KEY` (default `~/.warden/guard_key`, `0600`). What it proves: *this host
-controls the key and counter-signs an honest scan count* — not that every request is
-routed through the guard. Multi-worker deployments share one counter file
-(`$WARDEN_GUARD_STATE`), reported as "payloads this guard has signed".
+controls the key and signed the stated rolling count, or explicitly signed that the exact
+count is temporarily unavailable* — not that every request is
+routed through the guard or that an independent party audited local counter state.
+Multi-worker deployments share the JSON lifetime state and companion SQLite rolling
+buckets derived from `$WARDEN_GUARD_STATE`.
+
+### Rotate an endpoint key without silent re-binding
+
+Sign the existing revocation body with the currently bound endpoint key. Omitting
+`replacement_pub` remains a plain revocation; including it authorizes only that exact
+canonical Ed25519 public key:
+
+```python
+from warden_guard.apa import sign_revocation
+
+plain_revocation = sign_revocation(attestation_id, old_key)
+rotation_authorization = sign_revocation(
+    attestation_id,
+    old_key,
+    replacement_pub=new_pub,
+)
+```
+
+POST the signed object to `/apa/revoke`, then serve a fresh Protection Proof signed by
+the authorized replacement and call `/apa/register` again. Retain the old endpoint key
+until that registration returns an `active` Attestation for `new_pub`; an authorization
+alone does not rebind the host.
 
 ## CLI
 

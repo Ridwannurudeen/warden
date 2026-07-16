@@ -9,10 +9,11 @@ import tempfile
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SNAPSHOT_SCHEMA_VERSION = 1
+SNAPSHOT_SCHEMA_VERSION = 2
 
 CommandRunner = Callable[[list[str]], str]
 
@@ -110,7 +111,7 @@ class SearchPageData(BaseModel):
     agents: list[MarketplaceAgent] = Field(alias="list")
     page: int
     page_size: int = Field(alias="pageSize")
-    total: int | None = None
+    total: int | None = Field(default=None, ge=0)
 
 
 class SearchEnvelope(BaseModel):
@@ -119,11 +120,28 @@ class SearchEnvelope(BaseModel):
 
 
 class SnapshotMetadata(BaseModel):
-    schema_version: int
-    fetched_at: str
+    schema_version: Literal[2]
+    captured_at: str
     query: str
     page_size: int
-    agent_count: int
+    sampled: int = Field(ge=0)
+    expected: int = Field(ge=0)
+    dropped: int = Field(ge=0)
+
+    @field_validator("captured_at")
+    @classmethod
+    def validate_captured_at(cls, value: str) -> str:
+        try:
+            datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+        except ValueError as exc:
+            raise ValueError("captured_at must be a UTC timestamp with second precision") from exc
+        return value
+
+    @model_validator(mode="after")
+    def validate_coverage(self) -> SnapshotMetadata:
+        if self.dropped != max(self.expected - self.sampled, 0):
+            raise ValueError("dropped must equal max(expected - sampled, 0)")
+        return self
 
 
 class MarketplaceSnapshot(BaseModel):
@@ -143,6 +161,26 @@ def parse_search_output(output: str) -> SearchPageData:
 
 
 def _run_cli(command: list[str]) -> str:
+    home = os.getenv("HOME") or (os.getenv("USERPROFILE") if os.name == "nt" else None)
+    path = os.getenv("PATH")
+    if not home or not path:
+        raise RuntimeError("onchainos CLI requires HOME and PATH")
+    environment = {"HOME": home, "PATH": path}
+    if os.name == "nt":
+        for name in (
+            "SYSTEMROOT",
+            "WINDIR",
+            "PATHEXT",
+            "COMSPEC",
+            "TEMP",
+            "TMP",
+            "USERPROFILE",
+            "APPDATA",
+            "LOCALAPPDATA",
+        ):
+            value = os.getenv(name)
+            if value:
+                environment[name] = value
     try:
         completed = subprocess.run(
             command,
@@ -151,6 +189,7 @@ def _run_cli(command: list[str]) -> str:
             encoding="utf-8",
             timeout=120,
             check=False,
+            env=environment,
         )
     except FileNotFoundError as exc:
         raise RuntimeError("onchainos CLI is not installed") from exc
@@ -169,11 +208,12 @@ def fetch_snapshot(
     *,
     query: str = "a",
     page_size: int = 100,
-    fetched_at: str | None = None,
+    captured_at: str | None = None,
     command_runner: CommandRunner | None = None,
 ) -> MarketplaceSnapshot:
     runner = command_runner or _run_cli
     agents_by_id: dict[str, MarketplaceAgent] = {}
+    reported_totals: list[int] = []
     page_number = 1
 
     while True:
@@ -189,6 +229,8 @@ def fetch_snapshot(
             str(page_size),
         ]
         page = parse_search_output(runner(command))
+        if page.total is not None:
+            reported_totals.append(page.total)
         if not page.agents:
             break
 
@@ -202,13 +244,19 @@ def fetch_snapshot(
         page_number += 1
 
     agents = sorted(agents_by_id.values(), key=lambda agent: int(agent.agent_id))
+    if not reported_totals:
+        raise RuntimeError("marketplace search did not report an expected total")
+    sampled = len(agents)
+    expected = max(reported_totals)
     snapshot = MarketplaceSnapshot(
         metadata=SnapshotMetadata(
             schema_version=SNAPSHOT_SCHEMA_VERSION,
-            fetched_at=fetched_at or _utc_timestamp(),
+            captured_at=captured_at or _utc_timestamp(),
             query=query,
             page_size=page_size,
-            agent_count=len(agents),
+            sampled=sampled,
+            expected=expected,
+            dropped=max(expected - sampled, 0),
         ),
         agents=agents,
     )
@@ -237,6 +285,7 @@ def _write_snapshot(path: Path, snapshot: MarketplaceSnapshot) -> None:
                     "agent": agent.model_dump(mode="json", by_alias=True),
                 }
                 handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+        os.chmod(temporary_path, 0o644)
         os.replace(temporary_path, path)
     finally:
         if temporary_path is not None and temporary_path.exists():
@@ -257,6 +306,8 @@ def load_snapshot(path: Path) -> MarketplaceSnapshot:
         for record in records[1:]
         if record.get("kind") == "agent"
     ]
-    if len(agents) != metadata.agent_count:
-        raise RuntimeError("marketplace snapshot agent count does not match metadata")
+    if len(agents) != metadata.sampled:
+        raise RuntimeError("marketplace snapshot sampled count does not match metadata")
+    if len({agent.agent_id for agent in agents}) != len(agents):
+        raise RuntimeError("marketplace snapshot contains duplicate agent IDs")
     return MarketplaceSnapshot(metadata=metadata, agents=agents)

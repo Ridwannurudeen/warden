@@ -5,20 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Warden is the deterministic action firewall that stops poisoned agent output before a wallet, tool, secret, or outbound link is acted on."
+      content="Warden is the immune system of the agent economy: live runtime defense plus open, cryptographically verifiable Agent Protection Attestations."
     />
     <meta name="color-scheme" content="dark light" />
-    <title>Warden — Action Firewall for Autonomous Agents</title>
+    <title>Warden — The Immune System of the Agent Economy</title>
     <link rel="canonical" href="https://warden.gudman.xyz/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Warden" />
     <meta
       property="og:title"
-      content="Warden — Action Firewall for Autonomous Agents"
+      content="Warden — The Immune System of the Agent Economy"
     />
     <meta
       property="og:description"
-      content="Stop poisoned agent output before it moves money, calls a tool, reveals a secret, or follows a link."
+      content="Watch live attacks stop at runtime, then verify Warden's open Agent Protection Attestation."
     />
     <meta property="og:url" content="https://warden.gudman.xyz/" />
     <meta
@@ -57,7 +57,8 @@
         <details class="nav-group">
           <summary>Product</summary>
           <div class="nav-menu">
-            <a href="/playground">Playground</a
+            <a href="/theater">Attack Theater</a
+            ><a href="/playground">Playground</a
             ><a href="/agents">Marketplace index</a
             ><a href="/gauntlet">Gauntlet</a
             ><a href="/showcase">Judge showcase</a>
@@ -67,13 +68,15 @@
           <summary>Developers</summary>
           <div class="nav-menu">
             <a href="/docs">Documentation</a><a href="/integrate">Integrate</a
-            ><a href="/status">API status</a>
+            ><a href="/trust">Trust Layer</a><a href="/status">API status</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Evidence</summary>
           <div class="nav-menu">
-            <a href="/badges">Audit badges</a
+            <a href="/verify">Verify APA</a
+            ><a href="/apa/log">Transparency log</a
+            ><a href="/badges">Audit badges</a
             ><a href="/agents#methodology">Public-text methodology</a
             ><a href="/gauntlet#policy">Adversarial challenge</a>
           </div>
@@ -103,62 +106,102 @@
     <main id="main" class="site-main">
       <div class="page-shell">
         <aside class="trust-strip" aria-label="Warden ecosystem context">
+          <span>Open APA verification standard</span>
+          <span>Ed25519 signed attestations</span>
+          <span>Live runtime defense</span>
           <span>Independent service listed on OKX.AI</span>
-          <span>x402 on X Layer</span>
-          <span>Deterministic fast path</span>
-          <span>Machine-readable verdicts</span>
         </aside>
 
         <section class="home-hero">
           <div class="home-hero-copy">
-            <p class="eyebrow">
-              Deterministic pre-action security for the agent economy
-            </p>
-            <h1>Stop <span class="accent-word">poisoned</span> agent output before it moves money.</h1>
+            <p class="eyebrow">Open protection proofs for autonomous systems</p>
+            <h1>The immune system of the agent economy.</h1>
             <p class="hero-text">
-              Warden inspects untrusted messages, tool output, links, and
-              payment instructions before an agent transfers funds or calls a
-              tool. One repeatable request returns ALLOW, SANITIZE, or BLOCK
-              with machine-readable evidence.
+              Warden neutralizes hostile agent output before action, then makes
+              its live guard state independently checkable through the open
+              Agent Protection Attestation standard.
             </p>
             <div class="hero-actions">
-              <a
-                class="button primary button--hero"
-                href="/playground?example=drain-001"
-                >Run a live scan</a
-              ><a class="button secondary" href="/hire">Hire Warden on OKX.AI</a
-              ><a class="text-link action-link" href="/integrate"
-                >View the integration contract</a
+              <a class="button primary button--hero" href="/theater"
+                >Watch the immune response</a
+              ><a class="button secondary" href="/integrate">Integrate APA</a
+              ><a class="text-link action-link" href="/agents"
+                >Explore the Safety Map</a
               >
             </div>
           </div>
 
-          <figure class="action-gate live-scan" data-live-scan>
+          <figure
+            id="safety-map"
+            class="safety-map"
+            data-safety-map
+            aria-labelledby="safety-map-title"
+          >
             <figcaption>
-              <span class="live-dot is-ok" aria-hidden="true"></span>
-              <span>Live demo · real deterministic scan</span>
+              <span>
+                <strong id="safety-map-title">Agent Safety Map</strong>
+                <small data-marketplace-coverage data-coverage-state="degraded"
+                  >Partial/degraded discovery response for marketplace query
+                  "a": 730 unique agents sampled; highest reported result total
+                  752; 22 expected agents not present in this response.</small
+                >
+              </span>
+              <span
+                class="snapshot-note"
+                data-marketplace-snapshot
+                data-fallback-snapshot="2026-07-16T02:47:26Z"
+                >Snapshot 2026-07-16T02:47:26Z</span
+              >
             </figcaption>
-            <div class="ls-body">
-              <div class="ls-chips" role="group" aria-label="Example payloads">
-                <button type="button" class="ls-chip is-active" data-example="secret">Secret exfil</button>
-                <button type="button" class="ls-chip" data-example="drain">Drain address</button>
-                <button type="button" class="ls-chip" data-example="injection">Prompt injection</button>
-                <button type="button" class="ls-chip" data-example="benign">Benign</button>
+            <div class="safety-map__field">
+              <svg
+                class="safety-map-fabric"
+                viewBox="0 0 640 390"
+                role="img"
+                aria-label="A distributed visualization of portable verification across sampled marketplace agents"
+              >
+                <path
+                  d="M74 84 222 162 118 310 242 301 334 197 486 325 572 217 518 79 334 197 222 162Z"
+                />
+                <path d="M74 84 334 197 572 217" />
+                <path d="M118 310 334 197 518 79" />
+                <path d="m222 162 264 163" />
+                <path d="M242 301 518 79" />
+                <circle cx="74" cy="84" r="8" />
+                <circle cx="118" cy="310" r="8" />
+                <circle cx="222" cy="162" r="8" />
+                <circle cx="242" cy="301" r="8" />
+                <circle cx="334" cy="197" r="8" />
+                <circle cx="486" cy="325" r="8" />
+                <circle cx="518" cy="79" r="8" />
+                <circle cx="572" cy="217" r="8" />
+              </svg>
+              <div class="safety-map__fabric-label">
+                <span>APA verification fabric</span>
+                <strong
+                  >issuer key · guard live · signed count or
+                  <span>explicit unavailable state</span></strong
+                >
               </div>
-              <label class="ls-label" for="ls-input">Untrusted payload — edit and re-run</label>
-              <textarea id="ls-input" class="ls-input" data-ls-input rows="3" spellcheck="false" aria-label="Untrusted payload to scan"></textarea>
-              <button type="button" class="button primary ls-run" data-ls-run>
-                Run Warden <span aria-hidden="true">→</span>
-              </button>
-              <div class="ls-result" data-ls-result hidden aria-live="polite">
-                <div class="ls-verdict" data-ls-verdict></div>
-                <dl class="ls-meta">
-                  <div><dt>Threats</dt><dd data-ls-threats>—</dd></div>
-                  <div><dt>Risk</dt><dd data-ls-risk>—</dd></div>
-                  <div><dt>Compute</dt><dd class="num" data-ls-latency>—</dd></div>
-                </dl>
-                <p class="ls-sanitized" data-ls-sanitized hidden></p>
+              <div class="safety-map__signal safety-map__signal--agents">
+                <strong class="num" data-marketplace-count>730</strong>
+                <span>agents indexed</span>
               </div>
+              <div class="safety-map__signal safety-map__signal--matched">
+                <strong class="num" data-marketplace-matched>3</strong>
+                <span>public-text match</span>
+              </div>
+              <div class="safety-map__signal safety-map__signal--audited">
+                <strong class="num" data-marketplace-audited>0</strong>
+                <span>endpoint audits</span>
+              </div>
+            </div>
+            <div class="safety-map__boundary">
+              Public listing text is discovery evidence, not proof of endpoint
+              behavior. APA verifies endpoint-key control, a fresh guard-live
+              proof, and a signed rolling 24-hour count or an explicit
+              unavailable state; it does not prove that every request traversed
+              the guard or audit local counter state.
             </div>
           </figure>
         </section>
@@ -166,11 +209,11 @@
         <section class="evidence-rail" aria-label="Current Warden evidence">
           <div>
             <span>Marketplace snapshot</span
-            ><strong class="num" data-marketplace-count>376</strong
+            ><strong class="num" data-marketplace-count>730</strong
             ><small
               data-marketplace-snapshot
-              data-fallback-snapshot="2026-07-13T17:45:35Z"
-              >Snapshot 2026-07-13T17:45:35Z</small
+              data-fallback-snapshot="2026-07-16T02:47:26Z"
+              >Snapshot 2026-07-16T02:47:26Z</small
             >
           </div>
           <div>
@@ -200,19 +243,62 @@
             </p>
             <ol class="boundary-steps">
               <li>
-                <span>01</span><strong><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Inspect exact payload</strong
+                <span>01</span
+                ><strong
+                  ><svg
+                    class="step-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.9"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m21 21-4.3-4.3" /></svg
+                  >Inspect exact payload</strong
                 ><small
                   >Pair untrusted text with the minimum trusted context.</small
                 >
               </li>
               <li>
-                <span>02</span><strong><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 7-7 8-4-1-7-3.5-7-8V6z"/><path d="m9 12 2 2 4-4"/></svg>Run deterministic detectors</strong
+                <span>02</span
+                ><strong
+                  ><svg
+                    class="step-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.9"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 3l7 3v5c0 4.5-3 7-7 8-4-1-7-3.5-7-8V6z" />
+                    <path d="m9 12 2 2 4-4" /></svg
+                  >Run deterministic detectors</strong
                 ><small
                   >Repeatable checks return reasons and a severity band.</small
                 >
               </li>
               <li>
-                <span>03</span><strong><svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 3h8.2L21 7.9v8.2L16.1 21H7.9L3 16.1V7.9z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>Enforce next action</strong
+                <span>03</span
+                ><strong
+                  ><svg
+                    class="step-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.9"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M7.9 3h8.2L21 7.9v8.2L16.1 21H7.9L3 16.1V7.9z" />
+                    <path d="M12 8v4" />
+                    <path d="M12 16h.01" /></svg
+                  >Enforce next action</strong
                 ><small
                   >Continue, use sanitized output, or stop before
                   execution.</small
@@ -222,7 +308,7 @@
           </div>
           <div
             class="boundary-diagram"
-            aria-label="Untrusted service output passes through Warden before four protected actions"
+            aria-label="Untrusted service output passes through Warden before four action classes"
           >
             <div class="boundary-source">
               <span>Untrusted service output</span
@@ -244,7 +330,6 @@
       </section>
 
       <div class="page-shell">
-
         <section class="services-section" id="services">
           <div class="section-heading">
             <p class="eyebrow">Evaluate free. Pay for production work.</p>
@@ -256,9 +341,9 @@
             <p
               class="snapshot-note"
               data-service-snapshot
-              data-fallback-snapshot="2026-07-13T17:45:35Z"
+              data-fallback-snapshot="2026-07-16T02:47:26Z"
             >
-              Catalog snapshot 2026-07-13T17:45:35Z
+              Catalog snapshot 2026-07-16T02:47:26Z
             </p>
           </div>
           <div class="service-comparison" data-service-catalog>
@@ -366,18 +451,18 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
         </section>
 
         <section class="final-cta">
-          <p class="eyebrow">The next action is the boundary</p>
-          <h2>Put Warden in front of it.</h2>
+          <p class="eyebrow">See the immune response</p>
+          <h2>Watch three attacks meet the boundary.</h2>
           <p>
-            Start with the real free scan. Move to a paid task only when the
-            payload or authorized endpoint needs production evidence.
+            Attack Theater runs one live three-request pass, then APA shows how
+            to expose verifiable guard state beyond the demo.
           </p>
           <div class="hero-actions">
-            <a class="button primary button--hero" href="/playground"
-              >Run a live scan</a
-            ><a class="button secondary" href="/hire">Hire on OKX.AI</a
-            ><a class="text-link action-link" href="/integrate"
-              >Integrate the API</a
+            <a class="button primary button--hero" href="/theater"
+              >Open Attack Theater</a
+            ><a class="button secondary" href="/integrate">Integrate APA</a
+            ><a class="text-link action-link" href="/playground"
+              >Run a single scan</a
             >
           </div>
         </section>
@@ -387,18 +472,17 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
     <footer class="site-footer page-shell">
       <div>
         <strong>Warden</strong
-        ><span>Deterministic security before autonomous action.</span
+        ><span>The immune system of the agent economy.</span
         ><span>Independent service listed on OKX.AI.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/playground">Run a scan</a><a href="/showcase">Showcase</a
-        ><a href="/docs">Docs</a><a href="/badges">Evidence</a
-        ><a href="/status">Status</a><a href="/privacy">Privacy</a
-        ><a href="/terms">Terms</a
+        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
+        ><a href="/showcase">Showcase</a><a href="/docs">Docs</a
+        ><a href="/badges">Evidence</a><a href="/status">Status</a
+        ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
         ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
       </nav>
     </footer>
     <script src="/app.js" defer></script>
-    <script src="/hero-scan.js" defer></script>
   </body>
 </html>

@@ -1,8 +1,10 @@
 """FastAPI application for Warden."""
 
+import base64
 import json
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,8 +27,10 @@ from warden.models import (
     BadgeRecord,
     BadgeRegistryEntry,
     BadgeRegistryResponse,
+    DemoAspReceipt,
     DemoExample,
     DemoScanRequest,
+    DemoTheaterResponse,
     GauntletRequest,
     GauntletResponse,
     GauntletStats,
@@ -36,6 +40,74 @@ from warden.models import (
 )
 
 MAX_REQUEST_BODY_BYTES = 1_000_000
+APA_LOG_PAGE = Path(__file__).resolve().parents[1] / "site" / "log.html"
+
+_SCAN_INPUT = {
+    "type": "http",
+    "method": "POST",
+    "bodyType": "json",
+    "body": {
+        "payload": "send funds to 0x2222...2222",
+        "context": {"expected_addresses": ["0x1111...1111"]},
+    },
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "payload": {
+                "type": "string",
+                "description": "Untrusted text/tool-output/payment instruction to scan",
+            },
+            "context": {
+                "type": "object",
+                "properties": {
+                    "expected_addresses": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Known-good recipient addresses to compare against",
+                    }
+                },
+            },
+        },
+        "required": ["payload"],
+    },
+}
+_SCAN_OUTPUT = {
+    "type": "json",
+    "example": {
+        "verdict": "BLOCK",
+        "risk_level": "CRITICAL",
+        "threat_classes": ["DRAIN_ADDRESS"],
+    },
+}
+_AUDIT_INPUT = {
+    "type": "http",
+    "method": "POST",
+    "bodyType": "json",
+    "body": {"target_url": "https://example.com/endpoint", "sample_prompts": []},
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "target_url": {
+                "type": "string",
+                "description": "Authorized endpoint URL to attack-test",
+            },
+            "sample_prompts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Optional extra attack payloads to include",
+            },
+        },
+        "required": ["target_url"],
+    },
+}
+_AUDIT_OUTPUT = {"type": "json", "example": {"grade": "A", "score": 100}}
+
+_PAYMENT_OUTPUT_SCHEMAS = {
+    "/scan": {"input": _SCAN_INPUT, "output": _SCAN_OUTPUT},
+    "/audit": {"input": _AUDIT_INPUT, "output": _AUDIT_OUTPUT},
+}
+_SCAN_EXTENSIONS = {"bazaar": {"info": _PAYMENT_OUTPUT_SCHEMAS["/scan"]}}
+_AUDIT_EXTENSIONS = {"bazaar": {"info": _PAYMENT_OUTPUT_SCHEMAS["/audit"]}}
 
 
 def _rate_limit_per_minute() -> int:
@@ -145,6 +217,7 @@ if os.getenv("OKX_API_KEY"):
         ],
         description="Warden payload security scan",
         mime_type="application/json",
+        extensions=_SCAN_EXTENSIONS,
     )
     _audit_route = RouteConfig(
         accepts=[
@@ -158,6 +231,7 @@ if os.getenv("OKX_API_KEY"):
         ],
         description="Warden agent endpoint security audit",
         mime_type="application/json",
+        extensions=_AUDIT_EXTENSIONS,
     )
     # Challenge unpaid GET as well as POST: OKX's x402-check probes with GET and
     # expects a 402 payment challenge; a POST-only paywall returns 405 and reads
@@ -225,15 +299,52 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def payment_required_schema_middleware(request: Request, call_next):
+    response = await call_next(request)
+    payment_required = response.headers.get("PAYMENT-REQUIRED")
+    if payment_required is None:
+        return response
+
+    challenge = json.loads(
+        base64.b64decode(payment_required.encode("ascii"), validate=True).decode("utf-8")
+    )
+    resource_path = urlsplit(challenge["resource"]["url"]).path.rstrip("/")
+    output_schema = _PAYMENT_OUTPUT_SCHEMAS.get(resource_path)
+    if output_schema is None:
+        return response
+
+    challenge["outputSchema"] = output_schema
+    for requirements in challenge["accepts"]:
+        requirements["outputSchema"] = output_schema
+
+    response.headers["PAYMENT-REQUIRED"] = base64.b64encode(
+        json.dumps(challenge, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii")
+    return response
+
+
 # OKX's create-task auto-replay re-requests the paid resource with GET but does
 # not forward a business body, so a service that needs input (scan/audit) has
-# nothing to act on. The supported path for such services is task-402-pay --body
-# (which warden.gudman.xyz/hire generates). This hint turns the 400 into a
-# self-service recovery for anyone inspecting a task frozen in `accepted`.
-_RECOVERY_HINT = (
-    " If your task froze in `accepted` after paying, OKX's auto-replay sent no "
-    "body — re-send with `task-402-pay --body '{...}'` or use "
-    "https://warden.gudman.xyz/hire. No charge was made for this request."
+# nothing to act on. These route-specific hints give a buyer the complete
+# task-402-pay recovery without changing the frozen POST contracts.
+_SCAN_RECOVERY_HINT = (
+    " Your task froze because OKX's auto-replay sent no body. No charge was made. "
+    "To finish it yourself: fetch the live 402 from this endpoint, then run "
+    "`onchainos agent task-402-pay <JOB_ID> --provider-agent-id 3808 "
+    "--endpoint https://warden.gudman.xyz/scan --token-symbol USDT --token-amount 0.5 "
+    "--accepts '<accepts from the 402>' --body "
+    '\'{"payload":"<your untrusted text>"}\'` then '
+    "`onchainos agent complete <JOB_ID>`. Guided version: https://warden.gudman.xyz/hire"
+)
+_AUDIT_RECOVERY_HINT = (
+    " Your task froze because OKX's auto-replay sent no body. No charge was made. "
+    "To finish it yourself: fetch the live 402 from this endpoint, then run "
+    "`onchainos agent task-402-pay <JOB_ID> --provider-agent-id 3808 "
+    "--endpoint https://warden.gudman.xyz/audit --token-symbol USDT --token-amount 0.5 "
+    "--accepts '<accepts from the 402>' --body "
+    '\'{"target_url":"<your authorized endpoint URL>"}\'` then '
+    "`onchainos agent complete <JOB_ID>`. Guided version: https://warden.gudman.xyz/hire"
 )
 
 
@@ -280,7 +391,7 @@ async def scan_get(request: Request) -> ScanResponse:
         raise HTTPException(
             status_code=400,
             detail="Provide the payload to scan as a 'payload' query parameter or JSON body field."
-            + _RECOVERY_HINT,
+            + _SCAN_RECOVERY_HINT,
         ) from exc
     return await scan(req)
 
@@ -293,6 +404,31 @@ async def demo_scan(req: DemoScanRequest) -> ScanResponse:
         context=req.context.model_dump(),
     )
     return ScanResponse.from_verdict(verdict)
+
+
+def _demo_theater_asp_handler(payload: str) -> DemoAspReceipt:
+    return DemoAspReceipt(invoked=True, received_payload=payload)
+
+
+@app.post("/api/demo/theater", response_model=DemoTheaterResponse)
+async def demo_theater(req: DemoScanRequest) -> DemoTheaterResponse:
+    verdict = await engine.scan(
+        req.payload,
+        depth="fast",
+        context=req.context.model_dump(),
+    )
+    scan_response = ScanResponse.from_verdict(verdict)
+    if scan_response.verdict == "BLOCK":
+        receipt = DemoAspReceipt(invoked=False, received_payload=None)
+    else:
+        delivered_payload = (
+            scan_response.sanitized_payload if scan_response.verdict == "SANITIZE" else req.payload
+        )
+        receipt = _demo_theater_asp_handler(delivered_payload)
+    return DemoTheaterResponse(
+        **scan_response.model_dump(),
+        asp_receipt=receipt,
+    )
 
 
 @app.post("/api/demo/gauntlet", response_model=GauntletResponse)
@@ -370,7 +506,7 @@ async def audit_get(request: Request) -> AuditResponse:
         raise HTTPException(
             status_code=400,
             detail="Provide the endpoint to audit as a 'target_url' query parameter or JSON body field."
-            + _RECOVERY_HINT,
+            + _AUDIT_RECOVERY_HINT,
         ) from exc
     return await audit(req)
 
@@ -408,22 +544,26 @@ async def apa_register(req: ApaRegisterRequest) -> dict[str, object]:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    binding = protection_store.get_binding(endpoint_host)
-    if binding is None:
-        protection_store.bind_host(endpoint_host, pub)
-        status = "active"
-    elif binding["pub"] == pub:
-        status = "active"
-    else:
-        # A different key for a bound host: possible rotation or compromise —
-        # never silently rebind (APA-SPEC §4.3).
-        protection_store.flag_key_changed(endpoint_host)
-        status = "key-changed"
-
-    record = protection.issue_attestation(endpoint_host, pub, scans, status=status)
-    protection_store.store_attestation(record)
-    protection_store.append_log("issued", record)
-    return {"attestation": record, "verified": protection.verify_attestation_record(record)}
+    try:
+        record = protection_store.commit_registration(
+            endpoint_host=endpoint_host,
+            probed_pub=pub,
+            record_factory=lambda status: protection.issue_attestation(
+                endpoint_host,
+                pub,
+                scans,
+                status=status,
+            ),
+            record_validator=protection.verify_attestation_record,
+            status_signer=protection.resign_attestation_status,
+        )
+    except protection_store.ProtectionStateConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {
+        "attestation": record,
+        "verified": protection.verify_attestation_record(record),
+        "scope": protection.ATTESTATION_SCOPE,
+    }
 
 
 @app.get("/apa/attestation/{attestation_id}")
@@ -435,6 +575,7 @@ async def apa_attestation(attestation_id: str) -> dict[str, object]:
         "attestation": record,
         "status": protection.effective_status(record),
         "verified": protection.verify_attestation_record(record),
+        "scope": protection.ATTESTATION_SCOPE,
     }
 
 
@@ -453,10 +594,29 @@ async def apa_badge_svg(attestation_id: str) -> Response:
     )
 
 
+def _explicitly_accepts_html(request: Request) -> bool:
+    for value in request.headers.get("accept", "").split(","):
+        media_type, *parameters = value.split(";")
+        if media_type.strip().lower() != "text/html":
+            continue
+        quality = 1.0
+        for parameter in parameters:
+            name, separator, raw = parameter.strip().partition("=")
+            if separator and name.lower() == "q":
+                try:
+                    quality = float(raw)
+                except ValueError:
+                    quality = 0.0
+        return quality > 0
+    return False
+
+
 @app.get("/apa/log")
-async def apa_log() -> dict[str, object]:
+async def apa_log(request: Request) -> Response:
+    if _explicitly_accepts_html(request):
+        return Response(content=APA_LOG_PAGE.read_text(encoding="utf-8"), media_type="text/html")
     entries = protection_store.read_log()
-    return {"entries": entries, "total": len(entries)}
+    return JSONResponse(content={"entries": entries, "total": len(entries)})
 
 
 @app.post("/apa/revoke")
@@ -469,14 +629,37 @@ async def apa_revoke(req: ApaRevokeRequest) -> dict[str, object]:
     if binding is None:
         raise HTTPException(status_code=400, detail="No key binding for this endpoint host")
     try:
-        protection.verify_revocation(req.model_dump(), str(binding["pub"]), endpoint_host)
+        replacement_pub = protection.verify_revocation(
+            req.model_dump(exclude_none=True),
+            str(binding["pub"]),
+            endpoint_host,
+            consume_nonce=False,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    updated = protection_store.set_attestation_status(req.attestation_id, "revoked")
-    if updated is not None:
-        protection_store.append_log("revoked", updated)
-    return {"attestation_id": req.attestation_id, "status": "revoked"}
+    try:
+        protection_store.commit_revocation(
+            attestation_id=req.attestation_id,
+            endpoint_host=endpoint_host,
+            bound_pub=str(binding["pub"]),
+            nonce=req.nonce,
+            replacement_pub=replacement_pub,
+            record_validator=protection.verify_attestation_record,
+            status_signer=protection.resign_attestation_status,
+        )
+    except protection_store.NonceReplay as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except protection_store.ProtectionStateConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    response: dict[str, object] = {
+        "attestation_id": req.attestation_id,
+        "status": "revoked",
+    }
+    if replacement_pub is not None:
+        response["replacement_pub"] = replacement_pub
+    return response
 
 
 @app.get("/")

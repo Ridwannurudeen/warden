@@ -1,24 +1,30 @@
 # Frontend screenshot manifest
 
 The two `warden-landing-*.png` files in this directory were captured on 2026-07-04 and predate the
-hackathon frontend overhaul. Keep them as baseline evidence; do not use them as current release
-screenshots.
+Trust Layer interface. Preserve them as baseline evidence; do not present them as current screenshots.
 
-The final capture environment was unavailable on 2026-07-13 because the in-app browser reported no
-attached browser session. Capture the current production build after deployment approval, using a
-device scale factor of at least 2 and the following stable paths:
+No current screenshots have been accepted for this working tree. Capture them only from the exact build
+being reviewed, at device scale factor 2 or higher, and record the commit alongside the files.
 
-| Route         |   Viewport | Output file                     | Required state                                           |
-| ------------- | ---------: | ------------------------------- | -------------------------------------------------------- |
-| `/`           | 1440 × 900 | `home-desktop-dark.png`         | First viewport and action-gate example visible           |
-| `/`           |  390 × 844 | `home-mobile-dark.png`          | Closed navigation; hero CTA visible                      |
-| `/playground` | 1440 × 900 | `playground-block-desktop.png`  | Real drain-address result showing BLOCK                  |
-| `/playground` |  390 × 844 | `playground-mobile-input.png`   | Default example and trusted recipient visible            |
-| `/showcase`   | 1440 × 900 | `showcase-verdict-desktop.png`  | Scene 04 after an explicit live scan or labeled fallback |
-| `/showcase`   |  390 × 844 | `showcase-mobile-gate.png`      | Scene 03 before the explicit scan action                 |
-| `/hire`       | 1440 × 900 | `hire-readiness-desktop.png`    | Readiness and current service summary visible            |
-| `/agents`     | 1440 × 900 | `marketplace-index-desktop.png` | Filters, methodology boundary, and first rows visible    |
+| Route         |   Viewport | Theme         | Output file                           | Required state                                                                 |
+| ------------- | ---------: | ------------- | ------------------------------------- | ------------------------------------------------------------------------------ |
+| `/`           | 1440 x 900 | Light default | `home-safety-map-desktop-light.png`   | Immune-system hero and Safety Map boundary are readable.                       |
+| `/`           |  390 x 844 | Light default | `home-mobile-light.png`               | Closed navigation and primary Theater action are visible.                      |
+| `/`           | 1440 x 900 | Dark explicit | `home-safety-map-desktop-dark.png`    | Same evidence as the light frame; contrast is manually checked.                |
+| `/theater`    | 1440 x 900 | Light default | `theater-complete-desktop-light.png`  | A real one-pass run has three receipt-validated feed rows and counter 3/3.     |
+| `/theater`    |  390 x 844 | Light default | `theater-complete-mobile-light.png`   | Verdicts, downstream delivery, status, and controls fit without clipping.      |
+| `/trust`      | 1440 x 900 | Light default | `trust-pillars-desktop-light.png`     | Local enforcement, APA, and Safety Map pillars are visible.                    |
+| `/verify`     | 1440 x 900 | Light default | `verify-initial-desktop-light.png`    | Initial verifier instructions are visible; no invented attestation is entered. |
+| `/apa/log`    | 1440 x 900 | Light default | `apa-log-desktop-light.png`           | Real transparency entries or the honest empty state are visible.               |
+| `/playground` | 1440 x 900 | Light default | `playground-block-desktop-light.png`  | A real drain-address response shows BLOCK and DRAIN_ADDRESS.                   |
+| `/agents`     | 1440 x 900 | Light default | `marketplace-index-desktop-light.png` | Filters, evidence boundary, date, and first rows are visible.                  |
 
-Before accepting each capture, verify that no payload, address, token, credential, payment signature,
-browser extension, or unrelated desktop content is visible. Also capture one light-theme homepage frame
-to confirm theme contrast, but keep the dark frame as the README hero when it is current.
+Before accepting each capture:
+
+- Confirm the route, viewport, theme, commit, and capture date in the review notes.
+- Confirm all local assets load and the console has no errors.
+- Confirm live states came from the displayed endpoint during that session.
+- Confirm no payload, address, token, credential, payment signature, wallet, extension, notification, or
+  unrelated desktop content is visible.
+- Confirm APA copy and badges report their real status and do not imply per-request routing or permanent safety.
+- Do not mark the release checklist complete until desktop and mobile captures have been reviewed by a human.

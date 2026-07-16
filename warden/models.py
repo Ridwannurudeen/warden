@@ -59,6 +59,12 @@ class DemoExample(BaseModel):
     payload: str
 
 
+class DemoAspReceipt(BaseModel):
+    handler: Literal["warden-demo-asp"] = "warden-demo-asp"
+    invoked: bool
+    received_payload: str | None
+
+
 class GauntletRequest(BaseModel):
     intent: str = Field(max_length=500)
     payload: str
@@ -120,6 +126,10 @@ class ScanResponse(BaseModel):
             checks=verdict.checks,
             latency_ms=verdict.latency_ms,
         )
+
+
+class DemoTheaterResponse(ScanResponse):
+    asp_receipt: DemoAspReceipt
 
 
 class GauntletResponse(ScanResponse):
@@ -191,6 +201,7 @@ class ApaRevokeRequest(BaseModel):
     attestation_id: str = Field(min_length=1, max_length=64)
     ts: int
     nonce: str = Field(min_length=1, max_length=256)
+    replacement_pub: str | None = Field(default=None, min_length=1, max_length=128)
     sig: str = Field(min_length=1, max_length=256)
 
 

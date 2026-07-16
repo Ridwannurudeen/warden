@@ -3,6 +3,7 @@
 import json
 import re
 import subprocess
+import sys
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -26,6 +27,7 @@ DOC_SLUGS = {
     "malicious-link",
 }
 CORE_NAV = {
+    "/theater",
     "/playground",
     "/agents",
     "/gauntlet",
@@ -33,7 +35,10 @@ CORE_NAV = {
     "/hire",
     "/docs",
     "/integrate",
+    "/trust",
     "/status",
+    "/verify",
+    "/apa/log",
     "/badges",
 }
 
@@ -66,7 +71,10 @@ class StaticPageAudit(HTMLParser):
             if rel & {"stylesheet", "icon", "preload", "modulepreload"}:
                 resource_values.append(attributes["href"])
         self.external_resources.extend(
-            value for value in resource_values if value.startswith(("http://", "https://", "//"))
+            value
+            for value in resource_values
+            if value.startswith(("http://", "https://", "//"))
+            and not value.startswith("https://warden.gudman.xyz/")
         )
 
 
@@ -128,9 +136,51 @@ def test_docs_renderer_writes_index_and_one_page_per_reason(tmp_path):
     assert "not the result of scanning the redacted text" in secret_page
 
 
+def test_build_site_publishes_apa_spec_byte_identically(tmp_path):
+    docs_output = tmp_path / "docs"
+    spec_output = tmp_path / "spec" / "APA-SPEC.md"
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "scripts/build_site.py",
+            "--docs-output",
+            str(docs_output),
+            "--spec-output",
+            str(spec_output),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert spec_output.read_bytes() == (ROOT / "spec" / "APA-SPEC.md").read_bytes()
+
+
+def test_public_apa_spec_matches_source_byte_for_byte():
+    assert (SITE / "spec" / "APA-SPEC.md").read_bytes() == (
+        ROOT / "spec" / "APA-SPEC.md"
+    ).read_bytes()
+
+
+def test_apa_spec_matches_source_ready_reference_contract():
+    spec = (ROOT / "spec" / "APA-SPEC.md").read_text(encoding="utf-8")
+
+    assert "source-ready; not deployed" in spec
+    assert 'GET /apa/log        → { "entries": [...], "total": N }' in spec
+    for overclaim in ("First deployment", "first deployment", "Deployment #1"):
+        assert overclaim not in spec
+    assert "paginated JSONL" not in spec
+
+
 def test_required_multi_page_routes_exist_with_shared_navigation():
     required = [
         SITE / "index.html",
+        SITE / "theater.html",
         SITE / "playground.html",
         SITE / "agents" / "index.html",
         SITE / "gauntlet.html",
@@ -140,6 +190,9 @@ def test_required_multi_page_routes_exist_with_shared_navigation():
         SITE / "badge.html",
         SITE / "docs" / "index.html",
         SITE / "integrate.html",
+        SITE / "trust.html",
+        SITE / "verify.html",
+        SITE / "log.html",
         SITE / "status.html",
         SITE / "privacy.html",
         SITE / "terms.html",
@@ -157,6 +210,50 @@ def test_required_multi_page_routes_exist_with_shared_navigation():
         assert "warden-social-card.svg" not in source
         audit = _audit_page(path)
         assert CORE_NAV <= audit.links, path
+
+
+def test_every_site_shell_links_complete_trust_navigation():
+    html_files = list(SITE.rglob("*.html"))
+    assert html_files
+
+    for path in html_files:
+        source = path.read_text(encoding="utf-8")
+        header = re.search(
+            r'<header class="site-header page-shell">(?P<body>.*?)</header>',
+            source,
+            re.DOTALL,
+        )
+        footer = re.search(
+            r'<footer class="site-footer page-shell">(?P<body>.*?)</footer>',
+            source,
+            re.DOTALL,
+        )
+        assert header, path
+        assert footer, path
+        for href in ("/theater", "/trust", "/verify", "/apa/log"):
+            assert f'href="{href}"' in header.group("body"), path
+        assert 'href="/theater"' in footer.group("body"), path
+        assert "The immune system of the agent economy." in footer.group("body"), path
+
+
+def test_trust_evidence_pages_mark_the_correct_navigation_item_current():
+    pages = (
+        ("trust.html", "Developers", "/trust"),
+        ("verify.html", "Evidence", "/verify"),
+        ("log.html", "Evidence", "/apa/log"),
+    )
+
+    for filename, group_name, href in pages:
+        source = (SITE / filename).read_text(encoding="utf-8")
+        current_group = re.search(
+            rf'<details class="nav-group has-current">\s*<summary>{group_name}</summary>'
+            r"(?P<body>.*?)</details>",
+            source,
+            re.DOTALL,
+        )
+        assert current_group, filename
+        assert f'href="{href}" aria-current="page"' in current_group.group("body")
+        assert source.count('aria-current="page"') == 1
 
 
 def test_site_is_csp_clean_and_makes_no_external_resource_requests():
@@ -191,10 +288,146 @@ def test_shared_styles_support_light_dark_mobile_and_new_surfaces():
         ".scan-workspace",
         ".surface-tabs",
         ".reason-matrix",
+        ".theater-stage",
+        ".safety-map-fabric",
     ):
         assert selector in css
     assert "prefers-reduced-motion: reduce" in css
     assert "prefers-reduced-motion: reduce" in (SITE / "showcase.js").read_text(encoding="utf-8")
+    assert "prefers-reduced-motion: reduce" in (SITE / "theater.js").read_text(encoding="utf-8")
+
+
+def test_attack_theater_is_real_owned_one_pass_surface():
+    page = (SITE / "theater.html").read_text(encoding="utf-8")
+    script = (SITE / "theater.js").read_text(encoding="utf-8")
+
+    assert "Attack Theater · live immune response · one pass" in page
+    assert "live demo scanner" not in page
+    assert "Warden-owned demo agent" in page
+    assert "data-theater" in page
+    assert "data-theater-feed" in page
+    assert "data-theater-count" in page
+    assert "data-theater-latency" in page
+    assert "data-theater-stage-delivery" in page
+    assert "data-theater-toggle" in page
+    assert "data-theater-next" in page
+    assert "AWAITING LIVE VERDICT" in page
+    assert "SANITIZE \u00b7 PROMPT_INJECTION" not in page
+    assert page.index("/scan-client.js") < page.index("/theater.js")
+    assert '"/api/demo/theater"' in script
+    assert 'postJson("/api/demo/scan"' not in script
+    assert "assertScanResponse" in script
+    assert "hasValidAspReceipt" in script
+    assert "prefers-reduced-motion: reduce" in script
+    assert "fallback" not in script.lower()
+
+
+def test_trust_layer_page_exposes_honest_open_contracts():
+    page = (SITE / "trust.html").read_text(encoding="utf-8")
+    home = (SITE / "index.html").read_text(encoding="utf-8")
+
+    for pillar in ("Local enforcement", "Agent Protection Attestation", "Safety Map"):
+        assert pillar in page
+    assert "safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)" in page
+    assert 'href="/#safety-map"' in page
+    assert 'id="safety-map"' in home
+    assert 'href="/verify"' in page
+    assert 'href="/apa/log"' in page
+    assert 'href="/spec/APA-SPEC.md"' in page
+    badge_sources = re.findall(r'<img[^>]+src="([^"]+/badge\.svg)"', page)
+    assert badge_sources == ["https://warden.gudman.xyz/apa/attestation/ATTESTATION_ID/badge.svg"]
+    assert "does not prove that every request" in page
+
+
+def test_public_apa_copy_discloses_the_explicit_unavailable_counter_state():
+    surfaces = (
+        ROOT / "README.md",
+        SITE / "index.html",
+        SITE / "trust.html",
+        SITE / "theater.html",
+        SITE / "verify.html",
+        SITE / "verify.js",
+    )
+
+    for path in surfaces:
+        source = path.read_text(encoding="utf-8")
+        assert "explicit unavailable state" in source, path
+
+
+def test_verifier_copy_describes_rotation_and_transparency_without_upgrading_proof():
+    page = (SITE / "verify.html").read_text(encoding="utf-8")
+    normalized = re.sub(r"\s+", " ", page)
+
+    assert "applicable current or recent key" in normalized
+    assert "independently anchored log checkpoint" in normalized
+    assert "an unanchored chain cannot expose a complete rewrite" in normalized
+    assert "transparency log makes silent re-binding detectable" not in normalized
+
+
+def test_integrate_leads_with_source_installed_sdk_and_honest_tiers():
+    page = (SITE / "integrate.html").read_text(encoding="utf-8")
+    normalized_page = re.sub(r"\s+", " ", page)
+
+    assert page.index('id="sdk-first"') < page.index("x402-protected")
+    assert "python -m pip install -e . -e sdk/python" in page
+    assert "safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)" in page
+    assert "WardenClient()" in page
+    assert "fail_open=True" in page
+    assert "best-effort telemetry, not enforcement" in normalized_page
+    assert "4,000" in page
+    assert "pip install warden-guard" not in page
+    assert "unrelated" in page
+
+
+def test_handoff_docs_describe_the_real_theater_and_unchecked_capture_work():
+    demo = (ROOT / "docs" / "HACKATHON_DEMO.md").read_text(encoding="utf-8")
+    release = (ROOT / "docs" / "RELEASE_CHECKLIST.md").read_text(encoding="utf-8")
+    screenshots = (ROOT / "docs" / "screenshots" / "README.md").read_text(encoding="utf-8")
+
+    assert "/theater" in demo
+    assert "/api/demo/theater" in demo
+    assert "autoplay" in demo.lower()
+    assert "fallback" not in demo.lower()
+    assert "90 seconds or shorter" in demo
+    for route in ("/theater", "/trust", "/verify", "/apa/log"):
+        assert route in release
+    assert "remain unchecked" in release
+    for route in ("/theater", "/trust", "/verify"):
+        assert route in screenshots
+    assert "fallback" not in screenshots.lower()
+
+
+def test_readme_leads_with_the_trust_layer_and_exact_quickstart_contracts():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "The immune system of the agent economy" in readme
+    assert "python -m pip install -e . -e sdk/python" in readme
+    assert "safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)" in readme
+    assert "best-effort telemetry, not enforcement" in readme
+    assert "20 requests per minute per" in readme
+    assert "4,000 characters" in readme
+    assert "### APA and legacy audit badges" in readme
+    assert "HMAC-SHA256" in readme
+    for route in ("/theater", "/trust", "/verify", "/apa/log"):
+        assert route in readme
+    assert "pip install warden-guard" not in readme
+
+
+def test_current_submission_surfaces_are_staged_and_use_hardened_claims():
+    form = (ROOT / "submission" / "FORM-ANSWERS.md").read_text(encoding="utf-8")
+    audit = (ROOT / "submission" / "COMPETITIVE-AUDIT.md").read_text(encoding="utf-8")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "Private repository" in form
+    assert "Public GitHub repo" not in form
+    assert "Do not change visibility" in form
+    assert "Warden Guard Live" in audit
+    assert "query `a`" in audit
+    assert "marketplace-wide safety index" not in audit
+    assert "any agent adopts" not in audit
+    assert "infrastructure the whole marketplace can run on" not in audit
+    assert "[Attack Theater](site/theater.html)" in readme
+    assert "[Attack Theater](https://warden.gudman.xyz/theater)" not in readme
 
 
 def test_marketplace_rows_and_mobile_navigation_fit_narrow_viewports():
@@ -275,8 +508,8 @@ def test_shared_styles_meet_wcag_contrast_contract():
         )
         return (luminances[0] + 0.05) / (luminances[1] + 0.05)
 
-    dark = theme_tokens(":root")
-    light = {**dark, **theme_tokens(':root[data-theme="light"]')}
+    light = theme_tokens(":root")
+    dark = {**light, **theme_tokens(':root[data-theme="dark"]')}
     required_tokens = {
         "on-accent",
         "on-danger",
@@ -286,6 +519,11 @@ def test_shared_styles_meet_wcag_contrast_contract():
     }
     assert required_tokens <= dark.keys()
     assert required_tokens <= light.keys()
+    assert light["accent-bright"] == "#6a57eb"
+    assert light["danger"] == "#cf234e"
+    assert light["faint"] == "#625e78"
+    assert light["control-border"] == "#8b84a6"
+    assert dark["control-border"] == "#6c6494"
 
     text_pairs = (
         ("on-accent", "accent-bright"),
@@ -319,6 +557,11 @@ def test_shared_styles_meet_wcag_contrast_contract():
         r"input,\s*select,\s*textarea\s*\{[^}]*border: 1px solid var\(--control-border\)",
     )
     assert all(re.search(pattern, css, re.DOTALL) for pattern in selector_contracts)
+
+    allow_rules = re.findall(r"\.status-label--allow\s*\{(?P<body>[^}]*)\}", css, re.DOTALL)
+    assert allow_rules
+    assert "color: var(--on-mint)" in allow_rules[-1]
+    assert "background: var(--mint)" in allow_rules[-1]
 
 
 def test_hire_readiness_and_shell_controls_match_semantic_styles():
@@ -395,13 +638,15 @@ def test_home_playground_badges_integrations_and_status_are_real_surfaces():
     integrate = (SITE / "integrate.html").read_text(encoding="utf-8")
     status = (SITE / "status.html").read_text(encoding="utf-8")
 
-    assert "DRAIN_ADDRESS" in home and home.count("data-marketplace-count") >= 2
-    assert "data-home-badge-count" in home
-    assert "data-home-bypass-count" in home
+    assert "The immune system of the agent economy" in home
+    assert home.count("data-marketplace-count") >= 2
+    assert "data-marketplace-matched" in home
+    assert "data-marketplace-audited" in home
+    assert "data-marketplace-coverage" in home
+    assert "data-safety-map" in home
     assert "data-service-snapshot" in home
-    assert "Inspect exact payload" in home
-    assert 'class="button primary button--hero" href="/playground"' in home
-    assert 'class="button secondary" href="/hire"' in home
+    assert 'class="button primary button--hero" href="/theater"' in home
+    assert 'class="button secondary" href="/integrate"' in home
     assert "/api/demo/scan" in playground and "data-playground-form" in playground
     assert "data-demo-diff" in playground and "data-demo-json" in playground
     assert "data-gauntlet-error" in gauntlet and "data-gauntlet-retry" in gauntlet
@@ -429,11 +674,28 @@ def test_status_and_marketplace_metadata_are_dated_and_honest():
     assert status["paymentActivity"]["transactionSpecific"] is False
     assert "does not contain" in status["paymentActivity"]["note"]
     assert status["paymentActivity"]["url"].startswith("https://www.oklink.com/xlayer/address/")
-    assert set(marketplace) == {"agentCount", "auditedCount", "fetchedAt", "matchedCount"}
-    assert marketplace["agentCount"] > 0
-    assert 0 <= marketplace["auditedCount"] <= marketplace["agentCount"]
-    assert 0 <= marketplace["matchedCount"] <= marketplace["agentCount"]
-    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", marketplace["fetchedAt"])
+    assert set(marketplace) == {
+        "schemaVersion",
+        "capturedAt",
+        "query",
+        "sampled",
+        "expected",
+        "dropped",
+        "matchedCount",
+        "auditedCount",
+    }
+    assert marketplace["schemaVersion"] == 2
+    assert marketplace["query"] == "a"
+    assert marketplace["sampled"] > 0
+    assert marketplace["expected"] >= 0
+    assert marketplace["dropped"] == max(marketplace["expected"] - marketplace["sampled"], 0)
+    assert 0 <= marketplace["auditedCount"] <= marketplace["sampled"]
+    assert 0 <= marketplace["matchedCount"] <= marketplace["sampled"]
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", marketplace["capturedAt"])
+    home = (SITE / "index.html").read_text(encoding="utf-8")
+    assert "Partial/degraded discovery response for marketplace query" in home
+    assert '"a": 730 unique agents sampled' in home
+    assert "22 expected agents not present in this response" in home
 
 
 def test_privacy_and_terms_cover_gauntlet_retention_and_public_surfaces():

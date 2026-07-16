@@ -3,20 +3,36 @@
 from __future__ import annotations
 
 import html
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
-from warden.badges import verify_badge
+from warden.badges import b64u_decode, b64u_encode, ed25519_verify_record, verify_badge
+from warden.marketplace.fetch import SnapshotMetadata
 from warden.marketplace.index import IndexedAgent
 from warden.site_render import page_shell
+
+APA_ISSUER = "warden"
+APA_PROTECTOR = "warden"
+APA_ATTESTATION_TTL_SECONDS = 3_600
+MAX_SAFE_UNIX_SECONDS = 9_007_199_254_740_991
 
 
 @dataclass(frozen=True)
 class RenderSummary:
-    agent_count: int
+    sampled: int
+    expected: int
+    dropped: int
     matched_count: int
     audited_count: int
+
+
+@dataclass(frozen=True)
+class ApaIssuerKey:
+    kid: str
+    pub: str
+    not_after: int
 
 
 def _escape(value: object) -> str:
@@ -56,6 +72,32 @@ def _buyer_review(value: float | None) -> str:
     return f"{formatted} / 5"
 
 
+def _coverage_text(coverage: SnapshotMetadata) -> str:
+    agent_label = "agent" if coverage.sampled == 1 else "agents"
+    if coverage.sampled == coverage.expected and coverage.dropped == 0:
+        return (
+            f'Complete discovery response for marketplace query "{coverage.query}". '
+            f"{coverage.sampled} unique {agent_label} sampled; "
+            f"the highest reported result total for that query was {coverage.expected}. "
+            f"Captured {coverage.captured_at}."
+        )
+    if coverage.sampled > coverage.expected:
+        return (
+            f'Partial/degraded discovery response for marketplace query "{coverage.query}". '
+            f"{coverage.sampled} unique {agent_label} sampled; the sample exceeded the highest "
+            f"reported result total of {coverage.expected}, so upstream counts disagree. "
+            f"Captured {coverage.captured_at}."
+        )
+    missing_label = "agent was" if coverage.dropped == 1 else "agents were"
+    return (
+        f'Partial/degraded discovery response for marketplace query "{coverage.query}". '
+        f"{coverage.sampled} unique {agent_label} sampled; "
+        f"the highest reported result total for that query was {coverage.expected}; "
+        f"{coverage.dropped} expected {missing_label} not present in this response. "
+        f"Captured {coverage.captured_at}."
+    )
+
+
 def _public_text_status(indexed: IndexedAgent) -> tuple[str, str]:
     if indexed.fields_scanned == 0 or indexed.verdict is None:
         return "unscanned", "Not scanned — no public text"
@@ -71,11 +113,9 @@ def _verified_badge(records: list[dict[str, object]]) -> dict[str, object] | Non
     return max(valid, key=lambda record: str(record.get("issued_at", "")))
 
 
-def associate_badges(
-    indexed_agents: list[IndexedAgent],
-    badge_records: list[dict[str, object]],
-    badge_links: dict[str, str],
-) -> dict[str, list[dict[str, object]]]:
+def _listed_service_hosts(
+    indexed_agents: list[IndexedAgent], *, include_non_default_port: bool
+) -> dict[str, set[str]]:
     service_hosts_by_agent: dict[str, set[str]] = {}
     for indexed in indexed_agents:
         for service in indexed.agent.services:
@@ -87,8 +127,144 @@ def associate_badges(
                 or endpoint.password
             ):
                 continue
+            try:
+                port = endpoint.port
+            except ValueError:
+                continue
             host = endpoint.hostname.rstrip(".").casefold()
+            default_port = 443 if endpoint.scheme == "https" else 80
+            if include_non_default_port and port not in (None, default_port):
+                host = f"{host}:{port}"
             service_hosts_by_agent.setdefault(indexed.agent.agent_id, set()).add(host)
+    return service_hosts_by_agent
+
+
+def _normalize_apa_endpoint_host(value: object) -> str | None:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or any(character.isspace() or character in "/?#@" for character in value)
+    ):
+        return None
+    parsed = urlparse(f"//{value}")
+    if (
+        not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.path
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+    ):
+        return None
+    try:
+        port = parsed.port
+    except ValueError:
+        return value.casefold()
+    host = parsed.hostname.rstrip(".").casefold()
+    return host if port is None else f"{host}:{port}"
+
+
+def _require_apa_issuer_pub(issuer_pub: str) -> None:
+    try:
+        decoded = b64u_decode(issuer_pub)
+        valid = (
+            issuer_pub.startswith("ed25519:")
+            and len(decoded) == 32
+            and b64u_encode(decoded, "ed25519") == issuer_pub
+        )
+    except (TypeError, ValueError):
+        valid = False
+    if not valid:
+        raise ValueError("APA issuer public key must be a canonical ed25519: 32-byte key")
+
+
+def _valid_apa_attestation(
+    record: dict[str, object],
+    issuer_pub: str,
+    issuer_history: Sequence[ApaIssuerKey] = (),
+) -> bool:
+    attestation_id = record.get("attestation_id")
+    if (
+        record.get("spec_version") != "apa/0.1"
+        or record.get("predicate_type") != "https://warden.gudman.xyz/spec/protection/v1"
+        or record.get("issuer") != APA_ISSUER
+        or record.get("protector") != APA_PROTECTOR
+        or not isinstance(attestation_id, str)
+        or len(attestation_id) != 32
+        or any(character not in "0123456789abcdef" for character in attestation_id)
+        or record.get("tier") != "guard-live"
+        or record.get("status") not in {"active", "stale", "key-changed", "revoked", "invalid"}
+    ):
+        return False
+    if not isinstance(record.get("endpoint_host"), str) or not record["endpoint_host"]:
+        return False
+    endpoint_pub = record.get("pub")
+    try:
+        if (
+            not isinstance(endpoint_pub, str)
+            or not endpoint_pub.startswith("ed25519:")
+            or len(b64u_decode(endpoint_pub)) != 32
+        ):
+            return False
+    except (TypeError, ValueError):
+        return False
+    issuer_sig = record.get("issuer_sig")
+    try:
+        if (
+            not isinstance(issuer_sig, str)
+            or not issuer_sig.startswith("sig:")
+            or len(b64u_decode(issuer_sig)) != 64
+        ):
+            return False
+    except (TypeError, ValueError):
+        return False
+    if "scans_24h" not in record:
+        return False
+    scans = record["scans_24h"]
+    if scans is not None and (type(scans) is not int or scans < 0):
+        return False
+    verified_at = record.get("verified_at")
+    expires_at = record.get("expires_at")
+    if (
+        type(verified_at) is not int
+        or verified_at < 0
+        or verified_at > MAX_SAFE_UNIX_SECONDS - APA_ATTESTATION_TTL_SECONDS
+        or type(expires_at) is not int
+        or expires_at != verified_at + APA_ATTESTATION_TTL_SECONDS
+    ):
+        return False
+    if ed25519_verify_record(record, issuer_pub, "issuer_sig"):
+        return True
+    return any(
+        verified_at <= key.not_after and ed25519_verify_record(record, key.pub, "issuer_sig")
+        for key in issuer_history
+    )
+
+
+def _verified_attestation(
+    records: list[dict[str, object]],
+    issuer_pub: str,
+    issuer_history: Sequence[ApaIssuerKey] = (),
+) -> dict[str, object] | None:
+    valid = [
+        record for record in records if _valid_apa_attestation(record, issuer_pub, issuer_history)
+    ]
+    if not valid:
+        return None
+    return max(
+        valid,
+        key=lambda record: (int(record["verified_at"]), str(record["attestation_id"])),
+    )
+
+
+def associate_badges(
+    indexed_agents: list[IndexedAgent],
+    badge_records: list[dict[str, object]],
+    badge_links: dict[str, str],
+) -> dict[str, list[dict[str, object]]]:
+    service_hosts_by_agent = _listed_service_hosts(indexed_agents, include_non_default_port=False)
 
     associated: dict[str, list[dict[str, object]]] = {}
     for badge in badge_records:
@@ -102,6 +278,30 @@ def associate_badges(
         if target_host not in service_hosts_by_agent[agent_id]:
             continue
         associated.setdefault(agent_id, []).append(badge)
+    return associated
+
+
+def associate_attestations(
+    indexed_agents: list[IndexedAgent],
+    attestation_records: list[dict[str, object]],
+    attestation_links: dict[str, str],
+    issuer_pub: str,
+    issuer_history: Sequence[ApaIssuerKey] = (),
+) -> dict[str, list[dict[str, object]]]:
+    _require_apa_issuer_pub(issuer_pub)
+    service_hosts_by_agent = _listed_service_hosts(indexed_agents, include_non_default_port=True)
+    associated: dict[str, list[dict[str, object]]] = {}
+    for record in attestation_records:
+        if not _valid_apa_attestation(record, issuer_pub, issuer_history):
+            continue
+        attestation_id = str(record["attestation_id"])
+        agent_id = attestation_links.get(attestation_id)
+        if agent_id not in service_hosts_by_agent:
+            continue
+        endpoint_host = _normalize_apa_endpoint_host(record["endpoint_host"])
+        if endpoint_host not in service_hosts_by_agent[agent_id]:
+            continue
+        associated.setdefault(agent_id, []).append(record)
     return associated
 
 
@@ -129,8 +329,11 @@ def _render_services(indexed: IndexedAgent) -> str:
 
 def _render_agent_page(
     indexed: IndexedAgent,
-    fetched_at: str,
+    coverage: SnapshotMetadata,
     badge_records: list[dict[str, object]],
+    attestation_records: list[dict[str, object]],
+    apa_issuer_pub: str,
+    apa_issuer_history: Sequence[ApaIssuerKey],
 ) -> str:
     agent = indexed.agent
     badge = _verified_badge(badge_records)
@@ -145,6 +348,23 @@ def _render_agent_page(
             '<p class="status-label status-label--allow">Verified audit badge</p>'
             f'<a class="button secondary" href="/badges/{audit_id}">Open badge {audit_id}</a>'
             '<p class="caveat">The badge signature verifies record integrity. Its agent association comes from a reviewed build manifest and a matching listed-service host.</p>'
+        )
+
+    attestation = _verified_attestation(
+        attestation_records,
+        apa_issuer_pub,
+        apa_issuer_history,
+    )
+    if attestation is None:
+        apa_status = '<p class="status-label status-label--pending">No linked APA guard proof</p>'
+    else:
+        attestation_id = _escape(attestation["attestation_id"])
+        scans = attestation["scans_24h"]
+        scans_label = "exact count unavailable" if scans is None else f"{int(scans):,} / 24h"
+        apa_status = (
+            '<p class="status-label status-label--pending">Linked signed APA guard proof; open record for current status</p>'
+            f'<a class="button secondary" href="/apa/attestation/{attestation_id}">Open attestation {attestation_id}</a>'
+            f'<p class="caveat">Signed usage claim at verification time: {_escape(scans_label)}. This static page does not claim the record is currently active. This is not an endpoint audit or security certification. The issuer signature authenticates the record; its agent association comes from a reviewed manifest plus a matching listed-service endpoint host. Guard-live does not prove every request traversed the guard.</p>'
         )
 
     avatar_url = _safe_external_url(agent.profile_picture)
@@ -190,11 +410,16 @@ def _render_agent_page(
   {audit_status}
 </section>
 <section>
+  <p class="eyebrow">Agent Protection Attestation</p>
+  <h2>Guard-proof status</h2>
+  {apa_status}
+</section>
+<section>
   <p class="eyebrow">Public services</p>
   <h2>{len(agent.services)} listed service{"s" if len(agent.services) != 1 else ""}</h2>
   <div class="service-grid">{_render_services(indexed)}</div>
 </section>
-<p class="snapshot-note">Marketplace snapshot fetched {_escape(fetched_at)}.</p>
+<p class="snapshot-note">{_escape(_coverage_text(coverage))}</p>
 """
     return page_shell(
         f"{agent.name or 'Unnamed agent'} | Warden Security Index",
@@ -207,9 +432,10 @@ def _render_agent_page(
 
 def _render_index_page(
     indexed_agents: list[IndexedAgent],
-    fetched_at: str,
+    coverage: SnapshotMetadata,
     summary: RenderSummary,
     audited_agent_ids: set[str],
+    attested_agent_ids: set[str],
 ) -> str:
     categories = sorted(
         {category for indexed in indexed_agents for category in indexed.agent.category_codes}
@@ -231,6 +457,11 @@ def _render_index_page(
         match_state, public_text_label = _public_text_status(indexed)
         audit_state = "audited" if agent.agent_id in audited_agent_ids else "not-audited"
         audit_label = "Linked signed audit" if audit_state == "audited" else "No linked audit"
+        apa_label = (
+            "Linked signed APA guard proof; open record for current status"
+            if agent.agent_id in attested_agent_ids
+            else "No linked APA guard proof"
+        )
         categories_text = ", ".join(agent.category_codes) or "Uncategorized"
         category_data = "|".join(agent.category_codes)
         search_text = " ".join(
@@ -241,6 +472,7 @@ def _render_index_page(
                 public_text_label,
                 " ".join(indexed.threat_classes),
                 audit_label,
+                apa_label,
             )
         )
         sold_sort = "" if agent.sold_count is None else str(agent.sold_count)
@@ -251,6 +483,7 @@ def _render_index_page(
             f"Public listing text: {public_text_label}; "
             f"Verdict: {indexed.verdict or 'NOT_SCANNED'}; "
             f"Endpoint audit: {audit_label}; "
+            f"APA attestation: {apa_label}; "
             f"Buyer review average: {_buyer_review(agent.security_rate)}"
         )
         rows.append(
@@ -259,18 +492,18 @@ def _render_index_page(
   <span data-label="Category">{_escape(categories_text)}</span>
   <span class="num" data-label="Sold">{_number(agent.sold_count)}</span>
   <span data-label="Public text"><strong>{_escape(public_text_label)}</strong><small>{_escape(indexed.verdict or "NOT_SCANNED")}</small></span>
-  <span data-label="Endpoint audit"><strong>{audit_label}</strong></span>
+  <span data-label="Endpoint evidence"><strong>{audit_label}</strong><small>{apa_label}</small></span>
   <span class="num" data-label="Buyer reviews">{_buyer_review(agent.security_rate)}</span>
 </a>"""
         )
 
-    agent_label = "agent" if summary.agent_count == 1 else "agents"
+    agent_label = "agent" if summary.sampled == 1 else "agents"
     body = f"""
 <section class="index-hero">
   <p class="eyebrow">OKX.AI marketplace security index</p>
-  <h1><span class="num">{summary.agent_count}</span> {agent_label} indexed</h1>
+  <h1><span class="num">{summary.sampled}</span> {agent_label} indexed</h1>
   <p class="hero-text">{summary.matched_count} with deterministic pattern matches in public listing text | {summary.audited_count} with linked signed endpoint-audit records.</p>
-  <p class="caveat"><strong>Public listing text only.</strong> All agents returned by the marketplace sweep at {_escape(fetched_at)}. A text signal is not a finding that an agent is malicious, compromised, or unsafe.</p>
+  <p class="caveat"><strong>Public listing text only.</strong> {_escape(_coverage_text(coverage))} A text signal is not a finding that an agent is malicious, compromised, or unsafe.</p>
 </section>
 <details class="methodology-drawer" id="methodology">
   <summary>Methodology and evidence boundary</summary>
@@ -283,6 +516,8 @@ def _render_index_page(
     <p>Audit status is separate. “Linked signed audit” requires a valid Warden badge plus a reviewed audit-to-agent link and matching listed-service host. A badge is point-in-time evidence, not certification.</p>
     <p><a class="button secondary" href="/hire">Configure an authorized endpoint audit</a></p>
     <p class="caveat">Audit only a public endpoint you own or are authorized to test. A returned result is not independent proof of target-owner permission.</p>
+    <h3>APA guard proofs</h3>
+    <p>“Linked signed APA guard proof” requires a valid Warden issuer signature, an explicit reviewed attestation-to-agent link, and the attested endpoint host in that agent's listed services. It records live-guard evidence at verification time; open the attestation for current status. It is not an endpoint audit or security certification, and it does not prove every request traversed the guard.</p>
   </div>
 </details>
 <section class="filter-bar marketplace-filter-bar" data-agent-controls hidden aria-label="Search, filter, and sort agents">
@@ -294,9 +529,9 @@ def _render_index_page(
   <button class="button secondary" type="button" data-agent-reset>Clear filters</button>
 </section>
 <section>
-  <p class="snapshot-note" aria-live="polite" aria-atomic="true">Showing <span class="num" data-agent-rendered>{summary.agent_count}</span> of <span class="num" data-agent-visible>{summary.agent_count}</span> matching agents.</p>
+  <p class="snapshot-note" aria-live="polite" aria-atomic="true">Showing <span class="num" data-agent-rendered>{summary.sampled}</span> of <span class="num" data-agent-visible>{summary.sampled}</span> matching agents.</p>
   <noscript><p class="snapshot-note">Search and filter controls require JavaScript. All agents in this dated snapshot are listed below.</p></noscript>
-  <div class="agent-row agent-row--header" aria-hidden="true"><span>Agent</span><span>Category</span><span>Sold</span><span>Public listing text</span><span>Endpoint audit</span><span>Buyer review average</span></div>
+  <div class="agent-row agent-row--header" aria-hidden="true"><span>Agent</span><span>Category</span><span>Sold</span><span>Public listing text</span><span>Endpoint evidence</span><span>Buyer review average</span></div>
   <div data-agent-results>{"".join(rows)}</div>
   <button class="button secondary" type="button" data-agent-more hidden>Show more agents</button>
   <p class="empty-state" data-agent-empty hidden>No marketplace listings match these filters. Clear a filter to restore the full dated snapshot.</p>
@@ -316,11 +551,20 @@ def render_marketplace(
     indexed_agents: list[IndexedAgent],
     output_dir: Path,
     *,
-    fetched_at: str,
+    coverage: SnapshotMetadata,
     badge_records: dict[str, list[dict[str, object]]] | None = None,
+    attestation_records: dict[str, list[dict[str, object]]] | None = None,
+    apa_issuer_pub: str | None = None,
+    apa_issuer_history: Sequence[ApaIssuerKey] = (),
 ) -> RenderSummary:
+    if len(indexed_agents) != coverage.sampled:
+        raise RuntimeError("indexed agent count does not match snapshot sampled coverage")
     output_dir.mkdir(parents=True, exist_ok=True)
     badges = badge_records or {}
+    attestations = attestation_records or {}
+    if attestations and not apa_issuer_pub:
+        raise ValueError("APA issuer public key is required to render attestation evidence")
+    issuer_pub = apa_issuer_pub or ""
     expected_files = {f"{indexed.agent.agent_id}.html" for indexed in indexed_agents}
     for existing in output_dir.glob("*.html"):
         if existing.stem.isdecimal() and existing.name not in expected_files:
@@ -328,19 +572,43 @@ def render_marketplace(
 
     audited_count = 0
     audited_agent_ids: set[str] = set()
+    attested_agent_ids: set[str] = set()
     for indexed in indexed_agents:
         records = badges.get(indexed.agent.agent_id, [])
         if _verified_badge(records) is not None:
             audited_count += 1
             audited_agent_ids.add(indexed.agent.agent_id)
-        page = _render_agent_page(indexed, fetched_at, records)
+        agent_attestations = attestations.get(indexed.agent.agent_id, [])
+        attestation = _verified_attestation(
+            agent_attestations,
+            issuer_pub,
+            apa_issuer_history,
+        )
+        if attestation is not None:
+            attested_agent_ids.add(indexed.agent.agent_id)
+        page = _render_agent_page(
+            indexed,
+            coverage,
+            records,
+            agent_attestations,
+            issuer_pub,
+            apa_issuer_history,
+        )
         (output_dir / f"{indexed.agent.agent_id}.html").write_text(page, encoding="utf-8")
 
     summary = RenderSummary(
-        agent_count=len(indexed_agents),
+        sampled=coverage.sampled,
+        expected=coverage.expected,
+        dropped=coverage.dropped,
         matched_count=sum(bool(indexed.threat_classes) for indexed in indexed_agents),
         audited_count=audited_count,
     )
-    index_page = _render_index_page(indexed_agents, fetched_at, summary, audited_agent_ids)
+    index_page = _render_index_page(
+        indexed_agents,
+        coverage,
+        summary,
+        audited_agent_ids,
+        attested_agent_ids,
+    )
     (output_dir / "index.html").write_text(index_page, encoding="utf-8")
     return summary

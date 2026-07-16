@@ -67,6 +67,82 @@
     return value;
   }
 
+  function normalizeMarketplaceSummary(value) {
+    const capturedAt = value?.capturedAt;
+    if (
+      typeof capturedAt !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(capturedAt) ||
+      !Number.isFinite(Date.parse(capturedAt)) ||
+      new Date(capturedAt).toISOString() !== capturedAt.replace("Z", ".000Z")
+    ) {
+      throw new Error("marketplace capturedAt must be a valid UTC timestamp");
+    }
+    if (value?.schemaVersion !== 2) {
+      throw new Error("marketplace summary schemaVersion must be 2");
+    }
+    const query = value?.query;
+    if (
+      typeof query !== "string" ||
+      !query ||
+      query !== query.trim() ||
+      query.length > 100
+    ) {
+      throw new Error("marketplace query must be a non-empty trimmed string");
+    }
+    const sampled = normalizeEvidenceCount(
+      value.sampled,
+      "marketplace sampled count",
+    );
+    const expected = normalizeEvidenceCount(
+      value.expected,
+      "marketplace expected count",
+    );
+    const dropped = normalizeEvidenceCount(
+      value.dropped,
+      "marketplace dropped count",
+    );
+    const matchedCount = normalizeEvidenceCount(
+      value.matchedCount,
+      "marketplace matched count",
+    );
+    const auditedCount = normalizeEvidenceCount(
+      value.auditedCount,
+      "marketplace audited count",
+    );
+    if (dropped !== Math.max(expected - sampled, 0)) {
+      throw new Error(
+        "marketplace dropped count does not match sampled coverage",
+      );
+    }
+    if (matchedCount > sampled || auditedCount > sampled) {
+      throw new Error(
+        "marketplace evidence counts cannot exceed sampled coverage",
+      );
+    }
+    return {
+      schemaVersion: 2,
+      capturedAt,
+      query,
+      sampled,
+      expected,
+      dropped,
+      matchedCount,
+      auditedCount,
+      complete: sampled === expected && dropped === 0,
+    };
+  }
+
+  function marketplaceCoverageText(summary) {
+    const query = JSON.stringify(summary.query);
+    if (summary.complete) {
+      return `Complete discovery response for marketplace query ${query}: ${summary.sampled.toLocaleString()} unique agents sampled; highest reported result total ${summary.expected.toLocaleString()}.`;
+    }
+    if (summary.sampled > summary.expected) {
+      return `Partial/degraded discovery response for marketplace query ${query}: ${summary.sampled.toLocaleString()} unique agents sampled; the sample exceeded the highest reported result total ${summary.expected.toLocaleString()}, so upstream counts disagree.`;
+    }
+    return `Partial/degraded discovery response for marketplace query ${query}: ${summary.sampled.toLocaleString()} unique agents sampled; highest reported result total ${summary.expected.toLocaleString()}; ${summary.dropped.toLocaleString()} expected agents not present in this response.`;
+  }
+
   function isHealthyResponse(value) {
     return value?.status === "ok";
   }
@@ -78,7 +154,9 @@
     focusStatusTarget,
     isHealthyResponse,
     isOutsideNavigationPointer,
+    marketplaceCoverageText,
     normalizeEvidenceCount,
+    normalizeMarketplaceSummary,
     resolveTheme,
     summaryToRestoreOnEscape,
   };
@@ -301,7 +379,25 @@
   const marketplaceCounts = Array.from(
     document.querySelectorAll("[data-marketplace-count]"),
   );
-  if (marketplaceCounts.length) {
+  const marketplaceMatches = Array.from(
+    document.querySelectorAll("[data-marketplace-matched]"),
+  );
+  const marketplaceAudits = Array.from(
+    document.querySelectorAll("[data-marketplace-audited]"),
+  );
+  const marketplaceSnapshots = Array.from(
+    document.querySelectorAll("[data-marketplace-snapshot]"),
+  );
+  const marketplaceCoverage = Array.from(
+    document.querySelectorAll("[data-marketplace-coverage]"),
+  );
+  if (
+    marketplaceCounts.length ||
+    marketplaceMatches.length ||
+    marketplaceAudits.length ||
+    marketplaceSnapshots.length ||
+    marketplaceCoverage.length
+  ) {
     root
       .fetch("/data/marketplace-summary.json", {
         headers: { accept: "application/json" },
@@ -314,21 +410,30 @@
         return response.json();
       })
       .then((summary) => {
-        const count = normalizeEvidenceCount(
-          summary.agentCount,
-          "marketplace agent count",
-        ).toLocaleString();
+        const normalized = normalizeMarketplaceSummary(summary);
+        const count = normalized.sampled.toLocaleString();
         for (const element of marketplaceCounts) {
           element.textContent = count;
         }
-        const snapshot = document.querySelector("[data-marketplace-snapshot]");
-        if (snapshot) {
-          snapshot.textContent = `Snapshot ${summary.fetchedAt}`;
+        for (const element of marketplaceMatches) {
+          element.textContent = normalized.matchedCount.toLocaleString();
+        }
+        for (const element of marketplaceAudits) {
+          element.textContent = normalized.auditedCount.toLocaleString();
+        }
+        for (const snapshot of marketplaceSnapshots) {
+          snapshot.textContent = `Captured ${normalized.capturedAt}`;
+        }
+        const coverageText = marketplaceCoverageText(normalized);
+        for (const coverage of marketplaceCoverage) {
+          coverage.textContent = coverageText;
+          coverage.dataset.coverageState = normalized.complete
+            ? "complete"
+            : "degraded";
         }
       })
       .catch(() => {
-        const snapshot = document.querySelector("[data-marketplace-snapshot]");
-        if (snapshot) {
+        for (const snapshot of marketplaceSnapshots) {
           snapshot.textContent = `Committed snapshot ${snapshot.dataset.fallbackSnapshot}`;
         }
       });

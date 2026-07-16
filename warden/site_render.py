@@ -10,6 +10,7 @@ NAV_GROUPS = (
     (
         "Product",
         (
+            ("/theater", "Attack Theater", "theater"),
             ("/playground", "Playground", "playground"),
             ("/agents", "Marketplace index", "agents"),
             ("/gauntlet", "Gauntlet", "gauntlet"),
@@ -21,12 +22,15 @@ NAV_GROUPS = (
         (
             ("/docs", "Documentation", "docs"),
             ("/integrate", "Integrate", "integrate"),
+            ("/trust", "Trust Layer", "trust"),
             ("/status", "API status", "status"),
         ),
     ),
     (
         "Evidence",
         (
+            ("/verify", "Verify APA", "verify"),
+            ("/apa/log", "Transparency log", "apa-log"),
             ("/badges", "Audit badges", "badges"),
             ("/agents#methodology", "Public-text methodology", "agents-methodology"),
             ("/gauntlet#policy", "Adversarial challenge", "gauntlet-policy"),
@@ -46,7 +50,7 @@ def _render_navigation(active: str) -> str:
         current_class = " has-current" if contains_current else ""
         groups.append(
             f'<details class="nav-group{current_class}">'
-            f'<summary>{group_name}</summary>'
+            f"<summary>{group_name}</summary>"
             f'<div class="nav-menu">{"".join(links)}</div>'
             "</details>"
         )
@@ -69,7 +73,10 @@ def page_shell(
     canonical_url = f"https://warden.gudman.xyz{canonical}"
     script_tags = [
         '<script src="/app.js" defer></script>',
-        *(f'<script src="/{html.escape(script, quote=True)}" defer></script>' for script in scripts),
+        *(
+            f'<script src="/{html.escape(script, quote=True)}" defer></script>'
+            for script in scripts
+        ),
     ]
     class_attribute = f' class="{html.escape(body_class, quote=True)}"' if body_class else ""
     return f"""<!doctype html>
@@ -107,8 +114,8 @@ def page_shell(
     </header>
     <main id="main" class="page-shell site-main">{body}</main>
     <footer class="site-footer page-shell">
-      <div><strong>Warden</strong><span>Deterministic security before autonomous action.</span><span>Independent service listed on OKX.AI.</span></div>
-      <nav aria-label="Footer"><a href="/playground">Run a scan</a><a href="/showcase">Showcase</a><a href="/docs">Docs</a><a href="/badges">Evidence</a><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav>
+      <div><strong>Warden</strong><span>The immune system of the agent economy.</span><span>Independent service listed on OKX.AI.</span></div>
+      <nav aria-label="Footer"><a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a><a href="/showcase">Showcase</a><a href="/docs">Docs</a><a href="/badges">Evidence</a><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav>
     </footer>
     {"".join(script_tags)}
   </body>

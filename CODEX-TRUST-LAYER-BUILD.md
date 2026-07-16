@@ -16,7 +16,7 @@ and led by a demo. Build v2's phasing (bottom of this block).
 Phases **P1 (honesty + protocol core)** and **P2 (Python SDK)** are DONE and verified against the crypto oracle
 (`spec/verify_apa.py`). **Do NOT rebuild them.** What already exists in the tree (48 tests green, ruff clean):
 - `sdk/python/**` — full `warden-guard` SDK: client (free default `fail_open=True` + `local=True` in-process
-  mode + `paid=True`), async, ASGI middleware, `@guard` decorator, persistent monotonic **scan counter**,
+  mode + `paid=True`), async, ASGI middleware, `@guard` decorator, lifetime + rolling **scan counters**,
   Ed25519 keygen, signed `/.well-known/agent-protection` heartbeat, `warden-guard verify` CLI. 36 tests.
 - `warden/apa_url.py` (standalone SSRF validator), `warden/protection.py` (Ed25519 issuer: `probe_guard`,
   `issue_attestation`, `verify_attestation_record`, `render_badge_svg`, revoke, `issuer_public_key`),
@@ -60,8 +60,9 @@ weaken the test.
    traffic is *routed through Warden*. So: (a) **rename the "guarded" tier to "Warden Guard Live" / "Warden-
    Integrated"** — never bare "Protected"; (b) the heartbeat MUST additionally attest a **signed rolling scan
    counter** `{scans_served, window_start}` signed by the ASP key, so the badge can honestly display *"N payloads
-   screened in the last 24h"* — a number an ASP cannot fake without actually calling `scan()`. The honest caveat
-   goes **on the SVG and badge JSON**, not just the verify page.
+   screened in the last 24h"*. The endpoint signature prevents third-party alteration; it does not independently
+   audit an endpoint owner's local state. The honest caveat goes **on the SVG and badge JSON**, not just the
+   verify page.
 2. **Key the badge to the VERIFIED ENDPOINT HOST only (verified C2).** `POST /protect/register` currently trusts
    an unverified `agent_id` → brand impersonation (register as CertiK #1965). Drop `agent_id` from the trust
    surface; the badge attests the **endpoint host that served a valid signature**, nothing else. If an agent_id
@@ -172,12 +173,15 @@ no network, honestly sub-ms, not rate-limited). The draft's `fail_open=False` de
 superseded.
 
 **Scan-counter mechanism (fills the §B1 gap — this is the linchpin of the honest badge):**
-- The SDK MUST maintain a **monotonic scan counter**, incremented **atomically on every `scan()`/`guard()` call**
-  (both hosted and local modes), persisted to `$WARDEN_GUARD_STATE` (default `~/.warden/state.json`, `0600`) so it
-  survives restarts. `proof.py` reads it to populate `scans_served` in the **signed** heartbeat; the issuer copies
-  it into the attestation's `scans_24h`.
-- The counter MUST be **settable only by real scan calls** — never via API param, env var, or config. A forged
-  count fails the signature (proven by `verify_apa.py` selftest case [2]).
+- The SDK MUST maintain a lifetime monotonic counter plus an exact rolling 24-hour count, updated atomically
+  only after `scan()`/`guard()` returns a valid verdict (both hosted and local modes). Failed, fail-open, and
+  malformed hosted responses do not count. State derives from `$WARDEN_GUARD_STATE` (default
+  `~/.warden/state.json`, `0600`) and survives restarts. `proof.py` signs the rolling count as `scans_served` plus
+  `window_start`; the issuer copies it into the attestation's `scans_24h`. Migrating a positive or unreadable
+  lifetime-only state MUST persist a full 24-hour warmup and sign `null`, never `0`, until exact rolling coverage
+  is available.
+- The SDK exposes no API/config setter for either counter. Third-party tampering fails signature verification
+  (proven by `verify_apa.py` selftest case [2]); endpoint-owner state integrity is outside this signature model.
 - **Multi-process honesty:** if the ASP runs N workers, either coordinate one shared counter file (atomic
   increment via file lock) OR have each keypair report its own process's count; **document which**, and word the
   badge as "payloads this guard has signed", not "all traffic". Do not aggregate across keys.

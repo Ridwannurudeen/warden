@@ -70,7 +70,7 @@ def build_hire_catalog(
         )
     return {
         "schemaVersion": 1,
-        "snapshotFetchedAt": snapshot.metadata.fetched_at,
+        "snapshotFetchedAt": snapshot.metadata.captured_at,
         "providerAgentId": provider.agent_id,
         "providerName": provider.name,
         "services": services,

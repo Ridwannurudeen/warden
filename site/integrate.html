@@ -54,6 +54,7 @@
         <details class="nav-group">
           <summary>Product</summary>
           <div class="nav-menu">
+            <a href="/theater">Attack Theater</a>
             <a href="/playground">Playground</a>
             <a href="/agents">Marketplace index</a>
             <a href="/gauntlet">Gauntlet</a>
@@ -65,12 +66,15 @@
           <div class="nav-menu">
             <a href="/docs">Documentation</a>
             <a href="/integrate" aria-current="page">Integrate</a>
+            <a href="/trust">Trust Layer</a>
             <a href="/status">API status</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Evidence</summary>
           <div class="nav-menu">
+            <a href="/verify">Verify APA</a>
+            <a href="/apa/log">Transparency log</a>
             <a href="/badges">Audit badges</a>
             <a href="/agents#methodology">Public-text methodology</a>
             <a href="/gauntlet#policy">Adversarial challenge</a>
@@ -101,12 +105,77 @@
 
     <main id="main" class="page-shell site-main">
       <section class="page-hero">
-        <p class="eyebrow">Five integration surfaces</p>
+        <p class="eyebrow">SDK first · hosted surfaces second</p>
         <h1>Put the firewall at the action boundary.</h1>
         <p class="hero-text">
           Treat every response, tool result, and external message as untrusted
           until Warden returns a typed decision. Only the resulting action
           payload crosses into execution.
+        </p>
+      </section>
+
+      <section
+        id="sdk-first"
+        class="snippet-card"
+        aria-labelledby="sdk-first-title"
+      >
+        <header>
+          <div>
+            <p class="eyebrow">Python + TypeScript SDKs · source install</p>
+            <h2 id="sdk-first-title">
+              Choose the enforcement boundary before the agent acts.
+            </h2>
+          </div>
+        </header>
+        <p>
+          Install the Python service and SDK from this repository. The package
+          currently named
+          <code>warden-guard</code> on PyPI is unrelated, so Warden does not
+          publish a PyPI install command here.
+        </p>
+        <pre><code>python -m pip install -e . -e sdk/python</code></pre>
+        <h3>Local enforcement</h3>
+        <p>
+          Local mode runs <code>WardenEngine</code> in the caller's process. It
+          has no network dependency or hosted quota, fails closed, returns
+          sanitized text for <code>SANITIZE</code>, and raises
+          <code>WardenBlocked</code> for <code>BLOCK</code>.
+        </p>
+        <pre><code>from warden_guard import WardenClient
+
+safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)</code></pre>
+        <h3>Python hosted free default</h3>
+        <p>
+          <code>WardenClient()</code> calls <code>/api/demo/scan</code> with
+          <code>fail_open=True</code>. That route is best-effort telemetry, not
+          enforcement: the current default quota is 20 requests per minute per
+          IP, depth is forced to <code>fast</code>, payloads are truncated to
+          4,000 characters, and hosted latency includes network round-trip time.
+        </p>
+        <pre><code>warden = WardenClient()  # hosted free default; fail_open=True
+result = warden.scan(untrusted_text)</code></pre>
+        <h3>TypeScript hosted client from source</h3>
+        <p>
+          The <code>@warden/guard</code> package under <code>sdk/ts</code> is
+          source-built; Warden does not claim it is published to npm. Install
+          the locked development dependencies, run its tests, and compile it
+          from the repository with Node 20.19+ (the built zero-dependency
+          runtime itself declares Node 18+):
+        </p>
+        <pre><code>cd sdk/ts
+npm ci
+npm test
+npm run build</code></pre>
+        <pre><code>import { WardenClient } from "@warden/guard";
+
+const warden = new WardenClient(); // hosted free default; failOpen: true
+const result = await warden.scan(untrustedText);</code></pre>
+        <p>
+          This client has no local TypeScript scanner engine. Its default free
+          hosted path is best-effort: network, timeout, and HTTP failures become
+          an <code>ALLOW</code> result when <code>failOpen: true</code>. Setting
+          <code>failOpen: false</code> makes those hosted failures throw; it
+          does not move detection in-process.
         </p>
       </section>
 
@@ -443,14 +512,14 @@
     <footer class="site-footer page-shell">
       <div>
         <strong>Warden</strong
-        ><span>Deterministic security before autonomous action.</span
+        ><span>The immune system of the agent economy.</span
         ><span>Independent service listed on OKX.AI.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/playground">Run a scan</a><a href="/showcase">Showcase</a
-        ><a href="/docs">Docs</a><a href="/badges">Evidence</a
-        ><a href="/status">Status</a><a href="/privacy">Privacy</a
-        ><a href="/terms">Terms</a
+        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
+        ><a href="/showcase">Showcase</a><a href="/docs">Docs</a
+        ><a href="/badges">Evidence</a><a href="/status">Status</a
+        ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
         ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
       </nav>
     </footer>

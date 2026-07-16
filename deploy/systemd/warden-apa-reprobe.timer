@@ -1,0 +1,11 @@
+[Unit]
+Description=Re-probe Warden APA protection heartbeats every fifteen minutes
+
+[Timer]
+OnCalendar=*-*-* *:00/15:00 UTC
+RandomizedDelaySec=2m
+Persistent=true
+Unit=warden-apa-reprobe.service
+
+[Install]
+WantedBy=timers.target

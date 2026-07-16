@@ -16,13 +16,20 @@ from warden.site_docs import render_docs  # noqa: E402
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build Warden's generated static pages.")
     parser.add_argument("--docs-output", type=Path, default=ROOT / "site" / "docs")
+    parser.add_argument(
+        "--spec-output",
+        type=Path,
+        default=ROOT / "site" / "spec" / "APA-SPEC.md",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     render_docs(ROOT, args.docs_output)
-    print("Built 11 reason-code pages and the documentation index.")
+    args.spec_output.parent.mkdir(parents=True, exist_ok=True)
+    args.spec_output.write_bytes((ROOT / "spec" / "APA-SPEC.md").read_bytes())
+    print("Built 11 reason-code pages, the documentation index, and the public APA spec.")
 
 
 if __name__ == "__main__":

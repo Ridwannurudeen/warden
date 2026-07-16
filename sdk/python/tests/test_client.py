@@ -8,6 +8,7 @@ import httpx
 import pytest
 
 from warden_guard import AsyncWardenClient, WardenBlocked, WardenClient, WardenError
+from warden_guard.state import get_scan_count
 
 _REAL_CLIENT = httpx.Client
 _REAL_ASYNC_CLIENT = httpx.AsyncClient
@@ -18,8 +19,10 @@ def _verdict_body(verdict: str, **extra: object) -> dict[str, object]:
         "verdict": verdict,
         "risk_level": "HIGH" if verdict != "ALLOW" else "NONE",
         "threat_classes": ["SECRET_EXFIL"] if verdict == "BLOCK" else [],
+        "detections": [],
         "sanitized_payload": extra.get("sanitized_payload", ""),
         "recommendation": "test",
+        "checks": {"injection": "pass"},
         "latency_ms": 0.5,
         **extra,
     }
@@ -51,6 +54,7 @@ def test_scan_maps_block_verdict(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.blocked and not result.allowed and not result.sanitized
     assert result.threat_classes == ["SECRET_EXFIL"]
     assert result.safe_payload is None
+    assert get_scan_count() == 1
 
 
 def test_scan_maps_sanitize_verdict(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -95,6 +99,7 @@ def test_fail_open_default_returns_allow_on_outage(monkeypatch: pytest.MonkeyPat
     result = client.scan("anything")
     assert result.allowed
     assert "down" in str(result.raw["error"])
+    assert get_scan_count() == 0
 
 
 def test_fail_closed_raises_on_outage(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -104,6 +109,14 @@ def test_fail_closed_raises_on_outage(monkeypatch: pytest.MonkeyPatch) -> None:
     _mock_httpx(monkeypatch, handler)
     with pytest.raises(WardenError):
         WardenClient(fail_open=False).scan("anything")
+    assert get_scan_count() == 0
+
+
+def test_malformed_success_response_is_not_counted(monkeypatch: pytest.MonkeyPatch) -> None:
+    _mock_httpx(monkeypatch, _static_handler({"risk_level": "NONE"}))
+    with pytest.raises(WardenError, match="verdict"):
+        WardenClient().scan("anything")
+    assert get_scan_count() == 0
 
 
 def test_request_body_shape(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -149,3 +162,22 @@ async def test_async_guard_raises_on_block(monkeypatch: pytest.MonkeyPatch) -> N
     _mock_httpx(monkeypatch, _static_handler(_verdict_body("BLOCK")))
     with pytest.raises(WardenBlocked):
         await AsyncWardenClient().guard("evil")
+
+
+async def test_async_fail_open_outage_is_not_counted(monkeypatch: pytest.MonkeyPatch) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("down")
+
+    _mock_httpx(monkeypatch, handler)
+    result = await AsyncWardenClient().scan("anything")
+    assert result.allowed
+    assert get_scan_count() == 0
+
+
+async def test_async_malformed_success_response_is_not_counted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_httpx(monkeypatch, _static_handler({"verdict": "MAYBE"}))
+    with pytest.raises(WardenError, match="verdict"):
+        await AsyncWardenClient().scan("anything")
+    assert get_scan_count() == 0

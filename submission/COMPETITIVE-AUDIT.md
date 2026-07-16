@@ -3,6 +3,10 @@
 Source: full `onchainos agent search` sweep of the OKX.AI marketplace via Warden's own `marketplace/fetch.py`.
 **744 agents** captured with real `soldCount` / `feedbackRate` / category. This is measured data, not memory.
 
+> **Current positioning:** the dated sweep below is competitive evidence, not a deployment or adoption claim.
+> The hardened build is led by Attack Theater, the open APA standard, an endpoint-scoped **Warden Guard Live**
+> attestation, and a source-ready Safety Index whose committed capture is explicitly scoped to query `a`.
+
 ## Market shape
 | Category | Agents |
 |---|---|
@@ -42,38 +46,42 @@ so **Revenue Rocket is not our track.**
 Cross-referencing all of the above, **not one competitor is a deterministic, real-time, in-the-loop payload
 firewall.** They are one of: (a) token/contract risk scanners, (b) after-the-fact deliverable/correctness
 checkers, (c) advisory trust-scorers, (d) consumer wallet scanners. None screens an *untrusted payload at the
-moment of action* with a sub-millisecond ALLOW/SANITIZE/BLOCK. That lane is **empty and it's ours.**
+moment of action* with a deterministic ALLOW/SANITIZE/BLOCK decision. That lane is **empty and it's ours.**
 
 And critically: **not one of them offers**
-1. a **drop-in SDK** so any of the other 743 agents can be protected in one line, or
-2. a **cryptographically-verifiable "Protected by Warden" badge** (per-ASP Ed25519 attestation), or
-3. a **live marketplace-wide safety index**.
+1. source-installed **Python and TypeScript SDKs** an agent developer can integrate at the action boundary, or
+2. a cryptographically verifiable, endpoint-host-scoped **Warden Guard Live** APA attestation, or
+3. a query-scoped, timer-ready Safety Index with explicit sampled / expected / dropped coverage.
 
 ## How we counter each real threat
 - **vs Agent Output Verifier (190 sold):** they verify *correctness* of a deliverable *after* it's produced. We
   prevent *adversarial threats* (injection, drain, exfil, hijack) *before* the agent acts — deterministically,
-  in-loop, sub-ms. Different, higher-stakes job, and we're *adoptable by every agent* via SDK, not called ad-hoc.
+  in-loop. Local Python mode keeps verdict computation in process; hosted modes add network RTT. Different,
+  higher-stakes job, exposed as an SDK integration rather than only an ad-hoc call.
 - **vs CertiK (brand, 87):** they scan tokens/contracts (a gateway to their existing product). We secure the
   agent's *runtime payloads* — a different, unserved layer — and we're **verifiable + open-source**, not a
   closed brand gateway.
-- **vs Agent Trust Layer / SlowMist / scorers:** they *advise* ("this agent scores X"). We *prevent* and
-  *cryptographically prove* protection. Active infrastructure, not an opinion.
-- **vs the 25 zero-sold guard/shield agents:** each is one scanner. We are the **fabric** they could all plug
-  into — the network effect none of them has.
+- **vs Agent Trust Layer / SlowMist / scorers:** they *advise* ("this agent scores X"). Warden enforces a
+  runtime decision and cryptographically proves the narrower APA claim: endpoint-key control, a conforming
+  guard proof, and a signed count or explicit unavailable state at verification time.
+- **vs the 25 zero-sold guard/shield agents:** each is one scanner. APA is an open **fabric** their services
+  could implement; no present-tense adoption or network effect is claimed.
 
 ## Award positioning (refined by the data)
 - **PRIMARY → Creative Genius ($10k):** the field is data APIs, yield bots, and single scanners. The
-  **verifiable trust *fabric* of the agent economy** — a per-ASP cryptographic "Protected by Warden" badge + a
-  one-line SDK any agent adopts + a live marketplace safety index — is the most *imaginative, category-defining*
-  idea in the marketplace, and it's execution we control. We can't out-traction the data APIs, but we can
+  **verifiable trust *fabric* of the agent economy** — an endpoint-host Warden Guard Live attestation +
+  source-installed SDKs + a query-scoped, timer-ready Safety Index — is the most *imaginative,
+  category-defining* idea in the marketplace, and its implementation is under our control. We can't
+  out-traction the data APIs, but we can
   **out-invent the entire field.** This is our best 10k shot.
-- **SECONDARY → Best Product ($10k):** highest completeness/UX/value — award-grade site, live interactive demo,
-  SDK, verifiable badge, safety index, open source, real reviews + a real bug-fix feedback loop.
+- **SECONDARY → Best Product ($10k):** completeness/UX/value — award-grade source, a real-response
+  auto-playing demo, SDKs, verifiable APA records, a Safety Index, and dated marketplace feedback.
 - **FLOOR → Software Utility (2.5k):** strong best-in-class Software Services entry.
 - **Not our track → Revenue Rocket** (raw volume race we can't win in the window).
 
 ## The build that wins it
 The **Warden Trust Layer** (spec: `CODEX-TRUST-LAYER-BUILD.md`) is exactly this counter: the SDK (network
-effect), the verifiable per-ASP badge (the novel primitive no one else has), and the live safety index (the
-public good). Build it, lead the submission on Creative Genius, and Warden becomes the one entry that is
-*infrastructure the whole marketplace can run on* — not another service competing inside it.
+effect), the verifiable per-ASP badge (the novel primitive no one else has), and the Safety Index (the public
+good). Build it, lead the submission on Creative Genius, and Warden becomes the one entry designed as
+infrastructure other marketplaces and agent services can adopt — not another claim that one vendor has
+certified the whole ecosystem.
