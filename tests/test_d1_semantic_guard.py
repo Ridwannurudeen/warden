@@ -1,6 +1,7 @@
 """D1 optional semantic-layer gating and failure regressions."""
 
 import asyncio
+import gzip
 
 import httpx
 import pytest
@@ -55,6 +56,20 @@ class CountingResponseStream(httpx.AsyncByteStream):
         for _ in range(self.chunk_count):
             self.bytes_yielded += len(self.chunk)
             yield self.chunk
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+class CompressedResponseStream(httpx.AsyncByteStream):
+    def __init__(self) -> None:
+        self.chunk = gzip.compress(b"x" * (MAX_SEMANTIC_RESPONSE_BYTES * 100))
+        self.bytes_yielded = 0
+        self.closed = False
+
+    async def __aiter__(self):
+        self.bytes_yielded += len(self.chunk)
+        yield self.chunk
 
     async def aclose(self) -> None:
         self.closed = True
@@ -275,6 +290,7 @@ async def test_http_semantic_adapter_uses_provider_neutral_contract():
 
     async def handler(request: httpx.Request) -> httpx.Response:
         assert request.headers["Authorization"] == "Bearer test-semantic-key"
+        assert request.headers["Accept-Encoding"] == "identity"
         assert request.headers["Content-Type"] == "application/json"
         body = request.read().decode("utf-8")
         assert '"model":"security-classifier-v1"' in body
@@ -394,4 +410,31 @@ async def test_oversized_stream_stops_early_and_semantic_scan_fails_open():
     assert result["layers_triggered"] == []
     assert stream.bytes_yielded == MAX_SEMANTIC_RESPONSE_BYTES * 3 // 2
     assert stream.bytes_yielded < len(stream.chunk) * stream.chunk_count
+    assert stream.closed is True
+
+
+@pytest.mark.asyncio
+async def test_compressed_semantic_response_is_rejected_before_decompression():
+    stream = CompressedResponseStream()
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-encoding": "gzip"},
+            stream=stream,
+        )
+
+    analyzer = HttpSemanticAnalyzer(
+        endpoint="https://semantic.example/v1/chat/completions",
+        model="security-classifier-v1",
+        api_key="test-semantic-key",
+        transport=httpx.MockTransport(handler),
+    )
+    scanner = InjectionScanner(ai_analyzer=analyzer)
+
+    result = await scanner.scan(NOVEL_INJECTION, depth="thorough")
+
+    assert result["clean"] is True
+    assert result["layers_triggered"] == []
+    assert stream.bytes_yielded == 0
     assert stream.closed is True

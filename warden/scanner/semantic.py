@@ -88,7 +88,10 @@ class HttpSemanticAnalyzer:
                 async with client.stream(
                     "POST",
                     self._endpoint,
-                    headers={"Authorization": f"Bearer {self._api_key}"},
+                    headers={
+                        "Authorization": f"Bearer {self._api_key}",
+                        "Accept-Encoding": "identity",
+                    },
                     json={
                         "model": self._model,
                         "messages": [
@@ -100,13 +103,23 @@ class HttpSemanticAnalyzer:
                     },
                 ) as response:
                     response.raise_for_status()
+                    content_encoding = response.headers.get("content-encoding", "").strip().lower()
+                    if content_encoding and content_encoding != "identity":
+                        raise ValueError("semantic response must not be compressed")
                     chunks: list[bytes] = []
-                    response_size = 0
-                    async for chunk in response.aiter_bytes():
-                        response_size += len(chunk)
-                        if response_size > MAX_SEMANTIC_RESPONSE_BYTES:
+                    if response.is_stream_consumed:
+                        if len(response.content) > MAX_SEMANTIC_RESPONSE_BYTES:
                             raise ValueError("semantic response exceeds size limit")
-                        chunks.append(chunk)
+                        chunks = [response.content]
+                    else:
+                        response_size = 0
+                        async for chunk in response.aiter_raw(
+                            chunk_size=MAX_SEMANTIC_RESPONSE_BYTES // 2
+                        ):
+                            response_size += len(chunk)
+                            if response_size > MAX_SEMANTIC_RESPONSE_BYTES:
+                                raise ValueError("semantic response exceeds size limit")
+                            chunks.append(chunk)
 
         response_data = json.loads(b"".join(chunks))
         if not isinstance(response_data, dict):
