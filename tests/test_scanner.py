@@ -1,5 +1,9 @@
 """Tests for the copied ShieldBot injection scanner in Warden imports."""
 
+from pathlib import Path
+import subprocess
+import sys
+
 import pytest
 
 from warden.scanner.patterns import KNOWN_INJECTIONS, SIMILARITY_THRESHOLD
@@ -99,6 +103,23 @@ class TestLayer1Regex:
         assert not result["clean"]
         categories = {d["pattern_category"] for d in result["detections"] if d["layer"] == 1}
         assert "encoding_tricks" in categories
+
+    def test_web3_sign_pattern_completes_for_max_length_whitespace(self):
+        code = (
+            "import re\n"
+            "from warden.models import MAX_PAYLOAD_LENGTH\n"
+            "from warden.scanner.patterns import INJECTION_PATTERNS\n"
+            "payload = 'sign' + ' ' * (MAX_PAYLOAD_LENGTH - len('sign'))\n"
+            "pattern = re.compile(INJECTION_PATTERNS['web3_specific'][7])\n"
+            "assert pattern.search(payload) is None\n"
+        )
+
+        subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=Path(__file__).resolve().parents[1],
+            check=True,
+            timeout=2,
+        )
 
 
 class TestCleanContent:

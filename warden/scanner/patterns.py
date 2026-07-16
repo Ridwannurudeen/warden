@@ -42,7 +42,7 @@ INJECTION_PATTERNS = {
         r"(?i)admin\s+announcement\s*:\s*(?:migrate|upgrade|approve)",
         r"(?i)(?:airdrop|reward|claim)\s+(?:available|ready)\s*[-:]\s*(?:visit|go\s+to|click)",
         r"(?i)(?:price|oracle|feed)\s*:\s*(?:override|set|force)\s+",
-        r"(?i)(?:sign|sendTransaction)\s+.*(?:0x[a-fA-F0-9]{40}|transaction)",
+        r"(?i)(?:sign|sendTransaction)(?>\s+).*(?:0x[a-fA-F0-9]{40}|transaction)",
     ],
     "control_characters": [
         r"[\u200b\u200c\u200d\u200e\u200f\u2060\u2061\u2062\u2063\ufeff]",
