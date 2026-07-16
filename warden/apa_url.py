@@ -12,6 +12,10 @@ class PublicUrlUnavailable(ValueError):
     """The public URL is valid in shape but cannot currently be resolved."""
 
 
+_IPV4_COMPATIBLE_NETWORK = ipaddress.ip_network("::/96")
+_NAT64_WELL_KNOWN_NETWORK = ipaddress.ip_network("64:ff9b::/96")
+
+
 async def validate_public_http_url(target_url: str) -> tuple[str, str, ParseResult]:
     """
     Validate target_url and pin it to one resolved IP.
@@ -66,4 +70,12 @@ def is_blocked_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     mapped = getattr(ip, "ipv4_mapped", None)
     if mapped is not None:
         ip = mapped
+    if ip.is_multicast:
+        return True
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip in _IPV4_COMPATIBLE_NETWORK:
+            return True
+        if ip in _NAT64_WELL_KNOWN_NETWORK:
+            embedded = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+            return is_blocked_ip(embedded)
     return not ip.is_global

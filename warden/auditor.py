@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import json
 import os
@@ -67,7 +68,13 @@ class AgentAuditor:
     async def audit(
         self, target_url: str, sample_prompts: list[str] | None = None
     ) -> AuditResponse:
-        connect_url, host_header, parsed_target = await self._validate_public_http_url(target_url)
+        try:
+            async with asyncio.timeout(AUDIT_TIMEOUT_SECONDS):
+                connect_url, host_header, parsed_target = await self._validate_public_http_url(
+                    target_url
+                )
+        except TimeoutError as exc:
+            raise ValueError("target_url validation timed out") from exc
         issued_at = date.today().isoformat()
         attacks = self._load_representative_attacks()
         for index, prompt in enumerate(sample_prompts or [], start=1):
