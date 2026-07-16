@@ -219,6 +219,8 @@ class AgentAuditor:
                 body = await self._read_limited_response(response)
         except httpx.HTTPError:
             return AuditOutcome.INCONCLUSIVE
+        if body is None:
+            return AuditOutcome.INCONCLUSIVE
 
         if response.status_code in {401, 403}:
             return AuditOutcome.BLOCKED
@@ -233,6 +235,8 @@ class AgentAuditor:
             parsed = json.loads(body)
         except json.JSONDecodeError:
             parsed = None
+        except (ValueError, RecursionError):
+            return AuditOutcome.INCONCLUSIVE
         if isinstance(parsed, dict):
             verdict = str(parsed.get("verdict", "")).lower()
             if verdict in {"block", "blocked", "deny", "denied"}:
@@ -242,11 +246,14 @@ class AgentAuditor:
         # Strip echoed attack values before keyword-matching so JSON escaping cannot
         # make a target reflection look like a threat classification.
         if parsed is not None:
-            payload_pattern = re.compile(re.escape(payload), re.IGNORECASE) if payload else None
-            residual = json.dumps(
-                self._without_payload_reflections(parsed, payload_pattern),
-                ensure_ascii=False,
-            ).lower()
+            try:
+                payload_pattern = re.compile(re.escape(payload), re.IGNORECASE) if payload else None
+                residual = json.dumps(
+                    self._without_payload_reflections(parsed, payload_pattern),
+                    ensure_ascii=False,
+                ).lower()
+            except (ValueError, RecursionError):
+                return AuditOutcome.INCONCLUSIVE
         else:
             residual = body.lower().replace(payload.lower(), " ") if payload else body.lower()
         # A 4xx that names a recognized threat class in its (payload-stripped) body
@@ -260,15 +267,21 @@ class AgentAuditor:
         return AuditOutcome.NOT_BLOCKED
 
     @staticmethod
-    async def _read_limited_response(response: httpx.Response) -> str:
+    async def _read_limited_response(response: httpx.Response) -> str | None:
+        content_encoding = response.headers.get("content-encoding", "").strip().lower()
+        if content_encoding and content_encoding != "identity":
+            return None
         chunks: list[bytes] = []
         total = 0
-        async for chunk in response.aiter_bytes():
+        async for chunk in response.aiter_raw(chunk_size=16_384):
             total += len(chunk)
             if total > MAX_AUDIT_RESPONSE_BYTES:
-                break
+                return None
             chunks.append(chunk)
-        return b"".join(chunks).decode("utf-8", errors="ignore")
+        try:
+            return b"".join(chunks).decode("utf-8")
+        except UnicodeDecodeError:
+            return None
 
     @classmethod
     def _without_payload_reflections(
@@ -375,7 +388,12 @@ class AgentAuditor:
                 raise ValueError("target_url did not pass consent check")
             return False
 
-        raw_body = b"".join(chunks).decode("utf-8", errors="ignore").strip()
+        try:
+            raw_body = b"".join(chunks).decode("utf-8").strip()
+        except UnicodeDecodeError:
+            if require_consent:
+                raise ValueError("target_url did not pass consent check")
+            return False
         consent_verified = False
         if self._is_json_header(response):
             try:

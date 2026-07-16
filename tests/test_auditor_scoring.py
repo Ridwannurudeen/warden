@@ -6,12 +6,17 @@ from warden.auditor import AgentAuditor, AuditOutcome
 
 
 class _Response:
-    def __init__(self, status_code: int, body: str):
+    def __init__(
+        self,
+        status_code: int,
+        body: str | bytes,
+        headers: dict[str, str] | None = None,
+    ):
         self.status_code = status_code
-        self.headers: dict[str, str] = {}
-        self._body = body.encode("utf-8")
+        self.headers = headers or {}
+        self._body = body.encode("utf-8") if isinstance(body, str) else body
 
-    async def aiter_bytes(self):
+    async def aiter_raw(self, chunk_size: int | None = None):
         yield self._body
 
 
@@ -34,9 +39,14 @@ class _Client:
         return _Stream(self._response)
 
 
-def _outcome(status_code: int, body: str, payload: str = "attack payload") -> AuditOutcome:
+def _outcome(
+    status_code: int,
+    body: str | bytes,
+    payload: str = "attack payload",
+    headers: dict[str, str] | None = None,
+) -> AuditOutcome:
     auditor = AgentAuditor()
-    client = _Client(_Response(status_code, body))
+    client = _Client(_Response(status_code, body, headers))
     return asyncio.run(auditor._target_outcome(client, "http://x", "x", payload))
 
 
@@ -73,3 +83,29 @@ def test_200_reflected_injection_payload_is_not_blocked():
 
 def test_401_any_body_is_blocked():
     assert _outcome(401, "nope") is AuditOutcome.BLOCKED
+
+
+def test_oversized_response_is_inconclusive():
+    body = f'{{"verdict":"block","padding":"{"x" * 100_000}"}}'
+    assert _outcome(200, body) is AuditOutcome.INCONCLUSIVE
+
+
+def test_compressed_response_is_inconclusive():
+    assert (
+        _outcome(200, '{"verdict":"block"}', headers={"content-encoding": "gzip"})
+        is AuditOutcome.INCONCLUSIVE
+    )
+
+
+def test_deeply_nested_json_response_is_inconclusive():
+    body = f'{"[" * 990}"safe"{"]" * 990}'
+    assert _outcome(200, body) is AuditOutcome.INCONCLUSIVE
+
+
+def test_oversized_json_integer_is_inconclusive():
+    body = f'{{"value":{"9" * 5_000}}}'
+    assert _outcome(200, body) is AuditOutcome.INCONCLUSIVE
+
+
+def test_invalid_utf8_response_is_inconclusive():
+    assert _outcome(200, b'{"verdict":"blo\xffck"}') is AuditOutcome.INCONCLUSIVE

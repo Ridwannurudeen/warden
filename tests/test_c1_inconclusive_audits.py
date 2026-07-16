@@ -16,7 +16,7 @@ class _Response:
         self.headers: dict[str, str] = {}
         self._body = body.encode("utf-8")
 
-    async def aiter_bytes(self):
+    async def aiter_raw(self, chunk_size: int | None = None):
         yield self._body
 
 

@@ -170,6 +170,24 @@ def test_audit_rejects_compressed_consent_body(monkeypatch):
     assert response.json()["consent_verified"] is False
 
 
+def test_audit_rejects_invalid_utf8_consent_marker(monkeypatch):
+    _stubbed_audit_requests(
+        monkeypatch,
+        _ConsentResponse(
+            status_code=200,
+            text="unused",
+            raw_body=b"warden-audit-\xffallowed",
+        ),
+    )
+    monkeypatch.setenv("WARDEN_REQUIRE_CONSENT", "false")
+    monkeypatch.setenv("WARDEN_RATE_LIMIT_PER_MIN", "0")
+    monkeypatch.setenv("WARDEN_BADGE_SECRET", "consent-test-secret")
+    with TestClient(app) as client:
+        response = client.post("/audit", json={"target_url": "https://example.org/scan"})
+    assert response.status_code == 200
+    assert response.json()["consent_verified"] is False
+
+
 def test_echoed_payload_does_not_count_as_blocked():
     import asyncio
 
@@ -179,11 +197,12 @@ def test_echoed_payload_does_not_count_as_blocked():
 
     class _Resp:
         status_code = 200
+        headers: dict[str, str] = {}
 
         def __init__(self, body: str):
             self.body = body
 
-        async def aiter_bytes(self):
+        async def aiter_raw(self, chunk_size: int | None = None):
             yield self.body.encode()
 
     async def _run():
