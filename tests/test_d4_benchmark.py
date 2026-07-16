@@ -9,6 +9,7 @@ import pytest
 
 from scripts.benchmark_recall import evaluate_benchmark, load_jsonl, normalized_payload
 from warden.scanner.patterns import KNOWN_INJECTIONS
+from warden.scanner.semantic import HttpSemanticAnalyzer
 
 ROOT = Path(__file__).resolve().parents[1]
 ATTACKS = ROOT / "benchmark" / "held_out_attacks.jsonl"
@@ -48,6 +49,23 @@ async def test_published_benchmark_exactly_matches_a_fresh_run():
     readme = (ROOT / "benchmark" / "README.md").read_text(encoding="utf-8")
     assert "64.29% (18/28)" in readme
     assert "0.00% (0/16)" in readme
+
+
+@pytest.mark.asyncio
+async def test_benchmark_stays_deterministic_when_semantic_runtime_is_configured(monkeypatch):
+    monkeypatch.setenv("WARDEN_SEMANTIC_ENABLED", "true")
+    monkeypatch.setenv("WARDEN_SEMANTIC_ENDPOINT", "https://semantic.example/v1/classify")
+    monkeypatch.setenv("WARDEN_SEMANTIC_API_KEY", "test-semantic-key")
+    monkeypatch.setenv("OKX_API_KEY", "test-paywall-key")
+
+    async def fail_if_called(_self, _content):
+        pytest.fail("the deterministic benchmark must not call the semantic endpoint")
+
+    monkeypatch.setattr(HttpSemanticAnalyzer, "classify", fail_if_called)
+
+    measured = await evaluate_benchmark(ATTACKS, BENIGN)
+
+    assert measured == json.loads(PUBLISHED.read_text(encoding="utf-8"))
 
 
 def test_benchmark_cli_emits_the_published_json():

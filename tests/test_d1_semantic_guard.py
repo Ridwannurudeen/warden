@@ -4,8 +4,12 @@ import asyncio
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 
+import warden.api as api_module
+import warden.mcp_server as mcp_module
 from warden.engine import WardenEngine
+from warden.models import ScanRequest
 from warden.scanner.scanner import InjectionScanner
 from warden.scanner.semantic import (
     HttpSemanticAnalyzer,
@@ -144,7 +148,11 @@ async def test_paid_thorough_semantic_layer_blocks_novel_injection():
     )
     engine = WardenEngine(semantic_analyzer=analyzer)
 
-    verdict = await engine.scan(NOVEL_INJECTION, depth="thorough")
+    verdict = await engine.scan(
+        NOVEL_INJECTION,
+        depth="thorough",
+        allow_paid_semantic=True,
+    )
 
     assert analyzer.calls == [NOVEL_INJECTION]
     assert verdict.verdict == "BLOCK"
@@ -157,6 +165,64 @@ async def test_paid_thorough_semantic_layer_blocks_novel_injection():
             "source": "layer_4",
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_local_thorough_scan_does_not_enable_paid_semantic_layer():
+    analyzer = RecordingSemanticAnalyzer(
+        SemanticClassification(flagged=True, confidence=0.95, reason="Injection intent.")
+    )
+    engine = WardenEngine(semantic_analyzer=analyzer)
+
+    verdict = await engine.scan(NOVEL_INJECTION, depth="thorough")
+
+    assert analyzer.calls == []
+    assert verdict.verdict == "ALLOW"
+
+
+@pytest.mark.asyncio
+async def test_paid_http_scan_handler_enables_semantic_layer(monkeypatch):
+    analyzer = RecordingSemanticAnalyzer(
+        SemanticClassification(flagged=True, confidence=0.95, reason="Injection intent.")
+    )
+    monkeypatch.setattr(api_module, "engine", WardenEngine(semantic_analyzer=analyzer))
+
+    response = await api_module.scan(
+        ScanRequest(payload=NOVEL_INJECTION, depth="thorough")
+    )
+
+    assert analyzer.calls == [NOVEL_INJECTION]
+    assert response.verdict == "BLOCK"
+
+
+def test_free_demo_cannot_enable_semantic_layer_with_thorough_field(monkeypatch):
+    analyzer = RecordingSemanticAnalyzer(
+        SemanticClassification(flagged=True, confidence=0.95, reason="Injection intent.")
+    )
+    monkeypatch.setattr(api_module, "engine", WardenEngine(semantic_analyzer=analyzer))
+    monkeypatch.setenv("WARDEN_DEMO_RATE_LIMIT_PER_MIN", "0")
+
+    with TestClient(api_module.app) as client:
+        response = client.post(
+            "/api/demo/scan",
+            json={"payload": NOVEL_INJECTION, "depth": "thorough"},
+        )
+
+    assert response.status_code == 200
+    assert analyzer.calls == []
+
+
+@pytest.mark.asyncio
+async def test_mcp_thorough_scan_cannot_enable_paid_semantic_layer(monkeypatch):
+    analyzer = RecordingSemanticAnalyzer(
+        SemanticClassification(flagged=True, confidence=0.95, reason="Injection intent.")
+    )
+    monkeypatch.setattr(mcp_module, "engine", WardenEngine(semantic_analyzer=analyzer))
+
+    response = await mcp_module.scan_payload(NOVEL_INJECTION, depth="thorough")
+
+    assert response["verdict"] == "ALLOW"
+    assert analyzer.calls == []
 
 
 @pytest.mark.asyncio

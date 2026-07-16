@@ -402,6 +402,7 @@ async def scan(req: ScanRequest) -> ScanResponse:
         req.payload,
         depth=req.depth,
         context=req.context.model_dump(),
+        allow_paid_semantic=True,
     )
     return ScanResponse.from_verdict(verdict)
 

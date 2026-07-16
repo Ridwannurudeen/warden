@@ -35,6 +35,7 @@ class WardenEngine:
         payload: str | None,
         depth: str = "fast",
         context: dict[str, object] | None = None,
+        allow_paid_semantic: bool = False,
     ) -> Verdict:
         started = perf_counter()
         if payload is None:
@@ -52,7 +53,7 @@ class WardenEngine:
             },
         )
         analyzer_results = await self.registry.run_all(analyzer_context)
-        semantic_allowed = not any(
+        semantic_allowed = allow_paid_semantic and not any(
             result.error or result.flags or result.score > 0 for result in analyzer_results
         )
         scanner_result = await self.scanner.scan(
