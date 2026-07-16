@@ -1,14 +1,19 @@
 """FastMCP server exposing Warden's A2MCP tools."""
 
+from typing import Annotated
 from urllib.parse import urlparse
 
 from fastmcp import FastMCP
+from pydantic import Field
 
 from warden.auditor import AgentAuditor
 from warden.engine import WardenEngine
 from warden.models import (
     AuditRequest,
     AuditResponse,
+    Depth,
+    MAX_PAYLOAD_LENGTH,
+    ScanContext,
     ScanRequest,
     ScanResponse,
 )
@@ -18,16 +23,15 @@ engine = WardenEngine()
 auditor = AgentAuditor()
 
 
-@mcp.tool
+@mcp.tool(output_schema=ScanResponse.model_json_schema(by_alias=True))
 async def scan_payload(
-    payload: str,
-    depth: str = "fast",
-    context: dict[str, object] | None = None,
+    payload: Annotated[str, Field(max_length=MAX_PAYLOAD_LENGTH)],
+    depth: Depth = "fast",
+    context: ScanContext | None = None,
 ) -> dict[str, object]:
     """Scan untrusted agent payload content and return a Warden verdict."""
-    scan_depth = depth if depth in {"fast", "thorough"} else "fast"
     request = ScanRequest.model_validate(
-        {"payload": payload, "depth": scan_depth, "context": context or {}}
+        {"payload": payload, "depth": depth, "context": context or {}}
     )
     verdict = await engine.scan(
         request.payload,
@@ -37,7 +41,7 @@ async def scan_payload(
     return ScanResponse.from_verdict(verdict).model_dump(by_alias=True)
 
 
-@mcp.tool
+@mcp.tool(output_schema=AuditResponse.model_json_schema())
 async def audit_agent(
     target_url: str,
     sample_prompts: list[str] | None = None,
