@@ -53,6 +53,8 @@ class DemoScanRequest(BaseModel):
     @field_validator("payload")
     @classmethod
     def truncate_payload(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("payload must not be blank")
         return value[:MAX_DEMO_PAYLOAD_LENGTH]
 
 
