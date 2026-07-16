@@ -37,6 +37,16 @@ from warden.scanner.patterns import (
 logger = logging.getLogger(__name__)
 
 SEMANTIC_CONFIDENCE_THRESHOLD = 0.8
+MAX_REGEX_MATCHES_PER_CATEGORY = 100
+WHOLE_PAYLOAD_REDACTION_CATEGORIES = frozenset(
+    {
+        "direct_instruction",
+        "role_override",
+        "web3_specific",
+        "encoding_tricks",
+        "corpus_match",
+    }
+)
 
 
 class InjectionScanner:
@@ -201,15 +211,24 @@ class InjectionScanner:
         hits = []
         for category, compiled_list in self._compiled_patterns.items():
             confidence = CATEGORY_CONFIDENCE.get(category, 0.85)
+            seen_matches = set()
             for pattern, raw_pattern in compiled_list:
                 for match in pattern.finditer(content):
+                    match_text = match.group()
+                    if match_text in seen_matches:
+                        continue
+                    seen_matches.add(match_text)
                     hits.append({
                         "type": "regex",
                         "pattern_category": category,
-                        "match_text": match.group(),
+                        "match_text": match_text,
                         "confidence": confidence,
                         "layer": 1,
                     })
+                    if len(seen_matches) >= MAX_REGEX_MATCHES_PER_CATEGORY:
+                        break
+                if len(seen_matches) >= MAX_REGEX_MATCHES_PER_CATEGORY:
+                    break
         return hits
 
     # ── Layer 2: Heuristics ────────────────────────────────────────────
@@ -412,13 +431,9 @@ class InjectionScanner:
 
     def _sanitize_content(self, content: str, detections: List[Dict]) -> str:
         """Remove detected injection payloads from content."""
-        sanitized = content
-
-        # Remove matched text from regex detections
-        for det in detections:
-            match_text = det.get("match_text")
-            if match_text and det.get("type") == "regex":
-                sanitized = sanitized.replace(match_text, "[REDACTED]")
+        categories = {det.get("pattern_category") for det in detections}
+        if categories & WHOLE_PAYLOAD_REDACTION_CATEGORIES:
+            return "[REDACTED]"
 
         # Remove invisible/control characters
         invisible = set(
@@ -426,9 +441,7 @@ class InjectionScanner:
             "\u2060\u2061\u2062\u2063\ufeff"
             "\u202a\u202b\u202c\u202d\u202e"
         )
-        sanitized = "".join(ch for ch in sanitized if ch not in invisible)
-
-        return sanitized
+        return "".join(ch for ch in content if ch not in invisible)
 
     @staticmethod
     def _build_recommendation(clean: bool, risk_level: str, detections: List[Dict]) -> str:
