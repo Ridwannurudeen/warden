@@ -67,11 +67,13 @@ def _read_records_locked() -> list[dict[str, object]]:
             if not line.strip():
                 continue
             try:
-                records.append(json.loads(line))
+                record = json.loads(line)
             except json.JSONDecodeError:
                 # A single truncated/corrupt line (e.g. a crash mid-append) must not
                 # break every subsequent read of the store.
                 continue
+            if isinstance(record, dict):
+                records.append(record)
     return records
 
 
