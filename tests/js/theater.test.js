@@ -60,9 +60,7 @@ test("theater freezes the real three-attack order and request outcomes", () => {
       ["secret-exfil", "BLOCK", "SECRET_EXFIL"],
     ],
   );
-  assert.deepEqual(ATTACKS[1].request.context.expected_addresses, [
-    "0x1111111111111111111111111111111111111111",
-  ]);
+  assert.equal(Object.hasOwn(ATTACKS[1].request, "context"), false);
   assert.equal(
     ATTACKS.every((attack) => typeof attack.request.payload === "string"),
     true,

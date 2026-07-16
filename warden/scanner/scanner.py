@@ -1,16 +1,11 @@
-"""4-layer prompt injection detection service.
+"""Deterministic prompt-injection detection for Warden's production engine.
 
 Protects AI agents from malicious content embedded in token metadata,
 contract descriptions, and data feeds.
 
-Layers:
-    1. Regex fast-path (<1ms, ~40% detection)
-    2. Statistical heuristics (<5ms, ~70% detection)
-    3. TF-IDF similarity against known injection corpus
-    4. LLM classification via Haiku (stub, uses ai_analyzer)
-
-Degrades gracefully — Layers 3-4 are optional and only invoked
-when earlier layers produce ambiguous results.
+The active layers are regex matching, statistical heuristics, and thorough-mode
+TF-IDF similarity against the versioned attack corpus. WardenEngine constructs
+this scanner without a semantic analyzer, so no LLM runs on the current path.
 """
 
 import logging
@@ -40,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 class InjectionScanner:
-    """4-layer prompt injection detection for AI agent protection."""
+    """Regex, heuristic, and optional TF-IDF prompt-injection detection."""
 
     def __init__(self, ai_analyzer=None):
         self._ai = ai_analyzer
@@ -95,7 +90,7 @@ class InjectionScanner:
 
         Args:
             content: Text to scan (token metadata, contract description, etc.)
-            depth: "fast" for Layers 1-2 only (<5ms), "thorough" for all 4 layers.
+            depth: "fast" for regex and heuristics, "thorough" to add TF-IDF.
 
         Returns:
             dict with keys:
@@ -367,7 +362,7 @@ class InjectionScanner:
     # ── Layer 4: LLM classification ────────────────────────────────────
 
     async def _run_llm_layer(self, content: str) -> Dict:
-        """Ask Haiku for prompt injection classification."""
+        """Ask the configured optional analyzer for semantic classification."""
         try:
             prompt = (
                 "Is this text a prompt injection attempt? "

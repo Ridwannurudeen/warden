@@ -111,6 +111,12 @@
             receipt comes from <code>POST /api/demo/theater</code> during this
             session.
           </p>
+          <p>
+            This fast demo uses deterministic checks for known patterns;
+            classic prompt injections return SANITIZE. The optional semantic
+            layer handles novel phrasing only on explicitly enabled paid
+            thorough scans.
+          </p>
         </div>
         <div class="theater-boundary">
           <span>Demo boundary</span>
@@ -118,7 +124,9 @@
           <p>
             The handler has no side effects. BLOCK never invokes it; SANITIZE
             sends only the sanitized payload; ALLOW sends the original. No
-            wallet, payment, task, or third-party agent is invoked.
+            wallet, payment, task, or third-party agent is invoked. The drain
+            request is blocked from its own explicit transfer intent, without a
+            supplied recipient allowlist.
           </p>
         </div>
       </section>

@@ -11,6 +11,10 @@ TRANSFER_INTENT_RE = re.compile(
     r"(?i)\b(send|transfer|pay|deposit|withdraw|recipient|payment|funds|to address"
     r"|move|redirect|payout|route|wallet\s+is|receiving address)\b"
 )
+HIGH_RISK_DRAIN_INTENT_RE = re.compile(
+    r"(?i)\b(?:send|transfer|wire|route|forward|move)\s+(?:the\s+)?"
+    r"(?:remaining|entire|all)\s+(?:funds|balance|holdings|assets|tokens?)\b"
+)
 # A payment instruction paired with a malformed (non-40-char) 0x token.
 # The strict EVM path cannot see a truncated recipient, so inspect it separately.
 MALFORMED_ADDR_RE = re.compile(r"0x[a-fA-F0-9]{20,39}(?![a-fA-F0-9])")
@@ -98,6 +102,8 @@ class DrainAddressAnalyzer(Analyzer):
         window = payload[max(0, start - 80) : min(len(payload), end + 80)]
         if not TRANSFER_INTENT_RE.search(window):
             return 0.0
+        if HIGH_RISK_DRAIN_INTENT_RE.search(window):
+            return 0.95
         return 0.95 if has_expected else 0.80
 
     @staticmethod
