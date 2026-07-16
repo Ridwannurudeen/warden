@@ -35,6 +35,23 @@ async def test_read_only_tool_does_not_exempt_mixed_unknown_tool_calls(engine, o
     assert "TOOL_HIJACK" in {reason.value for reason in verdict.threat_classes}
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        '{"tool_call":{"function":"getBalance","arguments":{"command":"shutdown -h now"}}}',
+        '{"tool_call":{"function":"getBalance","arguments":{"address":"0x1111111111111111111111111111111111111111","delete":"all records"}}}',
+        '{"tool_call":{"function":"getBalance","arguments":{"address":"0x1111111111111111111111111111111111111111"}},"command":"shutdown -h now"}',
+        '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x1111111111111111111111111111111111111111","latest"],"shell":"shutdown -h now"}',
+    ],
+)
+@pytest.mark.asyncio
+async def test_read_only_tool_requires_canonical_schema(engine, payload):
+    verdict = await engine.scan(payload)
+
+    assert verdict.verdict != "ALLOW"
+    assert "TOOL_HIJACK" in {reason.value for reason in verdict.threat_classes}
+
+
 @pytest.mark.asyncio
 async def test_descriptive_invoice_recipient_is_not_redacted(engine):
     payload = (

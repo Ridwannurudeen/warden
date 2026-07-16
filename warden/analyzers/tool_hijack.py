@@ -6,12 +6,20 @@ import re
 from warden.core.analyzer import AnalysisContext, Analyzer, AnalyzerResult
 from warden.core.verdict import ReasonCode
 
-TOOL_KEYS = {"tool_call", "tool_calls", "tool_result", "function", "arguments"}
+TOOL_KEYS = {
+    "tool_call",
+    "tool_calls",
+    "tool_result",
+    "function",
+    "arguments",
+    "method",
+    "params",
+}
 FINANCIAL_ACTION_RE = re.compile(
     r"(?i)\b(transfer|approve|setApproval(?:ForAll)?|sign|sendTransaction|withdraw|deposit|pay)\b"
 )
-TOOL_OPERATION_KEYS = {"function", "name", "method"}
-READ_ONLY_TOOL_OPERATIONS = {"getbalance", "eth_getbalance"}
+EVM_ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{40}")
+BLOCK_REFERENCE_RE = re.compile(r"(?:latest|pending|safe|finalized|earliest|0x[0-9a-fA-F]+)")
 TOOL_SHAPE_RE = re.compile(
     r"(?i)(\"(?:tool_call|tool_calls|tool_result|function|arguments)\"|"
     r"\"role\"\s*:\s*\"tool\"|"
@@ -89,21 +97,43 @@ class ToolHijackAnalyzer(Analyzer):
         except json.JSONDecodeError:
             return False
 
-        operations = cls._json_tool_operations(parsed)
-        return bool(operations) and all(
-            operation.casefold() in READ_ONLY_TOOL_OPERATIONS for operation in operations
+        if not isinstance(parsed, dict):
+            return False
+        return cls._is_canonical_get_balance_call(parsed) or cls._is_canonical_eth_balance_call(
+            parsed
         )
 
-    @classmethod
-    def _json_tool_operations(cls, value: object) -> list[str]:
-        operations: list[str] = []
-        if isinstance(value, dict):
-            for key, nested in value.items():
-                if str(key) in TOOL_OPERATION_KEYS and isinstance(nested, str):
-                    operations.append(nested)
-                else:
-                    operations.extend(cls._json_tool_operations(nested))
-        elif isinstance(value, list):
-            for item in value:
-                operations.extend(cls._json_tool_operations(item))
-        return operations
+    @staticmethod
+    def _is_canonical_get_balance_call(payload: dict[object, object]) -> bool:
+        if set(payload) != {"tool_call"}:
+            return False
+        call = payload["tool_call"]
+        if not isinstance(call, dict) or set(call) != {"function", "arguments"}:
+            return False
+        arguments = call["arguments"]
+        return (
+            call["function"] == "getBalance"
+            and isinstance(arguments, dict)
+            and set(arguments) == {"address"}
+            and isinstance(arguments["address"], str)
+            and EVM_ADDRESS_RE.fullmatch(arguments["address"]) is not None
+        )
+
+    @staticmethod
+    def _is_canonical_eth_balance_call(payload: dict[object, object]) -> bool:
+        required_keys = {"jsonrpc", "method", "params"}
+        if not required_keys <= set(payload) <= required_keys | {"id"}:
+            return False
+        if payload["jsonrpc"] != "2.0" or payload["method"] != "eth_getBalance":
+            return False
+        if "id" in payload and (isinstance(payload["id"], bool) or not isinstance(payload["id"], int)):
+            return False
+        params = payload["params"]
+        return (
+            isinstance(params, list)
+            and len(params) == 2
+            and isinstance(params[0], str)
+            and EVM_ADDRESS_RE.fullmatch(params[0]) is not None
+            and isinstance(params[1], str)
+            and BLOCK_REFERENCE_RE.fullmatch(params[1]) is not None
+        )
