@@ -162,22 +162,30 @@ class LocalEngine:
     def __init__(self) -> None:
         try:
             from warden.engine import WardenEngine
-            from warden.models import ScanResponse
+            from warden.models import ScanRequest, ScanResponse
         except ImportError as exc:
             raise WardenError(
                 "WardenClient(local=True) requires the Warden root package "
                 "installed from this repository or an equivalent source checkout"
             ) from exc
         self._engine = WardenEngine()
+        self._request_model = ScanRequest
         self._response_model = ScanResponse
 
     async def scan(
         self, payload: str, *, depth: str, expected_addresses: list[str] | None
     ) -> dict[str, object]:
+        request = self._request_model.model_validate(
+            {
+                "payload": payload,
+                "depth": depth,
+                "context": {"expected_addresses": expected_addresses or []},
+            }
+        )
         verdict = await self._engine.scan(
-            payload,
-            depth=depth,
-            context={"expected_addresses": expected_addresses or []},
+            request.payload,
+            depth=request.depth,
+            context=request.context.model_dump(),
         )
         return self._response_model.from_verdict(verdict).model_dump(by_alias=True)
 
