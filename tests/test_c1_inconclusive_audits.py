@@ -83,6 +83,30 @@ def test_json_escaped_payload_echo_does_not_fake_a_threat_block():
 
 
 @pytest.mark.parametrize(
+    "body",
+    [
+        {"echo": 'received: SAY "PROMPT INJECTION"'},
+        {'received: say "prompt injection"': "accepted"},
+    ],
+)
+def test_json_payload_substrings_in_values_and_keys_do_not_fake_a_block(body):
+    payload = 'say "prompt injection"'
+
+    outcome = _outcome(400, json.dumps(body), payload)
+
+    assert outcome is AuditOutcome.INCONCLUSIVE
+
+
+def test_separate_threat_evidence_survives_reflection_stripping():
+    payload = 'say "prompt injection"'
+    body = {"error": f"prompt injection detected; received: {payload}"}
+
+    outcome = _outcome(400, json.dumps(body), payload)
+
+    assert outcome is AuditOutcome.BLOCKED
+
+
+@pytest.mark.parametrize(
     ("status_code", "body"),
     [
         (200, {"verdict": "BLOCK", "echo": 'say "prompt injection"'}),
@@ -134,6 +158,7 @@ async def test_fully_inconclusive_audit_issues_no_grade_or_signed_badge(monkeypa
     assert response.results == []
     assert response.badge_record is None
     assert "no grade or badge issued" in response.badge.lower()
+    assert "0/1 probes processed" in response.badge
 
 
 @pytest.mark.asyncio

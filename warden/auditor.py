@@ -153,7 +153,7 @@ class AgentAuditor:
         elif not conclusive_count:
             badge = (
                 "Warden audit inconclusive (no grade or badge issued): "
-                f"0/{len(results)} probes processed - {issued_at}"
+                f"0/{len(outcomes)} probes processed - {issued_at}"
             )
             badge_record = None
         else:
@@ -241,12 +241,13 @@ class AgentAuditor:
         # Strip echoed attack values before keyword-matching so JSON escaping cannot
         # make a target reflection look like a threat classification.
         if parsed is not None:
+            payload_pattern = re.compile(re.escape(payload), re.IGNORECASE) if payload else None
             residual = json.dumps(
-                self._without_payload_reflections(parsed, payload),
+                self._without_payload_reflections(parsed, payload_pattern),
                 ensure_ascii=False,
             ).lower()
         else:
-            residual = body.lower().replace(payload.lower(), " ")
+            residual = body.lower().replace(payload.lower(), " ") if payload else body.lower()
         # A 4xx that names a recognized threat class in its (payload-stripped) body
         # is a real security block, not a schema/transport error.
         if 400 <= response.status_code < 500 and THREAT_NAME_PATTERN.search(residual):
@@ -269,16 +270,24 @@ class AgentAuditor:
         return b"".join(chunks).decode("utf-8", errors="ignore")
 
     @classmethod
-    def _without_payload_reflections(cls, value: object, payload: str) -> object:
+    def _without_payload_reflections(
+        cls,
+        value: object,
+        payload_pattern: re.Pattern[str] | None,
+    ) -> object:
         if isinstance(value, str):
-            return "" if value == payload else value
+            return payload_pattern.sub("", value) if payload_pattern else value
         if isinstance(value, dict):
             return {
-                key: cls._without_payload_reflections(nested, payload)
+                (
+                    payload_pattern.sub("", key)
+                    if payload_pattern and isinstance(key, str)
+                    else key
+                ): cls._without_payload_reflections(nested, payload_pattern)
                 for key, nested in value.items()
             }
         if isinstance(value, list):
-            return [cls._without_payload_reflections(item, payload) for item in value]
+            return [cls._without_payload_reflections(item, payload_pattern) for item in value]
         return value
 
     async def _validate_public_http_url(self, target_url: str) -> tuple[str, str, ParseResult]:
