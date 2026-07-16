@@ -519,11 +519,11 @@ def test_shared_styles_meet_wcag_contrast_contract():
     }
     assert required_tokens <= dark.keys()
     assert required_tokens <= light.keys()
-    assert light["accent-bright"] == "#6a57eb"
-    assert light["danger"] == "#cf234e"
-    assert light["faint"] == "#625e78"
-    assert light["control-border"] == "#8b84a6"
-    assert dark["control-border"] == "#6c6494"
+    assert light["accent-bright"] == "#8c6516"
+    assert light["danger"] == "#c83737"
+    assert light["faint"] == "#625b4e"
+    assert light["control-border"] == "#837969"
+    assert dark["control-border"] == "#756d5e"
 
     text_pairs = (
         ("on-accent", "accent-bright"),
@@ -638,14 +638,17 @@ def test_home_playground_badges_integrations_and_status_are_real_surfaces():
     integrate = (SITE / "integrate.html").read_text(encoding="utf-8")
     status = (SITE / "status.html").read_text(encoding="utf-8")
 
-    assert "The immune system of the agent economy" in home
+    assert "The first agent-security service that issues cryptographic" in home
+    assert "data-product-proof" in home
+    assert "data-incident-console" in home
+    assert "data-home-proof" in home
     assert home.count("data-marketplace-count") >= 2
     assert "data-marketplace-matched" in home
     assert "data-marketplace-audited" in home
     assert "data-marketplace-coverage" in home
     assert "data-safety-map" in home
     assert "data-service-snapshot" in home
-    assert 'class="button primary button--hero" href="/theater"' in home
+    assert 'class="button primary button--hero" href="/hire"' in home
     assert 'class="button secondary" href="/integrate"' in home
     assert "/api/demo/scan" in playground and "data-playground-form" in playground
     assert "data-demo-diff" in playground and "data-demo-json" in playground

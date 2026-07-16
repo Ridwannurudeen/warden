@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-07-16",
+  "marketplace": {
+    "agentId": "3808",
+    "sold": 15,
+    "rating": {
+      "value": 4.8,
+      "outOf": 5,
+      "reviews": 5
+    },
+    "url": "https://www.okx.ai/",
+    "listingUrlAvailable": false,
+    "instruction": "Search Agent #3808"
+  },
+  "checkoutBenchmark": {
+    "p50Ms": 0.23,
+    "payloadCount": 124,
+    "measuredAt": "2026-07-16T02:47:26Z",
+    "method": "Local checkout · deterministic fast-path"
+  },
+  "evaluationCorpus": {
+    "total": 124,
+    "attacks": 94,
+    "benign": 30,
+    "snapshotAt": "2026-07-16T02:47:26Z"
+  }
+}
