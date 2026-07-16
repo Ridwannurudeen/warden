@@ -11,6 +11,7 @@ import argparse
 import json
 import sys
 import time
+import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 
@@ -19,6 +20,20 @@ from warden_guard.apa import validate_attestation, validate_protection_proof
 from warden_guard.keys import key_path, load_or_create_key, public_key_str
 from warden_guard.proof import WELL_KNOWN_PATH
 from warden_guard.proxy import WardenReverseProxy
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+        raise urllib.error.HTTPError(
+            req.full_url,
+            code,
+            "APA proof redirects are not allowed",
+            headers,
+            fp,
+        )
+
+
+_PROOF_OPENER = urllib.request.build_opener(_NoRedirectHandler())
 
 
 def verify_endpoint(url: str) -> tuple[bool, str]:
@@ -41,7 +56,9 @@ def verify_endpoint(url: str) -> tuple[bool, str]:
     endpoint_host = host_identity if port in (None, 443) else f"{host_identity}:{port}"
     proof_url = f"https://{endpoint_host}{WELL_KNOWN_PATH}"
     try:
-        with urllib.request.urlopen(proof_url, timeout=5) as resp:  # noqa: S310
+        with _PROOF_OPENER.open(proof_url, timeout=5) as resp:  # noqa: S310
+            if resp.geturl() != proof_url:
+                raise ValueError("APA proof redirects are not allowed")
             proof = json.loads(resp.read(64_000))
     except Exception as exc:  # noqa: BLE001
         return False, f"cannot fetch proof at {proof_url}: {exc}"

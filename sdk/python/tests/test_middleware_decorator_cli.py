@@ -144,9 +144,14 @@ def test_cli_live_proof_renders_null_scan_count_as_unavailable(
         def read(self, limit: int) -> bytes:
             return payload[:limit]
 
-    monkeypatch.setattr(
-        "warden_guard.cli.urllib.request.urlopen", lambda *args, **kwargs: Response()
-    )
+        def geturl(self) -> str:
+            return f"https://api.example.com{WELL_KNOWN_PATH}"
+
+    class Opener:
+        def open(self, *args: object, **kwargs: object) -> Response:
+            return Response()
+
+    monkeypatch.setattr("warden_guard.cli._PROOF_OPENER", Opener())
 
     ok, message = verify_endpoint("https://api.example.com")
 
@@ -172,11 +177,15 @@ def test_cli_live_proof_canonicalizes_explicit_default_https_port(
         def read(self, limit: int) -> bytes:
             return payload[:limit]
 
-    def urlopen(url: str, *, timeout: int) -> Response:
-        requested_urls.append(url)
-        return Response()
+        def geturl(self) -> str:
+            return requested_urls[-1]
 
-    monkeypatch.setattr("warden_guard.cli.urllib.request.urlopen", urlopen)
+    class Opener:
+        def open(self, url: str, *, timeout: int) -> Response:
+            requested_urls.append(url)
+            return Response()
+
+    monkeypatch.setattr("warden_guard.cli._PROOF_OPENER", Opener())
 
     ok, message = verify_endpoint("https://API.EXAMPLE.COM:443")
 
