@@ -6,8 +6,11 @@
 deterministic payload firewall for the agent economy, plus a reference implementation of the
 open [APA v0.1](../../spec/APA-SPEC.md) protection-proof standard.
 
+This SDK is not published under an owned PyPI package name. Install it from a
+checked-out Warden source tree:
+
 ```bash
-pip install warden-guard
+python -m pip install -e /path/to/warden/sdk/python
 ```
 
 ## Quickstart
@@ -26,9 +29,16 @@ safe = warden.guard(untrusted_text)  # returns safe text, raises WardenBlocked o
 > **Honesty note — read before shipping.** The free hosted tier is rate-limited and
 > truncates long payloads, so it is **best-effort telemetry, NOT enforcement**; it defaults
 > to `fail_open=True` (an outage returns ALLOW rather than taking your agent offline).
-> For enforcement use `WardenClient(local=True)` or the paid tier, with `fail_open=False`.
+> For enforcement use `WardenClient(local=True, fail_open=False)`. Selecting the
+> protected hosted route does not authorize an x402 payment.
 
 ## Enforcement-grade: local in-process mode
+
+Local mode also needs the repository's root package installed:
+
+```bash
+python -m pip install -e /path/to/warden
+```
 
 ```python
 warden = WardenClient(local=True, fail_open=False)  # imports WardenEngine — no network,
@@ -124,7 +134,9 @@ warden-guard verify https://api.example.com                # verify a live heart
 warden-guard verify attestation.json --issuer-pub ed25519:...  # offline attestation verify
 ```
 
-## Paid tier
+## Protected hosted route
 
-`WardenClient(paid=True)` uses the x402-gated `/scan` endpoint (0.5 USDT per scan on
-X Layer) for production volume over the hosted service.
+`WardenClient(paid=True)` selects the x402-gated `/scan` endpoint. The SDK does not
+construct, sign, or settle x402 payments; HTTP 402 therefore raises `WardenError`
+even when `fail_open=True`. Use a separate payment-aware integration before relying
+on the protected hosted route.

@@ -17,8 +17,21 @@ jobs:
         with:
           node-version: "22"
       - run: python -m pip install -e ".[dev]"
+      - run: python -m pip install -e "sdk/python[dev]"
       - run: python scripts/build_site.py
       - run: python scripts/build_index.py
+      - name: Verify distributable wheel and local x402 settlement
+        run: python -m pytest -q tests/test_r4_distribution.py tests/test_r4_x402_settlement.py
+      - run: python spec/verify_apa.py --selftest
       - run: ruff check .
-      - run: pytest -q
+      - run: python -m pytest -q
+      - run: python -m pytest -q sdk/python/tests
       - run: node --test tests/js/*.test.js
+      - run: npm ci
+        working-directory: sdk/ts
+      - run: npm test
+        working-directory: sdk/ts
+      - run: npm run build
+        working-directory: sdk/ts
+      - run: npm pack --dry-run
+        working-directory: sdk/ts

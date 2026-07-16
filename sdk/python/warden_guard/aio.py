@@ -22,7 +22,8 @@ class AsyncWardenClient:
 
     Same tiers and defaults as :class:`warden_guard.WardenClient`: the free
     hosted tier is best-effort telemetry (`fail_open=True`); use `local=True`
-    for in-process enforcement-grade verdicts or `paid=True` for hosted volume.
+    for in-process enforcement-grade verdicts. `paid=True` selects the protected
+    route but does not create or settle an x402 payment signature.
     """
 
     def __init__(
@@ -69,6 +70,11 @@ class AsyncWardenClient:
                 increment_scan_count()
                 return result
         except httpx.HTTPError as exc:
+            if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 402:
+                raise WardenError(
+                    "Warden scan requires x402 payment; paid=True selects the protected "
+                    "endpoint but does not create or settle a payment signature"
+                ) from exc
             if self.fail_open:
                 return ScanResult(verdict="ALLOW", risk_level="NONE", raw={"error": str(exc)})
             raise WardenError(f"Warden scan failed: {exc}") from exc

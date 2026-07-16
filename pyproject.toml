@@ -20,6 +20,9 @@ dependencies = [
 [tool.setuptools.packages.find]
 include = ["warden*"]
 
+[tool.setuptools.package-data]
+"warden.analyzers" = ["bip39_words.txt"]
+
 [project.optional-dependencies]
 dev = [
     "pytest==9.0.3",

@@ -20,8 +20,10 @@ Tiers — read this before shipping:
   rate-limited, honestly sub-millisecond verdict compute. Requires the `warden`
   package installed. This is the enforcement-grade path; pair it with
   `fail_open=False`.
-- **Paid hosted (`paid=True`):** the x402-gated `/scan` endpoint for production
-  volume over the hosted service.
+- **Protected hosted route (`paid=True`):** selects the x402-gated `/scan`
+  endpoint. This client does not create or settle payment signatures, so a 402
+  response raises `WardenError` even when `fail_open=True`. Use a payment-aware
+  integration to authorize and settle hosted requests.
 
 Latency honesty: verdict *compute* is sub-ms; the hosted paths add network RTT.
 
@@ -163,8 +165,8 @@ class LocalEngine:
             from warden.models import ScanResponse
         except ImportError as exc:
             raise WardenError(
-                "WardenClient(local=True) requires the `warden` package "
-                "(pip install warden or run inside the warden repo)"
+                "WardenClient(local=True) requires the Warden root package "
+                "installed from this repository or an equivalent source checkout"
             ) from exc
         self._engine = WardenEngine()
         self._response_model = ScanResponse
@@ -185,14 +187,17 @@ class WardenClient:
 
     Args:
         base_url: Warden host. Defaults to the public hosted service.
-        paid: Use the paid x402 endpoint instead of the free demo path.
+        paid: Select the protected x402 endpoint instead of the free demo path.
+            This client does not create or settle payment signatures.
         local: Run the verdict in-process via WardenEngine — no network,
             not rate-limited, sub-ms verdict compute. Enforcement-grade.
         timeout: Per-request timeout in seconds (hosted modes).
-        fail_open: If True (the free-tier default), a transport error returns
-            an ALLOW result instead of raising, so an outage never takes your
-            agent offline — best-effort telemetry, not enforcement. Set False
-            (fail closed) for enforcement; pair with `local=True` or `paid=True`.
+        fail_open: If True (the free-tier default), a transport or non-payment
+            HTTP error returns an ALLOW result instead of raising, so an outage
+            never takes your agent offline — best-effort telemetry, not
+            enforcement. HTTP 402 always raises because this client cannot
+            authorize payment. Set False (fail closed) for enforcement and pair
+            it with `local=True`.
     """
 
     def __init__(
@@ -239,6 +244,11 @@ class WardenClient:
                 increment_scan_count()
                 return result
         except httpx.HTTPError as exc:
+            if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 402:
+                raise WardenError(
+                    "Warden scan requires x402 payment; paid=True selects the protected "
+                    "endpoint but does not create or settle a payment signature"
+                ) from exc
             if self.fail_open:
                 return ScanResult(verdict="ALLOW", risk_level="NONE", raw={"error": str(exc)})
             raise WardenError(f"Warden scan failed: {exc}") from exc
