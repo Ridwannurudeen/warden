@@ -31,7 +31,7 @@ def test_preview_routes_all_apa_and_issuer_requests_to_the_api(tmp_path, monkeyp
         issuer = client.get("/.well-known/apa-issuer.json")
         script = client.get("/log.js")
 
-    assert log_json.json() == {"entries": [], "total": 0}
+    assert log_json.json() == {"entries": [], "total": 0, "next_cursor": None}
     assert log_html.headers["content-type"].startswith("text/html")
     assert "data-apa-log" in log_html.text
     assert missing.status_code == 404
@@ -51,7 +51,8 @@ def test_log_page_is_csp_compatible_and_states_the_verification_boundary():
     assert "data-apa-log-retry" in page
     assert '<script src="/log.js" defer></script>' in page
     assert "independently anchored checkpoint" in page
-    assert 'fetch("/apa/log"' in script
+    assert "fetchLogPages" in script
+    assert "`/apa/log?cursor=${cursor}&limit=${pageSize}`" in script
     assert 'accept: "application/json"' in script
     assert "textContent" in script
     assert "innerHTML" not in script
