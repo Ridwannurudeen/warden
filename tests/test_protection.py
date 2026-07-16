@@ -537,7 +537,11 @@ def test_transparency_log_defaults_to_json_and_serves_html_only_when_requested(
         wildcard = client.get("/apa/log", headers={"accept": "*/*"})
         html = client.get("/apa/log", headers={"accept": "text/html"})
 
-    expected = {"entries": protection_store.read_log(), "total": 1}
+    expected = {
+        "entries": protection_store.read_log(),
+        "total": 1,
+        "next_cursor": None,
+    }
     assert default.headers["content-type"].startswith("application/json")
     assert default.json() == expected
     assert explicit_json.json() == expected

@@ -40,6 +40,7 @@ from warden.models import (
 )
 
 MAX_REQUEST_BODY_BYTES = 1_000_000
+APA_LOG_DEFAULT_PAGE_SIZE = 100
 APA_LOG_MAX_PAGE_SIZE = 500
 APA_LOG_PAGE = Path(__file__).resolve().parents[1] / "site" / "log.html"
 
@@ -635,29 +636,26 @@ async def apa_log(
 ) -> Response:
     if _explicitly_accepts_html(request):
         return Response(content=APA_LOG_PAGE.read_text(encoding="utf-8"), media_type="text/html")
-    if cursor is not None or limit is not None:
-        page_cursor = 0 if cursor is None else cursor
-        page_limit = 100 if limit is None else limit
-        if page_cursor < 0:
-            raise HTTPException(status_code=400, detail="cursor must be non-negative")
-        if not 1 <= page_limit <= APA_LOG_MAX_PAGE_SIZE:
-            raise HTTPException(
-                status_code=400,
-                detail=f"limit must be between 1 and {APA_LOG_MAX_PAGE_SIZE}",
-            )
-        entries, total, next_cursor = protection_store.read_log_page(
-            page_cursor,
-            page_limit,
+    page_cursor = 0 if cursor is None else cursor
+    page_limit = APA_LOG_DEFAULT_PAGE_SIZE if limit is None else limit
+    if page_cursor < 0:
+        raise HTTPException(status_code=400, detail="cursor must be non-negative")
+    if not 1 <= page_limit <= APA_LOG_MAX_PAGE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"limit must be between 1 and {APA_LOG_MAX_PAGE_SIZE}",
         )
-        return JSONResponse(
-            content={
-                "entries": entries,
-                "total": total,
-                "next_cursor": next_cursor,
-            }
-        )
-    entries = protection_store.read_log()
-    return JSONResponse(content={"entries": entries, "total": len(entries)})
+    entries, total, next_cursor = protection_store.read_log_page(
+        page_cursor,
+        page_limit,
+    )
+    return JSONResponse(
+        content={
+            "entries": entries,
+            "total": total,
+            "next_cursor": next_cursor,
+        }
+    )
 
 
 @app.get("/apa/log/checkpoint")

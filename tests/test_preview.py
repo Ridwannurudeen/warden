@@ -63,7 +63,7 @@ def test_preview_keeps_apa_log_json_by_default(client):
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/json")
-    assert set(response.json()) == {"entries", "total"}
+    assert set(response.json()) == {"entries", "total", "next_cursor"}
 
 
 def test_preview_keeps_badge_api_distinct_from_static_badge_page(client):

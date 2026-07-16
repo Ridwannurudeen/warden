@@ -34,8 +34,9 @@ def _seed_log(size: int) -> list[dict[str, object]]:
     return protection_store.read_log()
 
 
-def test_log_cursor_pages_bound_serialization_and_legacy_response_stays_unchanged():
+def test_log_cursor_pages_bound_serialization_including_default_page(monkeypatch):
     entries = _seed_log(5)
+    monkeypatch.setattr("warden.api.APA_LOG_DEFAULT_PAGE_SIZE", 2)
 
     with TestClient(app) as client:
         legacy = client.get("/apa/log")
@@ -43,7 +44,11 @@ def test_log_cursor_pages_bound_serialization_and_legacy_response_stays_unchange
         second = client.get("/apa/log?cursor=2&limit=2")
         final = client.get("/apa/log?cursor=4&limit=2")
 
-    assert legacy.json() == {"entries": entries, "total": 5}
+    assert legacy.json() == {
+        "entries": entries[:2],
+        "total": 5,
+        "next_cursor": 2,
+    }
     assert first.json() == {
         "entries": entries[:2],
         "total": 5,
