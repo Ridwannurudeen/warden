@@ -151,11 +151,84 @@
     };
   }
 
+  function normalizeMonitor(payload) {
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      payload.schema_version !== 1 ||
+      !Array.isArray(payload.samples) ||
+      !["not_running", "collecting"].includes(payload.status)
+    ) {
+      throw new Error("Monitor data must be a schema-v1 object");
+    }
+    if (payload.status === "not_running") {
+      if (payload.samples.length) {
+        throw new Error("A stopped monitor cannot publish samples");
+      }
+      return {
+        state: "Not measured",
+        window: "No recorded readiness samples",
+        availability: "Not measured",
+        latest: "No probe recorded",
+      };
+    }
+    if (!payload.samples.length) {
+      throw new Error("A collecting monitor must publish at least one sample");
+    }
+
+    const samples = payload.samples.map((sample) => {
+      if (
+        !sample ||
+        typeof sample !== "object" ||
+        typeof sample.checked_at !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(sample.checked_at) ||
+        Number.isNaN(Date.parse(sample.checked_at)) ||
+        !["ready", "not_ready", "error"].includes(sample.status) ||
+        (sample.http_status !== null &&
+          (!Number.isInteger(sample.http_status) ||
+            sample.http_status < 100 ||
+            sample.http_status > 599)) ||
+        !Number.isFinite(sample.latency_ms) ||
+        sample.latency_ms < 0
+      ) {
+        throw new Error("Monitor sample is malformed");
+      }
+      return { ...sample, timestamp: Date.parse(sample.checked_at) };
+    });
+    for (let index = 1; index < samples.length; index += 1) {
+      if (samples[index].timestamp <= samples[index - 1].timestamp) {
+        throw new Error("Monitor samples must be in chronological order");
+      }
+    }
+
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const cadenceComplete = samples.every(
+      (sample, index) =>
+        index === 0 || sample.timestamp - samples[index - 1].timestamp <= 10 * 60 * 1000,
+    );
+    const complete =
+      samples.length >= 8640 &&
+      samples[samples.length - 1].timestamp - samples[0].timestamp >=
+        thirtyDaysMs &&
+      cadenceComplete;
+    const readyCount = samples.filter((sample) => sample.status === "ready").length;
+    const latest = samples[samples.length - 1];
+    return {
+      state: complete ? "30-day window measured" : "Collecting evidence",
+      window: `${samples.length.toLocaleString("en-US")} recorded readiness samples; 30-day window ${complete ? "complete" : "incomplete"}`,
+      availability: complete
+        ? `${((readyCount / samples.length) * 100).toFixed(2)}%`
+        : "Not measured",
+      latest: `${latest.checked_at} — ${latest.status.replace("_", " ")}`,
+    };
+  }
+
   const api = {
     formatCheckedAt,
     metadataView,
     normalizeEvaluation,
     normalizeHealth,
+    normalizeMonitor,
   };
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
@@ -350,8 +423,31 @@
     }
   }
 
+  async function loadMonitor() {
+    try {
+      const response = await root.fetch("/data/service-monitor.json", {
+        headers: { accept: "application/json" },
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const monitor = normalizeMonitor(await response.json());
+      text("[data-monitor-state]", monitor.state);
+      text("[data-monitor-window]", monitor.window);
+      text("[data-monitor-availability]", monitor.availability);
+      text("[data-monitor-latest]", monitor.latest);
+    } catch {
+      text("[data-monitor-state]", "Evidence unavailable");
+      text("[data-monitor-window]", "Evidence unavailable");
+      text("[data-monitor-availability]", "Not measured");
+      text("[data-monitor-latest]", "Evidence unavailable");
+    }
+  }
+
   healthRetry?.addEventListener("click", loadHealth);
   loadHealth();
   loadBuildMetadata();
   loadEvaluation();
+  loadMonitor();
 })(typeof globalThis === "undefined" ? this : globalThis);

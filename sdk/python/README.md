@@ -71,6 +71,24 @@ With the default whole-body extractor, `SANITIZE` replaces the body replayed to 
 A custom extractor cannot identify where its text belongs in the original body, so `SANITIZE` blocks
 unless the application uses `guard()` directly and forwards its returned safe text.
 
+## Standalone reverse proxy
+
+The proxy command places the same guard in front of an existing HTTP service. It
+preserves method, path, query, and end-to-end headers; strips hop-by-hop headers;
+rewrites only a sanitized UTF-8 body; and never calls the upstream on BLOCK, scanner
+failure, an oversized body, or a detected loop. Local scanning is the fail-closed
+default and requires the repository's root package plus the proxy extra:
+
+```bash
+python -m pip install -e /path/to/warden
+python -m pip install -e '/path/to/warden/sdk/python[proxy]'
+warden-guard proxy --upstream http://127.0.0.1:9000 --listen 127.0.0.1 --port 8787
+```
+
+Passing `--warden-url` explicitly selects a hosted scanner with `fail_open=False`.
+The free hosted route remains rate-limited and truncates long payloads, so that mode
+is not an enforcement-grade substitute for the default local scanner.
+
 ## Decorator
 
 ```python

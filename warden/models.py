@@ -216,3 +216,14 @@ class HealthResponse(BaseModel):
     version: str
     corpus_size: int
     analyzers: list[str]
+
+
+class ReadinessCheck(BaseModel):
+    status: Literal["ready", "disabled", "not_ready"]
+    detail: str
+
+
+class ReadinessResponse(BaseModel):
+    status: Literal["ready", "not_ready"]
+    version: str
+    checks: dict[str, ReadinessCheck]

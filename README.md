@@ -223,6 +223,7 @@ an availability claim.
 | `GET`  | `/verify`                                     | Browser APA attestation verifier                                |
 | `GET`  | `/spec/APA-SPEC.md`                           | Byte-identical public APA specification                         |
 | `GET`  | `/health`                                     | Version, corpus size, and analyzer list                         |
+| `GET`  | `/health/ready`                               | Local scanner and paid-route configuration readiness            |
 | `POST` | `/api/demo/scan`                              | Free, rate-limited, fast-only payload scan                      |
 | `POST` | `/api/demo/theater`                           | Verdict-gated, no-side-effect demo ASP with delivery receipt    |
 | `POST` | `/scan`                                       | Production x402 payload scan                                    |
@@ -271,6 +272,9 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
 - The TypeScript SDK has no local engine; its default free hosted path is best-effort because
   `failOpen: true` converts transport failures into `ALLOW` telemetry.
 - Trust Layer web routes are source-ready but require explicit deployment approval before they are live.
+- The 99.5% application-readiness objective is not a contractual SLA or an achieved uptime claim. The
+  committed monitor state is `not_running`; a complete independently scheduled 30-day window is required
+  before the status surface reports measured availability, and payment-facilitator uptime is out of scope.
 - Issuer-key rotation is source-ready but operator-managed: preserve each retired public key with its exact
   last `verified_at` cutoff in `WARDEN_ISSUER_HISTORY`. The one-hour lifetime bounds but does not eliminate
   retired-key backdating during the post-cutoff grace. No live rotation is claimed in this repository state.

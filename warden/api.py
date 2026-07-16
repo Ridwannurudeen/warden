@@ -35,6 +35,8 @@ from warden.models import (
     GauntletResponse,
     GauntletStats,
     HealthResponse,
+    ReadinessCheck,
+    ReadinessResponse,
     ScanRequest,
     ScanResponse,
 )
@@ -743,6 +745,69 @@ async def health() -> HealthResponse:
         version=__version__,
         corpus_size=_corpus_size(),
         analyzers=[analyzer.name for analyzer in engine.registry.get_all()],
+    )
+
+
+@app.get("/health/ready", response_model=ReadinessResponse)
+async def readiness(response: Response) -> ReadinessResponse:
+    analyzers = [analyzer.name for analyzer in engine.registry.get_all()]
+    scanner_ready = _corpus_size() > 0 and bool(analyzers)
+    checks = {
+        "deterministic_scanner": ReadinessCheck(
+            status="ready" if scanner_ready else "not_ready",
+            detail=(
+                "Corpus and deterministic analyzers are loaded."
+                if scanner_ready
+                else "Corpus or deterministic analyzers are unavailable."
+            ),
+        )
+    }
+
+    paid_names = (
+        "OKX_API_KEY",
+        "OKX_SECRET_KEY",
+        "OKX_PASSPHRASE",
+        "PAY_TO_ADDRESS",
+        "WARDEN_BADGE_SECRET",
+    )
+    paid_values = [bool(os.getenv(name, "").strip()) for name in paid_names]
+    paywall_required = os.getenv("WARDEN_REQUIRE_PAYWALL", "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if all(paid_values):
+        checks["paid_routes"] = ReadinessCheck(
+            status="ready",
+            detail="Paid-route configuration is complete; facilitator reachability is not probed here.",
+        )
+    elif paywall_required or any(paid_values):
+        checks["paid_routes"] = ReadinessCheck(
+            status="not_ready",
+            detail="Required paid-route configuration is incomplete.",
+        )
+    else:
+        checks["paid_routes"] = ReadinessCheck(
+            status="disabled",
+            detail="Paid routes are not configured in this process.",
+        )
+
+    checks["semantic_model"] = ReadinessCheck(
+        status="ready" if engine.semantic_enabled else "disabled",
+        detail=(
+            "The guarded paid semantic model is configured."
+            if engine.semantic_enabled
+            else "The optional paid semantic model is disabled."
+        ),
+    )
+    ready = all(check.status != "not_ready" for check in checks.values())
+    if not ready:
+        response.status_code = 503
+    return ReadinessResponse(
+        status="ready" if ready else "not_ready",
+        version=__version__,
+        checks=checks,
     )
 
 

@@ -171,6 +171,45 @@
         </p>
       </section>
 
+      <section aria-labelledby="service-objective-title">
+        <div class="section-heading">
+          <p class="eyebrow">Service objective · not a contractual SLA</p>
+          <h2 id="service-objective-title">
+            99.5% application-readiness objective
+          </h2>
+          <p class="section-copy">
+            The proposed measurement is a successful
+            <code>GET /health/ready</code> every five minutes over a complete
+            rolling 30-day window. Until that full scheduled window is recorded,
+            availability remains “Not measured” and no achieved uptime is claimed.
+          </p>
+        </div>
+        <div class="data-grid" aria-label="Readiness measurement evidence">
+          <div>
+            <span>Monitor state</span
+            ><strong data-monitor-state>Loading</strong>
+          </div>
+          <div>
+            <span>Evidence window</span
+            ><strong class="num" data-monitor-window>Loading</strong>
+          </div>
+          <div>
+            <span>Measured availability</span
+            ><strong class="num" data-monitor-availability>Loading</strong>
+          </div>
+          <div>
+            <span>Latest readiness probe</span
+            ><strong class="num" data-monitor-latest>Loading</strong>
+          </div>
+        </div>
+        <aside class="callout">
+          This objective covers Warden application readiness only and is not a
+          contractual SLA. Third-party payment-facilitator availability is outside this measurement
+          and must be monitored separately before paid-route
+          availability can be claimed.
+        </aside>
+      </section>
+
       <section aria-labelledby="sources-title">
         <div class="section-heading">
           <p class="eyebrow">Source ledger</p>

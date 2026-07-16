@@ -14,9 +14,11 @@ import time
 import urllib.request
 from urllib.parse import urlsplit
 
+from warden_guard.aio import AsyncWardenClient
 from warden_guard.apa import validate_attestation, validate_protection_proof
 from warden_guard.keys import key_path, load_or_create_key, public_key_str
 from warden_guard.proof import WELL_KNOWN_PATH
+from warden_guard.proxy import WardenReverseProxy
 
 
 def verify_endpoint(url: str) -> tuple[bool, str]:
@@ -86,7 +88,37 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("keygen", help="generate (or show) the local guard keypair")
 
+    proxy = sub.add_parser("proxy", help="run a fail-closed guarded reverse proxy")
+    proxy.add_argument("--upstream", required=True, help="HTTP(S) origin to protect")
+    proxy.add_argument(
+        "--warden-url",
+        help="explicit hosted scanner origin; omit for enforcement-grade local scanning",
+    )
+    proxy.add_argument("--listen", default="127.0.0.1", help="listen address")
+    proxy.add_argument("--port", type=int, default=8787, help="listen port")
+    proxy.add_argument("--max-body-bytes", type=int, default=1_000_000)
+
     args = parser.parse_args(argv)
+
+    if args.command == "proxy":
+        if not 1 <= args.port <= 65_535:
+            parser.error("proxy port must be between 1 and 65535")
+        try:
+            import uvicorn
+        except ImportError:
+            parser.error("proxy command requires the 'proxy' package extra")
+        client = AsyncWardenClient(
+            base_url=args.warden_url or "https://warden.gudman.xyz",
+            local=args.warden_url is None,
+            fail_open=False,
+        )
+        proxy_app = WardenReverseProxy(
+            args.upstream,
+            client=client,
+            max_body_bytes=args.max_body_bytes,
+        )
+        uvicorn.run(proxy_app, host=args.listen, port=args.port)
+        return 0
 
     if args.command == "keygen":
         existed = key_path().exists()
