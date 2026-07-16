@@ -20,7 +20,7 @@ def client():
 @pytest.mark.parametrize(
     ("path", "marker"),
     [
-        ("/", "The first agent-security service that issues cryptographic,"),
+        ("/", "The first agent-security service where you can cryptographically"),
         ("/theater", "Watch Warden neutralize three live attacks."),
         ("/showcase", "One poisoned instruction. One stopped action."),
         ("/agents", "agents indexed"),

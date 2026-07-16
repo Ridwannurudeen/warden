@@ -116,27 +116,29 @@
           <div class="home-hero-copy">
             <p class="eyebrow">Verifiable trust · provable safety</p>
             <h1>
-              The first agent-security service that issues cryptographic,
-              independently-verifiable attestations of what it blocked — trust
-              you can check, not trust you're told.
+              The first agent-security service where you can cryptographically
+              verify what it blocked — a verdict you can check, not one you're
+              told to trust.
             </h1>
             <p class="hero-text">
-              Put Warden between external agent output and a consequential
-              action. It explains the risk, withholds the unsafe action or
-              returns a safely transformed payload, and leaves evidence anyone
-              can verify.
+              Warden is a payload firewall between external agent output and a
+              consequential action. Prompt injection, drain swaps, tool
+              hijacks, and secret exfiltration are caught and explained —
+              ALLOW, SANITIZE, or BLOCK in under a second, with the unsafe
+              action withheld or a safely transformed payload returned, and
+              signed evidence anyone can verify.
             </p>
             <div class="hero-actions">
-              <a class="button primary button--hero" href="/hire"
-                >Use Warden now</a
+              <a class="button primary button--hero" href="/playground"
+                >Run a live scan</a
+              ><a class="button secondary" href="#verify"
+                >Verify a real attestation</a
               ><a
-                class="button secondary"
+                class="text-link action-link"
                 href="https://www.okx.ai/"
                 rel="noreferrer"
                 target="_blank"
                 >Use Warden on OKX</a
-              ><a class="text-link action-link" href="#incident-console"
-                >See the live boundary</a
               >
             </div>
             <p class="marketplace-direction">
@@ -192,6 +194,38 @@
               <strong data-proof-field="latency-method">Loading method</strong>
             </p>
           </aside>
+        </section>
+
+        <section
+          class="stat-band"
+          data-eval-stats
+          aria-label="Measured Warden performance"
+        >
+          <div class="stat-band__item">
+            <strong class="num" data-eval-stat="recall">—</strong>
+            <span>held-out attack recall</span>
+            <small>warden-held-out benchmark</small>
+          </div>
+          <div class="stat-band__item">
+            <strong class="num" data-eval-stat="fp-rate">—</strong>
+            <span>false positives on benign cases</span>
+            <small data-eval-stat="benign-cases">held-out benign set</small>
+          </div>
+          <div class="stat-band__item">
+            <strong class="num" data-proof-field="latency">—</strong>
+            <span>verdict p50</span>
+            <small data-proof-field="latency-sample">measured sample</small>
+          </div>
+          <div class="stat-band__item">
+            <strong class="num">&lt;1s</strong>
+            <span>sub-second enforcement</span>
+            <small>before the action executes</small>
+          </div>
+          <div class="stat-band__item">
+            <strong class="num stat-band__word">Signed</strong>
+            <span>&amp; independently verifiable</span>
+            <small>Ed25519 attestations, open verifier</small>
+          </div>
         </section>
 
         <section
@@ -295,7 +329,64 @@
           </p>
         </section>
 
+        <section class="capability-section" aria-labelledby="capability-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">One boundary, four guarantees</p>
+              <h2 id="capability-title">Scan. Attest. Verify. Audit.</h2>
+            </div>
+            <p class="section-copy">
+              Every dangerous payload follows the same pipeline: caught before
+              the action, recorded with a signature, checkable by anyone,
+              measurable on demand.
+            </p>
+          </div>
+          <div class="capability-grid">
+            <article class="capability-card">
+              <span class="capability-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6z"/><path d="M9.5 12l1.8 1.8L15 10"/></svg>
+              </span>
+              <h3>Scan</h3>
+              <p>
+                Gate one untrusted payload before a payment, tool call, link,
+                or secret-handling action — ALLOW, SANITIZE, or BLOCK.
+              </p>
+            </article>
+            <article class="capability-card">
+              <span class="capability-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10a1 1 0 0 1 1 1v16l-3-2-3 2-3-2-3 2V4a1 1 0 0 1 1-1z"/><path d="M9 8h6M9 12h4"/></svg>
+              </span>
+              <h3>Attest</h3>
+              <p>
+                Every non-ALLOW verdict is issued as an Ed25519-signed
+                attestation and appended to a hash-chained transparency log.
+              </p>
+            </article>
+            <article class="capability-card">
+              <span class="capability-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/><path d="M8.5 11l1.7 1.7L13.5 9.4"/></svg>
+              </span>
+              <h3>Verify</h3>
+              <p>
+                Anyone re-checks the signature and chain in the browser with
+                WebCrypto — no server, no account, no trust in Warden required.
+              </p>
+            </article>
+            <article class="capability-card">
+              <span class="capability-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16v-5M12 16V8M16 16v-3"/></svg>
+              </span>
+              <h3>Audit</h3>
+              <p>
+                Run the fixed attack battery against an endpoint you are
+                authorized to test and receive a graded, signed record.
+              </p>
+            </article>
+          </div>
+        </section>
+
         <section
+          id="verify"
           class="offline-proof"
           data-home-proof
           aria-labelledby="offline-proof-title"
@@ -359,6 +450,58 @@
           <p class="boundary-note">
             The bundled attestation can remain cryptographically valid while
             its freshness is archival. The proof reports both facts separately.
+          </p>
+        </section>
+
+        <section class="compare-section" aria-labelledby="compare-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">How Warden is different</p>
+              <h2 id="compare-title">
+                Most services ask for trust. Warden hands you the proof.
+              </h2>
+            </div>
+            <p class="section-copy">
+              A fair comparison against the typical AI-security service model —
+              judged only on properties you can check on this site.
+            </p>
+          </div>
+          <div class="compare-table" role="table" aria-label="Warden versus typical AI security services">
+            <div class="compare-row compare-row--head" role="row">
+              <span role="columnheader">Property</span>
+              <span role="columnheader">Warden</span>
+              <span role="columnheader">Typical AI security service</span>
+            </div>
+            <div class="compare-row" role="row">
+              <span role="cell">Verdict you can cryptographically verify</span>
+              <span role="cell" class="compare-yes"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg><em>Ed25519-signed, checkable offline</em></span>
+              <span role="cell" class="compare-no"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg><em>Dashboard claim you must trust</em></span>
+            </div>
+            <div class="compare-row" role="row">
+              <span role="cell">Public hash-chained transparency log</span>
+              <span role="cell" class="compare-yes"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg><em>Open entries, signed checkpoints</em></span>
+              <span role="cell" class="compare-no"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg><em>Private internal logs</em></span>
+            </div>
+            <div class="compare-row" role="row">
+              <span role="cell">Agent-native pay-per-call (x402)</span>
+              <span role="cell" class="compare-yes"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg><em>One metered call, no contract</em></span>
+              <span role="cell" class="compare-no"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg><em>Sales cycle and seat licenses</em></span>
+            </div>
+            <div class="compare-row" role="row">
+              <span role="cell">Published held-out evaluation, misses included</span>
+              <span role="cell" class="compare-yes"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg><em>Dated numbers, hash-fingerprinted</em></span>
+              <span role="cell" class="compare-no"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg><em>Marketing accuracy claims</em></span>
+            </div>
+            <div class="compare-row" role="row">
+              <span role="cell">Enforcement before the action executes</span>
+              <span role="cell" class="compare-yes"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg><em>Pre-action boundary, caller keeps authority</em></span>
+              <span role="cell" class="compare-no"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg><em>Post-hoc detection and alerts</em></span>
+            </div>
+          </div>
+          <p class="boundary-note">
+            "Typical" describes the common trust-the-vendor service model, not
+            any specific company. Where a vendor publishes verifiable evidence,
+            this comparison does not apply to them.
           </p>
         </section>
 
@@ -431,8 +574,14 @@
             </p>
             <div class="integration-pills" aria-label="Integration surfaces">
               <span>OnchainOS task</span><span>Raw x402</span><span>Python</span
-              ><span>TypeScript</span><span>MCP</span>
+              ><span>TypeScript</span><span>LangChain</span
+              ><span>LlamaIndex</span><span>MCP</span>
             </div>
+            <p class="integration-note">
+              Reference SDKs ship inside this repository — Python and
+              TypeScript clients plus LangChain and LlamaIndex guards. The
+              same-named package on PyPI is unrelated; install from source.
+            </p>
             <a class="button secondary" href="/integrate"
               >Open integration contracts</a
             >
@@ -560,6 +709,33 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
           </figure>
         </section>
 
+        <section class="proof-band" aria-label="Independent credibility signals">
+          <a class="proof-band__item" href="https://www.okx.ai/" rel="noreferrer" target="_blank">
+            <span>OKX marketplace</span>
+            <strong
+              >Agent <span data-proof-field="agent-id">—</span> ·
+              <span data-proof-field="sold">—</span> sold ·
+              <span data-proof-field="rating">—</span></strong
+            >
+            <small data-proof-field="verified-at">Loading verification date</small>
+          </a>
+          <a class="proof-band__item" href="/status">
+            <span>Measured &amp; published</span>
+            <strong>Held-out evaluation, misses left visible</strong>
+            <small>Dated numbers with a result fingerprint</small>
+          </a>
+          <a class="proof-band__item" href="/apa/log">
+            <span>Open transparency log</span>
+            <strong>Hash-chained entries, signed checkpoints</strong>
+            <small>Inspect the chain yourself</small>
+          </a>
+          <a class="proof-band__item" href="/integrate">
+            <span>Agent-native payments</span>
+            <strong>Built on OKX Agent Payments Protocol</strong>
+            <small>x402 pay-per-call, reviewable checkout</small>
+          </a>
+        </section>
+
         <section class="final-cta">
           <p class="eyebrow">Trust that survives inspection</p>
           <h2>Gate the action, keep the proof.</h2>
@@ -579,17 +755,28 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
     </main>
 
     <footer class="site-footer page-shell">
-      <div>
+      <div class="site-footer__brand">
         <strong>Warden</strong
         ><span>The immune system of the agent economy.</span
         ><span>Independent service listed on OKX.AI.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
-        ><a href="/showcase">Showcase</a><a href="/docs">Docs</a
-        ><a href="/badges">Evidence</a><a href="/status">Status</a
-        ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
-        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Product</span>
+          <a href="/playground">Run a scan</a><a href="/theater">Attack Theater</a
+          ><a href="/showcase">Showcase</a><a href="/hire">Use Warden</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Evidence</span>
+          <a href="/badges">Audit badges</a><a href="/apa/log">Transparency log</a
+          ><a href="/verify">Verify an APA</a><a href="/status">Status</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Company</span>
+          <a href="/docs">Docs</a><a href="/privacy">Privacy</a
+          ><a href="/terms">Terms</a
+          ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        </div>
       </nav>
     </footer>
     <script src="/app.js" defer></script>

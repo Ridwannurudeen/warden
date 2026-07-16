@@ -639,7 +639,7 @@ def test_home_playground_badges_integrations_and_status_are_real_surfaces():
     integrate = (SITE / "integrate.html").read_text(encoding="utf-8")
     status = (SITE / "status.html").read_text(encoding="utf-8")
 
-    assert "The first agent-security service that issues cryptographic" in home
+    assert "The first agent-security service where you can cryptographically" in home
     assert "data-product-proof" in home
     assert "data-incident-console" in home
     assert "data-home-proof" in home
@@ -667,9 +667,7 @@ def test_home_playground_badges_integrations_and_status_are_real_surfaces():
 
 def test_status_and_marketplace_metadata_are_dated_and_honest():
     status = json.loads((SITE / "data" / "site-status.json").read_text(encoding="utf-8"))
-    product_proof = json.loads(
-        (SITE / "data" / "product-proof.json").read_text(encoding="utf-8")
-    )
+    product_proof = json.loads((SITE / "data" / "product-proof.json").read_text(encoding="utf-8"))
     marketplace = json.loads(
         (SITE / "data" / "marketplace-summary.json").read_text(encoding="utf-8")
     )

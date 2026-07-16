@@ -195,9 +195,7 @@
     );
     if (
       typeof benchmark.measuredAt !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(
-        benchmark.measuredAt,
-      ) ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(benchmark.measuredAt) ||
       !Number.isFinite(Date.parse(benchmark.measuredAt)) ||
       !benchmark.measuredAt.startsWith(value.verifiedAt) ||
       typeof benchmark.method !== "string" ||
@@ -605,6 +603,55 @@
       });
   }
 
+  const evalStats = document.querySelector("[data-eval-stats]");
+  if (evalStats) {
+    root
+      .fetch("/data/evaluation.json", {
+        headers: { accept: "application/json" },
+        cache: "no-store",
+      })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((source) => {
+        const current = source && source.current;
+        if (
+          !current ||
+          typeof current.attack_recall_percent !== "number" ||
+          typeof current.false_positive_rate_percent !== "number" ||
+          typeof current.benign_cases !== "number" ||
+          typeof current.attack_cases !== "number"
+        ) {
+          throw new Error("Malformed evaluation snapshot");
+        }
+        const fields = {
+          recall: `${current.attack_recall_percent}%`,
+          "fp-rate": `${current.false_positive_rate_percent}%`,
+          "benign-cases": `${current.benign_cases.toLocaleString()} held-out benign cases`,
+        };
+        for (const [field, text] of Object.entries(fields)) {
+          for (const element of evalStats.querySelectorAll(
+            `[data-eval-stat="${field}"]`,
+          )) {
+            element.textContent = text;
+          }
+        }
+        evalStats.dataset.state = "ready";
+      })
+      .catch(() => {
+        evalStats.dataset.state = "unavailable";
+        for (const element of evalStats.querySelectorAll("[data-eval-stat]")) {
+          element.textContent =
+            element.dataset.evalStat === "benign-cases"
+              ? "Evaluation snapshot unavailable"
+              : "—";
+        }
+      });
+  }
+
   function bindHomeProof() {
     const proofRoot = document.querySelector("[data-home-proof]");
     if (!proofRoot || proofRoot.dataset.bound === "true") {
@@ -618,9 +665,7 @@
     const attestationId = proofRoot.querySelector(
       "[data-home-proof-attestation-id]",
     );
-    const chainHead = proofRoot.querySelector(
-      "[data-home-proof-chain-head]",
-    );
+    const chainHead = proofRoot.querySelector("[data-home-proof-chain-head]");
     const tamperIndex = proofRoot.querySelector(
       "[data-home-proof-tamper-index]",
     );
@@ -648,7 +693,8 @@
       runButton.disabled = true;
       proofRoot.dataset.state = "running";
       proofRoot.setAttribute("aria-busy", "true");
-      status.textContent = "Running the bundled proof entirely in this browser.";
+      status.textContent =
+        "Running the bundled proof entirely in this browser.";
       try {
         const proofApi = root.WardenHomeProof;
         if (
@@ -664,11 +710,10 @@
         renderCheck(chain, presentation.honestChain);
         renderCheck(tamper, presentation.tamperedChain);
         status.textContent = presentation.summary;
-        proofRoot.dataset.state = presentation.passed
-          ? "verified"
-          : "rejected";
+        proofRoot.dataset.state = presentation.passed ? "verified" : "rejected";
         if (attestationId) {
-          attestationId.textContent = result.material.attestation.attestation_id;
+          attestationId.textContent =
+            result.material.attestation.attestation_id;
         }
         if (chainHead) {
           chainHead.textContent = result.honestChain.headHash;
@@ -687,7 +732,9 @@
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bindHomeProof, { once: true });
+    document.addEventListener("DOMContentLoaded", bindHomeProof, {
+      once: true,
+    });
   } else {
     bindHomeProof();
   }

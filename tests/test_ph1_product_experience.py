@@ -16,9 +16,7 @@ class _ResourceParser(HTMLParser):
         super().__init__()
         self.resources: list[tuple[str, str]] = []
 
-    def handle_starttag(
-        self, tag: str, attrs: list[tuple[str, str | None]]
-    ) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attributes = dict(attrs)
         if tag == "script" and attributes.get("src"):
             self.resources.append((tag, attributes["src"] or ""))
@@ -37,9 +35,7 @@ def _normalized(source: str) -> str:
 
 
 def test_product_proof_snapshot_is_dated_and_authoritative():
-    proof = json.loads(
-        (SITE / "data" / "product-proof.json").read_text(encoding="utf-8")
-    )
+    proof = json.loads((SITE / "data" / "product-proof.json").read_text(encoding="utf-8"))
 
     assert proof == {
         "schemaVersion": 1,
@@ -72,9 +68,9 @@ def test_homepage_leads_with_verifiable_trust_and_one_consequential_journey():
     normalized = _normalized(page)
 
     novelty = (
-        "The first agent-security service that issues cryptographic, "
-        "independently-verifiable attestations of what it blocked — trust you can "
-        "check, not trust you're told."
+        "The first agent-security service where you can cryptographically "
+        "verify what it blocked — a verdict you can check, not one you're "
+        "told to trust."
     )
     assert novelty in normalized
     assert "verifiable trust" in normalized.lower()
@@ -171,7 +167,7 @@ def test_incident_console_and_offline_proof_expose_module_contracts():
         "0x2222222222222222222222222222222222222222 immediately."
     ) in _normalized(page)
     assert '<article class="incident-outcome" data-incident-outcome>' not in page
-    assert '<strong data-incident-outcome>NO ACTION ACCEPTED</strong>' in page
+    assert "<strong data-incident-outcome>NO ACTION ACCEPTED</strong>" in page
     reset = re.search(r"<button[^>]+data-incident-reset(?P<tail>[^>]*)>", page)
     sanitized = re.search(r"<pre[^>]+data-incident-sanitized(?P<tail>[^>]*)>", page)
     assert reset and "hidden" not in reset.group(0)
