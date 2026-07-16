@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+from contextlib import contextmanager
 from datetime import datetime, timezone
+from collections.abc import Iterator
 from pathlib import Path
 from threading import Lock
 from uuid import uuid4
@@ -25,6 +28,34 @@ _CLAIM_ID_RE = re.compile(r"[0-9a-f]{64}")
 
 def _timestamp() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+@contextmanager
+def _exclusive_store_lock() -> Iterator[None]:
+    _STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = _STORE_PATH.with_name(f".{_STORE_PATH.name}.lock")
+    with _LOCK, lock_path.open("a+b") as handle:
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b"\0")
+            handle.flush()
+        handle.seek(0)
+        if os.name == "nt":
+            import msvcrt
+
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            handle.seek(0)
+            if os.name == "nt":
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _read_records_locked() -> list[dict[str, object]]:
@@ -96,8 +127,7 @@ def record_attempt(
         "threat_classes": response.threat_classes,
     }
 
-    _STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with _LOCK:
+    with _exclusive_store_lock():
         records = _read_records_locked()
         if response.verdict == "ALLOW":
             existing = next(
@@ -143,7 +173,7 @@ def record_attempt(
 
 
 def get_stats(corpus_size: int) -> dict[str, int]:
-    with _LOCK:
+    with _exclusive_store_lock():
         records = _read_records_locked()
     return {
         "attempts": len(records),
@@ -171,7 +201,7 @@ def confirm_bypass(
     if parsed_at.tzinfo != timezone.utc or parsed_at.microsecond or not confirmed_at.endswith("Z"):
         raise ValueError("confirmed_at must be an exact UTC timestamp")
 
-    with _LOCK:
+    with _exclusive_store_lock():
         records = _read_records_locked()
         claim = next(
             (
