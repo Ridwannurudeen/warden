@@ -34,11 +34,13 @@ EXFIL_INSTRUCTION_RES = [
     # including underscored/prefixed forms like OKX_API_KEY. Kept off wallet/context
     # to avoid false positives on benign "provide the wallet balance" phrasing.
     re.compile(
-        r"(?i)\b(?:send|paste|share|upload|post|leak|output|return|reveal|give|provide"
-        r"|print|dump|echo|disclose|expose|show|reply\s+with|respond\s+with)\s+"
+        r"(?i)\b(?:send|paste|share|upload|post|leak|ship|smuggle|forward|output|return"
+        r"|reveal|give|provide|print|dump|echo|disclose|expose|show|reply\s+with"
+        r"|respond\s+with)\s+"
         r"(?:me\s+|us\s+)?(?:your|the|all|any)?\s*"
         r"(?:credentials?|mnemonic|seed\s*phrase|system\s*prompt|"
-        r"(?:[a-z0-9]+[_-])?(?:api|secret|access|private|signing|auth)[_ -]?keys?)\b"
+        r"(?:[a-z0-9]+[_-])?(?:api(?:[_ -]?secret)?|secret|access|private|signing|auth)"
+        r"[_ -]?keys?)\b"
     ),
 ]
 
