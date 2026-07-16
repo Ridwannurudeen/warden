@@ -21,6 +21,103 @@ units, or ports are touched. Do not run `systemctl restart nginx` — reload onl
 
 ---
 
+## Mandatory flat app-upgrade gate — signed log checkpoint and hardened unit
+
+The numbered Trust Layer steps below remain nginx-only. When an approved deploy also replaces the flat
+application at `/opt/warden`, this gate is mandatory before the new code starts. The app service is the flat
+layout's transparency-log writer; any installed reprobe timer/service is stopped as well. A failed migration or
+unit validation leaves the app stopped. Do not bypass that fail-closed state.
+
+Before replacing any Python source or virtual-environment files, quiesce writers and take a cold database
+backup:
+
+```bash
+set -euo pipefail
+systemctl stop warden.service
+for unit in warden-apa-reprobe.timer warden-apa-reprobe.service; do
+  if systemctl cat "$unit" >/dev/null 2>&1; then systemctl stop "$unit"; fi
+done
+! systemctl is-active --quiet warden.service
+! systemctl is-active --quiet warden-apa-reprobe.service
+test -f /opt/warden/data/protection.db
+test ! -L /opt/warden/data/protection.db
+backup="/root/warden-protection.pre-checkpoint-$(date -u +%Y%m%dT%H%M%SZ).db"
+test ! -e "$backup"
+cp -a -- /opt/warden/data/protection.db "$backup"
+test -f "$backup"
+```
+
+Keep those units stopped while the reviewed app artifact and its dependencies are installed at the existing
+flat paths. Source and virtual-environment files remain root-owned and read-only to the runtime user; only the
+four explicit runtime directories are writable. Then run the guarded migration with the application
+environment loaded as `warden`:
+
+```bash
+set -euo pipefail
+! systemctl is-active --quiet warden.service
+chown root:root /opt/warden/pyproject.toml
+chown -R root:root /opt/warden/warden /opt/warden/scripts /opt/warden/site /opt/warden/deploy /opt/warden/.venv
+chmod 0644 /opt/warden/pyproject.toml
+chmod -R u=rwX,go=rX /opt/warden/warden /opt/warden/scripts /opt/warden/site /opt/warden/deploy /opt/warden/.venv
+install -d -o warden -g warden -m 0750 /opt/warden/data /opt/warden/badges /opt/warden/gauntlet /opt/warden/logs
+
+runuser -u warden -- env -i HOME=/opt/warden PATH=/opt/warden/.venv/bin:/usr/local/bin:/usr/bin:/bin bash -s <<'WARDEN_MIGRATION'
+set -euo pipefail
+set -a
+. /opt/warden/.env
+set +a
+cd /opt/warden
+exec .venv/bin/python - <<'PY'
+import os
+import sqlite3
+
+from warden.protection_store import (
+    migrate_log_checkpoint,
+    read_log,
+    read_log_checkpoint,
+    verify_log_chain,
+)
+
+db_path = os.environ["WARDEN_PROTECTION_DB"]
+connection = sqlite3.connect(f"file:{db_path}?mode=rw", uri=True)
+try:
+    table_exists = connection.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'log_checkpoint'"
+    ).fetchone()
+    has_checkpoint = table_exists is not None and connection.execute(
+        "SELECT 1 FROM log_checkpoint WHERE singleton = 1"
+    ).fetchone() is not None
+finally:
+    connection.close()
+
+if has_checkpoint:
+    checkpoint = read_log_checkpoint()
+else:
+    checkpoint = migrate_log_checkpoint()
+
+entries = read_log()
+if not verify_log_chain(entries, checkpoint):
+    raise RuntimeError("transparency log does not match its signed checkpoint")
+PY
+WARDEN_MIGRATION
+
+install -m 0644 /opt/warden/deploy/warden.service /etc/systemd/system/warden.service
+systemctl daemon-reload
+systemd-analyze verify /etc/systemd/system/warden.service
+systemctl start warden.service
+curl -fsS http://127.0.0.1:8031/health >/dev/null
+if systemctl cat warden-apa-reprobe.timer >/dev/null 2>&1; then
+  systemctl start warden-apa-reprobe.timer
+fi
+```
+
+The guard calls `migrate_log_checkpoint()` only when the legacy database has no checkpoint row. That function
+validates the complete contiguous legacy chain before signing it and refuses to overwrite an existing
+checkpoint. On re-run, the existing signed checkpoint is verified against the full log instead, making the
+overall gate idempotent without weakening either failure mode.
+
+---
+
 ## Step 0 — Preflight (read-only gates; all must pass before touching anything)
 
 ```bash

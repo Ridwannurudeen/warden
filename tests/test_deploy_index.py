@@ -10,21 +10,22 @@ ROOT = Path(__file__).resolve().parents[1]
 SYSTEMD = ROOT / "deploy" / "systemd"
 
 
-def test_app_service_runs_atomic_release_with_only_persistent_state_writable():
+def test_app_service_matches_flat_production_with_only_persistent_state_writable():
     service = (ROOT / "deploy" / "warden.service").read_text(encoding="utf-8")
 
     for contract in (
-        "WorkingDirectory=/opt/warden/current",
+        "WorkingDirectory=/opt/warden",
         "Environment=PYTHONDONTWRITEBYTECODE=1",
         "EnvironmentFile=/opt/warden/.env",
-        "ExecStart=/opt/warden/current/.venv/bin/uvicorn",
-        "ReadWritePaths=/opt/warden/badges /opt/warden/gauntlet /opt/warden/data",
+        "ExecStart=/opt/warden/.venv/bin/uvicorn",
+        "ReadWritePaths=/opt/warden/data /opt/warden/badges "
+        "/opt/warden/gauntlet /opt/warden/logs",
     ):
         assert contract in service
-    assert "WorkingDirectory=/opt/warden\n" not in service
-    assert "ExecStart=/opt/warden/.venv/" not in service
+    assert "/opt/warden/current" not in service
     assert [line for line in service.splitlines() if line.startswith("ReadWritePaths=")] == [
-        "ReadWritePaths=/opt/warden/badges /opt/warden/gauntlet /opt/warden/data"
+        "ReadWritePaths=/opt/warden/data /opt/warden/badges "
+        "/opt/warden/gauntlet /opt/warden/logs"
     ]
 
 

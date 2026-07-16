@@ -241,6 +241,15 @@ test -x /usr/bin/flock
 runuser -u warden-fetch -- env -i HOME=/var/lib/warden-fetch PATH="$app/.venv/bin:/usr/local/bin:/usr/bin:/bin" bash -c 'set -euo pipefail; command -v onchainos; onchainos --version'
 runuser -u warden-fetch -- env -i HOME=/var/lib/warden-fetch PATH="$app/.venv/bin:/usr/local/bin:/usr/bin:/bin" onchainos agent search --query a --page 1 --page-size 1 >/dev/null
 
+render_app_service() {
+  source_service="$1"
+  target_service="$2"
+  app_root="$3"
+  sed -e "s#^WorkingDirectory=/opt/warden\$#WorkingDirectory=$app_root#" \
+      -e "s#^ExecStart=/opt/warden/.venv/#ExecStart=$app_root/.venv/#" \
+      "$source_service" >"$target_service"
+}
+
 candidate_service="$candidate_unit_dir/warden-candidate.service"
 candidate_index_fetch_service="$candidate_unit_dir/warden-index-fetch-candidate.service"
 candidate_index_service="$candidate_unit_dir/warden-index-candidate.service"
@@ -259,7 +268,8 @@ test ! -e "$candidate_reprobe_service"
 test ! -L "$candidate_reprobe_service"
 test ! -e "$candidate_reprobe_timer"
 test ! -L "$candidate_reprobe_timer"
-sed -e "s#/opt/warden/current#$app#g" -e "s#--port 8031#--port $candidate_port#" "$app/deploy/warden.service" >"$candidate_service"
+render_app_service "$app/deploy/warden.service" "$candidate_service" "$app"
+sed -i -e "s#--port 8031#--port $candidate_port#" "$candidate_service"
 sed -e "s#/opt/warden/current#$app#g" "$app/deploy/systemd/warden-index-fetch.service" >"$candidate_index_fetch_service"
 sed -e "s#/opt/warden/current#$app#g" -e "s#--index-root /opt/warden-index#--index-root $index_candidate#" -e 's#warden-index-fetch.service#warden-index-fetch-candidate.service#g' "$app/deploy/systemd/warden-index.service" >"$candidate_index_service"
 sed -e 's#Unit=warden-index.service#Unit=warden-index-candidate.service#' "$app/deploy/systemd/warden-index.timer" >"$candidate_index_timer"
@@ -367,7 +377,9 @@ index_target="releases/$capture"
 
 install_release_configs() {
   source_app="$1"
-  install -m 0644 "$source_app/deploy/warden.service" /etc/systemd/system/warden.service || return
+  rendered_app_service="$config_backup/warden-active.service"
+  render_app_service "$source_app/deploy/warden.service" "$rendered_app_service" /opt/warden/current || return
+  install -m 0644 "$rendered_app_service" /etc/systemd/system/warden.service || return
   install -m 0644 "$source_app/deploy/systemd/warden-index-fetch.service" /etc/systemd/system/warden-index-fetch.service || return
   install -m 0644 "$source_app/deploy/systemd/warden-index.service" /etc/systemd/system/warden-index.service || return
   install -m 0644 "$source_app/deploy/systemd/warden-index.timer" /etc/systemd/system/warden-index.timer || return
