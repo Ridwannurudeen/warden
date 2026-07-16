@@ -261,22 +261,21 @@ async def _fetch_proof(endpoint: str) -> tuple[str, dict[str, object]]:
     redirects are not followed; the response is size-capped.
     """
     try:
-        connect_url, host_header, parsed = await validate_public_http_url(endpoint)
-    except PublicUrlUnavailable as exc:
-        raise ProtectionProbeUnavailable(str(exc)) from exc
-    except ValueError as exc:
-        raise ProtectionProofInvalid(str(exc)) from exc
-    origin_parts = httpx.URL(connect_url)
-    proof_url = str(origin_parts.copy_with(path=PROOF_PATH, query=None))
-    endpoint_host = _canonical_endpoint_host(
-        host_header,
-        scheme=parsed.scheme,
-        port=parsed.port,
-    )
-
-    try:
-        async with _PROBE_SEMAPHORE:
-            async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
+        async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
+            async with _PROBE_SEMAPHORE:
+                try:
+                    connect_url, host_header, parsed = await validate_public_http_url(endpoint)
+                except PublicUrlUnavailable as exc:
+                    raise ProtectionProbeUnavailable(str(exc)) from exc
+                except ValueError as exc:
+                    raise ProtectionProofInvalid(str(exc)) from exc
+                origin_parts = httpx.URL(connect_url)
+                proof_url = str(origin_parts.copy_with(path=PROOF_PATH, query=None))
+                endpoint_host = _canonical_endpoint_host(
+                    host_header,
+                    scheme=parsed.scheme,
+                    port=parsed.port,
+                )
                 async with httpx.AsyncClient(
                     timeout=PROBE_TIMEOUT_SECONDS, follow_redirects=False
                 ) as client:
