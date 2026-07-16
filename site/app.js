@@ -284,6 +284,37 @@
 
   const document = root.document;
   document.documentElement.classList.add("js-enabled");
+
+  const prefersReducedMotion =
+    root.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+  if (
+    !prefersReducedMotion &&
+    typeof root.IntersectionObserver === "function"
+  ) {
+    const main = document.querySelector("main");
+    const revealTargets = main
+      ? main.querySelectorAll(
+          ":scope > section, :scope > .page-shell > section",
+        )
+      : [];
+    if (revealTargets.length > 0) {
+      const revealObserver = new root.IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("reveal-in");
+              revealObserver.unobserve(entry.target);
+            }
+          }
+        },
+        { rootMargin: "0px 0px -8% 0px" },
+      );
+      for (const target of revealTargets) {
+        target.classList.add("reveal");
+        revealObserver.observe(target);
+      }
+    }
+  }
   const themeButtons = Array.from(
     document.querySelectorAll("[data-theme-toggle]"),
   );

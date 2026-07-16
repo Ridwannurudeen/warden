@@ -27,8 +27,9 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link rel="icon" href="/assets/warden-avatar.png" />
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/styles.css?v=2530c152" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -66,7 +67,6 @@
           <div class="nav-menu">
             <a href="/docs">Documentation</a>
             <a href="/integrate">Integrate</a>
-            <a href="/trust">Trust Layer</a>
             <a href="/status">API status</a>
           </div>
         </details>
@@ -75,9 +75,8 @@
           <div class="nav-menu">
             <a href="/verify">Verify APA</a>
             <a href="/apa/log">Transparency log</a>
+            <a href="/trust">Trust Layer</a>
             <a href="/badges">Audit badges</a>
-            <a href="/agents#methodology">Public-text methodology</a>
-            <a href="/gauntlet#policy">Adversarial challenge</a>
           </div>
         </details>
         <div class="nav-mobile-actions">
@@ -106,14 +105,39 @@
     </header>
 
     <main id="main" class="page-shell site-main">
-      <section class="page-hero page-hero--compact">
-        <p class="eyebrow">Free deterministic fast path</p>
-        <h1>See what happens before the agent acts.</h1>
-        <p class="hero-text">
-          Paste untrusted content, add the recipients your agent actually
-          expects, and run Warden's real deterministic fast path. The result
-          tells the integrating agent whether to continue, sanitize, or stop.
-        </p>
+      <section class="page-hero page-hero--compact page-hero--visual">
+        <div>
+          <p class="eyebrow">Free deterministic fast path</p>
+          <h1>See what happens before the agent acts.</h1>
+          <p class="hero-text">
+            Paste untrusted content, add the recipients your agent actually
+            expects, and run Warden's real deterministic fast path. The result
+            tells the integrating agent whether to continue, sanitize, or stop.
+          </p>
+        </div>
+        <aside class="hero-receipt hero-receipt--compact" aria-label="Example signed attestation receipt">
+          <div class="hero-receipt__head">
+            <span class="hero-receipt__kicker">Scan → attest → verify</span>
+            <span class="hero-receipt__badge">BLOCK</span>
+          </div>
+          <dl class="hero-receipt__rows">
+            <div>
+              <dt>Threat</dt>
+              <dd class="hero-receipt__threat">DRAIN_ADDRESS</dd>
+            </div>
+            <div>
+              <dt>Action</dt>
+              <dd>Withheld before execution</dd>
+            </div>
+          </dl>
+          <p class="hero-receipt__verified">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+            Verdict independently verifiable
+          </p>
+          <p class="hero-receipt__note">
+            Illustrative receipt — <a href="/verify">verify a real one</a>.
+          </p>
+        </aside>
       </section>
 
       <aside class="scan-boundary" aria-label="Free scan limits">
@@ -350,7 +374,7 @@
         ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
       </nav>
     </footer>
-    <script src="/app.js" defer></script>
+    <script src="/app.js?v=f8430ef2" defer></script>
     <script src="/scan-client.js" defer></script>
     <script src="/playground.js" defer></script>
   </body>

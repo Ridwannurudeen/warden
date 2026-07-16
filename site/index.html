@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Warden issues cryptographic, independently verifiable proof of the dangerous agent actions it blocks or safely transforms."
+      content="Warden is a verifiable-trust payload firewall for AI agents: dangerous actions are blocked or safely transformed with Ed25519-signed proof anyone can check."
     />
     <meta name="color-scheme" content="dark light" />
     <title>Warden — Verifiable trust for consequential agent actions</title>
@@ -23,15 +23,16 @@
     <meta property="og:url" content="https://warden.gudman.xyz/" />
     <meta
       property="og:image"
-      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+      content="https://warden.gudman.xyz/assets/og.png"
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:image"
-      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+      content="https://warden.gudman.xyz/assets/og.png"
     />
-    <link rel="icon" href="/assets/warden-avatar.png" />
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/styles.css?v=2530c152" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -67,8 +68,7 @@
         <details class="nav-group">
           <summary>Developers</summary>
           <div class="nav-menu">
-            <a href="/docs">Documentation</a><a href="/integrate">Integrate</a
-            ><a href="/trust">Trust Layer</a><a href="/status">API status</a>
+            <a href="/docs">Documentation</a><a href="/integrate">Integrate</a><a href="/status">API status</a>
           </div>
         </details>
         <details class="nav-group">
@@ -76,9 +76,8 @@
           <div class="nav-menu">
             <a href="/verify">Verify APA</a
             ><a href="/apa/log">Transparency log</a
-            ><a href="/badges">Audit badges</a
-            ><a href="/agents#methodology">Public-text methodology</a
-            ><a href="/gauntlet#policy">Adversarial challenge</a>
+            ><a href="/trust">Trust Layer</a
+            ><a href="/badges">Audit badges</a>
           </div>
         </details>
         <div class="nav-mobile-actions">
@@ -146,6 +145,35 @@
               <strong data-proof-field="okx-instruction">search by agent ID</strong>.
             </p>
           </div>
+
+          <aside class="hero-receipt" aria-label="Example signed attestation receipt">
+            <div class="hero-receipt__head">
+              <span class="hero-receipt__kicker">Signed attestation · APA</span>
+              <span class="hero-receipt__badge">BLOCK</span>
+            </div>
+            <dl class="hero-receipt__rows">
+              <div>
+                <dt>Threat</dt>
+                <dd class="hero-receipt__threat">DRAIN_ADDRESS</dd>
+              </div>
+              <div>
+                <dt>Action</dt>
+                <dd>Withheld before execution</dd>
+              </div>
+              <div>
+                <dt>Signature</dt>
+                <dd class="hero-receipt__sig">Ed25519 · checked with WebCrypto</dd>
+              </div>
+            </dl>
+            <p class="hero-receipt__verified">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+              Verdict independently verifiable
+            </p>
+            <p class="hero-receipt__note">
+              Illustrative receipt —
+              <a href="#verify">verify a real attestation below</a>.
+            </p>
+          </aside>
 
           <aside
             class="product-proof"
@@ -269,13 +297,15 @@
 
             <article class="incident-outcome">
               <p class="console-label">Action boundary</p>
-              <strong data-incident-outcome>NO ACTION ACCEPTED</strong>
+              <strong data-incident-outcome>DRAIN BLOCKED — NO ACTION ACCEPTED</strong>
               <p
                 class="incident-status"
                 data-incident-status
                 aria-live="polite"
               >
-                Ready. Run the live incident to request both real demo endpoints.
+                Warden's verdict for this payload: BLOCK. The drain instruction
+                was withheld before execution. Run the live incident to
+                reproduce it against the live APIs.
               </p>
               <div class="incident-controls">
                 <button
@@ -306,15 +336,20 @@
             <dl class="incident-readout">
               <div>
                 <dt>Verdict</dt>
-                <dd data-incident-verdict>Awaiting live scan</dd>
+                <dd data-incident-verdict>BLOCK</dd>
               </div>
               <div>
                 <dt>Threat explanation</dt>
-                <dd data-incident-threat>No threat class claimed before the API responds</dd>
+                <dd data-incident-threat>
+                  DRAIN_ADDRESS — 0x2222222222222222222222222222222222222222
+                  detected
+                </dd>
               </div>
               <div>
                 <dt>Action receipt</dt>
-                <dd data-incident-receipt>No handler receipt yet</dd>
+                <dd data-incident-receipt>
+                  Action withheld — invoked=false, nothing delivered
+                </dd>
               </div>
             </dl>
             <pre
@@ -779,7 +814,7 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
         </div>
       </nav>
     </footer>
-    <script src="/app.js" defer></script>
+    <script src="/app.js?v=f8430ef2" defer></script>
     <script src="/scan-client.js" defer></script>
     <script src="/verify.js" defer></script>
     <script src="/log.js" defer></script>

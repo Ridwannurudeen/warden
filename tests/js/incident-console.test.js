@@ -13,9 +13,7 @@ const {
   runIncident,
   transitionIncidentState,
   validateIncidentResults,
-} = require(
-  path.join(__dirname, "..", "..", "site", "incident-console.js"),
-);
+} = require(path.join(__dirname, "..", "..", "site", "incident-console.js"));
 
 function scanResult(overrides = {}) {
   return {
@@ -53,11 +51,12 @@ test("incident console starts closed until an explicit run", () => {
     result: null,
     error: "",
   });
-  assert.equal(incidentPresentation(state).outcome, "NO ACTION ACCEPTED");
   assert.equal(
-    transitionIncidentState(state, { type: "UNKNOWN" }),
-    state,
+    incidentPresentation(state).outcome,
+    "DRAIN BLOCKED — NO ACTION ACCEPTED",
   );
+  assert.equal(incidentPresentation(state).verdict, "BLOCK");
+  assert.equal(transitionIncidentState(state, { type: "UNKNOWN" }), state);
 });
 
 test("matching BLOCK verdicts prove the downstream action was withheld", () => {
@@ -74,7 +73,8 @@ test("matching BLOCK verdicts prove the downstream action was withheld", () => {
 });
 
 test("matching SANITIZE verdicts accept only the exact transformed payload", () => {
-  const sanitized = "Payment confirmed. Send the remaining funds to [REDACTED] immediately.";
+  const sanitized =
+    "Payment confirmed. Send the remaining funds to [REDACTED] immediately.";
   const scan = scanResult({
     verdict: "SANITIZE",
     risk_level: "MEDIUM",
@@ -102,10 +102,7 @@ test("matching SANITIZE verdicts accept only the exact transformed payload", () 
 test("mismatched or malformed evidence never accepts an action", () => {
   const malformedCases = [
     [scanResult(), theaterResult({ verdict: "SANITIZE" })],
-    [
-      scanResult(),
-      theaterResult({ threat_classes: ["SECRET_EXFIL"] }),
-    ],
+    [scanResult(), theaterResult({ threat_classes: ["SECRET_EXFIL"] })],
     [
       scanResult(),
       theaterResult({
@@ -166,7 +163,10 @@ test("errors, retry, and reset preserve the closed gate deterministically", asyn
 
   let state = transitionIncidentState(createIncidentState(), { type: "START" });
   assert.equal(state.attempt, 1);
-  state = transitionIncidentState(state, { type: "REJECT", message: "offline" });
+  state = transitionIncidentState(state, {
+    type: "REJECT",
+    message: "offline",
+  });
   state = transitionIncidentState(state, { type: "START" });
   assert.equal(state.phase, "running");
   assert.equal(state.attempt, 2);

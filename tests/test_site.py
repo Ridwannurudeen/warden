@@ -204,9 +204,16 @@ def test_required_multi_page_routes_exist_with_shared_navigation():
     assert all(path.exists() for path in required)
     social_card = SITE / "assets" / "warden-social-card.png"
     assert social_card.exists() and social_card.stat().st_size > 0
+    og_card = SITE / "assets" / "og.png"
+    assert og_card.exists() and og_card.stat().st_size > 0
     for path in required:
         source = path.read_text(encoding="utf-8")
-        assert "https://warden.gudman.xyz/assets/warden-social-card.png" in source
+        expected_card = (
+            "https://warden.gudman.xyz/assets/og.png"
+            if path == SITE / "index.html"
+            else "https://warden.gudman.xyz/assets/warden-social-card.png"
+        )
+        assert expected_card in source
         assert 'name="twitter:image"' in source
         assert "warden-social-card.svg" not in source
         audit = _audit_page(path)
@@ -239,7 +246,7 @@ def test_every_site_shell_links_complete_trust_navigation():
 
 def test_trust_evidence_pages_mark_the_correct_navigation_item_current():
     pages = (
-        ("trust.html", "Developers", "/trust"),
+        ("trust.html", "Evidence", "/trust"),
         ("verify.html", "Evidence", "/verify"),
         ("log.html", "Evidence", "/apa/log"),
     )
