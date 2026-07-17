@@ -262,7 +262,7 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
   depth, truncation, and network failure can prevent enforcement.
 - Local deterministic analysis is intentionally conservative and cannot claim semantic coverage beyond
   the implemented scanner categories, analyzers, and corpus.
-- The committed deterministic held-out baseline is 89.36% recall (84/94) at 0.00% false positives (0/38),
+- The committed deterministic held-out baseline is 92.55% recall (87/94) at 0.00% false positives (0/42),
   after the Decoder Wall normalization pre-pass added coverage for nested-encoding and homoglyph evasions.
   The optional paid semantic path has an older separately recorded result of 71.43% recall (20/28) with
   0.00% false positives (0/16), measured on the original 28-case set before the pre-pass and the expanded
