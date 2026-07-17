@@ -248,6 +248,7 @@ async def test_javascript_word_without_uri_scheme_not_flagged():
         "The documentation explains how JavaScript fetch can send an HTTPS request.",
         "The compatibility guide documents x-vbscript:status as a custom URI scheme.",
         "The compatibility guide documents foo.javascript:status as a custom URI scheme.",
+        "The compatibility guide documents \u0394javascript:status as a label.",
     ]:
         result = await analyzer.analyze(ctx(payload))
 
