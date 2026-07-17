@@ -9,13 +9,7 @@
   });
   const REQUIRED_THREAT = "DRAIN_ADDRESS";
   const VERDICTS = new Set(["ALLOW", "SANITIZE", "BLOCK"]);
-  const RISK_LEVELS = new Set([
-    "NONE",
-    "LOW",
-    "MEDIUM",
-    "HIGH",
-    "CRITICAL",
-  ]);
+  const RISK_LEVELS = new Set(["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 
   class IncidentValidationError extends Error {
     constructor(message) {
@@ -218,16 +212,25 @@
         sanitized: "Not accepted",
       };
     }
+    if (state.phase === "error") {
+      return {
+        outcome: "NO ACTION ACCEPTED",
+        status: `${state.error} No action was accepted.`,
+        verdict: "No verified verdict",
+        threat: "DRAIN_ADDRESS expected",
+        receipt: "Not accepted",
+        sanitized: "Not accepted",
+      };
+    }
     return {
-      outcome: "NO ACTION ACCEPTED",
+      outcome: "DRAIN BLOCKED — NO ACTION ACCEPTED",
       status:
-        state.phase === "error"
-          ? `${state.error} No action was accepted.`
-          : "Run both live checks before accepting any consequential action.",
-      verdict: "No verified verdict",
-      threat: "DRAIN_ADDRESS expected",
-      receipt: "Not accepted",
-      sanitized: "Not accepted",
+        "Warden's verdict for this payload: BLOCK. The drain instruction was withheld before execution. Run the live incident to reproduce it against the live APIs.",
+      verdict: "BLOCK",
+      threat:
+        "DRAIN_ADDRESS — 0x2222222222222222222222222222222222222222 detected",
+      receipt: "Action withheld — invoked=false, nothing delivered",
+      sanitized: "Not delivered",
     };
   }
 

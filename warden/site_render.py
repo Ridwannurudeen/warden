@@ -14,7 +14,7 @@ NAV_GROUPS = (
             ("/playground", "Playground", "playground"),
             ("/agents", "Marketplace index", "agents"),
             ("/gauntlet", "Gauntlet", "gauntlet"),
-            ("/showcase", "Judge showcase", "showcase"),
+            ("/showcase", "Walkthrough", "showcase"),
         ),
     ),
     (

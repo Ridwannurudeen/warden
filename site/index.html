@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Warden issues cryptographic, independently verifiable proof of the dangerous agent actions it blocks or safely transforms."
+      content="Warden is a verifiable-trust payload firewall for AI agents: dangerous actions are blocked or safely transformed with Ed25519-signed proof anyone can check."
     />
     <meta name="color-scheme" content="dark light" />
     <title>Warden — Verifiable trust for consequential agent actions</title>
@@ -23,15 +23,16 @@
     <meta property="og:url" content="https://warden.gudman.xyz/" />
     <meta
       property="og:image"
-      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+      content="https://warden.gudman.xyz/assets/og.png"
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:image"
-      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+      content="https://warden.gudman.xyz/assets/og.png"
     />
-    <link rel="icon" href="/assets/warden-avatar.png" />
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/styles.css?v=e281c1aa" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -57,28 +58,24 @@
         <details class="nav-group">
           <summary>Product</summary>
           <div class="nav-menu">
-            <a href="/theater">Attack Theater</a
-            ><a href="/playground">Playground</a
-            ><a href="/agents">Marketplace index</a
-            ><a href="/gauntlet">Gauntlet</a
-            ><a href="/showcase">Judge showcase</a>
+            <a href="/playground">Playground</a>
+            <a href="/theater">Attack Theater</a>
+            <a href="/agents">Marketplace index</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Developers</summary>
           <div class="nav-menu">
-            <a href="/docs">Documentation</a><a href="/integrate">Integrate</a
-            ><a href="/trust">Trust Layer</a><a href="/status">API status</a>
+            <a href="/docs">Documentation</a>
+            <a href="/integrate">Integrate</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Evidence</summary>
           <div class="nav-menu">
-            <a href="/verify">Verify APA</a
-            ><a href="/apa/log">Transparency log</a
-            ><a href="/badges">Audit badges</a
-            ><a href="/agents#methodology">Public-text methodology</a
-            ><a href="/gauntlet#policy">Adversarial challenge</a>
+            <a href="/verify">Verify APA</a>
+            <a href="/apa/log">Transparency log</a>
+            <a href="/trust">Trust Layer</a>
           </div>
         </details>
         <div class="nav-mobile-actions">
@@ -113,6 +110,21 @@
         </aside>
 
         <section class="home-hero">
+          <div class="hero-chain" aria-hidden="true">
+            <svg viewBox="0 0 430 190" fill="none">
+              <path d="M8 152 C96 128 148 96 214 96 C288 96 330 52 422 30" stroke="currentColor" stroke-width="1.4" />
+              <g stroke="currentColor" stroke-width="1.4">
+                <rect x="88" y="118" width="46" height="30" rx="5" />
+                <rect x="192" y="82" width="46" height="30" rx="5" />
+                <rect x="300" y="52" width="46" height="30" rx="5" />
+              </g>
+              <g fill="currentColor" font-family="monospace" font-size="9">
+                <text x="97" y="137">a9f2</text>
+                <text x="201" y="101">4c7e</text>
+                <text x="309" y="71">d10b</text>
+              </g>
+            </svg>
+          </div>
           <div class="home-hero-copy">
             <p class="eyebrow">Verifiable trust · provable safety</p>
             <h1>
@@ -146,6 +158,35 @@
               <strong data-proof-field="okx-instruction">search by agent ID</strong>.
             </p>
           </div>
+
+          <aside class="hero-receipt" aria-label="Example signed attestation receipt">
+            <div class="hero-receipt__head">
+              <span class="hero-receipt__kicker">Signed attestation · APA</span>
+              <span class="hero-receipt__badge">BLOCK</span>
+            </div>
+            <dl class="hero-receipt__rows">
+              <div>
+                <dt>Threat</dt>
+                <dd class="hero-receipt__threat">DRAIN_ADDRESS</dd>
+              </div>
+              <div>
+                <dt>Action</dt>
+                <dd>Withheld before execution</dd>
+              </div>
+              <div>
+                <dt>Signature</dt>
+                <dd class="hero-receipt__sig">Ed25519 · checked with WebCrypto</dd>
+              </div>
+            </dl>
+            <p class="hero-receipt__verified">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+              Verdict independently verifiable
+            </p>
+            <p class="hero-receipt__note">
+              Illustrative receipt —
+              <a href="#verify">verify a real attestation below</a>.
+            </p>
+          </aside>
 
           <aside
             class="product-proof"
@@ -269,13 +310,15 @@
 
             <article class="incident-outcome">
               <p class="console-label">Action boundary</p>
-              <strong data-incident-outcome>NO ACTION ACCEPTED</strong>
+              <strong data-incident-outcome>DRAIN BLOCKED — NO ACTION ACCEPTED</strong>
               <p
                 class="incident-status"
                 data-incident-status
                 aria-live="polite"
               >
-                Ready. Run the live incident to request both real demo endpoints.
+                Warden's verdict for this payload: BLOCK. The drain instruction
+                was withheld before execution. Run the live incident to
+                reproduce it against the live APIs.
               </p>
               <div class="incident-controls">
                 <button
@@ -306,15 +349,20 @@
             <dl class="incident-readout">
               <div>
                 <dt>Verdict</dt>
-                <dd data-incident-verdict>Awaiting live scan</dd>
+                <dd data-incident-verdict>BLOCK</dd>
               </div>
               <div>
                 <dt>Threat explanation</dt>
-                <dd data-incident-threat>No threat class claimed before the API responds</dd>
+                <dd data-incident-threat>
+                  DRAIN_ADDRESS — 0x2222222222222222222222222222222222222222
+                  detected
+                </dd>
               </div>
               <div>
                 <dt>Action receipt</dt>
-                <dd data-incident-receipt>No handler receipt yet</dd>
+                <dd data-incident-receipt>
+                  Action withheld — invoked=false, nothing delivered
+                </dd>
               </div>
             </dl>
             <pre
@@ -463,7 +511,7 @@
             </div>
             <p class="section-copy">
               A fair comparison against the typical AI-security service model —
-              judged only on properties you can check on this site.
+              measured only on properties you can check on this site.
             </p>
           </div>
           <div class="compare-table" role="table" aria-label="Warden versus typical AI security services">
@@ -634,7 +682,7 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
               ><small>Review public entries and signed checkpoints.</small>
             </a>
             <a href="/showcase">
-              <span>Showcase</span><strong>Judge-mode walkthrough</strong
+              <span>Walkthrough</span><strong>Guided walkthrough</strong
               ><small>A structured tour of the wider product surface.</small>
             </a>
             <a href="/theater">
@@ -646,67 +694,6 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
               ><small>Configure the paid point-in-time endpoint service.</small>
             </a>
           </div>
-
-          <figure
-            id="safety-map"
-            class="safety-map"
-            data-safety-map
-            aria-labelledby="safety-map-title"
-          >
-            <figcaption>
-              <span>
-                <strong id="safety-map-title">Experimental Safety Map</strong>
-                <small data-marketplace-coverage data-coverage-state="degraded"
-                  >Partial/degraded discovery response for marketplace query
-                  "a": 730 unique agents sampled; highest reported result total
-                  752; 22 expected agents not present in this response.</small
-                >
-              </span>
-              <span
-                class="snapshot-note"
-                data-marketplace-snapshot
-                data-fallback-snapshot="2026-07-16T02:49:49Z"
-                >Loading dated snapshot</span
-              >
-            </figcaption>
-            <div class="safety-map__field">
-              <svg
-                class="safety-map-fabric"
-                viewBox="0 0 760 360"
-                role="img"
-                aria-label="Dated sampled-agent evidence fabric"
-              >
-                <path d="M96 76 L376 180 L648 92 M376 180 L168 286 M376 180 L622 282" />
-                <circle cx="96" cy="76" r="8" />
-                <circle cx="376" cy="180" r="10" />
-                <circle cx="648" cy="92" r="8" />
-                <circle cx="168" cy="286" r="8" />
-                <circle cx="622" cy="282" r="8" />
-              </svg>
-              <div class="safety-map__signal safety-map__signal--agents">
-                <strong class="num" data-marketplace-count>—</strong>
-                <span>sampled agents</span>
-              </div>
-              <div class="safety-map__signal safety-map__signal--matched">
-                <strong class="num" data-marketplace-matched>—</strong>
-                <span>Warden-name matches</span>
-              </div>
-              <div class="safety-map__signal safety-map__signal--audited">
-                <strong class="num" data-marketplace-audited>—</strong>
-                <span>public-text audits</span>
-              </div>
-              <div class="safety-map__fabric-label">
-                <span><span data-marketplace-count>—</span> sampled records</span>
-                <strong>Discovery evidence, not a universal safety ranking</strong>
-              </div>
-            </div>
-            <p class="safety-map__boundary">
-              Known patterns are covered by deterministic and corpus-backed
-              layers. Novel phrasing may require semantic analysis and can be
-              missed; this map does not upgrade partial discovery into a claim
-              about the whole marketplace.
-            </p>
-          </figure>
         </section>
 
         <section class="proof-band" aria-label="Independent credibility signals">
@@ -737,6 +724,7 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
         </section>
 
         <section class="final-cta">
+          <span class="chain-rule" aria-hidden="true"></span>
           <p class="eyebrow">Trust that survives inspection</p>
           <h2>Gate the action, keep the proof.</h2>
           <p>
@@ -764,12 +752,13 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
         <div class="site-footer__col">
           <span class="site-footer__label">Product</span>
           <a href="/playground">Run a scan</a><a href="/theater">Attack Theater</a
-          ><a href="/showcase">Showcase</a><a href="/hire">Use Warden</a>
+          ><a href="/gauntlet">Gauntlet</a
+          ><a href="/showcase">Walkthrough</a><a href="/hire">Use Warden</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Evidence</span>
           <a href="/badges">Audit badges</a><a href="/apa/log">Transparency log</a
-          ><a href="/verify">Verify an APA</a><a href="/status">Status</a>
+          ><a href="/verify">Verify an APA</a><a href="/status">API status</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Company</span>
@@ -779,7 +768,7 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
         </div>
       </nav>
     </footer>
-    <script src="/app.js" defer></script>
+    <script src="/app.js?v=65a484d3" defer></script>
     <script src="/scan-client.js" defer></script>
     <script src="/verify.js" defer></script>
     <script src="/log.js" defer></script>

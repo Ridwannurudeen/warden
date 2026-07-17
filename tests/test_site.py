@@ -204,9 +204,16 @@ def test_required_multi_page_routes_exist_with_shared_navigation():
     assert all(path.exists() for path in required)
     social_card = SITE / "assets" / "warden-social-card.png"
     assert social_card.exists() and social_card.stat().st_size > 0
+    og_card = SITE / "assets" / "og.png"
+    assert og_card.exists() and og_card.stat().st_size > 0
     for path in required:
         source = path.read_text(encoding="utf-8")
-        assert "https://warden.gudman.xyz/assets/warden-social-card.png" in source
+        expected_card = (
+            "https://warden.gudman.xyz/assets/og.png"
+            if path == SITE / "index.html"
+            else "https://warden.gudman.xyz/assets/warden-social-card.png"
+        )
+        assert expected_card in source
         assert 'name="twitter:image"' in source
         assert "warden-social-card.svg" not in source
         audit = _audit_page(path)
@@ -239,7 +246,7 @@ def test_every_site_shell_links_complete_trust_navigation():
 
 def test_trust_evidence_pages_mark_the_correct_navigation_item_current():
     pages = (
-        ("trust.html", "Developers", "/trust"),
+        ("trust.html", "Evidence", "/trust"),
         ("verify.html", "Evidence", "/verify"),
         ("log.html", "Evidence", "/apa/log"),
     )
@@ -255,6 +262,53 @@ def test_trust_evidence_pages_mark_the_correct_navigation_item_current():
         assert current_group, filename
         assert f'href="{href}" aria-current="page"' in current_group.group("body")
         assert source.count('aria-current="page"') == 1
+
+
+def test_top_nav_is_curated_and_utility_pages_live_in_footer():
+    curated_groups = {
+        "Product": ["/playground", "/theater", "/agents"],
+        "Developers": ["/docs", "/integrate"],
+        "Evidence": ["/verify", "/apa/log", "/trust"],
+    }
+    relocated_to_footer = ("/gauntlet", "/showcase", "/status", "/badges")
+    top_level_pages = [
+        "index.html",
+        "theater.html",
+        "playground.html",
+        "gauntlet.html",
+        "showcase.html",
+        "hire.html",
+        "badges.html",
+        "badge.html",
+        "integrate.html",
+        "trust.html",
+        "verify.html",
+        "log.html",
+        "status.html",
+        "privacy.html",
+        "terms.html",
+    ]
+
+    for filename in top_level_pages:
+        source = (SITE / filename).read_text(encoding="utf-8")
+        for group_name, expected_hrefs in curated_groups.items():
+            block = re.search(
+                rf'<details class="nav-group[^"]*">\s*<summary>{group_name}</summary>'
+                r'\s*<div class="nav-menu">(?P<body>.*?)</div>',
+                source,
+                re.DOTALL,
+            )
+            assert block, (filename, group_name)
+            hrefs = re.findall(r'href="([^"]+)"', block.group("body"))
+            assert hrefs == expected_hrefs, (filename, group_name, hrefs)
+        footer = re.search(
+            r'<footer class="site-footer page-shell">(?P<body>.*?)</footer>',
+            source,
+            re.DOTALL,
+        )
+        assert footer, filename
+        for href in relocated_to_footer:
+            assert f'href="{href}"' in footer.group("body"), (filename, href)
 
 
 def test_site_is_csp_clean_and_makes_no_external_resource_requests():
@@ -290,7 +344,6 @@ def test_shared_styles_support_light_dark_mobile_and_new_surfaces():
         ".surface-tabs",
         ".reason-matrix",
         ".theater-stage",
-        ".safety-map-fabric",
     ):
         assert selector in css
     assert "prefers-reduced-motion: reduce" in css
@@ -325,13 +378,11 @@ def test_attack_theater_is_real_owned_one_pass_surface():
 
 def test_trust_layer_page_exposes_honest_open_contracts():
     page = (SITE / "trust.html").read_text(encoding="utf-8")
-    home = (SITE / "index.html").read_text(encoding="utf-8")
 
     for pillar in ("Local enforcement", "Agent Protection Attestation", "Safety Map"):
         assert pillar in page
     assert "safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)" in page
-    assert 'href="/#safety-map"' in page
-    assert 'id="safety-map"' in home
+    assert 'href="/agents"' in page
     assert 'href="/verify"' in page
     assert 'href="/apa/log"' in page
     assert 'href="/spec/APA-SPEC.md"' in page
@@ -643,11 +694,6 @@ def test_home_playground_badges_integrations_and_status_are_real_surfaces():
     assert "data-product-proof" in home
     assert "data-incident-console" in home
     assert "data-home-proof" in home
-    assert home.count("data-marketplace-count") >= 2
-    assert "data-marketplace-matched" in home
-    assert "data-marketplace-audited" in home
-    assert "data-marketplace-coverage" in home
-    assert "data-safety-map" in home
     assert "data-service-snapshot" in home
     assert 'class="button primary button--hero" href="/hire"' in home
     assert 'class="button secondary" href="/integrate"' in home

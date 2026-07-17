@@ -5,7 +5,7 @@
     if (storedTheme === "light" || storedTheme === "dark") {
       return storedTheme;
     }
-    return "light";
+    return "dark";
   }
 
   function cycleFocusIndex(currentIndex, direction, count) {
@@ -284,6 +284,46 @@
 
   const document = root.document;
   document.documentElement.classList.add("js-enabled");
+
+  const prefersReducedMotion =
+    root.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+  if (
+    !prefersReducedMotion &&
+    typeof root.IntersectionObserver === "function"
+  ) {
+    const main = document.querySelector("main");
+    const revealTargets = main
+      ? main.querySelectorAll(
+          ":scope > section, :scope > .page-shell > section",
+        )
+      : [];
+    if (revealTargets.length > 0) {
+      const revealObserver = new root.IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("reveal-in");
+              revealObserver.unobserve(entry.target);
+            }
+          }
+        },
+        { rootMargin: "0px 0px -8% 0px" },
+      );
+      for (const target of revealTargets) {
+        target.classList.add("reveal");
+        revealObserver.observe(target);
+      }
+    }
+  }
+  const siteHeader = document.querySelector(".site-header");
+  if (siteHeader) {
+    const syncHeaderScroll = () => {
+      siteHeader.classList.toggle("is-scrolled", root.scrollY > 8);
+    };
+    syncHeaderScroll();
+    root.addEventListener("scroll", syncHeaderScroll, { passive: true });
+  }
+
   const themeButtons = Array.from(
     document.querySelectorAll("[data-theme-toggle]"),
   );
@@ -485,69 +525,6 @@
         }
         for (const dot of healthDots) {
           dot.classList.add("is-offline");
-        }
-      });
-  }
-
-  const marketplaceCounts = Array.from(
-    document.querySelectorAll("[data-marketplace-count]"),
-  );
-  const marketplaceMatches = Array.from(
-    document.querySelectorAll("[data-marketplace-matched]"),
-  );
-  const marketplaceAudits = Array.from(
-    document.querySelectorAll("[data-marketplace-audited]"),
-  );
-  const marketplaceSnapshots = Array.from(
-    document.querySelectorAll("[data-marketplace-snapshot]"),
-  );
-  const marketplaceCoverage = Array.from(
-    document.querySelectorAll("[data-marketplace-coverage]"),
-  );
-  if (
-    marketplaceCounts.length ||
-    marketplaceMatches.length ||
-    marketplaceAudits.length ||
-    marketplaceSnapshots.length ||
-    marketplaceCoverage.length
-  ) {
-    root
-      .fetch("/data/marketplace-summary.json", {
-        headers: { accept: "application/json" },
-        cache: "no-store",
-      })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((summary) => {
-        const normalized = normalizeMarketplaceSummary(summary);
-        const count = normalized.sampled.toLocaleString();
-        for (const element of marketplaceCounts) {
-          element.textContent = count;
-        }
-        for (const element of marketplaceMatches) {
-          element.textContent = normalized.matchedCount.toLocaleString();
-        }
-        for (const element of marketplaceAudits) {
-          element.textContent = normalized.auditedCount.toLocaleString();
-        }
-        for (const snapshot of marketplaceSnapshots) {
-          snapshot.textContent = `Captured ${normalized.capturedAt}`;
-        }
-        const coverageText = marketplaceCoverageText(normalized);
-        for (const coverage of marketplaceCoverage) {
-          coverage.textContent = coverageText;
-          coverage.dataset.coverageState = normalized.complete
-            ? "complete"
-            : "degraded";
-        }
-      })
-      .catch(() => {
-        for (const snapshot of marketplaceSnapshots) {
-          snapshot.textContent = `Committed snapshot ${snapshot.dataset.fallbackSnapshot}`;
         }
       });
   }
