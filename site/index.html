@@ -32,7 +32,7 @@
     />
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=1c44e350" />
+    <link rel="stylesheet" href="/styles.css?v=e281c1aa" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -511,7 +511,7 @@
             </div>
             <p class="section-copy">
               A fair comparison against the typical AI-security service model —
-              judged only on properties you can check on this site.
+              measured only on properties you can check on this site.
             </p>
           </div>
           <div class="compare-table" role="table" aria-label="Warden versus typical AI security services">
@@ -682,7 +682,7 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
               ><small>Review public entries and signed checkpoints.</small>
             </a>
             <a href="/showcase">
-              <span>Showcase</span><strong>Judge-mode walkthrough</strong
+              <span>Walkthrough</span><strong>Guided walkthrough</strong
               ><small>A structured tour of the wider product surface.</small>
             </a>
             <a href="/theater">
@@ -694,67 +694,6 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
               ><small>Configure the paid point-in-time endpoint service.</small>
             </a>
           </div>
-
-          <figure
-            id="safety-map"
-            class="safety-map"
-            data-safety-map
-            aria-labelledby="safety-map-title"
-          >
-            <figcaption>
-              <span>
-                <strong id="safety-map-title">Experimental Safety Map</strong>
-                <small data-marketplace-coverage data-coverage-state="degraded"
-                  >Partial/degraded discovery response for marketplace query
-                  "a": 730 unique agents sampled; highest reported result total
-                  752; 22 expected agents not present in this response.</small
-                >
-              </span>
-              <span
-                class="snapshot-note"
-                data-marketplace-snapshot
-                data-fallback-snapshot="2026-07-16T02:49:49Z"
-                >Loading dated snapshot</span
-              >
-            </figcaption>
-            <div class="safety-map__field">
-              <svg
-                class="safety-map-fabric"
-                viewBox="0 0 760 360"
-                role="img"
-                aria-label="Dated sampled-agent evidence fabric"
-              >
-                <path d="M96 76 L376 180 L648 92 M376 180 L168 286 M376 180 L622 282" />
-                <circle cx="96" cy="76" r="8" />
-                <circle cx="376" cy="180" r="10" />
-                <circle cx="648" cy="92" r="8" />
-                <circle cx="168" cy="286" r="8" />
-                <circle cx="622" cy="282" r="8" />
-              </svg>
-              <div class="safety-map__signal safety-map__signal--agents">
-                <strong class="num" data-marketplace-count>—</strong>
-                <span>sampled agents</span>
-              </div>
-              <div class="safety-map__signal safety-map__signal--matched">
-                <strong class="num" data-marketplace-matched>—</strong>
-                <span>Warden-name matches</span>
-              </div>
-              <div class="safety-map__signal safety-map__signal--audited">
-                <strong class="num" data-marketplace-audited>—</strong>
-                <span>public-text audits</span>
-              </div>
-              <div class="safety-map__fabric-label">
-                <span><span data-marketplace-count>—</span> sampled records</span>
-                <strong>Discovery evidence, not a universal safety ranking</strong>
-              </div>
-            </div>
-            <p class="safety-map__boundary">
-              Known patterns are covered by deterministic and corpus-backed
-              layers. Novel phrasing may require semantic analysis and can be
-              missed; this map does not upgrade partial discovery into a claim
-              about the whole marketplace.
-            </p>
-          </figure>
         </section>
 
         <section class="proof-band" aria-label="Independent credibility signals">
@@ -814,7 +753,7 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
           <span class="site-footer__label">Product</span>
           <a href="/playground">Run a scan</a><a href="/theater">Attack Theater</a
           ><a href="/gauntlet">Gauntlet</a
-          ><a href="/showcase">Judge showcase</a><a href="/hire">Use Warden</a>
+          ><a href="/showcase">Walkthrough</a><a href="/hire">Use Warden</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Evidence</span>
@@ -829,7 +768,7 @@ if (result.verdict === "ALLOW") continueUnderPolicy()</code></pre>
         </div>
       </nav>
     </footer>
-    <script src="/app.js?v=fd8fb8c4" defer></script>
+    <script src="/app.js?v=65a484d3" defer></script>
     <script src="/scan-client.js" defer></script>
     <script src="/verify.js" defer></script>
     <script src="/log.js" defer></script>

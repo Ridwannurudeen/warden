@@ -344,7 +344,6 @@ def test_shared_styles_support_light_dark_mobile_and_new_surfaces():
         ".surface-tabs",
         ".reason-matrix",
         ".theater-stage",
-        ".safety-map-fabric",
     ):
         assert selector in css
     assert "prefers-reduced-motion: reduce" in css
@@ -379,13 +378,11 @@ def test_attack_theater_is_real_owned_one_pass_surface():
 
 def test_trust_layer_page_exposes_honest_open_contracts():
     page = (SITE / "trust.html").read_text(encoding="utf-8")
-    home = (SITE / "index.html").read_text(encoding="utf-8")
 
     for pillar in ("Local enforcement", "Agent Protection Attestation", "Safety Map"):
         assert pillar in page
     assert "safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)" in page
-    assert 'href="/#safety-map"' in page
-    assert 'id="safety-map"' in home
+    assert 'href="/agents"' in page
     assert 'href="/verify"' in page
     assert 'href="/apa/log"' in page
     assert 'href="/spec/APA-SPEC.md"' in page
@@ -697,11 +694,6 @@ def test_home_playground_badges_integrations_and_status_are_real_surfaces():
     assert "data-product-proof" in home
     assert "data-incident-console" in home
     assert "data-home-proof" in home
-    assert home.count("data-marketplace-count") >= 2
-    assert "data-marketplace-matched" in home
-    assert "data-marketplace-audited" in home
-    assert "data-marketplace-coverage" in home
-    assert "data-safety-map" in home
     assert "data-service-snapshot" in home
     assert 'class="button primary button--hero" href="/hire"' in home
     assert 'class="button secondary" href="/integrate"' in home

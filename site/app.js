@@ -529,69 +529,6 @@
       });
   }
 
-  const marketplaceCounts = Array.from(
-    document.querySelectorAll("[data-marketplace-count]"),
-  );
-  const marketplaceMatches = Array.from(
-    document.querySelectorAll("[data-marketplace-matched]"),
-  );
-  const marketplaceAudits = Array.from(
-    document.querySelectorAll("[data-marketplace-audited]"),
-  );
-  const marketplaceSnapshots = Array.from(
-    document.querySelectorAll("[data-marketplace-snapshot]"),
-  );
-  const marketplaceCoverage = Array.from(
-    document.querySelectorAll("[data-marketplace-coverage]"),
-  );
-  if (
-    marketplaceCounts.length ||
-    marketplaceMatches.length ||
-    marketplaceAudits.length ||
-    marketplaceSnapshots.length ||
-    marketplaceCoverage.length
-  ) {
-    root
-      .fetch("/data/marketplace-summary.json", {
-        headers: { accept: "application/json" },
-        cache: "no-store",
-      })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((summary) => {
-        const normalized = normalizeMarketplaceSummary(summary);
-        const count = normalized.sampled.toLocaleString();
-        for (const element of marketplaceCounts) {
-          element.textContent = count;
-        }
-        for (const element of marketplaceMatches) {
-          element.textContent = normalized.matchedCount.toLocaleString();
-        }
-        for (const element of marketplaceAudits) {
-          element.textContent = normalized.auditedCount.toLocaleString();
-        }
-        for (const snapshot of marketplaceSnapshots) {
-          snapshot.textContent = `Captured ${normalized.capturedAt}`;
-        }
-        const coverageText = marketplaceCoverageText(normalized);
-        for (const coverage of marketplaceCoverage) {
-          coverage.textContent = coverageText;
-          coverage.dataset.coverageState = normalized.complete
-            ? "complete"
-            : "degraded";
-        }
-      })
-      .catch(() => {
-        for (const snapshot of marketplaceSnapshots) {
-          snapshot.textContent = `Committed snapshot ${snapshot.dataset.fallbackSnapshot}`;
-        }
-      });
-  }
-
   const productProof = document.querySelector("[data-product-proof]");
   if (productProof) {
     const productProofStatus = document.querySelector(

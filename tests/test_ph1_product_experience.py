@@ -78,7 +78,6 @@ def test_homepage_leads_with_verifiable_trust_and_one_consequential_journey():
     assert page.index("data-product-proof") < page.index("data-incident-console")
     assert page.index("data-incident-console") < page.index("data-home-proof")
     assert page.index("data-home-proof") < page.index('id="labs"')
-    assert page.index('id="labs"') < page.index('id="safety-map"')
     assert "external agent output" in normalized.lower()
     assert "consequential action" in normalized.lower()
     assert "withheld" in normalized.lower()
@@ -222,7 +221,6 @@ def test_experimental_surfaces_are_grouped_below_the_primary_proof_journey():
         "/theater",
     ):
         assert page.index(f'href="{href}"', labs) > labs
-    assert page.index('id="safety-map"') > labs
     assert "Labs &amp; trust" in page
 
 
