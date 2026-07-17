@@ -244,8 +244,11 @@ async def test_script_uri_schemes_flag_malicious_link(payload):
 async def test_javascript_word_without_uri_scheme_not_flagged():
     analyzer = MaliciousLinkAnalyzer()
 
-    result = await analyzer.analyze(
-        ctx("The documentation explains how JavaScript fetch can send an HTTPS request.")
-    )
+    for payload in [
+        "The documentation explains how JavaScript fetch can send an HTTPS request.",
+        "The compatibility guide documents x-vbscript:status as a custom URI scheme.",
+        "The compatibility guide documents foo.javascript:status as a custom URI scheme.",
+    ]:
+        result = await analyzer.analyze(ctx(payload))
 
-    assert result.score == 0
+        assert result.score == 0

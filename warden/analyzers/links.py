@@ -8,8 +8,8 @@ from warden.core.analyzer import AnalysisContext, Analyzer, AnalyzerResult
 from warden.core.verdict import ReasonCode
 
 URL_RE = re.compile(
-    r"(?i)\b(?:https?://[^\s<>'\")]+|data:[^\s<>'\")]+|"
-    r"(?:javascript|vbscript):[^\s<>'\")]+)"
+    r"(?i)(?:\b(?:https?://[^\s<>'\")]+|data:[^\s<>'\")]+)|"
+    r"(?<![a-z0-9+.-])(?:javascript|vbscript):[^\s<>'\")]+)"
 )
 CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
 ASCII_ALPHA_RE = re.compile(r"[A-Za-z]")
