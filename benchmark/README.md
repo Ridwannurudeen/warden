@@ -6,11 +6,14 @@ TF-IDF examples in `warden/scanner/patterns.py` after case and whitespace normal
 
 ## Published result
 
-Measured on 2026-07-16 with the deterministic fast path, using thorough mode only for the two cases
-that declare it and with semantic analysis disabled:
+Measured on 2026-07-17 with the deterministic fast path, using thorough mode only for the cases
+that declare it and with semantic analysis disabled. The set now includes a held-out evasion
+family (`held-evade-*`, 66 cases) covering nested base64/hex/percent/HTML/`\xNN`-encoded
+injections and drains, homoglyph-swapped keywords, and zero-width obfuscation, all folded by the
+Decoder Wall normalization pre-pass before detection:
 
-- Attack recall: **64.29% (18/28)**
-- False-positive rate: **0.00% (0/16)**
+- Attack recall: **89.36% (84/94)**
+- False-positive rate: **0.00% (0/38)**
 
 An attack counts as detected only when Warden returns `SANITIZE` or `BLOCK` and includes the case's
 expected threat class. A benign case counts as a false positive when Warden returns anything other
@@ -18,9 +21,10 @@ than `ALLOW`. The exact misses and per-category counts are committed in `results
 
 This is a small, authored regression benchmark, not a claim about universal production efficacy. In
 particular, it currently exposes misses in indirect prompt overrides, novel authorization wording,
-hex-encoded instructions, `remit` redirection, XML-shaped tool calls, `transmit` exfiltration, and
-`javascript:` links. Those misses remain published rather than being copied into the detector's
-training corpus.
+XML-shaped tool calls, `transmit` exfiltration, `javascript:` links, and one base64-of-hex
+double-encoding whose intermediate hex blob is deliberately not treated as decodable text (that
+same conservatism keeps benign hex blobs at zero false positives). Those misses remain published
+rather than being copied into the detector's training corpus.
 
 Run it from the repository root:
 
@@ -52,13 +56,15 @@ python scripts/benchmark_recall.py --semantic --json
 
 That command requires the complete semantic environment documented in the repository README, forces every
 case through paid `thorough` orchestration, and reports an enablement gate. The feature must stay disabled
-unless model-backed recall exceeds this 64.29% baseline while the held-out benign set remains at zero false
+unless model-backed recall exceeds this 89.36% baseline while the held-out benign set remains at zero false
 positives.
 
-A semantic-enabled run recorded on 2026-07-16 is published separately in `history.jsonl` and
-`site/data/evaluation.json`: **71.43% recall (20/28)** with **0.00% false positives (0/16)**. The deterministic
-`results.json` remains the reproducible offline baseline. Repository configuration does not enable the paid
-semantic runtime, and reproducing that after-result requires an explicitly configured external model.
+A semantic-enabled run recorded on 2026-07-16 against the original 28-case set is published separately in
+`history.jsonl` and `site/data/evaluation.json`: **71.43% recall (20/28)** with **0.00% false positives
+(0/16)**. That historical measurement predates both the Decoder Wall pre-pass and the expanded evasion set,
+so it is not comparable to the current 94-case deterministic baseline. The deterministic `results.json`
+remains the reproducible offline baseline. Repository configuration does not enable the paid semantic
+runtime, and reproducing that after-result requires an explicitly configured external model.
 
 `tests/test_d4_benchmark.py` reruns the evaluation and requires byte-equivalent JSON data after
 parsing, so detector changes must update the published result intentionally.

@@ -52,6 +52,8 @@ INJECTION_PATTERNS = {
         r"(?i)(?:base64|b64)\s*(?:decode|encoded)\s*:",
         r"(?i)\\x[0-9a-f]{2}(?:\\x[0-9a-f]{2}){3,}",
         r"(?i)(?:rot13|unicode\s+escaped)\s*(?:decode|payload)\s*:",
+        # Decode-and-obey instruction next to an actual encoded blob.
+        r"(?i)\b(?:base64|b64|hex|rot13)[\s_-]*decode\b\W{0,8}[0-9a-zA-Z+/=]{12,}",
     ],
 }
 

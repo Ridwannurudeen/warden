@@ -262,10 +262,13 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
   depth, truncation, and network failure can prevent enforcement.
 - Local deterministic analysis is intentionally conservative and cannot claim semantic coverage beyond
   the implemented scanner categories, analyzers, and corpus.
-- The optional paid semantic path has a separately recorded held-out result of 71.43% recall (20/28) with
-  0.00% false positives (0/16), compared with the committed deterministic baseline of 64.29% (18/28). Repository
-  configuration still leaves the runtime disabled. Its fail-open behavior preserves the deterministic verdict
-  when inference is unavailable, and reproducing the recorded result requires an explicitly configured model.
+- The committed deterministic held-out baseline is 89.36% recall (84/94) at 0.00% false positives (0/38),
+  after the Decoder Wall normalization pre-pass added coverage for nested-encoding and homoglyph evasions.
+  The optional paid semantic path has an older separately recorded result of 71.43% recall (20/28) with
+  0.00% false positives (0/16), measured on the original 28-case set before the pre-pass and the expanded
+  evasion family, so it is not directly comparable. Repository configuration still leaves the runtime
+  disabled. Its fail-open behavior preserves the deterministic verdict when inference is unavailable, and
+  reproducing the recorded result requires an explicitly configured model.
 - The endpoint auditor assumes the target accepts `POST` JSON with a `payload` field. It rejects internal
   network targets, redirects, oversized responses, and slow endpoints.
 - Marketplace evidence reports dated schema-v2 `sampled`, `expected`, and `dropped` coverage. Re-check

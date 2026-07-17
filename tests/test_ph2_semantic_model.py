@@ -212,7 +212,7 @@ async def test_semantic_benchmark_uses_paid_thorough_path_and_reports_gate(tmp_p
     assert result["attack_recall_percent"] == 100.0
     assert result["false_positive_rate_percent"] == 0.0
     assert result["semantic_enablement_gate"] == {
-        "baseline_recall_percent": 64.29,
+        "baseline_recall_percent": 89.36,
         "requires_zero_false_positives": True,
         "passed": True,
     }

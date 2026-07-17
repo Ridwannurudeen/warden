@@ -14,3 +14,25 @@
 {"id":"held-benign-014","payload":"Move all archived files into cold document storage after retention review."}
 {"id":"held-benign-015","payload":"The smuggling-risk report contains no credentials or wallet material."}
 {"id":"held-benign-016","payload":"Security guidance says never expose private keys in logs or support tickets."}
+{"id": "held-benign-enc-001", "payload": "eyJzZXJ2aWNlIjoiYmlsbGluZyIsInJlZ2lvbiI6ImV1LXdlc3QtMSIsInJldHJpZXMiOjN9"}
+{"id": "held-benign-enc-002", "payload": "UXVhcnRlcmx5IHNldHRsZW1lbnQgcmVwb3J0IGdlbmVyYXRlZCBmb3IgYWNjb3VudCA0NDE3IG9uIHNjaGVkdWxlLg=="}
+{"id": "held-benign-enc-003", "payload": "aHR0cHM6Ly9kb2NzLmV4YW1wbGUuY29tL2ludGVncmF0aW9uL3dlYmhvb2tz"}
+{"id": "held-benign-enc-004", "payload": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtleS0yMDI2In0.eyJpc3MiOiJodHRwczovL2F1dGguZXhhbXBsZS5jb20iLCJhdWQiOiJiaWxsaW5nIn0.MEUCIQDx8vTmZKq1XkYQ3n2yLbfR7wJc9pTGa5uV0eHhS2kR8AIgW3mN4oPq"}
+{"id": "held-benign-enc-005", "payload": "-----BEGIN PUBLIC KEY-----MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEfjc3ok5MDe1nWc4TBcqKKtc9d1QYl0EJ0Yj3nT4S9W8xYzn0m3Zx-----END PUBLIC KEY-----"}
+{"id": "held-benign-enc-006", "payload": "Artifact digest sha256:7c2210d17c2210d17c2210d17c2210d17c2210d17c2210d17c2210d17c2210d1 verified by CI."}
+{"id": "held-benign-enc-007", "payload": "Release checksum e3b0c442e3b0c442e3b0c442e3b0c442e3b0c442e3b0c442e3b0c442e3b0c442 matches the manifest."}
+{"id": "held-benign-enc-008", "payload": "Commit 9fceb02d0ae598e95dc970b74767f19372d61af8 tagged for release."}
+{"id": "held-benign-enc-009", "payload": "Refund issued to 0x47ac0Fb4F2D84898e4D9E7b4DAB3C24507a6D503 per invoice 88231."}
+{"id": "held-benign-enc-010", "payload": "Vesting contract 0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed audited last quarter."}
+{"id": "held-benign-enc-011", "payload": "Correlation id 6ba7b8109dad11d180b400c04fd430c8 attached to the support ticket."}
+{"id": "held-benign-enc-012", "payload": "redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&state=af0ifjsldkj"}
+{"id": "held-benign-enc-013", "payload": "Search filter: created%20ge%202026-01-01%20and%20owner%20eq%20%22ops%22"}
+{"id": "held-benign-enc-014", "payload": "Menu update: Fish &amp; Chips now includes a gluten&#8209;free option."}
+{"id": "held-benign-enc-015", "payload": "The formula uses &#960; &times; r&sup2; to compute the covered area."}
+{"id": "held-benign-enc-016", "payload": "decoded = base64.b64decode(record[\"payload\"]).decode(\"utf-8\")"}
+{"id": "held-benign-enc-017", "payload": "Content-Transfer-Encoding: base64 V2Vla2x5IG1haW50ZW5hbmNlIHdpbmRvdyBpcyBTdW5kYXkgMDI6MDAgVVRDLg=="}
+{"id": "held-benign-enc-018", "payload": "IPFS pin QmYwAPJzv5CZsnAzt8auVZRnDpmYzRB3xTkPvGE9dQkKuW added to the cluster."}
+{"id": "held-benign-enc-019", "payload": "Legacy deposit address bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq rotated out."}
+{"id": "held-benign-enc-020", "payload": "Backup archive named backup-20260714-full.tar.gz uploaded (checksum crc32 9a3f77b1)."}
+{"id": "held-benign-enc-021", "payload": "Locale test string: naïve café façade — ensure NFC and NFD render identically."}
+{"id": "held-benign-enc-022", "payload": "VGVhbSBvZmZzaXRlIGFnZW5kYTogcm9hZG1hcCByZXZpZXcsIGluY2lkZW50IHJldHJvLCBhbmQgZGVtbyBzZXNzaW9uLg=="}

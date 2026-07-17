@@ -37,7 +37,7 @@ async def test_benchmark_harness_records_dated_history_and_public_current_result
         "semantic_enabled": False,
     }
     assert record["measured_at"] == "2026-07-16T16:30:00Z"
-    assert record["attack_recall_percent"] == 64.29
+    assert record["attack_recall_percent"] == 89.36
     assert record["false_positive_rate_percent"] == 0.0
     assert len(record["result_sha256"]) == 64
 

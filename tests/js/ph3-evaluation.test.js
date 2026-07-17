@@ -40,7 +40,7 @@ test("public evaluation data matches the committed held-out benchmark", () => {
   assert.match(view.measuredAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
   assert.equal(evaluation.methodology.semantic_enabled, true);
   assert.equal(view.mode, "Paid thorough with semantic model");
-  assert.equal(benchmark.attack_recall_percent, 64.29);
+  assert.equal(benchmark.attack_recall_percent, 89.36);
   assert.equal(benchmark.false_positive_rate_percent, 0);
 });
 
