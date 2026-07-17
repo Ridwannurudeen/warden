@@ -22,6 +22,7 @@
   const BREAKER_ID = /^[0-9a-f]{32}$/;
   const BENCHMARK_CASE_ID = /^gauntlet-[0-9a-f]{16}$/;
   const SHA256_HEX = /^[0-9a-f]{64}$/;
+  const FINDER_FORMAT_CONTROLS = /\p{Cf}/gu;
   const BREAKER_FIELDS = new Set([
     "spec_version",
     "predicate_type",
@@ -74,6 +75,13 @@
 
   function isObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function normalizeFinderHandle(value) {
+    return String(value ?? "")
+      .normalize("NFKC")
+      .replace(FINDER_FORMAT_CONTROLS, "")
+      .trim();
   }
 
   function assertUnicodeScalarString(value) {
@@ -388,12 +396,17 @@
         { kind: "parser" },
       );
     }
+    const normalizedFinder =
+      certificate.finder === null
+        ? null
+        : normalizeFinderHandle(certificate.finder);
     if (
       certificate.finder !== null &&
       (typeof certificate.finder !== "string" ||
         !certificate.finder ||
         certificate.finder.trim() !== certificate.finder ||
-        Array.from(certificate.finder).length > 128 ||
+        !normalizedFinder ||
+        Array.from(normalizedFinder).length > 128 ||
         /[\u0000-\u001f\u007f]/.test(certificate.finder))
     ) {
       throw new ApaVerifierError(
@@ -1038,7 +1051,7 @@
         : "Invalid Ed25519 signature",
       certificateId: certificate.certificate_id,
       award: certificate.award,
-      finder: certificate.finder || "Anonymous",
+      finder: normalizeFinderHandle(certificate.finder) || "Anonymous",
       threatClass: certificate.threat_class,
       benchmarkCase: certificate.benchmark_case_id,
       payloadDigest: certificate.payload_sha256,
@@ -1060,6 +1073,7 @@
     TOFU_BOUNDARY,
     ApaVerifierError,
     attestationViewModel,
+    breakerViewModel,
     canonicalBytes,
     canonicalJson,
     decodeBase64Url,

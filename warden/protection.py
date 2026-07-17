@@ -20,6 +20,7 @@ import httpx
 from warden.apa_url import PublicUrlUnavailable, validate_public_http_url
 from warden.badges import b64u_decode, b64u_encode, ed25519_sign_record, ed25519_verify_record
 from warden.core.verdict import ReasonCode
+from warden.models import normalize_finder_handle
 from warden import protection_store
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -285,6 +286,7 @@ def issue_breaker_certificate(
     log_seq: int,
 ) -> dict[str, object]:
     """Issue one historical WARDEN BREAKER certificate with the APA issuer key."""
+    finder = normalize_finder_handle(finder)
     record = {
         "spec_version": BREAKER_SPEC_VERSION,
         "predicate_type": BREAKER_PREDICATE_TYPE,
@@ -355,6 +357,7 @@ def verify_breaker_certificate(record: dict[str, object]) -> bool:
         not isinstance(finder, str)
         or not finder
         or finder.strip() != finder
+        or normalize_finder_handle(finder) != finder
         or len(finder) > 128
         or any(ord(character) < 32 or ord(character) == 127 for character in finder)
     ):

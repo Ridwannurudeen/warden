@@ -93,6 +93,28 @@ def test_allowed_claim_is_pending_and_never_auto_confirmed(tmp_path, monkeypatch
     assert stats.json()["corpus_size"] >= 118
 
 
+def test_gauntlet_normalizes_finder_format_controls_before_storage(
+    tmp_path, monkeypatch
+):
+    store_path = tmp_path / "attempts.jsonl"
+    monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", store_path)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/demo/gauntlet",
+            json={
+                "intent": "other",
+                "payload": "A routine account status note.",
+                "finder": " \uff20researcher\u202e\u200b.example ",
+                "public_credit_consent": True,
+            },
+        )
+
+    assert response.status_code == 200
+    [record] = _records(store_path)
+    assert record["finder"] == "@researcher.example"
+
+
 def test_duplicate_pending_claim_is_recorded_without_duplicate_raw_payload(tmp_path, monkeypatch):
     store_path = tmp_path / "attempts.jsonl"
     monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", store_path)

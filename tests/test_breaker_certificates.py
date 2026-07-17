@@ -230,6 +230,19 @@ def test_pending_finder_credit_tampering_fails_integrity_check(breaker_state):
     assert _read_jsonl(breaker_state["benchmark_path"]) == []
 
 
+def test_confirmed_finder_credit_strips_format_controls_before_signing(
+    breaker_state,
+):
+    disguised_finder = "\uff20researcher\u202e\u200b.example"
+    claim_id = _record_pending(submission_finder=disguised_finder)
+
+    result = _confirm(claim_id, breaker_state, finder=disguised_finder)
+
+    assert _certificate(result)["finder"] == "@researcher.example"
+    [attempt] = _read_jsonl(breaker_state["attempts_path"])
+    assert attempt["finder"] == "@researcher.example"
+
+
 def test_confirmed_reproducer_issues_signed_certificate_log_and_public_records(
     breaker_state,
 ):

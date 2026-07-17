@@ -54,6 +54,13 @@
     "log_seq",
     "issuer_sig",
   ]);
+  const GAUNTLET_STAT_KEYS = [
+    "attempts",
+    "pending_claims",
+    "confirmed_bypasses",
+    "corpus_size",
+  ];
+  const FINDER_FORMAT_CONTROLS = /\p{Cf}/gu;
   const GAUNTLET_EXAMPLES = Object.freeze({
     drain: Object.freeze({
       intent: "drain_funds",
@@ -89,6 +96,13 @@
     };
   }
 
+  function normalizeFinderHandle(value) {
+    return String(value ?? "")
+      .normalize("NFKC")
+      .replace(FINDER_FORMAT_CONTROLS, "")
+      .trim();
+  }
+
   function buildGauntletRequest({
     intent,
     payload,
@@ -111,8 +125,8 @@
     if (payload.length > 4000) {
       throw new Error("The adversarial payload cannot exceed 4,000 characters");
     }
-    const normalizedFinder = String(finder || "").trim();
-    if (normalizedFinder.length > 128) {
+    const normalizedFinder = normalizeFinderHandle(finder);
+    if (Array.from(normalizedFinder).length > 128) {
       throw new Error("Finder credit cannot exceed 128 characters");
     }
     const request = {
@@ -175,17 +189,11 @@
   }
 
   function deriveGauntletStats(value) {
-    const keys = [
-      "attempts",
-      "pending_claims",
-      "confirmed_bypasses",
-      "corpus_size",
-    ];
     const valid =
       value !== null &&
       typeof value === "object" &&
       !Array.isArray(value) &&
-      keys.every(
+      GAUNTLET_STAT_KEYS.every(
         (key) => Number.isInteger(value[key]) && Number(value[key]) >= 0,
       );
     if (!valid) {
@@ -194,9 +202,23 @@
       });
     }
     return {
-      values: Object.fromEntries(keys.map((key) => [key, Number(value[key])])),
+      values: Object.fromEntries(
+        GAUNTLET_STAT_KEYS.map((key) => [key, Number(value[key])]),
+      ),
       zeroConfirmed: value.confirmed_bypasses === 0,
     };
+  }
+
+  function renderGauntletStats(stats, document, zeroState) {
+    for (const key of GAUNTLET_STAT_KEYS) {
+      const target = document.querySelector(`[data-stat="${key}"]`);
+      if (target) {
+        target.textContent = stats
+          ? stats.values[key].toLocaleString()
+          : "Unavailable";
+      }
+    }
+    zeroState.hidden = !stats || !stats.zeroConfirmed;
   }
 
   function isObject(value) {
@@ -243,12 +265,17 @@
     const certificateIds = new Set();
     const benchmarkCaseIds = new Set();
     const rows = value.breakers.map((certificate) => {
+      const normalizedFinder =
+        typeof certificate?.finder === "string"
+          ? normalizeFinderHandle(certificate.finder)
+          : null;
       const validFinder =
         certificate?.finder === null ||
         (typeof certificate?.finder === "string" &&
           certificate.finder.length > 0 &&
-          certificate.finder.length <= 128 &&
           certificate.finder.trim() === certificate.finder &&
+          normalizedFinder.length > 0 &&
+          Array.from(normalizedFinder).length <= 128 &&
           !/[\u0000-\u001f\u007f]/u.test(certificate.finder));
       const valid =
         isObject(certificate) &&
@@ -294,7 +321,7 @@
         benchmarkCaseId: certificate.benchmark_case_id,
         threatClass: certificate.threat_class,
         payloadSha256: certificate.payload_sha256,
-        finder: certificate.finder || "Anonymous",
+        finder: normalizedFinder || "Anonymous",
         confirmedAt: confirmedAt.toISOString(),
         logSeq: certificate.log_seq,
         verifyHref: `${verifier.pathname}${verifier.search}`,
@@ -335,6 +362,8 @@
     getGauntletExample,
     isCurrentGauntletRequest,
     isCurrentGauntletStatsRequest,
+    normalizeFinderHandle,
+    renderGauntletStats,
     retryableGauntletRequest,
   };
   if (typeof module !== "undefined" && module.exports) {
@@ -420,19 +449,14 @@
       if (!isCurrentGauntletStatsRequest(requestId, statsRequestId)) {
         return;
       }
-      for (const [key, value] of Object.entries(stats.values)) {
-        const target = document.querySelector(`[data-stat="${key}"]`);
-        if (target) {
-          target.textContent = value.toLocaleString();
-        }
-      }
-      zeroState.hidden = !stats.zeroConfirmed;
+      renderGauntletStats(stats, document, zeroState);
       statsStatus.textContent =
         "Live counters loaded from this Warden instance.";
     } catch (error) {
       if (!isCurrentGauntletStatsRequest(requestId, statsRequestId)) {
         return;
       }
+      renderGauntletStats(null, document, zeroState);
       statsStatus.textContent = formatScanError(error);
       statsRetry.hidden = false;
     } finally {

@@ -13,6 +13,8 @@ const {
   getGauntletExample,
   isCurrentGauntletRequest,
   isCurrentGauntletStatsRequest,
+  normalizeFinderHandle,
+  renderGauntletStats,
   retryableGauntletRequest,
 } = require(path.join(__dirname, "..", "..", "site", "gauntlet.js"));
 
@@ -116,6 +118,41 @@ test("gauntlet request keeps authorization and public finder consent separate", 
   assert.equal("public_credit_consent" in anonymous, false);
 });
 
+test("finder handles normalize formatting controls before submission and display", () => {
+  const disguised = " \uff20researcher\u202e\u200b.example ";
+  assert.equal(normalizeFinderHandle(disguised), "@researcher.example");
+
+  const request = buildGauntletRequest({
+    intent: "other",
+    payload: "A routine status note.",
+    finder: disguised,
+    expectedAddresses: "",
+    consent: true,
+    publicCreditConsent: true,
+  });
+  assert.equal(request.finder, "@researcher.example");
+
+  const leaderboard = deriveBreakerLeaderboard(
+    {
+      breakers: [breaker({ finder: "\uff20researcher\u202e\u200b.example" })],
+      total: 1,
+    },
+    BASE_URL,
+  );
+  assert.equal(leaderboard.rows[0].finder, "@researcher.example");
+  assert.throws(
+    () =>
+      deriveBreakerLeaderboard(
+        {
+          breakers: [breaker({ finder: "\u202e\u200b" })],
+          total: 1,
+        },
+        BASE_URL,
+      ),
+    /malformed/,
+  );
+});
+
 test("gauntlet request rejects blank, oversized, unsupported, and invalid recipients", () => {
   const values = {
     intent: "drain_funds",
@@ -197,6 +234,55 @@ test("gauntlet stats validate counts and expose an honest confirmed-bypass zero 
       }),
     /malformed/,
   );
+});
+
+test("failed Gauntlet stats refresh clears stale values and recovery repopulates them", () => {
+  const keys = [
+    "attempts",
+    "pending_claims",
+    "confirmed_bypasses",
+    "corpus_size",
+  ];
+  const targets = new Map(keys.map((key) => [key, { textContent: "" }]));
+  const document = {
+    querySelector(selector) {
+      const key = /^\[data-stat="([^"]+)"\]$/u.exec(selector)?.[1];
+      return key ? targets.get(key) : null;
+    },
+  };
+  const zeroState = { hidden: true };
+
+  renderGauntletStats(
+    deriveGauntletStats({
+      attempts: 12,
+      pending_claims: 3,
+      confirmed_bypasses: 0,
+      corpus_size: 122,
+    }),
+    document,
+    zeroState,
+  );
+  assert.equal(targets.get("attempts").textContent, "12");
+  assert.equal(zeroState.hidden, false);
+
+  renderGauntletStats(null, document, zeroState);
+  for (const target of targets.values()) {
+    assert.equal(target.textContent, "Unavailable");
+  }
+  assert.equal(zeroState.hidden, true);
+
+  renderGauntletStats(
+    deriveGauntletStats({
+      attempts: 13,
+      pending_claims: 2,
+      confirmed_bypasses: 1,
+      corpus_size: 123,
+    }),
+    document,
+    zeroState,
+  );
+  assert.equal(targets.get("confirmed_bypasses").textContent, "1");
+  assert.equal(zeroState.hidden, true);
 });
 
 test("breaker leaderboard validates payload-safe records and builds same-origin verifier links", () => {

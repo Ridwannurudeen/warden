@@ -17,7 +17,12 @@ from uuid import uuid4
 from warden import protection, protection_store
 from warden.core.verdict import ReasonCode
 from warden.engine import WardenEngine
-from warden.models import ClaimStatus, GauntletRequest, ScanResponse
+from warden.models import (
+    ClaimStatus,
+    GauntletRequest,
+    ScanResponse,
+    normalize_finder_handle,
+)
 
 
 _STORE_PATH = Path(__file__).resolve().parents[1] / "gauntlet" / "attempts.jsonl"
@@ -382,14 +387,12 @@ def confirm_bypass(
         raise ValueError("reviewed_payload must not be blank")
     if len(reviewed_payload) > 4_000:
         raise ValueError("reviewed_payload must not exceed 4000 characters")
-    if finder is not None:
-        finder = finder.strip()
-        if (
-            not finder
-            or len(finder) > 128
-            or any(ord(character) < 32 or ord(character) == 127 for character in finder)
-        ):
-            raise ValueError("finder must be a printable handle of at most 128 characters")
+    finder = normalize_finder_handle(finder)
+    if finder is not None and (
+        len(finder) > 128
+        or any(ord(character) < 32 or ord(character) == 127 for character in finder)
+    ):
+        raise ValueError("finder must be a printable handle of at most 128 characters")
     requested_at, requested_at_unix = _parse_confirmed_at(
         confirmed_at or _timestamp()
     )

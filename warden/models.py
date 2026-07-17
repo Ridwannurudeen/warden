@@ -1,5 +1,6 @@
 """Pydantic boundary models for Warden HTTP and MCP surfaces."""
 
+import unicodedata
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -17,6 +18,18 @@ VerdictLabel = Literal["ALLOW", "SANITIZE", "BLOCK"]
 RiskLabel = Literal["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
 Grade = Literal["A", "B", "C", "D", "F", "INCONCLUSIVE"]
 ClaimStatus = Literal["not_candidate", "pending", "duplicate"]
+
+
+def normalize_finder_handle(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = unicodedata.normalize("NFKC", value)
+    normalized = "".join(
+        character
+        for character in normalized
+        if unicodedata.category(character) != "Cf"
+    ).strip()
+    return normalized or None
 
 
 class ScanContext(BaseModel):
@@ -93,13 +106,10 @@ class GauntletRequest(BaseModel):
             raise ValueError("payload must not be blank")
         return value[:MAX_DEMO_PAYLOAD_LENGTH]
 
-    @field_validator("finder")
+    @field_validator("finder", mode="before")
     @classmethod
-    def normalize_finder(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        normalized = value.strip()
-        return normalized or None
+    def normalize_finder(cls, value: object) -> object:
+        return normalize_finder_handle(value) if isinstance(value, str) else value
 
 
 class Detection(BaseModel):

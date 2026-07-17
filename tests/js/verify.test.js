@@ -11,6 +11,7 @@ const {
   KEY_THEFT_BOUNDARY,
   TOFU_BOUNDARY,
   ApaVerifierError,
+  breakerViewModel,
   canonicalJson,
   decodeBase64Url,
   loadBreakerVerificationMaterial,
@@ -217,6 +218,22 @@ test("BREAKER certificate schema and issuer signature verify independently", asy
     { cryptoImpl: webcrypto },
   );
   assert.equal(unicodeResult.accepted, true);
+
+  const formattedFinder = await signRecord(
+    breakerCore({ finder: "\uff20researcher\u202e\u200b.example" }),
+    material.keys.privateKey,
+    "issuer_sig",
+  );
+  const formattedResult = await verifyBreakerCertificate(
+    formattedFinder,
+    material.issuerDocument,
+    { cryptoImpl: webcrypto },
+  );
+  assert.equal(formattedResult.accepted, true);
+  assert.equal(
+    breakerViewModel(formattedFinder, formattedResult).finder,
+    "@researcher.example",
+  );
 });
 
 test("BREAKER issuer-key history uses the signed confirmation-time cutoff", async () => {
