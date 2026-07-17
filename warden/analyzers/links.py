@@ -7,7 +7,10 @@ from urllib.parse import urlparse
 from warden.core.analyzer import AnalysisContext, Analyzer, AnalyzerResult
 from warden.core.verdict import ReasonCode
 
-URL_RE = re.compile(r"(?i)\b(?:https?://[^\s<>'\")]+|data:[^\s<>'\")]+)")
+URL_RE = re.compile(
+    r"(?i)\b(?:https?://[^\s<>'\")]+|data:[^\s<>'\")]+|"
+    r"(?:javascript|vbscript):[^\s<>'\")]+)"
+)
 CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
 ASCII_ALPHA_RE = re.compile(r"[A-Za-z]")
 
@@ -50,7 +53,10 @@ class MaliciousLinkAnalyzer(Analyzer):
 
     @staticmethod
     def _confidence(url: str) -> float:
-        if url.lower().startswith("data:"):
+        lowered = url.lower()
+        if lowered.startswith(("javascript:", "vbscript:")):
+            return 0.95
+        if lowered.startswith("data:"):
             return 0.85
 
         parsed = urlparse(url)

@@ -36,3 +36,4 @@
 {"id": "held-benign-enc-020", "payload": "Backup archive named backup-20260714-full.tar.gz uploaded (checksum crc32 9a3f77b1)."}
 {"id": "held-benign-enc-021", "payload": "Locale test string: naïve café façade — ensure NFC and NFD render identically."}
 {"id": "held-benign-enc-022", "payload": "VGVhbSBvZmZzaXRlIGFnZW5kYTogcm9hZG1hcCByZXZpZXcsIGluY2lkZW50IHJldHJvLCBhbmQgZGVtbyBzZXNzaW9uLg=="}
+{"id":"held-benign-recall-link-001","payload":"The documentation explains how JavaScript fetch can send an HTTPS request."}

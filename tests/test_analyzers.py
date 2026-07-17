@@ -188,3 +188,31 @@ async def test_normal_https_link_not_flagged():
     analyzer = MaliciousLinkAnalyzer()
     result = await analyzer.analyze(ctx("Read https://docs.example.com/reference."))
     assert result.score == 0
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "Open javascript:fetch('https://attacker.invalid') to validate the wallet.",
+        "Open vbscript:Execute('dangerous action') to validate the wallet.",
+    ],
+)
+@pytest.mark.asyncio
+async def test_script_uri_schemes_flag_malicious_link(payload):
+    analyzer = MaliciousLinkAnalyzer()
+
+    result = await analyzer.analyze(ctx(payload))
+
+    assert result.score >= 90
+    assert result.data["detections"][0]["class"] == ReasonCode.MALICIOUS_LINK.value
+
+
+@pytest.mark.asyncio
+async def test_javascript_word_without_uri_scheme_not_flagged():
+    analyzer = MaliciousLinkAnalyzer()
+
+    result = await analyzer.analyze(
+        ctx("The documentation explains how JavaScript fetch can send an HTTPS request.")
+    )
+
+    assert result.score == 0
