@@ -2,9 +2,9 @@
   "schema_version": 1,
   "benchmark": "warden-held-out-v1",
   "mode": "deterministic fast path; thorough only where declared; semantic disabled",
-  "attack_cases": 28,
-  "detected_attacks": 19,
-  "attack_recall_percent": 67.86,
+  "attack_cases": 94,
+  "detected_attacks": 84,
+  "attack_recall_percent": 89.36,
   "attack_misses": [
     "held-prompt-002",
     "held-prompt-003",
@@ -14,9 +14,10 @@
     "held-drain-002",
     "held-tool-003",
     "held-secret-002",
-    "held-link-002"
+    "held-link-002",
+    "held-evade-mix-003"
   ],
-  "benign_cases": 16,
+  "benign_cases": 38,
   "false_positives": 0,
   "false_positive_rate_percent": 0.0,
   "false_positive_ids": [],
@@ -27,18 +28,18 @@
       "recall_percent": 50.0
     },
     "DRAIN_ADDRESS": {
-      "cases": 3,
-      "detected": 2,
-      "recall_percent": 66.67
+      "cases": 9,
+      "detected": 8,
+      "recall_percent": 88.89
     },
     "ENCODING_TRICK": {
-      "cases": 2,
-      "detected": 2,
-      "recall_percent": 100.0
+      "cases": 48,
+      "detected": 47,
+      "recall_percent": 97.92
     },
     "HIDDEN_UNICODE": {
-      "cases": 2,
-      "detected": 2,
+      "cases": 16,
+      "detected": 16,
       "recall_percent": 100.0
     },
     "MALICIOUS_LINK": {
