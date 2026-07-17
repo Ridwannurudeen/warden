@@ -64,10 +64,11 @@ test("status page states the objective and its evidence boundary", () => {
     path.join(__dirname, "..", "..", "site", "status.html"),
     "utf8",
   );
-  assert.match(html, /99\.5% application-readiness objective/);
-  assert.match(html, /not a contractual SLA/);
+  const normalizedHtml = html.replace(/\s+/g, " ");
+  assert.match(normalizedHtml, /99\.5% application-readiness objective/);
+  assert.match(normalizedHtml, /not a contractual SLA/);
   assert.match(
-    html,
+    normalizedHtml,
     /Third-party payment-facilitator availability is outside this measurement/,
   );
   assert.match(html, /data-monitor-availability/);

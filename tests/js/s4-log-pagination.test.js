@@ -59,3 +59,40 @@ test("browser log loader follows bounded cursor pages", async () => {
     [1, 2, 3, 4, 5],
   );
 });
+
+test("browser log loader rejects pagination past the published total", async () => {
+  let calls = 0;
+
+  await assert.rejects(
+    fetchLogPages(async () => {
+      calls += 1;
+      return response({
+        entries: [entry(calls)],
+        total: 1,
+        next_cursor: calls,
+      });
+    }, 2),
+    /published total/,
+  );
+  assert.equal(calls, 1);
+});
+
+test("browser log loader rejects a log larger than its verification ceiling", async () => {
+  let calls = 0;
+
+  await assert.rejects(
+    fetchLogPages(async () => {
+      calls += 1;
+      if (calls > 1) {
+        throw new Error("unexpected second log request");
+      }
+      return response({
+        entries: [entry(1)],
+        total: 10_001,
+        next_cursor: 1,
+      });
+    }),
+    /verification limit/,
+  );
+  assert.equal(calls, 1);
+});

@@ -711,6 +711,33 @@ def test_home_playground_badges_integrations_and_status_are_real_surfaces():
     assert "transaction-specific" in status.lower()
 
 
+def test_gauntlet_breaker_board_is_empty_honest_and_requires_public_credit_consent():
+    gauntlet_source = (SITE / "gauntlet.html").read_text(encoding="utf-8")
+    privacy_source = (SITE / "privacy.html").read_text(encoding="utf-8")
+    gauntlet = " ".join(gauntlet_source.lower().split())
+    privacy = " ".join(privacy_source.lower().split())
+
+    assert "warden signs its own defeats" in gauntlet
+    assert (
+        "every attack that beat us, cryptographically proven, already in our benchmark."
+        in gauntlet
+    )
+    assert "data-breaker-board" in gauntlet_source
+    assert "data-breaker-empty" in gauntlet_source
+    assert "data-breaker-certificate" in gauntlet_source
+    assert "data-breaker-row" not in gauntlet_source
+    assert "50 most recent certificates" in gauntlet
+    assert "transparency chain remains the complete public record" in gauntlet
+
+    assert "data-gauntlet-public-credit-consent" in gauntlet_source
+    assert "consent to publish" in gauntlet
+    assert "finder handle" in gauntlet
+    assert "raw submitted payload is not published" in privacy
+    assert "redacted reproducer" in privacy
+    assert "payload digest" in privacy
+    assert "consented finder handle" in privacy
+
+
 def test_status_and_marketplace_metadata_are_dated_and_honest():
     status = json.loads((SITE / "data" / "site-status.json").read_text(encoding="utf-8"))
     product_proof = json.loads((SITE / "data" / "product-proof.json").read_text(encoding="utf-8"))
@@ -763,8 +790,10 @@ def test_privacy_and_terms_cover_gauntlet_retention_and_public_surfaces():
 
     assert "pending gauntlet" in privacy
     assert "payload" in privacy and "finder" in privacy
+    assert "does not authenticate account ownership" in privacy
     assert "/api/demo/gauntlet" in terms
     assert "/api/badges" in terms
+    assert "does not prove the submitter controls" in terms
     assert 'rel="canonical" href="https://warden.gudman.xyz/privacy"' in privacy_source
     assert 'rel="canonical" href="https://warden.gudman.xyz/terms"' in terms_source
     for source in (privacy_source, terms_source):

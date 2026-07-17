@@ -166,9 +166,13 @@ def test_monitor_history_is_bounded_and_refuses_symlink_output(tmp_path, monkeyp
 def test_status_surface_publishes_an_unmeasured_objective_not_an_uptime_claim():
     root = Path(__file__).resolve().parents[1]
     html = (root / "site" / "status.html").read_text(encoding="utf-8")
+    normalized_html = " ".join(html.split())
     monitor = json.loads((root / "site" / "data" / "service-monitor.json").read_text())
 
-    assert "99.5% application-readiness objective" in html
-    assert "not a contractual SLA" in html
-    assert "Third-party payment-facilitator availability is outside this measurement" in html
+    assert "99.5% application-readiness objective" in normalized_html
+    assert "not a contractual SLA" in normalized_html
+    assert (
+        "Third-party payment-facilitator availability is outside this measurement"
+        in normalized_html
+    )
     assert monitor == {"schema_version": 1, "status": "not_running", "samples": []}

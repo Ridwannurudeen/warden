@@ -26,6 +26,34 @@
     "malicious_link",
     "other",
   ]);
+  const BREAKER_THREAT_CLASSES = new Set([
+    "PROMPT_INJECTION",
+    "ROLE_OVERRIDE",
+    "WEB3_INJECTION",
+    "HIDDEN_UNICODE",
+    "ENCODING_TRICK",
+    "STATISTICAL_ANOMALY",
+    "CORPUS_MATCH",
+    "DRAIN_ADDRESS",
+    "TOOL_HIJACK",
+    "SECRET_EXFIL",
+    "MALICIOUS_LINK",
+  ]);
+  const BREAKER_CERTIFICATE_FIELDS = new Set([
+    "spec_version",
+    "predicate_type",
+    "certificate_id",
+    "issuer",
+    "award",
+    "benchmark_case_id",
+    "threat_class",
+    "payload_sha256",
+    "payload_scope",
+    "finder",
+    "confirmed_at",
+    "log_seq",
+    "issuer_sig",
+  ]);
   const GAUNTLET_EXAMPLES = Object.freeze({
     drain: Object.freeze({
       intent: "drain_funds",
@@ -67,6 +95,7 @@
     finder,
     expectedAddresses,
     consent,
+    publicCreditConsent,
   }) {
     if (consent !== true) {
       throw new Error(
@@ -94,7 +123,13 @@
       },
     };
     if (normalizedFinder) {
+      if (publicCreditConsent !== true) {
+        throw new Error(
+          "Consent to publish the finder handle before requesting public credit",
+        );
+      }
       request.finder = normalizedFinder;
+      request.public_credit_consent = true;
     }
     return request;
   }
@@ -164,6 +199,122 @@
     };
   }
 
+  function isObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function hasExactKeys(value, expectedKeys) {
+    const keys = Object.keys(value);
+    return (
+      keys.length === expectedKeys.size &&
+      keys.every((key) => expectedKeys.has(key))
+    );
+  }
+
+  function malformedBreakerEnvelope() {
+    return new ScanClientError("Breaker leaderboard is malformed", {
+      kind: "malformed",
+    });
+  }
+
+  function deriveBreakerLeaderboard(value, baseUrl) {
+    if (
+      !isObject(value) ||
+      !hasExactKeys(value, new Set(["breakers", "total"])) ||
+      !Array.isArray(value.breakers) ||
+      value.breakers.length > 50 ||
+      !Number.isSafeInteger(value.total) ||
+      value.total < 0 ||
+      value.total !== value.breakers.length
+    ) {
+      throw malformedBreakerEnvelope();
+    }
+
+    let pageUrl;
+    try {
+      pageUrl = new URL(baseUrl);
+    } catch {
+      throw malformedBreakerEnvelope();
+    }
+    if (!["http:", "https:"].includes(pageUrl.protocol)) {
+      throw malformedBreakerEnvelope();
+    }
+
+    const certificateIds = new Set();
+    const benchmarkCaseIds = new Set();
+    const rows = value.breakers.map((certificate) => {
+      const validFinder =
+        certificate?.finder === null ||
+        (typeof certificate?.finder === "string" &&
+          certificate.finder.length > 0 &&
+          certificate.finder.length <= 128 &&
+          certificate.finder.trim() === certificate.finder &&
+          !/[\u0000-\u001f\u007f]/u.test(certificate.finder));
+      const valid =
+        isObject(certificate) &&
+        hasExactKeys(certificate, BREAKER_CERTIFICATE_FIELDS) &&
+        certificate.spec_version === "warden-breaker/1" &&
+        certificate.predicate_type ===
+          "https://warden.gudman.xyz/spec/gauntlet-breaker/v1" &&
+        /^[0-9a-f]{32}$/u.test(certificate.certificate_id) &&
+        certificate.issuer === "warden" &&
+        certificate.award === "WARDEN BREAKER" &&
+        /^gauntlet-[0-9a-f]{16}$/u.test(certificate.benchmark_case_id) &&
+        BREAKER_THREAT_CLASSES.has(certificate.threat_class) &&
+        /^[0-9a-f]{64}$/u.test(certificate.payload_sha256) &&
+        certificate.payload_scope === "human-reviewed-redacted-reproducer" &&
+        validFinder &&
+        Number.isSafeInteger(certificate.confirmed_at) &&
+        certificate.confirmed_at >= 0 &&
+        Number.isSafeInteger(certificate.log_seq) &&
+        certificate.log_seq >= 1 &&
+        /^sig:[A-Za-z0-9_-]{86}$/u.test(certificate.issuer_sig);
+      if (
+        !valid ||
+        certificateIds.has(certificate.certificate_id) ||
+        benchmarkCaseIds.has(certificate.benchmark_case_id)
+      ) {
+        throw malformedBreakerEnvelope();
+      }
+
+      const confirmedAt = new Date(certificate.confirmed_at * 1000);
+      if (Number.isNaN(confirmedAt.getTime())) {
+        throw malformedBreakerEnvelope();
+      }
+      const verifier = new URL("/verify", pageUrl);
+      verifier.searchParams.set("breaker", certificate.certificate_id);
+      if (verifier.origin !== pageUrl.origin) {
+        throw malformedBreakerEnvelope();
+      }
+
+      certificateIds.add(certificate.certificate_id);
+      benchmarkCaseIds.add(certificate.benchmark_case_id);
+      return {
+        certificateId: certificate.certificate_id,
+        benchmarkCaseId: certificate.benchmark_case_id,
+        threatClass: certificate.threat_class,
+        payloadSha256: certificate.payload_sha256,
+        finder: certificate.finder || "Anonymous",
+        confirmedAt: confirmedAt.toISOString(),
+        logSeq: certificate.log_seq,
+        verifyHref: `${verifier.pathname}${verifier.search}`,
+      };
+    });
+    if (
+      rows.some(
+        (row, index) => index > 0 && row.logSeq >= rows[index - 1].logSeq,
+      )
+    ) {
+      throw malformedBreakerEnvelope();
+    }
+
+    return {
+      rows,
+      total: value.total,
+      zeroConfirmed: value.total === 0,
+    };
+  }
+
   function retryableGauntletRequest(lastRequest, consentGranted) {
     return lastRequest && consentGranted ? lastRequest : null;
   }
@@ -178,6 +329,7 @@
 
   const api = {
     buildGauntletRequest,
+    deriveBreakerLeaderboard,
     deriveGauntletReceipt,
     deriveGauntletStats,
     getGauntletExample,
@@ -206,6 +358,12 @@
   const retryButton = document.querySelector("[data-gauntlet-retry]");
   const consent = document.querySelector("[data-gauntlet-consent]");
   const consentError = document.querySelector("[data-gauntlet-consent-error]");
+  const publicCreditConsent = document.querySelector(
+    "[data-gauntlet-public-credit-consent]",
+  );
+  const publicCreditError = document.querySelector(
+    "[data-gauntlet-public-credit-error]",
+  );
   const addressError = document.querySelector("[data-gauntlet-address-error]");
   const payloadError = document.querySelector("[data-gauntlet-payload-error]");
   const submitButton = form.querySelector('button[type="submit"]');
@@ -213,10 +371,19 @@
   const statsStatus = document.querySelector("[data-gauntlet-stats-status]");
   const statsRetry = document.querySelector("[data-gauntlet-stats-retry]");
   const zeroState = document.querySelector("[data-gauntlet-zero]");
+  const breakerBoard = document.querySelector("[data-breaker-board]");
+  const breakerStatus = document.querySelector("[data-breaker-status]");
+  const breakerRetry = document.querySelector("[data-breaker-retry]");
+  const breakerEmpty = document.querySelector("[data-breaker-empty]");
+  const breakerList = document.querySelector("[data-breaker-list]");
+  const breakerCertificate = document.querySelector(
+    "[data-breaker-certificate]",
+  );
   let lastRequest = null;
   let submissionBusy = false;
   let submissionRequestId = 0;
   let statsRequestId = 0;
+  let breakerRequestId = 0;
 
   function setStatus(message, state = "ready") {
     status.textContent = message;
@@ -227,6 +394,12 @@
     consentError.textContent = message;
     consentError.hidden = !message;
     consent.setAttribute("aria-invalid", String(Boolean(message)));
+  }
+
+  function setPublicCreditError(message = "") {
+    publicCreditError.textContent = message;
+    publicCreditError.hidden = !message;
+    publicCreditConsent.setAttribute("aria-invalid", String(Boolean(message)));
   }
 
   function setFieldError(element, control, message = "") {
@@ -265,6 +438,108 @@
     } finally {
       if (isCurrentGauntletStatsRequest(requestId, statsRequestId)) {
         statsPanel.setAttribute("aria-busy", "false");
+      }
+    }
+  }
+
+  function appendBreakerDatum(list, label, value, code = false) {
+    const item = document.createElement("div");
+    const term = document.createElement("dt");
+    const detail = document.createElement("dd");
+    const output = document.createElement(code ? "code" : "span");
+    term.textContent = label;
+    output.textContent = String(value);
+    detail.append(output);
+    item.append(term, detail);
+    list.append(item);
+  }
+
+  function clearBreakerEvidence() {
+    breakerList.replaceChildren();
+    breakerList.hidden = true;
+    breakerEmpty.hidden = true;
+    breakerCertificate.hidden = true;
+  }
+
+  function renderBreakerLeaderboard(leaderboard) {
+    clearBreakerEvidence();
+    if (leaderboard.zeroConfirmed) {
+      breakerEmpty.hidden = false;
+      breakerStatus.textContent =
+        "No human-confirmed BREAKER certificates have been issued.";
+      return;
+    }
+
+    for (const row of leaderboard.rows) {
+      const card = document.createElement("article");
+      const eyebrow = document.createElement("p");
+      const heading = document.createElement("h3");
+      const evidence = document.createElement("dl");
+      const verify = document.createElement("a");
+      card.className = "service-card";
+      card.dataset.breakerRow = "";
+      eyebrow.className = "eyebrow";
+      eyebrow.textContent = "WARDEN BREAKER";
+      heading.textContent = row.finder;
+      evidence.className = "data-list";
+      appendBreakerDatum(evidence, "Threat class", row.threatClass, true);
+      appendBreakerDatum(evidence, "Confirmed at", row.confirmedAt);
+      appendBreakerDatum(evidence, "Log position", row.logSeq, true);
+      appendBreakerDatum(evidence, "Payload digest", row.payloadSha256, true);
+      verify.className = "button secondary";
+      verify.href = row.verifyHref;
+      verify.textContent = "Verify signed certificate";
+      card.append(eyebrow, heading, evidence, verify);
+      breakerList.append(card);
+    }
+    breakerList.hidden = false;
+
+    const latest = leaderboard.rows[0];
+    breakerCertificate.querySelector(
+      "[data-breaker-certificate-id]",
+    ).textContent = latest.certificateId;
+    breakerCertificate.querySelector("[data-breaker-finder]").textContent =
+      latest.finder;
+    breakerCertificate.querySelector("[data-breaker-threat]").textContent =
+      latest.threatClass;
+    breakerCertificate.querySelector("[data-breaker-confirmed]").textContent =
+      latest.confirmedAt;
+    breakerCertificate.querySelector("[data-breaker-digest]").textContent =
+      latest.payloadSha256;
+    breakerCertificate.querySelector("[data-breaker-log-seq]").textContent =
+      String(latest.logSeq);
+    const latestVerify = breakerCertificate.querySelector(
+      "[data-breaker-verify]",
+    );
+    latestVerify.href = latest.verifyHref;
+    breakerCertificate.hidden = false;
+    breakerStatus.textContent = `${leaderboard.total.toLocaleString()} human-confirmed BREAKER certificate${leaderboard.total === 1 ? "" : "s"} loaded.`;
+  }
+
+  async function loadBreakers() {
+    const requestId = ++breakerRequestId;
+    breakerBoard.setAttribute("aria-busy", "true");
+    breakerRetry.hidden = true;
+    breakerStatus.textContent = "Loading public BREAKER certificates...";
+    try {
+      const leaderboard = deriveBreakerLeaderboard(
+        await getJson("/api/demo/gauntlet/breakers"),
+        root.location.href,
+      );
+      if (requestId !== breakerRequestId) {
+        return;
+      }
+      renderBreakerLeaderboard(leaderboard);
+    } catch (error) {
+      if (requestId !== breakerRequestId) {
+        return;
+      }
+      clearBreakerEvidence();
+      breakerStatus.textContent = formatScanError(error);
+      breakerRetry.hidden = false;
+    } finally {
+      if (requestId === breakerRequestId) {
+        breakerBoard.setAttribute("aria-busy", "false");
       }
     }
   }
@@ -342,7 +617,7 @@
       }
       renderReceipt(data);
       setStatus("Challenge complete. Review the receipt state.", "success");
-      await loadStats();
+      await Promise.all([loadStats(), loadBreakers()]);
     } catch (error) {
       if (!isCurrentGauntletRequest(requestId, submissionRequestId)) {
         return;
@@ -384,7 +659,16 @@
     }
   });
   form.elements.intent.addEventListener("change", () => supersedeSubmission());
-  form.elements.finder.addEventListener("input", () => supersedeSubmission());
+  form.elements.finder.addEventListener("input", () => {
+    supersedeSubmission();
+    setPublicCreditError();
+  });
+  publicCreditConsent.addEventListener("change", () => {
+    supersedeSubmission();
+    if (publicCreditConsent.checked) {
+      setPublicCreditError();
+    }
+  });
   form.elements.expected_addresses.addEventListener("input", () => {
     supersedeSubmission();
     setFieldError(addressError, form.elements.expected_addresses);
@@ -403,8 +687,10 @@
         finder: formData.get("finder"),
         expectedAddresses: formData.get("expected_addresses"),
         consent: consent.checked,
+        publicCreditConsent: publicCreditConsent.checked,
       });
       setConsentError();
+      setPublicCreditError();
       submitChallenge(request);
     } catch (error) {
       if (!consent.checked) {
@@ -417,6 +703,9 @@
           error.message,
         );
         form.elements.expected_addresses.focus();
+      } else if (/finder|credit|publish/i.test(error.message)) {
+        setPublicCreditError(error.message);
+        publicCreditConsent.focus();
       } else if (/payload/i.test(error.message)) {
         setFieldError(payloadError, form.elements.payload, error.message);
         form.elements.payload.focus();
@@ -429,6 +718,7 @@
     supersedeSubmission();
     root.setTimeout(() => {
       setConsentError();
+      setPublicCreditError();
       setFieldError(addressError, form.elements.expected_addresses);
       setFieldError(payloadError, form.elements.payload);
       errorPanel.hidden = true;
@@ -454,7 +744,15 @@
     root.WardenUI?.focusStatusTarget(statsStatus);
     loadStats();
   });
+  breakerRetry.addEventListener("click", () => {
+    root.WardenUI?.focusStatusTarget(breakerStatus);
+    loadBreakers();
+  });
 
   loadStats();
-  root.setInterval(loadStats, 60000);
+  loadBreakers();
+  root.setInterval(() => {
+    loadStats();
+    loadBreakers();
+  }, 60000);
 })(typeof globalThis === "undefined" ? this : globalThis);

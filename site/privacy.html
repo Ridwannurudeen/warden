@@ -27,9 +27,18 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=e281c1aa" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/assets/favicon-32.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/assets/apple-touch-icon.png"
+    />
+    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -107,7 +116,7 @@
           Gauntlet-review store and public badge store implemented by the
           application.
         </p>
-        <p class="snapshot-note">Effective 13 July 2026.</p>
+        <p class="snapshot-note">Effective 17 July 2026.</p>
       </section>
 
       <div class="doc-layout legal-layout">
@@ -167,6 +176,17 @@
               for these records, so submit only material you are comfortable
               retaining for security review.
             </p>
+            <p>
+              For a human-confirmed bypass, the raw submitted payload is not
+              published. A reviewer prepares and rescans a publishable redacted
+              reproducer; only that reproducer enters the held-out benchmark.
+              The public WARDEN BREAKER certificate contains its payload digest,
+              assigned threat class, confirmation time, log position, and either
+              a consented finder handle or an anonymous credit. It does not
+              contain the private claim, raw submission, declared intent, or
+              private review context. Finder handles are self-asserted; Warden
+              does not authenticate account ownership.
+            </p>
           </section>
 
           <section id="public-records">
@@ -176,6 +196,13 @@
               <code>/api/badges</code> and <code>/badge/{audit_id}</code>. The
               marketplace security index is built from public OKX.AI listing
               data, not visitor data.
+            </p>
+            <p>
+              Confirmed WARDEN BREAKER certificates are public through
+              <code>/api/demo/gauntlet/breakers</code>,
+              <code>/api/demo/gauntlet/breakers/{certificate_id}</code>, the
+              shared transparency log, and their <code>/verify?breaker=</code>
+              permalinks. Pending and rejected claims are not listed.
             </p>
             <p>
               Paid calls use x402 settlement on X Layer. Blockchain addresses
@@ -216,9 +243,8 @@
         ><span>Independent service listed on OKX.AI.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a
-        ><a href="/playground">Run a scan</a><a href="/gauntlet">Gauntlet</a
-        ><a href="/showcase">Walkthrough</a
+        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
+        ><a href="/gauntlet">Gauntlet</a><a href="/showcase">Walkthrough</a
         ><a href="/docs">Docs</a><a href="/badges">Audit badges</a
         ><a href="/status">API status</a><a href="/privacy">Privacy</a
         ><a href="/terms">Terms</a

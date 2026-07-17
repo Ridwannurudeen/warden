@@ -14,6 +14,47 @@
   const APA_TIERS = new Set(["guard-live", "audited"]);
   const SPEC_VERSION = "apa/0.1";
   const PREDICATE_TYPE = "https://warden.gudman.xyz/spec/protection/v1";
+  const BREAKER_SPEC_VERSION = "warden-breaker/1";
+  const BREAKER_PREDICATE_TYPE =
+    "https://warden.gudman.xyz/spec/gauntlet-breaker/v1";
+  const BREAKER_AWARD = "WARDEN BREAKER";
+  const BREAKER_PAYLOAD_SCOPE = "human-reviewed-redacted-reproducer";
+  const BREAKER_ID = /^[0-9a-f]{32}$/;
+  const BENCHMARK_CASE_ID = /^gauntlet-[0-9a-f]{16}$/;
+  const SHA256_HEX = /^[0-9a-f]{64}$/;
+  const BREAKER_FIELDS = new Set([
+    "spec_version",
+    "predicate_type",
+    "certificate_id",
+    "issuer",
+    "award",
+    "benchmark_case_id",
+    "threat_class",
+    "payload_sha256",
+    "payload_scope",
+    "finder",
+    "confirmed_at",
+    "log_seq",
+    "issuer_sig",
+  ]);
+  const THREAT_CLASSES = new Set([
+    "PROMPT_INJECTION",
+    "ROLE_OVERRIDE",
+    "WEB3_INJECTION",
+    "HIDDEN_UNICODE",
+    "ENCODING_TRICK",
+    "STATISTICAL_ANOMALY",
+    "CORPUS_MATCH",
+    "DRAIN_ADDRESS",
+    "TOOL_HIJACK",
+    "SECRET_EXFIL",
+    "MALICIOUS_LINK",
+  ]);
+  const transparencyLog =
+    root.WardenTransparencyLog ||
+    (typeof module !== "undefined" && module.exports
+      ? require("./log.js")
+      : null);
 
   const APA_BOUNDARY =
     "A valid, fresh attestation proves that the host serving endpoint_host controlled the key pub when the issuer verified a live APA-conformant Protection Proof. The endpoint signed that proof, including its rolling 24-hour screened-payload count or an explicit unavailable state; the issuer separately signed the attestation. It does not prove that every request is routed through the guard or independently audit the endpoint owner's local counter state.";
@@ -268,6 +309,121 @@
     return attestation;
   }
 
+  function validateBreakerCertificate(certificate) {
+    if (!isObject(certificate)) {
+      throw new ApaVerifierError(
+        "WARDEN BREAKER certificate must be a JSON object",
+        { kind: "parser" },
+      );
+    }
+    const fields = Object.keys(certificate);
+    if (
+      fields.length !== BREAKER_FIELDS.size ||
+      fields.some((field) => !BREAKER_FIELDS.has(field))
+    ) {
+      throw new ApaVerifierError(
+        "WARDEN BREAKER certificate fields do not match the supported schema",
+        { kind: "parser" },
+      );
+    }
+    if (certificate.spec_version !== BREAKER_SPEC_VERSION) {
+      throw new ApaVerifierError(
+        "WARDEN BREAKER certificate spec_version is unsupported",
+        { kind: "parser" },
+      );
+    }
+    if (certificate.predicate_type !== BREAKER_PREDICATE_TYPE) {
+      throw new ApaVerifierError(
+        "WARDEN BREAKER certificate predicate_type is unsupported",
+        { kind: "parser" },
+      );
+    }
+    if (certificate.issuer !== "warden") {
+      throw new ApaVerifierError(
+        "WARDEN BREAKER certificate issuer must be warden",
+        { kind: "parser" },
+      );
+    }
+    if (certificate.award !== BREAKER_AWARD) {
+      throw new ApaVerifierError(
+        "WARDEN BREAKER certificate award is unsupported",
+        { kind: "parser" },
+      );
+    }
+    if (
+      typeof certificate.certificate_id !== "string" ||
+      !BREAKER_ID.test(certificate.certificate_id)
+    ) {
+      throw new ApaVerifierError(
+        "WARDEN BREAKER certificate_id must be 32 lowercase hexadecimal characters",
+        { kind: "parser" },
+      );
+    }
+    if (
+      typeof certificate.benchmark_case_id !== "string" ||
+      !BENCHMARK_CASE_ID.test(certificate.benchmark_case_id)
+    ) {
+      throw new ApaVerifierError(
+        "WARDEN BREAKER benchmark_case_id must identify one Gauntlet case",
+        { kind: "parser" },
+      );
+    }
+    if (!THREAT_CLASSES.has(certificate.threat_class)) {
+      throw new ApaVerifierError("WARDEN BREAKER threat_class is unsupported", {
+        kind: "parser",
+      });
+    }
+    if (
+      typeof certificate.payload_sha256 !== "string" ||
+      !SHA256_HEX.test(certificate.payload_sha256)
+    ) {
+      throw new ApaVerifierError(
+        "WARDEN BREAKER payload_sha256 must be lowercase SHA-256 hex",
+        { kind: "parser" },
+      );
+    }
+    if (certificate.payload_scope !== BREAKER_PAYLOAD_SCOPE) {
+      throw new ApaVerifierError(
+        "WARDEN BREAKER payload_scope is unsupported",
+        { kind: "parser" },
+      );
+    }
+    if (
+      certificate.finder !== null &&
+      (typeof certificate.finder !== "string" ||
+        !certificate.finder ||
+        certificate.finder.trim() !== certificate.finder ||
+        Array.from(certificate.finder).length > 128 ||
+        /[\u0000-\u001f\u007f]/.test(certificate.finder))
+    ) {
+      throw new ApaVerifierError(
+        "WARDEN BREAKER finder must be null or a trimmed public credit",
+        { kind: "parser" },
+      );
+    }
+    if (
+      !Number.isSafeInteger(certificate.confirmed_at) ||
+      certificate.confirmed_at < 0
+    ) {
+      throw new ApaVerifierError(
+        "WARDEN BREAKER confirmed_at must be non-negative safe Unix seconds",
+        { kind: "parser" },
+      );
+    }
+    if (!Number.isSafeInteger(certificate.log_seq) || certificate.log_seq < 1) {
+      throw new ApaVerifierError(
+        "WARDEN BREAKER log_seq must be a positive safe integer",
+        { kind: "parser" },
+      );
+    }
+    decodeBase64Url(certificate.issuer_sig, "sig", 64);
+    const core = Object.fromEntries(
+      Object.entries(certificate).filter(([key]) => key !== "issuer_sig"),
+    );
+    canonicalJson(core);
+    return certificate;
+  }
+
   function extractAttestation(value) {
     if (!isObject(value)) {
       throw new ApaVerifierError("Attestation input must be a JSON object", {
@@ -284,6 +440,39 @@
       );
     }
     return candidate;
+  }
+
+  function extractBreakerCertificate(value) {
+    if (!isObject(value)) {
+      throw new ApaVerifierError("WARDEN BREAKER input must be a JSON object", {
+        kind: "input",
+      });
+    }
+    const candidate = Object.hasOwn(value, "certificate")
+      ? value.certificate
+      : value;
+    if (!isObject(candidate)) {
+      throw new ApaVerifierError(
+        "The certificate property must contain a JSON object",
+        { kind: "input" },
+      );
+    }
+    return candidate;
+  }
+
+  function parseBreakerQuery(search) {
+    const parameters = new URLSearchParams(String(search || ""));
+    const values = parameters.getAll("breaker");
+    if (values.length === 0) {
+      return null;
+    }
+    if (values.length !== 1 || !BREAKER_ID.test(values[0])) {
+      throw new ApaVerifierError(
+        "The breaker query must contain one 32-lowercase-hex certificate ID",
+        { kind: "input" },
+      );
+    }
+    return values[0];
   }
 
   function parseVerifierInput(value, baseHref) {
@@ -402,6 +591,47 @@
       issuerRequest,
     ]);
     return { attestation, issuerDocument };
+  }
+
+  async function loadBreakerVerificationMaterial(certificateId, fetchImpl) {
+    if (!BREAKER_ID.test(certificateId)) {
+      throw new ApaVerifierError(
+        "WARDEN BREAKER certificate IDs must contain 32 lowercase hexadecimal characters",
+        { kind: "input" },
+      );
+    }
+    if (typeof fetchImpl !== "function") {
+      throw new ApaVerifierError("Fetch is unavailable", { kind: "network" });
+    }
+    if (
+      !transparencyLog ||
+      typeof transparencyLog.fetchLogPages !== "function"
+    ) {
+      throw new ApaVerifierError(
+        "Transparency-log verification is unavailable",
+        { kind: "unsupported" },
+      );
+    }
+    const [certificateEnvelope, issuerDocument, entries, checkpoint] =
+      await Promise.all([
+        fetchJson(`/api/demo/gauntlet/breakers/${certificateId}`, fetchImpl),
+        fetchJson("/.well-known/apa-issuer.json", fetchImpl),
+        transparencyLog.fetchLogPages(fetchImpl),
+        fetchJson("/apa/log/checkpoint", fetchImpl),
+      ]);
+    const certificate = extractBreakerCertificate(certificateEnvelope);
+    if (certificate.certificate_id !== certificateId) {
+      throw new ApaVerifierError(
+        "The certificate response does not match the requested certificate ID",
+        { kind: "verification" },
+      );
+    }
+    return {
+      certificate,
+      issuerDocument,
+      entries,
+      checkpoint,
+    };
   }
 
   function issuerKeysFor(attestation, issuerDocument) {
@@ -593,6 +823,179 @@
     };
   }
 
+  async function verifyBreakerCertificate(
+    certificate,
+    issuerDocument,
+    options = {},
+  ) {
+    validateBreakerCertificate(certificate);
+    const keys = issuerKeysFor(
+      {
+        issuer: certificate.issuer,
+        verified_at: certificate.confirmed_at,
+      },
+      issuerDocument,
+    );
+    const crypto = options.cryptoImpl || root.crypto;
+    if (!crypto?.subtle) {
+      throw new ApaVerifierError(
+        "This browser does not provide WebCrypto Ed25519 verification",
+        { kind: "unsupported" },
+      );
+    }
+
+    const signature = decodeBase64Url(certificate.issuer_sig, "sig", 64);
+    const core = Object.fromEntries(
+      Object.entries(certificate).filter(([key]) => key !== "issuer_sig"),
+    );
+    const signedBytes = canonicalBytes(core);
+    let issuerKey = null;
+    for (const candidate of keys) {
+      try {
+        const publicKey = await crypto.subtle.importKey(
+          "raw",
+          decodeBase64Url(candidate.pub, "ed25519", 32),
+          { name: "Ed25519" },
+          false,
+          ["verify"],
+        );
+        if (
+          await crypto.subtle.verify(
+            { name: "Ed25519" },
+            publicKey,
+            signature,
+            signedBytes,
+          )
+        ) {
+          issuerKey = candidate;
+          break;
+        }
+      } catch (error) {
+        throw new ApaVerifierError(
+          "WebCrypto could not perform Ed25519 verification",
+          { kind: "unsupported", cause: error },
+        );
+      }
+    }
+    if (!issuerKey) {
+      return {
+        accepted: false,
+        signatureValid: false,
+        code: "signature-invalid",
+        issuerKey: null,
+      };
+    }
+    return {
+      accepted: true,
+      signatureValid: true,
+      code: "verified",
+      issuerKey,
+    };
+  }
+
+  async function verifyBreakerInclusion(
+    certificate,
+    entries,
+    checkpoint,
+    issuerDocument,
+    options = {},
+  ) {
+    const signature = await verifyBreakerCertificate(
+      certificate,
+      issuerDocument,
+      options,
+    );
+    if (!signature.accepted) {
+      return {
+        ...signature,
+        logValid: false,
+        inclusionValid: false,
+        logEntry: null,
+      };
+    }
+
+    const logVerifier = options.logVerifier || transparencyLog;
+    if (
+      !logVerifier ||
+      typeof logVerifier.verifySignedLog !== "function" ||
+      typeof logVerifier.sha256Hex !== "function"
+    ) {
+      throw new ApaVerifierError(
+        "Transparency-log verification is unavailable",
+        { kind: "unsupported" },
+      );
+    }
+    const crypto = options.cryptoImpl || root.crypto;
+    let signedLog;
+    try {
+      signedLog = await logVerifier.verifySignedLog(
+        entries,
+        checkpoint,
+        issuerDocument,
+        crypto,
+      );
+    } catch (error) {
+      return {
+        ...signature,
+        accepted: false,
+        logValid: false,
+        inclusionValid: false,
+        code: "log-invalid",
+        reason: error.message,
+        logEntry: null,
+      };
+    }
+    if (!signedLog.ok) {
+      return {
+        ...signature,
+        accepted: false,
+        logValid: false,
+        inclusionValid: false,
+        code: "log-invalid",
+        reason: signedLog.reason,
+        logEntry: null,
+      };
+    }
+
+    const logEntry = entries[certificate.log_seq - 1] || null;
+    const recordHash = await logVerifier.sha256Hex(
+      canonicalJson(certificate),
+      crypto,
+    );
+    const inclusionValid =
+      isObject(logEntry) &&
+      logEntry.seq === certificate.log_seq &&
+      logEntry.ts === certificate.confirmed_at &&
+      logEntry.event === "breaker-confirmed" &&
+      logEntry.record_type === "breaker-certificate" &&
+      logEntry.certificate_id === certificate.certificate_id &&
+      logEntry.benchmark_case_id === certificate.benchmark_case_id &&
+      logEntry.record_hash === recordHash;
+    if (!inclusionValid) {
+      return {
+        ...signature,
+        accepted: false,
+        logValid: true,
+        inclusionValid: false,
+        code: "inclusion-invalid",
+        reason:
+          "The certificate does not match its signed transparency-log entry.",
+        logEntry,
+        checkpoint: signedLog.checkpoint,
+      };
+    }
+    return {
+      ...signature,
+      accepted: true,
+      logValid: true,
+      inclusionValid: true,
+      code: "verified",
+      logEntry,
+      checkpoint: signedLog.checkpoint,
+      headHash: signedLog.headHash,
+    };
+  }
+
   function formatUnixTime(value) {
     if (!Number.isSafeInteger(value)) {
       return "Unavailable";
@@ -625,6 +1028,32 @@
     };
   }
 
+  function breakerViewModel(certificate, verification) {
+    return {
+      issuer: certificate.issuer,
+      issuerKey: verification.issuerKey?.kid || "No matching issuer key",
+      signature: certificate.issuer_sig,
+      signatureState: verification.signatureValid
+        ? "Valid WebCrypto Ed25519 signature"
+        : "Invalid Ed25519 signature",
+      certificateId: certificate.certificate_id,
+      award: certificate.award,
+      finder: certificate.finder || "Anonymous",
+      threatClass: certificate.threat_class,
+      benchmarkCase: certificate.benchmark_case_id,
+      payloadDigest: certificate.payload_sha256,
+      payloadScope: certificate.payload_scope,
+      confirmedAt: formatUnixTime(certificate.confirmed_at),
+      logSequence: `#${certificate.log_seq.toLocaleString("en-US")}`,
+      logState: verification.logValid
+        ? verification.inclusionValid
+          ? "Full chain, signed checkpoint, and inclusion verified"
+          : "Signed log valid; certificate inclusion mismatch"
+        : "Signed log not accepted",
+      checkpointHead: verification.checkpoint?.head_hash || "Not accepted",
+    };
+  }
+
   const api = {
     APA_BOUNDARY,
     KEY_THEFT_BOUNDARY,
@@ -634,11 +1063,16 @@
     canonicalBytes,
     canonicalJson,
     decodeBase64Url,
+    extractBreakerCertificate,
     extractAttestation,
     formatUnixTime,
+    loadBreakerVerificationMaterial,
     loadVerificationMaterial,
+    parseBreakerQuery,
     parseVerifierInput,
     verifyApaAttestation,
+    verifyBreakerCertificate,
+    verifyBreakerInclusion,
   };
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
@@ -653,6 +1087,9 @@
   const form = document.querySelector("[data-apa-verify-form]");
   const input = document.querySelector("[data-apa-verify-input]");
   const resultPanel = document.querySelector("[data-apa-verify-result]");
+  const breakerResultPanel = document.querySelector(
+    "[data-breaker-verify-result]",
+  );
   const emptyPanel = document.querySelector("[data-apa-verify-empty]");
   const errorPanel = document.querySelector("[data-apa-verify-error]");
   const submitButton = form?.querySelector('button[type="submit"]');
@@ -725,10 +1162,81 @@
     text("[data-apa-effective-status]", view.effectiveStatus);
     text("[data-apa-verified-at]", view.verifiedAt);
     text("[data-apa-expires-at]", view.expiresAt);
+    if (breakerResultPanel) {
+      breakerResultPanel.hidden = true;
+    }
     emptyPanel.hidden = true;
     errorPanel.hidden = true;
     resultPanel.hidden = false;
     resultPanel.focus();
+  }
+
+  function breakerVerificationMessage(verification) {
+    if (verification.accepted) {
+      return "The issuer signature, complete mixed transparency log, signed checkpoint, and certificate inclusion all pass independent browser verification.";
+    }
+    if (!verification.signatureValid) {
+      return "No issuer key applicable at the confirmation time validates this certificate.";
+    }
+    return (
+      verification.reason ||
+      "The certificate could not be matched to a valid full transparency log."
+    );
+  }
+
+  function renderBreakerVerification(certificate, verification) {
+    if (!breakerResultPanel) {
+      throw new ApaVerifierError(
+        "The WARDEN BREAKER result panel is unavailable",
+        { kind: "unsupported" },
+      );
+    }
+    const view = breakerViewModel(certificate, verification);
+    const statusLabel = document.querySelector(
+      "[data-breaker-verification-label]",
+    );
+    if (statusLabel) {
+      statusLabel.textContent = verification.accepted
+        ? "Verified · included"
+        : verification.signatureValid
+          ? "Rejected · inclusion"
+          : "Rejected · invalid signature";
+      statusLabel.className = verification.accepted
+        ? "status-label status-label--allow"
+        : verification.signatureValid
+          ? "status-label status-label--pending"
+          : "status-label";
+    }
+    text(
+      "[data-breaker-result-heading]",
+      verification.accepted
+        ? "Valid WARDEN BREAKER certificate"
+        : "WARDEN BREAKER certificate not accepted",
+    );
+    text(
+      "[data-breaker-result-message]",
+      breakerVerificationMessage(verification),
+    );
+    text("[data-breaker-issuer]", view.issuer);
+    text("[data-breaker-issuer-key]", view.issuerKey);
+    text("[data-breaker-signature-state]", view.signatureState);
+    text("[data-breaker-signature]", view.signature);
+    text("[data-breaker-certificate-id]", view.certificateId);
+    text("[data-breaker-award]", view.award);
+    text("[data-breaker-finder]", view.finder);
+    text("[data-breaker-threat-class]", view.threatClass);
+    text("[data-breaker-benchmark-case]", view.benchmarkCase);
+    text("[data-breaker-payload-digest]", view.payloadDigest);
+    text("[data-breaker-payload-scope]", view.payloadScope);
+    text("[data-breaker-confirmed-at]", view.confirmedAt);
+    text("[data-breaker-log-sequence]", view.logSequence);
+    text("[data-breaker-log-state]", view.logState);
+    text("[data-breaker-checkpoint-head]", view.checkpointHead);
+    resultPanel.hidden = true;
+    emptyPanel.hidden = true;
+    errorPanel.hidden = true;
+    breakerResultPanel.hidden = false;
+    breakerResultPanel.focus();
   }
 
   function renderError(error) {
@@ -740,6 +1248,9 @@
     );
     text("[data-apa-verify-status]", "No verification result was accepted.");
     resultPanel.hidden = true;
+    if (breakerResultPanel) {
+      breakerResultPanel.hidden = true;
+    }
     emptyPanel.hidden = true;
     errorPanel.hidden = false;
     errorPanel.focus();
@@ -753,6 +1264,9 @@
     event.preventDefault();
     setBusy(true);
     errorPanel.hidden = true;
+    if (breakerResultPanel) {
+      breakerResultPanel.hidden = true;
+    }
     text(
       "[data-apa-verify-status]",
       "Fetching public material and verifying with WebCrypto Ed25519...",
@@ -778,4 +1292,43 @@
       setBusy(false);
     }
   });
+
+  async function verifyBreakerFromQuery(certificateId) {
+    setBusy(true);
+    errorPanel.hidden = true;
+    text(
+      "[data-apa-verify-status]",
+      "Fetching the certificate, issuer keys, every transparency-log page, and the signed checkpoint...",
+    );
+    try {
+      const material = await loadBreakerVerificationMaterial(
+        certificateId,
+        root.fetch?.bind(root),
+      );
+      const verification = await verifyBreakerInclusion(
+        material.certificate,
+        material.entries,
+        material.checkpoint,
+        material.issuerDocument,
+      );
+      renderBreakerVerification(material.certificate, verification);
+      text(
+        "[data-apa-verify-status]",
+        "Independent WARDEN BREAKER verification complete.",
+      );
+    } catch (error) {
+      renderError(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  try {
+    const breakerId = parseBreakerQuery(root.location.search);
+    if (breakerId !== null) {
+      void verifyBreakerFromQuery(breakerId);
+    }
+  } catch (error) {
+    renderError(error);
+  }
 })(typeof globalThis === "undefined" ? this : globalThis);

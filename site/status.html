@@ -27,9 +27,18 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=e281c1aa" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/assets/favicon-32.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/assets/apple-touch-icon.png"
+    />
+    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
   </head>
   <body data-status-page>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -176,7 +185,8 @@
             The proposed measurement is a successful
             <code>GET /health/ready</code> every five minutes over a complete
             rolling 30-day window. Until that full scheduled window is recorded,
-            availability remains “Not measured” and no achieved uptime is claimed.
+            availability remains “Not measured” and no achieved uptime is
+            claimed.
           </p>
         </div>
         <div class="data-grid" aria-label="Readiness measurement evidence">
@@ -199,9 +209,13 @@
         </div>
         <aside class="callout">
           This objective covers Warden application readiness only and is not a
-          contractual SLA. Third-party payment-facilitator availability is outside this measurement
-          and must be monitored separately before paid-route
-          availability can be claimed.
+          contractual SLA.
+          <span
+            >Third-party payment-facilitator availability is outside this
+            measurement</span
+          >
+          and must be monitored separately before paid-route availability can be
+          claimed.
         </aside>
       </section>
 
@@ -294,12 +308,14 @@
       <section aria-labelledby="evaluation-title">
         <div class="section-heading">
           <p class="eyebrow">Measured security</p>
-          <h2 id="evaluation-title">Held-out recall, with the misses left visible.</h2>
+          <h2 id="evaluation-title">
+            Held-out recall, with the misses left visible.
+          </h2>
           <p class="section-copy">
-            Attack success requires a non-ALLOW decision with the expected threat
-            class. Any non-ALLOW decision on the held-out benign set is a false
-            positive. These authored cases are excluded from the scanner's training
-            corpus and similarity examples.
+            Attack success requires a non-ALLOW decision with the expected
+            threat class. Any non-ALLOW decision on the held-out benign set is a
+            false positive. These authored cases are excluded from the scanner's
+            training corpus and similarity examples.
           </p>
         </div>
         <div class="data-grid" aria-label="Current held-out evaluation">
@@ -313,7 +329,9 @@
           </div>
           <div>
             <span>Benign false positives</span
-            ><strong class="num" data-evaluation-false-positives>Loading</strong>
+            ><strong class="num" data-evaluation-false-positives
+              >Loading</strong
+            >
           </div>
           <div>
             <span>False-positive rate</span
@@ -329,11 +347,11 @@
           </div>
         </div>
         <aside class="callout">
-          The published run used the optional paid semantic model after the
-          deterministic layers. Repository configuration still leaves that runtime
-          disabled by default. Human-confirmed Gauntlet bypasses enter this held-out
-          set through an explicit review tool; they are never copied into the training
-          corpus by that workflow.
+          The published run used the deterministic scanner with semantic
+          analysis disabled, matching the committed reproducible benchmark.
+          Human-confirmed Gauntlet bypasses enter this held-out set through an
+          explicit review tool; they are never copied into the training corpus
+          by that workflow.
         </aside>
       </section>
 
@@ -373,12 +391,11 @@
         ><span>Independent service listed on OKX.AI.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a
-        ><a href="/playground">Run a scan</a><a href="/gauntlet">Gauntlet</a
-        ><a href="/showcase">Walkthrough</a
+        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
+        ><a href="/gauntlet">Gauntlet</a><a href="/showcase">Walkthrough</a
         ><a href="/docs">Docs</a><a href="/badges">Audit badges</a
-        ><a href="/status" aria-current="page">API status</a><a href="/privacy">Privacy</a
-        ><a href="/terms">Terms</a
+        ><a href="/status" aria-current="page">API status</a
+        ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
         ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
       </nav>
     </footer>

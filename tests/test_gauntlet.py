@@ -73,6 +73,7 @@ def test_allowed_claim_is_pending_and_never_auto_confirmed(tmp_path, monkeypatch
                 "intent": "hijack_tool_call",
                 "payload": "A normal weather report for Lagos.",
                 "finder": "researcher.example",
+                "public_credit_consent": True,
             },
         )
         stats = client.get("/api/demo/gauntlet/stats")
@@ -85,6 +86,7 @@ def test_allowed_claim_is_pending_and_never_auto_confirmed(tmp_path, monkeypatch
     assert record["status"] == "pending"
     assert record["payload"] == "A normal weather report for Lagos."
     assert record["finder"] == "researcher.example"
+    assert record["public_credit_consent"] is True
     assert stats.json()["attempts"] == 1
     assert stats.json()["pending_claims"] == 1
     assert stats.json()["confirmed_bypasses"] == 0
@@ -298,12 +300,14 @@ assert 'payment-required' not in response.headers
 
 def test_gauntlet_page_discloses_human_review_and_retention():
     page = (ROOT / "site" / "gauntlet.html").read_text(encoding="utf-8")
+    normalized_page = " ".join(page.lower().split())
 
     assert "data-gauntlet-form" in page
     assert "data-gauntlet-stats" in page
-    assert "human review" in page.lower()
-    assert "pending claims retain" in page.lower()
-    assert "confirmed bypass" in page.lower()
+    assert "human review" in normalized_page
+    assert "pending claims retain" in normalized_page
+    assert "confirmed bypass" in normalized_page
+    assert "not authenticated identities" in normalized_page
 
 
 def test_paid_http_contract_remains_frozen():

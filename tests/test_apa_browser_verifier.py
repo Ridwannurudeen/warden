@@ -431,9 +431,19 @@ def test_verify_page_is_csp_clean_and_exposes_the_independent_crypto_boundary():
     assert "data-apa-verify-form" in page
     assert "data-apa-verify-input" in page
     assert "data-apa-verify-result" in page
+    assert "data-breaker-verify-result" in page
+    assert "data-breaker-log-state" in page
+    assert '<script src="/log.js" defer></script>' in page
     assert '<script src="/verify.js" defer></script>' in page
+    assert page.index('<script src="/log.js"') < page.index('<script src="/verify.js"')
     assert "WebCrypto Ed25519" in page
     assert "crypto.subtle" in script
+    assert "/api/demo/gauntlet/breakers/" in script
+    assert "transparencyLog.fetchLogPages" in script
+    assert "logVerifier.verifySignedLog" in script
+    assert 'logEntry.record_type === "breaker-certificate"' in script
+    assert "logEntry.benchmark_case_id === certificate.benchmark_case_id" in script
+    assert "parseBreakerQuery(root.location.search)" in script
     assert "textContent" in script
     assert "innerHTML" not in script
     assert "payload.verified" not in script

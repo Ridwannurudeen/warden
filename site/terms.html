@@ -27,9 +27,18 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=e281c1aa" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/assets/favicon-32.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/assets/apple-touch-icon.png"
+    />
+    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -106,7 +115,7 @@
           demos, paid scans and audits, the adversarial Gauntlet, and signed
           audit badges.
         </p>
-        <p class="snapshot-note">Effective 13 July 2026.</p>
+        <p class="snapshot-note">Effective 17 July 2026.</p>
       </section>
 
       <div class="doc-layout legal-layout">
@@ -126,11 +135,13 @@
             <p>
               Warden provides the free <code>/api/demo/scan</code>,
               <code>/api/demo/examples</code>, <code>/api/demo/gauntlet</code>,
-              <code>/api/demo/gauntlet/stats</code>, <code>/api/badges</code>,
-              <code>/badge/{audit_id}</code>, and <code>/health</code> routes.
-              Production <code>POST /scan</code> and
-              <code>POST /audit</code> are protected by the x402 terms returned
-              by the live endpoint.
+              <code>/api/demo/gauntlet/stats</code>,
+              <code>/api/demo/gauntlet/breakers</code>,
+              <code>/api/demo/gauntlet/breakers/{certificate_id}</code>,
+              <code>/api/badges</code>, <code>/badge/{audit_id}</code>,
+              <code>/apa/log</code>, and <code>/health</code> routes. Production
+              <code>POST /scan</code> and <code>POST /audit</code> are protected
+              by the x402 terms returned by the live endpoint.
             </p>
           </section>
 
@@ -172,9 +183,18 @@
               pending candidate, not a confirmed bypass. Human review determines
               whether the declared attack intent is genuine. By submitting, you
               permit the Warden operator to retain and analyze the claim and, if
-              confirmed, reproduce it and add it to the security corpus. Finder
-              credit can be attached when a finder name is supplied, but no
-              payment or reward is promised.
+              confirmed, prepare a redacted reproducer and add only that
+              reproducer to the held-out benchmark. A confirmed bypass also
+              receives a public signed WARDEN BREAKER certificate and a
+              hash-chained transparency-log entry. It is not copied into the
+              scanner's training corpus by this workflow.
+            </p>
+            <p>
+              Public finder credit requires a supplied handle and explicit
+              consent to publish that exact handle. Without that consent, a
+              certificate must be anonymous. A certificate proves that Warden
+              recorded the credit; it does not prove the submitter controls or
+              owns the named account. No payment or reward is promised.
             </p>
             <p>
               Do not place secrets, personal information, unlawful content, or
@@ -245,9 +265,8 @@
         ><span>Independent service listed on OKX.AI.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a
-        ><a href="/playground">Run a scan</a><a href="/gauntlet">Gauntlet</a
-        ><a href="/showcase">Walkthrough</a
+        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
+        ><a href="/gauntlet">Gauntlet</a><a href="/showcase">Walkthrough</a
         ><a href="/docs">Docs</a><a href="/badges">Audit badges</a
         ><a href="/status">API status</a><a href="/privacy">Privacy</a
         ><a href="/terms">Terms</a

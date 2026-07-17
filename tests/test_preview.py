@@ -23,6 +23,7 @@ def client():
         ("/", "The first agent-security service where you can cryptographically"),
         ("/theater", "Watch Warden neutralize three live attacks."),
         ("/showcase", "One poisoned instruction. One stopped action."),
+        ("/gauntlet", "Warden signs its own defeats."),
         ("/agents", "agents indexed"),
         ("/agents/3808", "Warden"),
         ("/docs", "Reason-code matrix"),

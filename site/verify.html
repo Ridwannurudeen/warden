@@ -27,9 +27,18 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=e281c1aa" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/assets/favicon-32.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/assets/apple-touch-icon.png"
+    />
+    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -107,7 +116,12 @@
           attestation URL, or same-origin <code>badge.svg</code> URL. This page
           fetches the public issuer document and performs WebCrypto Ed25519
           verification locally; it never trusts the API's
-          <code>verified</code> flag.
+          <code>verified</code> flag. A
+          <code>/verify?breaker=&lt;certificate-id&gt;</code> link also checks
+          the signed WARDEN BREAKER certificate against every page of the mixed
+          transparency log and its signed checkpoint. Browser verification fails
+          closed when a log exceeds 10,000 entries rather than accepting an
+          incomplete chain.
         </p>
       </section>
 
@@ -117,9 +131,13 @@
         <span>WebCrypto Ed25519</span>
         <span>Same-origin fetches only</span>
         <span>Expiry and signed status enforced</span>
+        <span>Full BREAKER log inclusion enforced</span>
       </aside>
 
-      <section class="scan-workspace" aria-label="APA verification workspace">
+      <section
+        class="scan-workspace"
+        aria-label="Evidence verification workspace"
+      >
         <form class="scan-input-panel" data-apa-verify-form novalidate>
           <div class="scan-panel-heading">
             <div>
@@ -170,7 +188,8 @@
           <p class="privacy-note">
             Raw JSON stays in this page. ID and URL inputs fetch only the
             canonical same-origin attestation route and the public same-origin
-            issuer document.
+            issuer document. BREAKER links fetch only the canonical certificate,
+            issuer, paginated log, and checkpoint routes.
           </p>
         </form>
 
@@ -298,6 +317,126 @@
               </section>
             </div>
           </section>
+
+          <section
+            class="scan-result"
+            data-breaker-verify-result
+            tabindex="-1"
+            aria-live="polite"
+            aria-labelledby="breaker-result-heading"
+            hidden
+          >
+            <div class="verdict-summary">
+              <p class="eyebrow">02 / Independent result</p>
+              <div class="verdict-heading-row">
+                <h2 id="breaker-result-heading" data-breaker-result-heading>
+                  Verification pending
+                </h2>
+                <span
+                  class="status-label status-label--pending"
+                  data-breaker-verification-label
+                  >Pending</span
+                >
+              </div>
+              <p data-breaker-result-message></p>
+            </div>
+
+            <div class="badge-evidence-grid">
+              <section
+                class="badge-evidence"
+                aria-labelledby="breaker-issuer-title"
+              >
+                <p class="eyebrow">Issuer signature</p>
+                <h3 id="breaker-issuer-title" data-breaker-signature-state>
+                  Not checked
+                </h3>
+                <dl class="data-list">
+                  <div>
+                    <dt>Issuer</dt>
+                    <dd data-breaker-issuer>--</dd>
+                  </div>
+                  <div>
+                    <dt>Matched key</dt>
+                    <dd data-breaker-issuer-key>--</dd>
+                  </div>
+                  <div>
+                    <dt>Signature</dt>
+                    <dd><code data-breaker-signature>--</code></dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section
+                class="badge-evidence"
+                aria-labelledby="breaker-certificate-title"
+              >
+                <p class="eyebrow">Certificate</p>
+                <h3 id="breaker-certificate-title" data-breaker-award>
+                  WARDEN BREAKER
+                </h3>
+                <dl class="data-list">
+                  <div>
+                    <dt>Certificate ID</dt>
+                    <dd><code data-breaker-certificate-id>--</code></dd>
+                  </div>
+                  <div>
+                    <dt>Finder</dt>
+                    <dd data-breaker-finder>--</dd>
+                  </div>
+                  <div>
+                    <dt>Confirmed</dt>
+                    <dd data-breaker-confirmed-at>--</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section
+                class="badge-evidence"
+                aria-labelledby="breaker-case-title"
+              >
+                <p class="eyebrow">Reviewed reproducer</p>
+                <h3 id="breaker-case-title">Digest-bound benchmark case</h3>
+                <dl class="data-list">
+                  <div>
+                    <dt>Threat class</dt>
+                    <dd data-breaker-threat-class>--</dd>
+                  </div>
+                  <div>
+                    <dt>Benchmark case</dt>
+                    <dd><code data-breaker-benchmark-case>--</code></dd>
+                  </div>
+                  <div>
+                    <dt>Payload SHA-256</dt>
+                    <dd><code data-breaker-payload-digest>--</code></dd>
+                  </div>
+                  <div>
+                    <dt>Payload scope</dt>
+                    <dd data-breaker-payload-scope>--</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section
+                class="badge-evidence"
+                aria-labelledby="breaker-log-title"
+              >
+                <p class="eyebrow">Transparency inclusion</p>
+                <h3 id="breaker-log-title" data-breaker-log-state>
+                  Not checked
+                </h3>
+                <dl class="data-list">
+                  <div>
+                    <dt>Log sequence</dt>
+                    <dd class="num" data-breaker-log-sequence>--</dd>
+                  </div>
+                  <div>
+                    <dt>Signed checkpoint head</dt>
+                    <dd><code data-breaker-checkpoint-head>--</code></dd>
+                  </div>
+                </dl>
+              </section>
+            </div>
+          </section>
         </div>
       </section>
 
@@ -315,20 +454,20 @@
               A valid, fresh attestation proves that the host serving
               endpoint_host controlled the key pub when the issuer verified a
               live APA-conformant Protection Proof. The endpoint signed that
-              proof, including its rolling 24-hour screened-payload count or an explicit unavailable state; the
-              issuer separately signed the attestation. It does not prove that
-              every request is routed through the guard or independently audit
-              the endpoint owner's local counter state.
+              proof, including its rolling 24-hour screened-payload count or an
+              explicit unavailable state; the issuer separately signed the
+              attestation. It does not prove that every request is routed
+              through the guard or independently audit the endpoint owner's
+              local counter state.
             </p>
           </section>
           <section class="badge-evidence">
             <h3>TOFU</h3>
             <p data-tofu-boundary>
               First registration is trust-on-first-use: the issuer records the
-              first valid endpoint key. An independently anchored log
-              checkpoint makes later silent re-binding detectable; an
-              unanchored chain cannot expose a complete rewrite or remove
-              first-use trust.
+              first valid endpoint key. An independently anchored log checkpoint
+              makes later silent re-binding detectable; an unanchored chain
+              cannot expose a complete rewrite or remove first-use trust.
             </p>
           </section>
           <section class="badge-evidence">
@@ -351,14 +490,15 @@
       </div>
       <nav aria-label="Footer">
         <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
-        ><a href="/gauntlet">Gauntlet</a
-        ><a href="/showcase">Walkthrough</a><a href="/docs">Docs</a
-        ><a href="/badges">Audit badges</a><a href="/status">API status</a
-        ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
+        ><a href="/gauntlet">Gauntlet</a><a href="/showcase">Walkthrough</a
+        ><a href="/docs">Docs</a><a href="/badges">Audit badges</a
+        ><a href="/status">API status</a><a href="/privacy">Privacy</a
+        ><a href="/terms">Terms</a
         ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
       </nav>
     </footer>
     <script src="/app.js?v=65a484d3" defer></script>
+    <script src="/log.js" defer></script>
     <script src="/verify.js" defer></script>
   </body>
 </html>

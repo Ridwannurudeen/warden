@@ -38,8 +38,8 @@ test("public evaluation data matches the committed held-out benchmark", () => {
     `${latest.false_positives}/${latest.benign_cases}`,
   );
   assert.match(view.measuredAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
-  assert.equal(evaluation.methodology.semantic_enabled, true);
-  assert.equal(view.mode, "Paid thorough with semantic model");
+  assert.equal(evaluation.methodology.semantic_enabled, false);
+  assert.equal(view.mode, "Deterministic; semantic model disabled");
   assert.equal(benchmark.attack_recall_percent, 89.36);
   assert.equal(benchmark.false_positive_rate_percent, 0);
 });
@@ -99,8 +99,8 @@ test("status surface publishes the held-out methodology without an external requ
   const script = fs.readFileSync(path.join(ROOT, "site", "status.js"), "utf8");
 
   assert.match(html, /Measured security/);
-  assert.match(html, /expected threat\s+class/);
-  assert.match(html, /published run used the optional paid semantic model/i);
+  assert.match(html, /expected\s+threat\s+class/);
+  assert.match(html, /published run used the deterministic scanner/i);
   assert.match(script, /fetch\("\/data\/evaluation\.json"/);
   assert.doesNotMatch(script, /fetch\("https?:\/\//);
 });

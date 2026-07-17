@@ -11,9 +11,9 @@ proven, copyable primitives — Sigstore/Rekor (transparency log), in-toto/SLSA 
 (`.well-known` discovery).
 
 > **What APA proves, precisely (read this first — honesty is normative):**
-> A valid, fresh attestation proves that *"the host serving `endpoint_host` controls the key `pub`, is running an
+> A valid, fresh attestation proves that _"the host serving `endpoint_host` controls the key `pub`, is running an
 > APA-conformant guard, and has signed either an exact rolling count of payloads screened over the stated window
-> or an explicit declaration that the exact count is temporarily unavailable."*
+> or an explicit declaration that the exact count is temporarily unavailable."_
 > It does **NOT** prove that every request to that endpoint is routed through the guard. Implementations and
 > UIs **MUST NOT** claim more than this. A non-null `scans_24h` is the honest measure of real usage; `null` means
 > the exact rolling count was unavailable and MUST NOT be rendered as zero.
@@ -64,19 +64,20 @@ The response is a JSON **Protection Proof**:
 ```json
 {
   "spec_version": "apa/0.1",
-  "protector":    "warden",
-  "endpoint_host":"api.example.com",
-  "pub":          "ed25519:PB1n…",
-  "ts":           1789200000,
-  "nonce":        "9f2c…(≥128-bit base64url)",
-  "window_s":     86400,
+  "protector": "warden",
+  "endpoint_host": "api.example.com",
+  "pub": "ed25519:PB1n…",
+  "ts": 1789200000,
+  "nonce": "9f2c…(≥128-bit base64url)",
+  "window_s": 86400,
   "window_start": 1789113600,
   "scans_served": 41207,
-  "sig":          "sig:Q2h5…"
+  "sig": "sig:Q2h5…"
 }
 ```
 
 Rules:
+
 - `sig` = Ed25519 signature by `priv` over the canonical bytes of the object **without `sig`**. A Verifier
   checks it against `pub`. This binds the key to the live document.
 - `ts` is Unix seconds (UTC). A proof is **fresh** iff `abs(now - ts) ≤ TTL`. Default TTL = **3600 s
@@ -102,8 +103,9 @@ POST /apa/register        { "endpoint": "https://api.example.com" }
 ```
 
 The Issuer MUST:
+
 1. Validate `endpoint` as a public HTTPS origin (reject private/loopback/link-local/rebinding; `follow_redirects
-   = false`; hard timeout ≤3 s; response-size cap). **Never derive identity from a client-supplied `agent_id`;**
+= false`; hard timeout ≤3 s; response-size cap). **Never derive identity from a client-supplied `agent_id`;**
    identity is the host that served a valid proof.
 2. GET the Protection Proof, verify `sig` against the proof's `pub`, verify freshness + nonce-uniqueness.
 3. Record `(endpoint_host → pub)`. If a later proof presents a **different `pub`** for the same host, the Issuer
@@ -146,19 +148,19 @@ key until registration returns an `active` Attestation whose `pub` is the author
 
 ```json
 {
-  "spec_version":  "apa/0.1",
-  "predicate_type":"https://warden.gudman.xyz/spec/protection/v1",
-  "attestation_id":"a1b2c3…",
-  "issuer":        "warden",
-  "protector":     "warden",
+  "spec_version": "apa/0.1",
+  "predicate_type": "https://warden.gudman.xyz/spec/protection/v1",
+  "attestation_id": "a1b2c3…",
+  "issuer": "warden",
+  "protector": "warden",
   "endpoint_host": "api.example.com",
-  "pub":           "ed25519:PB1n…",
-  "tier":          "guard-live",
-  "status":        "active",
-  "scans_24h":     41207,
-  "verified_at":   1789200000,
-  "expires_at":    1789203600,
-  "issuer_sig":    "sig:Zm9v…"
+  "pub": "ed25519:PB1n…",
+  "tier": "guard-live",
+  "status": "active",
+  "scans_24h": 41207,
+  "verified_at": 1789200000,
+  "expires_at": 1789203600,
+  "issuer_sig": "sig:Zm9v…"
 }
 ```
 
@@ -206,10 +208,13 @@ and no network calls. Reference: `warden-guard verify <attestation|endpoint>`.
 ## 7. Transparency & issuer identity
 
 ### 7.1 Issuer key discovery
+
 An Issuer MUST publish its current (and recent, for rotation) verification key at:
+
 ```
 GET /.well-known/apa-issuer.json   → { "issuer": "...", "keys": [ { "kid": "...", "pub": "ed25519:…", "not_after": ... } ] }
 ```
+
 (did:web-aligned; a Verifier caches this and needs nothing else to verify offline.) The first entry MUST be the
 current signing key with `not_after = 9007199254740991` (the largest interoperable JSON safe integer). Recent
 verify-only keys follow in descending `not_after` order, and every history cutoff MUST be finite and below that
@@ -220,24 +225,72 @@ record. Rotation history contains public keys only: an Issuer MUST NOT retain or
 verification.
 
 ### 7.2 Append-only transparency log
+
 An Issuer SHOULD publish a hash-chained log of every issuance and status change:
+
 ```
 GET /apa/log        → { "entries": [...], "total": N }
+GET /apa/log/checkpoint → { "spec_version": "apa-log/0.1", "issuer": "...", "seq": N,
+                            "head_hash": "...", "issued_at": 1789200000, "issuer_sig": "sig:..." }
 ```
+
 Each entry: `{ seq, ts, event, attestation_id, endpoint_host, status, record_hash, prev_hash }`, where
 `prev_hash` = SHA-256 of the previous entry's canonical bytes (genesis `prev_hash` = 64 zero bytes hex). A party
 that preserved or independently anchored a prior entry hash can confirm continuity from that checkpoint. The
 hash chain alone cannot detect a complete rewrite when the verifier has no independently anchored checkpoint.
-The Warden reference endpoint returns the complete ordered log in this JSON object and serves a rendered view
-only when the request explicitly accepts `text/html`.
+The signed checkpoint binds the current sequence and canonical entry hash to the applicable issuer key. The
+Warden reference endpoint paginates the ordered JSON log and serves a rendered view only when the request
+explicitly accepts `text/html`.
+
+### 7.3 Warden BREAKER evidence extension
+
+The Warden reference implementation additively uses the same issuer key and transparency log for
+human-confirmed Gauntlet bypass evidence. A BREAKER certificate has exactly:
+
+```json
+{
+  "spec_version": "warden-breaker/1",
+  "predicate_type": "https://warden.gudman.xyz/spec/gauntlet-breaker/v1",
+  "certificate_id": "32 lowercase hex characters",
+  "issuer": "warden",
+  "award": "WARDEN BREAKER",
+  "benchmark_case_id": "gauntlet- plus 16 lowercase hex characters",
+  "threat_class": "one implemented Warden reason code",
+  "payload_sha256": "64 lowercase hex characters",
+  "payload_scope": "human-reviewed-redacted-reproducer",
+  "finder": "consented public handle or null",
+  "confirmed_at": 1789200000,
+  "log_seq": 42,
+  "issuer_sig": "sig:..."
+}
+```
+
+`issuer_sig` covers the canonical certificate without `issuer_sig`. Verification selects issuer keys using the
+signed `confirmed_at` and each key's `not_after`, just as APA Attestations use `verified_at`. BREAKER
+certificates are historical evidence and do not expire. The certificate proves that the issuer signed these
+review facts and committed their digest to its log; it does not reveal or independently prove the private raw
+submission. Human review and the current-scanner recheck are issuer procedures, not facts established by
+Ed25519 alone. A non-null `finder` proves only that Warden signed that public credit after its consent
+workflow; it does not authenticate ownership of an external handle.
+
+A BREAKER log entry has exactly
+`{ seq, ts, event, record_type, certificate_id, benchmark_case_id, record_hash, prev_hash }`, with
+`event = "breaker-confirmed"`, `record_type = "breaker-certificate"`, `ts = confirmed_at`, and
+`record_hash` equal to SHA-256 of the complete signed certificate's canonical bytes. APA entries retain the
+exact §7.2 shape and do not gain a `record_type` field. Verifiers therefore treat the shared log as a strict
+tagged union, verify every entry from genesis, verify the signed checkpoint, and require the BREAKER entry at
+the certificate's signed `log_seq` to match both IDs and `record_hash`. The Warden browser verifier fails
+closed above 10,000 entries to bound client-side request, memory, and DOM work.
 
 ## 8. The `audited` tier (optional, ties to endpoint audits)
+
 An Issuer MAY additionally issue an `audited` Attestation after running a published attack battery against the
 endpoint (with the endpoint's consent — the proof of consent MUST be included in the signed record as
 `consent_verified: true`, and an unconsented audit MUST NOT be issued as `audited`). The `audited` record adds
 `grade`, `blocked`, `total`, `battery_version` and is otherwise identical. It is **point-in-time**; UIs MUST say so.
 
 ## 9. Extensibility & interop
+
 - **Other protectors / issuers:** the `protector` and `issuer` fields make APA multi-vendor. A different firewall
   MAY serve a conformant Protection Proof; a different registry MAY issue Attestations under its own key.
 - **Other marketplaces:** nothing in APA is OKX-specific. `endpoint_host` + Ed25519 make an Attestation portable
@@ -246,7 +299,8 @@ endpoint (with the endpoint's consent — the proof of consent MUST be included 
   with `predicateType = predicate_type`, making it consumable by SLSA/Sigstore tooling.
 
 ## 10. Security considerations
-- **Scope (normative):** see the preamble. APA attests a *live guard + honest scan count*, not per-request
+
+- **Scope (normative):** see the preamble. APA attests a _live guard + honest scan count_, not per-request
   routing. Do not overclaim.
 - **Key theft:** a stolen `priv` lets an attacker serve valid proofs for the victim host. Issuers MUST support
   `POST /apa/revoke` (signed by the current key) and key rotation, and SHOULD surface `key-changed`.
@@ -259,10 +313,12 @@ endpoint (with the endpoint's consent — the proof of consent MUST be included 
 - **No floats in signed cores** (canonicalization determinism).
 
 ## 11. Reference implementation
+
 Warden (`warden/protection.py`, `warden/badges.py`, `sdk/python/warden_guard/proof.py`) is the reference
 implementation. The Trust Layer routes and deployment units in this repository are source-ready and are not
 claimed live. The reference verifier is `warden-guard verify`. This document is implementable without reading
 that code.
 
 ---
-*APA v0.1 — a small open primitive for a safer agent economy.*
+
+_APA v0.1 — a small open primitive for a safer agent economy._

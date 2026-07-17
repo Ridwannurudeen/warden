@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Inspect Warden's APA issuance and status-change log and verify its SHA-256 chain continuity in your browser."
+      content="Inspect Warden's shared APA and WARDEN BREAKER evidence log and verify its SHA-256 chain continuity in your browser."
     />
     <meta name="color-scheme" content="dark light" />
-    <title>APA Transparency Log | Warden</title>
+    <title>Evidence Transparency Log | Warden</title>
     <link rel="canonical" href="https://warden.gudman.xyz/apa/log" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Warden" />
-    <meta property="og:title" content="APA Transparency Log | Warden" />
+    <meta property="og:title" content="Evidence Transparency Log | Warden" />
     <meta
       property="og:description"
-      content="Inspect the current APA log and independently recompute its internal SHA-256 chain."
+      content="Inspect the shared APA and WARDEN BREAKER log and independently recompute its internal SHA-256 chain."
     />
     <meta property="og:url" content="https://warden.gudman.xyz/apa/log" />
     <meta
@@ -27,9 +27,18 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=e281c1aa" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/assets/favicon-32.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/assets/apple-touch-icon.png"
+    />
+    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -105,12 +114,13 @@
       data-state="loading"
     >
       <section class="page-hero">
-        <p class="eyebrow">APA issuer transparency</p>
+        <p class="eyebrow">Shared evidence transparency</p>
         <h1>Verify the published history, not a screenshot.</h1>
         <p class="hero-text">
           This page re-fetches <code>GET /apa/log</code> as JSON and recomputes
-          every SHA-256 <code>prev_hash</code> link locally. Issuance and status
-          changes remain visible in sequence.
+          every SHA-256 <code>prev_hash</code> link locally. APA issuance and
+          status changes share one ordered chain with confirmed WARDEN BREAKER
+          certificates.
         </p>
       </section>
 
@@ -161,10 +171,11 @@
 
       <section aria-labelledby="log-entries-title">
         <div class="section-heading">
-          <p class="eyebrow">Append sequence</p>
-          <h2 id="log-entries-title">Issuance and status-change entries</h2>
+          <p class="eyebrow">Shared append sequence</p>
+          <h2 id="log-entries-title">APA and BREAKER evidence entries</h2>
           <p class="section-copy">
-            Each entry includes the hash of its associated signed record and the
+            Each entry identifies either an APA attestation or a WARDEN BREAKER
+            certificate, then includes the hash of that signed record and the
             canonical hash of the preceding log entry.
           </p>
         </div>
@@ -185,11 +196,13 @@
         latest state. An operator-published checkpoint can additionally pin an
         older prefix outside that database; this page verifies the pin when one
         is present and says explicitly when it is unpublished. The static site
-        copy is still not independently timestamped or witnessed.
-        A coherent database rollback remains outside this proof when accompanied
-        by the older static copy. It also does not prove log completeness or
-        independently verify each <code>record_hash</code>. Anyone may preserve
-        a published checkpoint as an independent witness.
+        copy is still not independently timestamped or witnessed. A
+        <span>coherent database rollback</span> remains outside this proof when
+        accompanied by the older static copy. It also does not prove log
+        completeness or independently verify each <code>record_hash</code>.
+        Anyone may preserve a published checkpoint as an independent witness.
+        This browser view fails closed above 10,000 log entries to bound memory,
+        DOM, and request work.
       </aside>
     </main>
 
@@ -201,10 +214,10 @@
       </div>
       <nav aria-label="Footer">
         <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
-        ><a href="/gauntlet">Gauntlet</a
-        ><a href="/showcase">Walkthrough</a><a href="/docs">Docs</a
-        ><a href="/badges">Audit badges</a><a href="/status">API status</a
-        ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
+        ><a href="/gauntlet">Gauntlet</a><a href="/showcase">Walkthrough</a
+        ><a href="/docs">Docs</a><a href="/badges">Audit badges</a
+        ><a href="/status">API status</a><a href="/privacy">Privacy</a
+        ><a href="/terms">Terms</a
         ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
       </nav>
     </footer>

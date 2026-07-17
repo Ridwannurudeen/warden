@@ -3,6 +3,29 @@
 
   const GENESIS_PREV_HASH = "0".repeat(64);
   const HEX_HASH = /^[0-9a-f]{64}$/;
+  const BREAKER_CERTIFICATE_ID = /^[0-9a-f]{32}$/;
+  const BREAKER_BENCHMARK_CASE_ID = /^gauntlet-[0-9a-f]{16}$/;
+  const MAX_LOG_ENTRIES = 10_000;
+  const APA_LOG_ENTRY_FIELDS = new Set([
+    "seq",
+    "ts",
+    "event",
+    "attestation_id",
+    "endpoint_host",
+    "status",
+    "record_hash",
+    "prev_hash",
+  ]);
+  const BREAKER_LOG_ENTRY_FIELDS = new Set([
+    "seq",
+    "ts",
+    "event",
+    "record_type",
+    "certificate_id",
+    "benchmark_case_id",
+    "record_hash",
+    "prev_hash",
+  ]);
   const LOG_CHECKPOINT_VERSION = "apa-log/0.1";
 
   function canonicalValue(value) {
@@ -23,28 +46,75 @@
     return JSON.stringify(canonicalValue(value));
   }
 
+  function rejectUnexpectedFields(entry, expectedFields, index, entryType) {
+    for (const field of Object.keys(entry)) {
+      if (!expectedFields.has(field)) {
+        throw new Error(
+          `Entry ${index + 1} ${field} is not valid for ${entryType} entries`,
+        );
+      }
+    }
+  }
+
   function normalizeLogEntry(entry, index) {
     if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
       throw new Error(`Entry ${index + 1} must be an object`);
     }
-    if (!Number.isInteger(entry.seq) || entry.seq < 1) {
-      throw new Error(`Entry ${index + 1} seq must be a positive integer`);
+    if (!Number.isSafeInteger(entry.seq) || entry.seq < 1) {
+      throw new Error(`Entry ${index + 1} seq must be a positive safe integer`);
     }
-    if (!Number.isInteger(entry.ts) || entry.ts < 0) {
-      throw new Error(`Entry ${index + 1} ts must be a non-negative integer`);
+    if (!Number.isSafeInteger(entry.ts) || entry.ts < 0) {
+      throw new Error(
+        `Entry ${index + 1} ts must be a non-negative safe integer`,
+      );
     }
-    for (const field of [
-      "event",
-      "attestation_id",
-      "endpoint_host",
-      "status",
-    ]) {
-      if (typeof entry[field] !== "string" || !entry[field]) {
+
+    const isBreakerCertificate = Object.prototype.hasOwnProperty.call(
+      entry,
+      "record_type",
+    );
+    if (isBreakerCertificate) {
+      if (entry.record_type !== "breaker-certificate") {
         throw new Error(
-          `Entry ${index + 1} ${field} must be a non-empty string`,
+          `Entry ${index + 1} record_type must be breaker-certificate`,
         );
       }
+      if (entry.event !== "breaker-confirmed") {
+        throw new Error(
+          `Entry ${index + 1} event must be breaker-confirmed for a BREAKER certificate`,
+        );
+      }
+      if (
+        typeof entry.certificate_id !== "string" ||
+        !BREAKER_CERTIFICATE_ID.test(entry.certificate_id)
+      ) {
+        throw new Error(
+          `Entry ${index + 1} certificate_id must be 32 lowercase hex characters`,
+        );
+      }
+      if (
+        typeof entry.benchmark_case_id !== "string" ||
+        !BREAKER_BENCHMARK_CASE_ID.test(entry.benchmark_case_id)
+      ) {
+        throw new Error(
+          `Entry ${index + 1} benchmark_case_id must be gauntlet- followed by 16 lowercase hex characters`,
+        );
+      }
+    } else {
+      for (const field of [
+        "event",
+        "attestation_id",
+        "endpoint_host",
+        "status",
+      ]) {
+        if (typeof entry[field] !== "string" || !entry[field]) {
+          throw new Error(
+            `Entry ${index + 1} ${field} must be a non-empty string`,
+          );
+        }
+      }
     }
+
     for (const field of ["record_hash", "prev_hash"]) {
       if (typeof entry[field] !== "string" || !HEX_HASH.test(entry[field])) {
         throw new Error(
@@ -52,6 +122,12 @@
         );
       }
     }
+    rejectUnexpectedFields(
+      entry,
+      isBreakerCertificate ? BREAKER_LOG_ENTRY_FIELDS : APA_LOG_ENTRY_FIELDS,
+      index,
+      isBreakerCertificate ? "breaker-certificate" : "APA",
+    );
     return { ...entry };
   }
 
@@ -142,12 +218,26 @@
         throw new Error(`Log request failed with HTTP ${response.status}`);
       }
       const page = normalizeLogPage(await response.json(), cursor);
+      if (page.total > MAX_LOG_ENTRIES) {
+        throw new Error(
+          `Transparency log exceeds the browser verification limit of ${MAX_LOG_ENTRIES.toLocaleString()} entries`,
+        );
+      }
       if (expectedTotal === null) {
         expectedTotal = page.total;
       } else if (page.total !== expectedTotal) {
         throw new Error("Transparency log changed while pages were being read");
       }
       entries.push(...page.entries);
+      if (
+        entries.length > expectedTotal ||
+        (entries.length === expectedTotal && page.nextCursor !== null) ||
+        (page.nextCursor !== null && page.nextCursor > expectedTotal)
+      ) {
+        throw new Error(
+          "Transparency log pagination continues past the published total",
+        );
+      }
       if (page.nextCursor === null) {
         if (entries.length !== expectedTotal) {
           throw new Error(
@@ -555,6 +645,7 @@
 
   const api = {
     GENESIS_PREV_HASH,
+    MAX_LOG_ENTRIES,
     canonicalJson,
     fetchAnchorPublication,
     fetchLogPages,
@@ -613,14 +704,25 @@
     const facts = document.createElement("dl");
 
     heading.textContent = `Entry ${entry.seq}: ${entry.event}`;
-    summary.textContent = `${entry.endpoint_host} · status ${entry.status}`;
     facts.className = "data-list";
-    facts.append(
-      createFact("Observed", formatTimestamp(entry.ts), true),
-      createFact("Attestation", entry.attestation_id, true),
-      createFact("Record hash", entry.record_hash, true),
-      createFact("Previous hash", entry.prev_hash, true),
-    );
+    if (entry.record_type === "breaker-certificate") {
+      summary.textContent = `WARDEN BREAKER · ${entry.benchmark_case_id}`;
+      facts.append(
+        createFact("Observed", formatTimestamp(entry.ts), true),
+        createFact("Certificate", entry.certificate_id, true),
+        createFact("Benchmark case", entry.benchmark_case_id, true),
+        createFact("Record hash", entry.record_hash, true),
+        createFact("Previous hash", entry.prev_hash, true),
+      );
+    } else {
+      summary.textContent = `${entry.endpoint_host} · status ${entry.status}`;
+      facts.append(
+        createFact("Observed", formatTimestamp(entry.ts), true),
+        createFact("Attestation", entry.attestation_id, true),
+        createFact("Record hash", entry.record_hash, true),
+        createFact("Previous hash", entry.prev_hash, true),
+      );
+    }
     item.append(heading, summary, facts);
     return item;
   }

@@ -14,6 +14,8 @@ const {
   sha256Hex,
   verifyLogChain,
 } = require(logPath);
+const BREAKER_ID = "0123456789abcdef0123456789abcdef";
+const BENCHMARK_CASE_ID = "gauntlet-0123456789abcdef";
 
 function entry(seq, prevHash, overrides = {}) {
   return {
@@ -24,6 +26,20 @@ function entry(seq, prevHash, overrides = {}) {
     endpoint_host: "asp.example.org",
     status: "active",
     record_hash: "a".repeat(64),
+    prev_hash: prevHash,
+    ...overrides,
+  };
+}
+
+function breakerEntry(seq, prevHash, overrides = {}) {
+  return {
+    seq,
+    ts: 1_789_000_000 + seq,
+    event: "breaker-confirmed",
+    record_type: "breaker-certificate",
+    certificate_id: BREAKER_ID,
+    benchmark_case_id: BENCHMARK_CASE_ID,
+    record_hash: "c".repeat(64),
     prev_hash: prevHash,
     ...overrides,
   };
@@ -61,6 +77,76 @@ test("log payload validation rejects incomplete or contradictory envelopes", () 
       }),
     /record_hash/,
   );
+  for (const field of ["seq", "ts"]) {
+    assert.throws(
+      () =>
+        normalizeLogPayload({
+          entries: [
+            {
+              ...entries[0],
+              [field]: Number.MAX_SAFE_INTEGER + 1,
+            },
+          ],
+          total: 1,
+        }),
+      /safe integer/,
+    );
+  }
+});
+
+test("log payload normalization accepts typed BREAKER entries and rejects ambiguous subjects", () => {
+  const breaker = breakerEntry(1, GENESIS_PREV_HASH);
+  assert.deepEqual(normalizeLogPayload({ entries: [breaker], total: 1 }), [
+    breaker,
+  ]);
+  assert.throws(
+    () =>
+      normalizeLogPayload({
+        entries: [
+          breakerEntry(1, GENESIS_PREV_HASH, {
+            certificate_id: undefined,
+          }),
+        ],
+        total: 1,
+      }),
+    /certificate_id/,
+  );
+  assert.throws(
+    () =>
+      normalizeLogPayload({
+        entries: [
+          breakerEntry(1, GENESIS_PREV_HASH, {
+            benchmark_case_id: undefined,
+          }),
+        ],
+        total: 1,
+      }),
+    /benchmark_case_id/,
+  );
+  assert.throws(
+    () =>
+      normalizeLogPayload({
+        entries: [
+          breakerEntry(1, GENESIS_PREV_HASH, {
+            attestation_id: "ambiguous-subject",
+          }),
+        ],
+        total: 1,
+      }),
+    /attestation_id/,
+  );
+  assert.throws(
+    () =>
+      normalizeLogPayload({
+        entries: [
+          breakerEntry(1, GENESIS_PREV_HASH, {
+            record_type: "attestation",
+          }),
+        ],
+        total: 1,
+      }),
+    /record_type|attestation_id/,
+  );
 });
 
 test("browser-compatible SHA-256 verifies continuity and detects tampering", async () => {
@@ -75,6 +161,30 @@ test("browser-compatible SHA-256 verifies continuity and detects tampering", asy
   const rejected = await verifyLogChain(tampered, webcrypto);
   assert.equal(rejected.ok, false);
   assert.equal(rejected.index, 1);
+  assert.match(rejected.reason, /previous entry hash/);
+});
+
+test("mixed APA and BREAKER entries verify as one chain and reject breaker tampering", async () => {
+  const first = entry(1, GENESIS_PREV_HASH);
+  const second = breakerEntry(
+    2,
+    await sha256Hex(canonicalJson(first), webcrypto),
+  );
+  const third = entry(3, await sha256Hex(canonicalJson(second), webcrypto), {
+    attestation_id: "attestation-3",
+    record_hash: "d".repeat(64),
+  });
+  const entries = [first, second, third];
+
+  const verified = await verifyLogChain(entries, webcrypto);
+  assert.equal(verified.ok, true);
+  assert.equal(verified.total, 3);
+
+  const tampered = entries.map((item) => ({ ...item }));
+  tampered[1].certificate_id = "f".repeat(32);
+  const rejected = await verifyLogChain(tampered, webcrypto);
+  assert.equal(rejected.ok, false);
+  assert.equal(rejected.index, 2);
   assert.match(rejected.reason, /previous entry hash/);
 });
 
