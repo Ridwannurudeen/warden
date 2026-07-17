@@ -412,14 +412,16 @@
               aria-describedby="gauntlet-public-credit-disclosure gauntlet-public-credit-error"
               data-gauntlet-public-credit-consent
             />
-            If I supply a finder handle, I consent to publish that exact handle
-            on a human-confirmed BREAKER certificate and public
+            If I supply a finder handle, I consent to publish its normalized
+            visible form on a human-confirmed BREAKER certificate and public
             leaderboard.</label
           >
           <p class="field-hint" id="gauntlet-public-credit-disclosure">
             Leave the finder field blank for anonymous review. This public
             credit consent is separate from authorization to submit the payload.
-            Warden does not authenticate ownership of the supplied handle.
+            Warden removes invisible formatting and rejects non-visible
+            characters before publication. It does not authenticate ownership
+            of the supplied handle.
           </p>
           <p
             class="field-error"

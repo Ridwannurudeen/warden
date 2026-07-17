@@ -23,6 +23,9 @@
   const BENCHMARK_CASE_ID = /^gauntlet-[0-9a-f]{16}$/;
   const SHA256_HEX = /^[0-9a-f]{64}$/;
   const FINDER_FORMAT_CONTROLS = /\p{Cf}/gu;
+  const FINDER_VISIBLE_CHARACTERS = /^[\p{L}\p{M}\p{N}\p{P}\p{S} ]+$/u;
+  const FINDER_DEFAULT_IGNORABLE =
+    /[\u00ad\u034f\u061c\u115f-\u1160\u17b4-\u17b5\u180b-\u180f\u200b-\u200f\u202a-\u202e\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0\ufff0-\ufff8\u{1bca0}-\u{1bca3}\u{1d173}-\u{1d17a}\u{e0000}-\u{e0fff}]/u;
   const BREAKER_FIELDS = new Set([
     "spec_version",
     "predicate_type",
@@ -81,7 +84,7 @@
     return String(value ?? "")
       .normalize("NFKC")
       .replace(FINDER_FORMAT_CONTROLS, "")
-      .trim();
+      .replace(/^[ \t\r\n]+|[ \t\r\n]+$/gu, "");
   }
 
   function assertUnicodeScalarString(value) {
@@ -406,8 +409,10 @@
         !certificate.finder ||
         certificate.finder.trim() !== certificate.finder ||
         !normalizedFinder ||
-        Array.from(normalizedFinder).length > 128 ||
-        /[\u0000-\u001f\u007f]/.test(certificate.finder))
+        normalizedFinder !== certificate.finder ||
+        Array.from(certificate.finder).length > 128 ||
+        !FINDER_VISIBLE_CHARACTERS.test(certificate.finder) ||
+        FINDER_DEFAULT_IGNORABLE.test(certificate.finder))
     ) {
       throw new ApaVerifierError(
         "WARDEN BREAKER finder must be null or a trimmed public credit",
@@ -1051,7 +1056,7 @@
         : "Invalid Ed25519 signature",
       certificateId: certificate.certificate_id,
       award: certificate.award,
-      finder: normalizeFinderHandle(certificate.finder) || "Anonymous",
+      finder: certificate.finder || "Anonymous",
       threatClass: certificate.threat_class,
       benchmarkCase: certificate.benchmark_case_id,
       payloadDigest: certificate.payload_sha256,
@@ -1073,7 +1078,6 @@
     TOFU_BOUNDARY,
     ApaVerifierError,
     attestationViewModel,
-    breakerViewModel,
     canonicalBytes,
     canonicalJson,
     decodeBase64Url,

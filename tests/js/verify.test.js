@@ -11,7 +11,6 @@ const {
   KEY_THEFT_BOUNDARY,
   TOFU_BOUNDARY,
   ApaVerifierError,
-  breakerViewModel,
   canonicalJson,
   decodeBase64Url,
   loadBreakerVerificationMaterial,
@@ -219,21 +218,17 @@ test("BREAKER certificate schema and issuer signature verify independently", asy
   );
   assert.equal(unicodeResult.accepted, true);
 
-  const formattedFinder = await signRecord(
-    breakerCore({ finder: "\uff20researcher\u202e\u200b.example" }),
+  const combiningScriptFinder = await signRecord(
+    breakerCore({ finder: "\u0928\u092e\u0938\u094d\u0924\u0947.example" }),
     material.keys.privateKey,
     "issuer_sig",
   );
-  const formattedResult = await verifyBreakerCertificate(
-    formattedFinder,
+  const combiningScriptResult = await verifyBreakerCertificate(
+    combiningScriptFinder,
     material.issuerDocument,
     { cryptoImpl: webcrypto },
   );
-  assert.equal(formattedResult.accepted, true);
-  assert.equal(
-    breakerViewModel(formattedFinder, formattedResult).finder,
-    "@researcher.example",
-  );
+  assert.equal(combiningScriptResult.accepted, true);
 });
 
 test("BREAKER issuer-key history uses the signed confirmation-time cutoff", async () => {
@@ -292,6 +287,13 @@ test("BREAKER certificate validation rejects signed malformed or payload-bearing
     breakerCore({ finder: { html: "<img src=x onerror=alert(1)>" } }),
     breakerCore({ finder: " untrimmed " }),
     breakerCore({ finder: "\ud83d\ude00".repeat(129) }),
+    breakerCore({ finder: "\uff20researcher\u202e\u200b.example" }),
+    breakerCore({ finder: "researcher\u034f.example" }),
+    breakerCore({ finder: "researcher\ufe0f.example" }),
+    breakerCore({ finder: "researcher\u0085.example" }),
+    breakerCore({ finder: "researcher\u115f.example" }),
+    breakerCore({ finder: `researcher${"\u200b".repeat(5000)}.example` }),
+    breakerCore({ finder: "researcher\u{1ccd6}.example" }),
     breakerCore({ confirmed_at: "2026-09-10T00:00:00Z" }),
     breakerCore({ log_seq: 0 }),
     { ...breakerCore(), payload: "raw payload must never be public" },

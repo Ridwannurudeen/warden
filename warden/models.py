@@ -19,6 +19,26 @@ RiskLabel = Literal["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
 Grade = Literal["A", "B", "C", "D", "F", "INCONCLUSIVE"]
 ClaimStatus = Literal["not_candidate", "pending", "duplicate"]
 
+_FINDER_DEFAULT_IGNORABLE_RANGES = (
+    (0x00AD, 0x00AD),
+    (0x034F, 0x034F),
+    (0x061C, 0x061C),
+    (0x115F, 0x1160),
+    (0x17B4, 0x17B5),
+    (0x180B, 0x180F),
+    (0x200B, 0x200F),
+    (0x202A, 0x202E),
+    (0x2060, 0x206F),
+    (0x3164, 0x3164),
+    (0xFE00, 0xFE0F),
+    (0xFEFF, 0xFEFF),
+    (0xFFA0, 0xFFA0),
+    (0xFFF0, 0xFFF8),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+    (0xE0000, 0xE0FFF),
+)
+
 
 def normalize_finder_handle(value: str | None) -> str | None:
     if value is None:
@@ -28,8 +48,22 @@ def normalize_finder_handle(value: str | None) -> str | None:
         character
         for character in normalized
         if unicodedata.category(character) != "Cf"
-    ).strip()
+    ).strip(" \t\r\n")
     return normalized or None
+
+
+def finder_handle_is_visible(value: str) -> bool:
+    return all(
+        character == " "
+        or (
+            character.isprintable()
+            and not any(
+                start <= ord(character) <= end
+                for start, end in _FINDER_DEFAULT_IGNORABLE_RANGES
+            )
+        )
+        for character in value
+    )
 
 
 class ScanContext(BaseModel):
@@ -109,7 +143,14 @@ class GauntletRequest(BaseModel):
     @field_validator("finder", mode="before")
     @classmethod
     def normalize_finder(cls, value: object) -> object:
-        return normalize_finder_handle(value) if isinstance(value, str) else value
+        if not isinstance(value, str):
+            return value
+        normalized = normalize_finder_handle(value)
+        if normalized is None and value.strip(" \t\r\n"):
+            raise ValueError("finder must contain only visible characters")
+        if normalized is not None and not finder_handle_is_visible(normalized):
+            raise ValueError("finder must contain only visible characters")
+        return normalized
 
 
 class Detection(BaseModel):

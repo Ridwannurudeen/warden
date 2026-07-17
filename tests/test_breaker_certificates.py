@@ -243,6 +243,36 @@ def test_confirmed_finder_credit_strips_format_controls_before_signing(
     assert attempt["finder"] == "@researcher.example"
 
 
+@pytest.mark.parametrize(
+    "finder",
+    [
+        "researcher\u034f.example",
+        "researcher\ufe0f.example",
+        "researcher\u0085.example",
+        "researcher.example\u0085",
+        "\u001cresearcher.example",
+        "researcher\ue000.example",
+        "researcher\U0001ccd6.example",
+        "researcher\u115f.example",
+        "\u202e\u200b",
+    ],
+)
+def test_breaker_issuer_rejects_non_visible_finder_characters(
+    breaker_state,
+    finder,
+):
+    with pytest.raises(ValueError):
+        protection.issue_breaker_certificate(
+            certificate_id="a" * 32,
+            benchmark_case_id="gauntlet-" + "b" * 16,
+            threat_class=ReasonCode.TOOL_HIJACK,
+            payload_sha256="c" * 64,
+            finder=finder,
+            confirmed_at=CONFIRMED_AT_UNIX,
+            log_seq=1,
+        )
+
+
 def test_confirmed_reproducer_issues_signed_certificate_log_and_public_records(
     breaker_state,
 ):

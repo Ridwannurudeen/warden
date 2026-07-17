@@ -21,6 +21,7 @@ from warden.models import (
     ClaimStatus,
     GauntletRequest,
     ScanResponse,
+    finder_handle_is_visible,
     normalize_finder_handle,
 )
 
@@ -387,9 +388,13 @@ def confirm_bypass(
         raise ValueError("reviewed_payload must not be blank")
     if len(reviewed_payload) > 4_000:
         raise ValueError("reviewed_payload must not exceed 4000 characters")
-    finder = normalize_finder_handle(finder)
+    raw_finder = finder
+    finder = normalize_finder_handle(raw_finder)
+    if finder is None and raw_finder is not None and raw_finder.strip(" \t\r\n"):
+        raise ValueError("finder must contain only visible characters")
     if finder is not None and (
         len(finder) > 128
+        or not finder_handle_is_visible(finder)
         or any(ord(character) < 32 or ord(character) == 127 for character in finder)
     ):
         raise ValueError("finder must be a printable handle of at most 128 characters")

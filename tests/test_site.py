@@ -176,6 +176,7 @@ def test_apa_spec_matches_source_ready_reference_contract():
     for overclaim in ("First deployment", "first deployment", "Deployment #1"):
         assert overclaim not in spec
     assert "paginated JSONL" not in spec
+    assert "Default_Ignorable_Code_Point" in spec
 
 
 def test_required_multi_page_routes_exist_with_shared_navigation():
@@ -731,6 +732,7 @@ def test_gauntlet_breaker_board_is_empty_honest_and_requires_public_credit_conse
 
     assert "data-gauntlet-public-credit-consent" in gauntlet_source
     assert "consent to publish" in gauntlet
+    assert "normalized visible form" in gauntlet
     assert "finder handle" in gauntlet
     assert "raw submitted payload is not published" in privacy
     assert "redacted reproducer" in privacy

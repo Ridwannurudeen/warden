@@ -131,15 +131,40 @@ test("finder handles normalize formatting controls before submission and display
     publicCreditConsent: true,
   });
   assert.equal(request.finder, "@researcher.example");
+  const visibleUnicode = buildGauntletRequest({
+    intent: "other",
+    payload: "A routine status note.",
+    finder: "\u0928\u092e\u0938\u094d\u0924\u0947.example",
+    expectedAddresses: "",
+    consent: true,
+    publicCreditConsent: true,
+  });
+  assert.equal(
+    visibleUnicode.finder,
+    "\u0928\u092e\u0938\u094d\u0924\u0947.example",
+  );
 
   const leaderboard = deriveBreakerLeaderboard(
     {
-      breakers: [breaker({ finder: "\uff20researcher\u202e\u200b.example" })],
+      breakers: [breaker({ finder: "@researcher.example" })],
       total: 1,
     },
     BASE_URL,
   );
   assert.equal(leaderboard.rows[0].finder, "@researcher.example");
+  assert.throws(
+    () =>
+      deriveBreakerLeaderboard(
+        {
+          breakers: [
+            breaker({ finder: "\uff20researcher\u202e\u200b.example" }),
+          ],
+          total: 1,
+        },
+        BASE_URL,
+      ),
+    /malformed/,
+  );
   assert.throws(
     () =>
       deriveBreakerLeaderboard(
@@ -178,6 +203,25 @@ test("gauntlet request rejects blank, oversized, unsupported, and invalid recipi
     () => buildGauntletRequest({ ...values, expectedAddresses: "0x1234" }),
     /40 hexadecimal/,
   );
+  for (const finder of [
+    "researcher\u034f.example",
+    "researcher\ufe0f.example",
+    "researcher\u0085.example",
+    "researcher.example\u0085",
+    "\u001cresearcher.example",
+    "researcher\u115f.example",
+    "\u202e\u200b",
+  ]) {
+    assert.throws(
+      () =>
+        buildGauntletRequest({
+          ...values,
+          finder,
+          publicCreditConsent: true,
+        }),
+      /visible/,
+    );
+  }
 });
 
 test("gauntlet receipts map candidate, duplicate, and detected states without payload data", () => {

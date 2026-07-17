@@ -265,6 +265,13 @@ human-confirmed Gauntlet bypass evidence. A BREAKER certificate has exactly:
 }
 ```
 
+A non-null `finder` contains 1–128 Unicode scalar values and must already be in the issuer's canonical
+display form: NFKC-normalized, ASCII-whitespace trimmed, free of format controls and Unicode 15
+`Default_Ignorable_Code_Point` values, and limited to printable characters (ordinary U+0020 spaces are
+allowed). The issuer applies that normalization before signing. Verifiers validate the signature over the
+exact raw certificate, then reject a `finder` that is not already canonical and display the accepted signed
+value verbatim.
+
 `issuer_sig` covers the canonical certificate without `issuer_sig`. Verification selects issuer keys using the
 signed `confirmed_at` and each key's `not_after`, just as APA Attestations use `verified_at`. BREAKER
 certificates are historical evidence and do not expire. The certificate proves that the issuer signed these

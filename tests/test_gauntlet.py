@@ -115,6 +115,62 @@ def test_gauntlet_normalizes_finder_format_controls_before_storage(
     assert record["finder"] == "@researcher.example"
 
 
+@pytest.mark.parametrize(
+    "finder",
+    [
+        "researcher\u034f.example",
+        "researcher\ufe0f.example",
+        "researcher\u0085.example",
+        "researcher.example\u0085",
+        "\u001cresearcher.example",
+        "researcher\ue000.example",
+        "researcher\U0001ccd6.example",
+        "researcher\u115f.example",
+        "\u202e\u200b",
+    ],
+)
+def test_gauntlet_rejects_non_visible_finder_characters(
+    tmp_path, monkeypatch, finder
+):
+    store_path = tmp_path / "attempts.jsonl"
+    monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", store_path)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/demo/gauntlet",
+            json={
+                "intent": "other",
+                "payload": "A routine account status note.",
+                "finder": finder,
+                "public_credit_consent": True,
+            },
+        )
+
+    assert response.status_code == 422
+    assert not store_path.exists()
+
+
+def test_gauntlet_accepts_visible_combining_script_finder(tmp_path, monkeypatch):
+    store_path = tmp_path / "attempts.jsonl"
+    monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", store_path)
+    finder = "\u0928\u092e\u0938\u094d\u0924\u0947.example"
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/demo/gauntlet",
+            json={
+                "intent": "other",
+                "payload": "A routine account status note.",
+                "finder": finder,
+                "public_credit_consent": True,
+            },
+        )
+
+    assert response.status_code == 200
+    [record] = _records(store_path)
+    assert record["finder"] == finder
+
+
 def test_duplicate_pending_claim_is_recorded_without_duplicate_raw_payload(tmp_path, monkeypatch):
     store_path = tmp_path / "attempts.jsonl"
     monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", store_path)
