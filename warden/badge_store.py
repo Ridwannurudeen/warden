@@ -14,9 +14,9 @@ _LOCK = Lock()
 
 
 @contextmanager
-def _exclusive_store_lock() -> Iterator[None]:
-    _STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    lock_path = _STORE_PATH.with_name(f".{_STORE_PATH.name}.lock")
+def _exclusive_store_lock(store_path: Path = _STORE_PATH) -> Iterator[None]:
+    store_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = store_path.with_name(f".{store_path.name}.lock")
     with _LOCK, lock_path.open("a+b") as handle:
         handle.seek(0, os.SEEK_END)
         if handle.tell() == 0:
@@ -84,7 +84,7 @@ def get_badge(audit_id: str) -> dict[str, object] | None:
 
 def list_badges(store_path: Path | None = None) -> list[dict[str, object]]:
     path = store_path or _STORE_PATH
-    with _exclusive_store_lock():
+    with _exclusive_store_lock(path):
         records = _read_records(path)
 
     return sorted(records, key=lambda record: str(record.get("issued_at", "")), reverse=True)
