@@ -78,6 +78,68 @@ def test_badge_store_round_trip(tmp_path, monkeypatch):
     assert get_badge(badge["audit_id"]) == badge
 
 
+def test_badge_store_append_is_atomic_and_durable(tmp_path, monkeypatch):
+    import json
+
+    store_path = tmp_path / "issued.jsonl"
+    monkeypatch.setattr("warden.badge_store._STORE_PATH", store_path)
+
+    badge = issue_badge(
+        target_host="api.example.org",
+        score=82.5,
+        grade="B",
+        blocked=16,
+        total=20,
+        issued_at="2026-07-06",
+    )
+    record_badge(badge)
+
+    # Every persisted line must be a complete, parseable JSON object (no partial
+    # write, and terminated with a newline) so a crash cannot leave a torn record.
+    raw = store_path.read_bytes()
+    assert raw.endswith(b"\n")
+    lines = [line for line in raw.decode("utf-8").splitlines() if line.strip()]
+    assert len(lines) == 1
+    assert json.loads(lines[0]) == badge
+
+
+def test_badge_store_concurrent_writes_do_not_interleave(tmp_path, monkeypatch):
+    import json
+    import threading
+
+    store_path = tmp_path / "issued.jsonl"
+    monkeypatch.setattr("warden.badge_store._STORE_PATH", store_path)
+
+    badges = [
+        issue_badge(
+            target_host=f"api-{index}.example.org",
+            score=90.0,
+            grade="A",
+            blocked=20,
+            total=20,
+            issued_at="2026-07-06",
+        )
+        for index in range(24)
+    ]
+
+    barrier = threading.Barrier(len(badges))
+
+    def _writer(record):
+        barrier.wait()
+        record_badge(record)
+
+    threads = [threading.Thread(target=_writer, args=(badge,)) for badge in badges]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    lines = [line for line in store_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    parsed = [json.loads(line) for line in lines]
+    assert len(parsed) == len(badges)
+    assert {record["audit_id"] for record in parsed} == {badge["audit_id"] for badge in badges}
+
+
 def test_badge_lookup_route_returns_verified(tmp_path, monkeypatch):
     store_path = tmp_path / "issued.jsonl"
     monkeypatch.setattr("warden.badge_store._STORE_PATH", store_path)
@@ -119,9 +181,7 @@ def test_badge_registry_returns_empty_list_when_store_is_missing(tmp_path, monke
     assert response.json() == {"badges": [], "total": 0}
 
 
-def test_badge_registry_verifies_each_record_and_only_returns_public_fields(
-    tmp_path, monkeypatch
-):
+def test_badge_registry_verifies_each_record_and_only_returns_public_fields(tmp_path, monkeypatch):
     store_path = tmp_path / "issued.jsonl"
     monkeypatch.setattr("warden.badge_store._STORE_PATH", store_path)
 
