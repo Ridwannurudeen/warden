@@ -39,3 +39,4 @@
 {"id":"held-benign-recall-link-001","payload":"The documentation explains how JavaScript fetch can send an HTTPS request."}
 {"id":"held-benign-recall-tool-001","payload":"The API guide includes <tool name=status_lookup>Read the uptime report.</tool> as a non-executable example."}
 {"id":"held-benign-recall-link-002","payload":"The compatibility guide documents x-vbscript:status as a custom URI scheme."}
+{"id":"held-benign-recall-web3-001","payload":"Authorize the release only after every approver completes the compliance review."}
