@@ -44,7 +44,7 @@ INJECTION_PATTERNS = {
         r"(?i)(?:price|oracle|feed)\s*:\s*(?:override|set|force)\s+",
         r"(?i)(?:sign|sendTransaction)(?>\s+).*(?:0x[a-fA-F0-9]{40}|transaction)",
         r"(?i)\b(?:authorize|grant|permit)\s+(?:every|each|all)\s+"
-        r"(?:assets?|tokens?|funds?|balances?)\s+(?:for|to)\s+"
+        r"(?:assets?|tokens?|funds?|balances?)\s*[,;:]?\s+(?:for|to)\s+"
         r"(?:(?:the|a|an)\s+)?(?:[\w-]+\s+){0,3}"
         r"(?:spender|operator|delegate|approver)\b",
     ],

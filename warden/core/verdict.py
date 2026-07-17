@@ -326,6 +326,14 @@ class VerdictEngine:
             if detection.get("class") == ReasonCode.TOOL_HIJACK.value:
                 if float(detection.get("confidence", 0.0)) >= 0.8:
                     return ReasonCode.TOOL_HIJACK
+        for detection in detections:
+            if detection.get("class") == ReasonCode.MALICIOUS_LINK.value:
+                match = str(detection.get("match", ""))
+                normalized_match = (
+                    match.replace("\t", "").replace("\r", "").replace("\n", "").lower()
+                )
+                if normalized_match.startswith(("javascript:", "vbscript:")):
+                    return ReasonCode.MALICIOUS_LINK
         if scanner_risk == "CRITICAL":
             return VerdictEngine._highest_confidence_scanner_reason(detections)
         return None

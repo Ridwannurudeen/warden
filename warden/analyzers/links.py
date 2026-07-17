@@ -9,7 +9,12 @@ from warden.core.verdict import ReasonCode
 
 URL_RE = re.compile(
     r"(?i)(?:\b(?:https?://[^\s<>'\")]+|data:[^\s<>'\")]+)|"
-    r"(?<![\w+.-])(?:javascript|vbscript):[^\s<>'\")]+)"
+    r"(?<![-\w+./:\x5c])"
+    r"(?:j[\t\r\n]*a[\t\r\n]*v[\t\r\n]*a[\t\r\n]*s[\t\r\n]*c"
+    r"[\t\r\n]*r[\t\r\n]*i[\t\r\n]*p[\t\r\n]*t|"
+    r"v[\t\r\n]*b[\t\r\n]*s[\t\r\n]*c[\t\r\n]*r[\t\r\n]*i"
+    r"[\t\r\n]*p[\t\r\n]*t):[^\s<>'\")]*"
+    r")"
 )
 CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
 ASCII_ALPHA_RE = re.compile(r"[A-Za-z]")
@@ -53,7 +58,7 @@ class MaliciousLinkAnalyzer(Analyzer):
 
     @staticmethod
     def _confidence(url: str) -> float:
-        lowered = url.lower()
+        lowered = url.replace("\t", "").replace("\r", "").replace("\n", "").lower()
         if lowered.startswith(("javascript:", "vbscript:")):
             return 0.95
         if lowered.startswith("data:"):

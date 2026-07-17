@@ -32,10 +32,14 @@ TOOL_SHAPE_RE = re.compile(
 )
 FENCED_BLOCK_RE = re.compile(r"```(?:json|tool|javascript|python)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)
 TAGGED_TOOL_RE = re.compile(
-    r"<(?P<tag>tool|function|invoke)\b(?P<attributes>[^>]*)>"
+    r"<(?P<tag>tool|function|invoke)\b(?P<attributes>[^>]{0,512})>"
     r"(?P<body>(?:(?!</?(?:tool|function|invoke)\b).)*)"
     r"</(?P=tag)\s*>",
     re.IGNORECASE | re.DOTALL,
+)
+SELF_CLOSING_TAGGED_TOOL_RE = re.compile(
+    r"<(?:tool|function|invoke)\b(?P<attributes>[^>]{0,512})/\s*>",
+    re.IGNORECASE,
 )
 
 
@@ -98,6 +102,13 @@ class ToolHijackAnalyzer(Analyzer):
         for tagged_call in TAGGED_TOOL_RE.finditer(payload):
             content = f"{tagged_call.group('attributes')} {tagged_call.group('body')}"
             action = FINANCIAL_ACTION_RE.search(content) or DANGEROUS_COMMAND_RE.search(content)
+            if action is not None:
+                return action
+        for tagged_call in SELF_CLOSING_TAGGED_TOOL_RE.finditer(payload):
+            attributes = tagged_call.group("attributes")
+            action = FINANCIAL_ACTION_RE.search(attributes) or DANGEROUS_COMMAND_RE.search(
+                attributes
+            )
             if action is not None:
                 return action
         return None
