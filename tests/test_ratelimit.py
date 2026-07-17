@@ -106,18 +106,29 @@ def test_http_scan_route_skips_when_disabled(monkeypatch):
     assert all(response.status_code == 200 for response in responses)
 
 
-def test_paid_request_bypasses_rate_limit(monkeypatch):
-    # A request carrying an x402 payment header must never be rate-limited, even
-    # when the per-client window is exhausted (OKX's paid replay + x402-check probe
-    # share OKX egress IPs; a 429 there strands a signed payment or fails the check).
+def test_forged_payment_header_gets_ordinary_bucket(monkeypatch):
+    # A forged/unverified payment header must NOT unlock the elevated bucket before
+    # x402 settlement is verified. It falls through to the ordinary per-client limit.
     monkeypatch.setenv("WARDEN_RATE_LIMIT_PER_MIN", "1")
     ratelimit._reset_state()
     client = TestClient(app)
 
-    assert client.post("/scan", json={"payload": "x"}).status_code == 200
-    assert client.post("/scan", json={"payload": "x"}).status_code == 429
+    headers = {"payment-signature": "forged"}
+    assert client.post("/scan", json={"payload": "x"}, headers=headers).status_code == 200
+    assert client.post("/scan", json={"payload": "x"}, headers=headers).status_code == 429
 
+
+def test_verified_payer_gets_elevated_bucket(monkeypatch):
+    # Once a client has completed a verified settlement, its replays use the
+    # elevated payment bucket even past the ordinary limit.
+    monkeypatch.setenv("WARDEN_RATE_LIMIT_PER_MIN", "1")
+    monkeypatch.setenv("WARDEN_PAYMENT_RATE_LIMIT_PER_MIN", "600")
     ratelimit._reset_state()
-    headers = {"payment-signature": "dummy"}
+    ratelimit.mark_verified_payer(
+        SimpleNamespace(headers={}, client=SimpleNamespace(host="testclient"))
+    )
+
+    client = TestClient(app)
+    headers = {"payment-signature": "verified"}
     for _ in range(3):
         assert client.post("/scan", json={"payload": "x"}, headers=headers).status_code != 429

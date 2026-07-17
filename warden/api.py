@@ -19,7 +19,12 @@ from warden.auditor import AgentAuditor
 from warden.core.verdict import ReasonCode
 from warden.engine import WardenEngine
 from warden.gauntlet_store import get_stats, record_attempt
-from warden.ratelimit import check_rate_limit, retry_after_seconds
+from warden.ratelimit import (
+    check_rate_limit,
+    is_verified_payer,
+    mark_verified_payer,
+    retry_after_seconds,
+)
 from warden.models import (
     ApaRegisterRequest,
     ApaRevokeRequest,
@@ -60,9 +65,7 @@ class RequestBodyLimitMiddleware:
             return
 
         content_lengths = [
-            value
-            for name, value in scope.get("headers", [])
-            if name.lower() == b"content-length"
+            value for name, value in scope.get("headers", []) if name.lower() == b"content-length"
         ]
         if content_lengths:
             try:
@@ -149,6 +152,7 @@ class RequestBodyLimitMiddleware:
                 content={"detail": "JSON nesting is too deep"},
             )
             await response(scope, receive, send)
+
 
 _SCAN_INPUT = {
     "type": "http",
@@ -384,9 +388,16 @@ async def rate_limit_middleware(request: Request, call_next):
     carries_payment = bool(
         request.headers.get("payment-signature") or request.headers.get("x-payment")
     )
-    if carries_payment and path in {"/scan", "/audit"}:
+    paid_payment_route = carries_payment and path in {"/scan", "/audit"}
+    if paid_payment_route and is_verified_payer(request):
+        # Only a client that has already completed a verified x402 settlement earns
+        # the elevated bucket. A forged/unverified payment header falls through to
+        # the ordinary per-client limit below.
         limit_per_minute = _payment_rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute, scope="payment")
+    elif paid_payment_route:
+        limit_per_minute = _rate_limit_per_minute()
+        rate_limited = check_rate_limit(request, limit_per_minute)
     elif path.startswith("/api/demo/"):
         limit_per_minute = _demo_rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute, scope="demo")
@@ -407,7 +418,17 @@ async def rate_limit_middleware(request: Request, call_next):
         response.headers["Retry-After"] = str(retry_after_seconds())
         return response
 
-    return await call_next(request)
+    response = await call_next(request)
+    # A successful settlement surfaces the x402 PAYMENT-RESPONSE receipt on a 2xx
+    # response. Record the client so its subsequent replays earn the elevated
+    # payment bucket; a forged header never settles and never gets marked.
+    if (
+        paid_payment_route
+        and response.status_code < 400
+        and response.headers.get("PAYMENT-RESPONSE")
+    ):
+        mark_verified_payer(request)
+    return response
 
 
 @app.middleware("http")

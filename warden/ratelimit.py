@@ -15,6 +15,12 @@ _WINDOW_SECONDS = 60
 _STATE: dict[tuple[str, str], tuple[int, int]] = {}
 _STATE_LOCK = threading.Lock()
 
+# A client is granted the elevated payment bucket only after it has completed at
+# least one verified x402 settlement. This keeps a forged/unverified payment
+# header from unlocking elevated throughput before the facilitator confirms.
+_VERIFIED_TTL_SECONDS = 600
+_VERIFIED_PAYERS: dict[str, float] = {}
+
 
 def _client_ip(request: object) -> str:
     request_client = request.client
@@ -65,6 +71,24 @@ def check_rate_limit(request: object, limit_per_minute: int, scope: str = "paid"
         return count > limit_per_minute
 
 
+def mark_verified_payer(request: object) -> None:
+    """Record that ``request``'s client just completed a verified settlement."""
+    client = _client_ip(request)
+    with _STATE_LOCK:
+        _VERIFIED_PAYERS[client] = _time_now() + _VERIFIED_TTL_SECONDS
+
+
+def is_verified_payer(request: object) -> bool:
+    """Return ``True`` when the client has a live verified-settlement grant."""
+    client = _client_ip(request)
+    now = _time_now()
+    with _STATE_LOCK:
+        for known_client, expires_at in list(_VERIFIED_PAYERS.items()):
+            if expires_at <= now:
+                del _VERIFIED_PAYERS[known_client]
+        return client in _VERIFIED_PAYERS
+
+
 def retry_after_seconds() -> int:
     now = _time_now()
     remaining = _WINDOW_SECONDS - (int(now) % _WINDOW_SECONDS)
@@ -76,3 +100,4 @@ def retry_after_seconds() -> int:
 def _reset_state() -> None:
     with _STATE_LOCK:
         _STATE.clear()
+        _VERIFIED_PAYERS.clear()
