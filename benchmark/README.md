@@ -79,7 +79,7 @@ unless model-backed recall exceeds this 92.55% baseline while the held-out benig
 positives.
 
 A semantic-enabled run recorded on 2026-07-16 against the original 28-case set is published separately in
-`history.jsonl` and `site/data/evaluation.json`: **71.43% recall (20/28)** with **0.00% false positives
+`history.jsonl`: **71.43% recall (20/28)** with **0.00% false positives
 (0/16)**. That historical measurement predates both the Decoder Wall pre-pass and the expanded evasion set,
 so it is not comparable to the current 94-case deterministic baseline. The deterministic `results.json`
 remains the reproducible offline baseline. Repository configuration does not enable the paid semantic
