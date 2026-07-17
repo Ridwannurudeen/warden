@@ -115,7 +115,7 @@ def page_shell(
     <main id="main" class="page-shell site-main">{body}</main>
     <footer class="site-footer page-shell">
       <div><strong>Warden</strong><span>The immune system of the agent economy.</span><span>Independent service listed on OKX.AI.</span></div>
-      <nav aria-label="Footer"><a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a><a href="/showcase">Showcase</a><a href="/docs">Docs</a><a href="/badges">Evidence</a><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav>
+      <nav aria-label="Footer"><a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a><a href="/showcase">Walkthrough</a><a href="/docs">Docs</a><a href="/badges">Evidence</a><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav>
     </footer>
     {"".join(script_tags)}
   </body>
