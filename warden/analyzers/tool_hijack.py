@@ -18,6 +18,11 @@ TOOL_KEYS = {
 FINANCIAL_ACTION_RE = re.compile(
     r"(?i)\b(transfer|approve|setApproval(?:ForAll)?|sign|sendTransaction|withdraw|deposit|pay)\b"
 )
+DANGEROUS_COMMAND_RE = re.compile(
+    r"(?i)\b(?:exec(?:ute)?(?:[_-](?:shell|command))?|"
+    r"run[_-]?(?:shell|command)|shell|(?:ba|z|k)?sh|powershell|"
+    r"cmd(?:\.exe)?|curl|wget|invoke-webrequest)\b"
+)
 EVM_ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{40}")
 BLOCK_REFERENCE_RE = re.compile(r"(?:latest|pending|safe|finalized|earliest|0x[0-9a-fA-F]+)")
 TOOL_SHAPE_RE = re.compile(
@@ -26,6 +31,12 @@ TOOL_SHAPE_RE = re.compile(
     r"\b(?:tool_call|tool_calls|tool_result|function|arguments)\s*[:=])"
 )
 FENCED_BLOCK_RE = re.compile(r"```(?:json|tool|javascript|python)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)
+TAGGED_TOOL_RE = re.compile(
+    r"<(?P<tag>tool|function|invoke)\b(?P<attributes>[^>]*)>"
+    r"(?P<body>(?:(?!</?(?:tool|function|invoke)\b).)*)"
+    r"</(?P=tag)\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 class ToolHijackAnalyzer(Analyzer):
@@ -45,14 +56,20 @@ class ToolHijackAnalyzer(Analyzer):
         tool_shape = self._has_tool_shape(payload)
         financial_action = FINANCIAL_ACTION_RE.search(payload)
         fenced_tool = any(self._has_tool_shape(block) for block in FENCED_BLOCK_RE.findall(payload))
+        tagged_action = self._tagged_dangerous_action(payload)
 
-        if not tool_shape and not fenced_tool:
+        if not tool_shape and not fenced_tool and tagged_action is None:
             return AnalyzerResult(name=self.name, weight=self.weight, score=0, data={"detections": []})
-        if financial_action is None and self._is_read_only_tool_payload(payload):
+        if (
+            tagged_action is None
+            and financial_action is None
+            and self._is_read_only_tool_payload(payload)
+        ):
             return AnalyzerResult(name=self.name, weight=self.weight, score=0, data={"detections": []})
 
-        confidence = 0.88 if financial_action else 0.60
-        match = financial_action.group() if financial_action else "tool-shaped payload"
+        executable_action = tagged_action or financial_action
+        confidence = 0.88 if executable_action else 0.60
+        match = executable_action.group() if executable_action else "tool-shaped payload"
         detection = {
             "class": ReasonCode.TOOL_HIJACK.value,
             "match": match,
@@ -75,6 +92,15 @@ class ToolHijackAnalyzer(Analyzer):
         except json.JSONDecodeError:
             return False
         return cls._json_has_tool_key(parsed)
+
+    @staticmethod
+    def _tagged_dangerous_action(payload: str) -> re.Match[str] | None:
+        for tagged_call in TAGGED_TOOL_RE.finditer(payload):
+            content = f"{tagged_call.group('attributes')} {tagged_call.group('body')}"
+            action = FINANCIAL_ACTION_RE.search(content) or DANGEROUS_COMMAND_RE.search(content)
+            if action is not None:
+                return action
+        return None
 
     @classmethod
     def _json_has_tool_key(cls, value: object) -> bool:
