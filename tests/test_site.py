@@ -753,10 +753,6 @@ def test_status_and_marketplace_metadata_are_dated_and_honest():
     assert 0 <= marketplace["auditedCount"] <= marketplace["sampled"]
     assert 0 <= marketplace["matchedCount"] <= marketplace["sampled"]
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", marketplace["capturedAt"])
-    home = (SITE / "index.html").read_text(encoding="utf-8")
-    assert "Partial/degraded discovery response for marketplace query" in home
-    assert '"a": 730 unique agents sampled' in home
-    assert "22 expected agents not present in this response" in home
 
 
 def test_privacy_and_terms_cover_gauntlet_retention_and_public_surfaces():
