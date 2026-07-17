@@ -41,7 +41,7 @@ Use only `certbot certonly --webroot` for certificate issuance.
 - Runtime feature flags (set in `/opt/warden/.env`):
   - `WARDEN_RATE_LIMIT_PER_MIN=60` (set to `0` to disable)
   - `WARDEN_DEMO_RATE_LIMIT_PER_MIN=20` (shared limit for public demo and Gauntlet routes)
-  - `WARDEN_REQUIRE_CONSENT=false` (set to `true` for hard consent enforcement)
+  - `WARDEN_REQUIRE_CONSENT=true` (hard consent is the default; set to `false` to restore soft consent, which lets an audit proceed against a target that has not opted in)
   - `WARDEN_BADGE_SECRET=<strong-random-hmac-secret>` (required in production; the public development default is forgeable)
   - `WARDEN_ISSUER_KEY=<base64url-ed25519-seed>` (required in production; never let a release generate the development fallback)
   - `WARDEN_ISSUER_KID=<unique-current-key-id>` and `WARDEN_ISSUER_HISTORY=/opt/warden/issuer-history.json` (the current signer plus public-only retired-key history)

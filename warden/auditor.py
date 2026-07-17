@@ -350,11 +350,14 @@ class AgentAuditor:
 
     @staticmethod
     def _require_consent() -> bool:
-        return os.getenv("WARDEN_REQUIRE_CONSENT", "false").lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
+        # Hard consent is the default posture: an active probe battery must not be
+        # fired at a public target that has not explicitly opted in. Operators can
+        # set WARDEN_REQUIRE_CONSENT to an explicit off value to restore soft mode.
+        return os.getenv("WARDEN_REQUIRE_CONSENT", "true").lower() not in {
+            "0",
+            "false",
+            "no",
+            "off",
         }
 
     async def _verify_target_consent(

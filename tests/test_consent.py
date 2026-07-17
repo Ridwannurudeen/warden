@@ -92,6 +92,18 @@ def test_audit_requires_no_hard_block_when_consent_missing_and_soft(monkeypatch)
     assert response.json()["consent_verified"] is False
 
 
+def test_audit_refuses_non_consenting_target_by_default(monkeypatch):
+    # With no WARDEN_REQUIRE_CONSENT override, hard consent is the default, so an
+    # audit of a target that does not publish the opt-in marker must be refused.
+    _stubbed_audit_requests(monkeypatch, _ConsentResponse(status_code=404, text="missing"))
+    monkeypatch.delenv("WARDEN_REQUIRE_CONSENT", raising=False)
+    monkeypatch.setenv("WARDEN_RATE_LIMIT_PER_MIN", "0")
+    with TestClient(app) as client:
+        response = client.post("/audit", json={"target_url": "https://example.org/scan"})
+    assert response.status_code == 400
+    assert response.json()["detail"] == "target_url did not pass consent check"
+
+
 def test_audit_requires_consent_when_enabled(monkeypatch):
     _stubbed_audit_requests(monkeypatch, _ConsentResponse(status_code=404, text="missing"))
     monkeypatch.setenv("WARDEN_REQUIRE_CONSENT", "true")
