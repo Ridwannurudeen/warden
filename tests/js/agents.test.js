@@ -7,6 +7,8 @@ const test = require("node:test");
 const {
   AGENT_PAGE_SIZE,
   compareAgentRows,
+  filtersFromSearchParams,
+  filtersToSearchParams,
   focusIndexAfterAgentExpansion,
   matchesAgentFilters,
   matchesDocumentFilters,
@@ -20,6 +22,7 @@ test("marketplace search and filters require every selected condition", () => {
     category: "SOFTWARE_SERVICES|SECURITY",
     match: "signal",
     audit: "audited",
+    apa: "attested",
   };
 
   assert.equal(
@@ -28,6 +31,7 @@ test("marketplace search and filters require every selected condition", () => {
       category: "SECURITY",
       match: "signal",
       audit: "audited",
+      apa: "attested",
     }),
     true,
   );
@@ -37,6 +41,27 @@ test("marketplace search and filters require every selected condition", () => {
   );
   assert.equal(matchesAgentFilters(dataset, { match: "none" }), false);
   assert.equal(matchesAgentFilters(dataset, { audit: "not-audited" }), false);
+  assert.equal(matchesAgentFilters(dataset, { apa: "not-attested" }), false);
+});
+
+test("marketplace filters round-trip through shareable query parameters", () => {
+  const filters = filtersFromSearchParams(
+    "?q=warden&category=SECURITY&signal=none&audit=audited&apa=attested&sort=name-asc",
+  );
+
+  assert.deepEqual(filters, {
+    query: "warden",
+    category: "SECURITY",
+    match: "none",
+    audit: "audited",
+    apa: "attested",
+    sort: "name-asc",
+  });
+  assert.equal(
+    filtersToSearchParams(filters),
+    "q=warden&category=SECURITY&signal=none&audit=audited&apa=attested&sort=name-asc",
+  );
+  assert.equal(filtersToSearchParams({}), "");
 });
 
 test("marketplace sorting handles missing numbers and deterministic ties", () => {
@@ -48,6 +73,7 @@ test("marketplace sorting handles missing numbers and deterministic ties", () =>
       review: "",
       match: "unscanned",
       audit: "not-audited",
+      apa: "not-attested",
     },
     {
       name: "Alpha",
@@ -56,6 +82,7 @@ test("marketplace sorting handles missing numbers and deterministic ties", () =>
       review: "4.5",
       match: "none",
       audit: "not-audited",
+      apa: "not-attested",
     },
     {
       name: "Beta",
@@ -64,6 +91,7 @@ test("marketplace sorting handles missing numbers and deterministic ties", () =>
       review: "5",
       match: "signal",
       audit: "audited",
+      apa: "attested",
     },
   ];
 
@@ -93,6 +121,7 @@ test("marketplace window filters every cached row before slicing", () => {
       category: "SOFTWARE_SERVICES",
       match: "none",
       audit: "not-audited",
+      apa: "not-attested",
     },
   }));
   rows[100].dataset.search += " offscreen-target";

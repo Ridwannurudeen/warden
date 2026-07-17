@@ -39,8 +39,8 @@
 
   function createTheaterState({ reducedMotion = false } = {}) {
     return {
-      auto: !reducedMotion,
-      status: reducedMotion ? "paused" : "ready",
+      auto: false,
+      status: "idle",
       nextIndex: 0,
       activeIndex: null,
       neutralized: 0,
@@ -105,14 +105,40 @@
   }
 
   function transitionTheater(state, event) {
+    if (event.type === "RESET") {
+      return createTheaterState();
+    }
     if (event.type === "REPLAY") {
-      return createTheaterState({ reducedMotion: event.auto === false });
+      return {
+        ...createTheaterState(),
+        auto: event.auto !== false,
+        status: "ready",
+      };
+    }
+    if (event.type === "START") {
+      if (
+        state.status === "scanning" ||
+        state.status === "complete" ||
+        state.status === "unexpected" ||
+        state.status === "error"
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        auto: event.auto !== false,
+        status: "ready",
+        error: "",
+      };
     }
     if (event.type === "PAUSE") {
       return {
         ...state,
         auto: false,
-        status: state.status === "scanning" ? state.status : "paused",
+        status:
+          state.status === "scanning" || state.status === "idle"
+            ? state.status
+            : "paused",
       };
     }
     if (event.type === "RESUME") {
@@ -170,6 +196,8 @@
             sanitizedPayload: event.result.sanitized_payload,
             delivery,
             source: "live",
+            checkedAt:
+              typeof event.checkedAt === "string" ? event.checkedAt : null,
             expected,
           },
         ],
@@ -200,7 +228,7 @@
   function formatComputeLatency(value) {
     return Number.isFinite(value) && value >= 0
       ? `${value.toFixed(2)} ms`
-      : "—";
+      : "Not measured";
   }
 
   function stagePresentation(state) {
@@ -215,22 +243,30 @@
             ? Math.min(state.nextIndex, ATTACKS.length - 1)
             : state.activeIndex
         ];
-    let outcome = "AWAITING LIVE VERDICT";
-    let delivery = "DEMO ASP AWAITING GATE";
+    let outcome = "NOT RUN";
+    let delivery = "NO DOWNSTREAM INVOCATION";
+    let evidence = "ILLUSTRATIVE SCENE · NO RECEIPT";
     if (state.status === "scanning") {
-      outcome = "SCANNING";
+      outcome = "REQUEST IN PROGRESS";
+      delivery = "DELIVERY PENDING · NO RECEIPT YET";
+      evidence = "UNKNOWN · RESPONSE NOT YET ESTABLISHED";
     } else if (state.status === "error") {
       outcome = "REQUEST STOPPED";
       delivery = "DELIVERY UNKNOWN — NO RECEIPT";
+      evidence = "DEGRADED · NO VALID RESULT ACCEPTED";
     } else if (showLiveResult) {
       outcome = `${latest.verdict} · ${latest.threats.join(", ") || "No threat class"}`;
       delivery = latest.delivery;
+      evidence = latest.expected
+        ? "LIVE · VERDICT AND DEMO ASP RECEIPT VALIDATED"
+        : "LIVE · UNEXPECTED RESULT REQUIRES INSPECTION";
     }
     return {
       label: attack.label,
       payload: attack.payloadLabel,
       outcome,
       delivery,
+      evidence,
     };
   }
 
@@ -266,14 +302,18 @@
   const stagePayload = document.querySelector("[data-theater-stage-payload]");
   const stageOutcome = document.querySelector("[data-theater-stage-outcome]");
   const stageDelivery = document.querySelector("[data-theater-stage-delivery]");
+  const stageEvidence = document.querySelector("[data-theater-stage-evidence]");
   const count = document.querySelector("[data-theater-count]");
   const latency = document.querySelector("[data-theater-latency]");
   const feed = document.querySelector("[data-theater-feed]");
   const status = document.querySelector("[data-theater-status]");
   const progress = document.querySelector("[data-theater-progress]");
+  const sourceStamp = document.querySelector("[data-theater-source-stamp]");
+  const startButton = document.querySelector("[data-theater-start]");
   const toggleButton = document.querySelector("[data-theater-toggle]");
   const nextButton = document.querySelector("[data-theater-next]");
   const replayButton = document.querySelector("[data-theater-replay]");
+  const resetButton = document.querySelector("[data-theater-reset]");
   const reducedMotionQuery = root.matchMedia?.(
     "(prefers-reduced-motion: reduce)",
   );
@@ -284,6 +324,9 @@
   function renderFeed() {
     feed.replaceChildren();
     for (const item of state.feed) {
+      const attack = ATTACKS.find(
+        (candidate) => candidate.id === item.attackId,
+      );
       const row = document.createElement("li");
       row.className = "theater-feed__item";
       row.dataset.outcome = item.expected ? "neutralized" : "unexpected";
@@ -291,16 +334,58 @@
 
       const title = document.createElement("strong");
       title.textContent = item.label;
+      const input = document.createElement("span");
+      input.textContent = `Input · ${attack?.request?.payload || "Unavailable"}`;
+      const proposedAction = document.createElement("span");
+      proposedAction.textContent = `Proposed action · ${attack?.payloadLabel || "Unavailable"}`;
       const verdict = document.createElement("span");
-      verdict.textContent = `${item.verdict} · ${item.threats.join(", ") || "No threat class"}`;
+      verdict.textContent = `Detector / verdict · ${item.threats.join(", ") || "No threat class"} · ${item.verdict}`;
       const delivery = document.createElement("span");
-      delivery.textContent = item.delivery;
+      delivery.textContent = `Execution · ${item.delivery}`;
+      const evidence = document.createElement("span");
+      evidence.className = "source-stamp source-stamp--live";
+      evidence.dataset.sourceState = "live";
+      evidence.textContent = item.checkedAt
+        ? `LIVE · validated ${item.checkedAt}`
+        : "LIVE · validated response";
       const timing = document.createElement("span");
       timing.textContent = `Live compute ${formatComputeLatency(item.latencyMs)}`;
 
-      row.append(title, verdict, delivery, timing);
+      row.append(
+        title,
+        input,
+        proposedAction,
+        verdict,
+        delivery,
+        evidence,
+        timing,
+      );
       feed.append(row);
     }
+  }
+
+  function renderSourceStamp() {
+    const latest = state.feed.at(-1);
+    let sourceState = "illustrative";
+    let message = "Staged input only; no verdict or delivery receipt exists yet.";
+    if (state.status === "scanning") {
+      sourceState = "unknown";
+      message = "Request in progress; no result has been accepted.";
+    } else if (state.status === "error") {
+      sourceState = "degraded";
+      message = "The request failed; no valid verdict or receipt was accepted.";
+    } else if (latest) {
+      sourceState = "live";
+      message = latest.checkedAt
+        ? `Validated response received at ${latest.checkedAt}.`
+        : "Validated response received during this session.";
+    }
+    sourceStamp.dataset.sourceState = sourceState;
+    sourceStamp.className = `source-stamp source-stamp--${sourceState}`;
+    sourceStamp.replaceChildren();
+    const label = document.createElement("strong");
+    label.textContent = sourceState.toUpperCase();
+    sourceStamp.append(label, ` ${message}`);
   }
 
   function scheduleNext() {
@@ -329,9 +414,12 @@
     if (state.status === "paused") {
       return reducedMotion
         ? "Reduced motion is enabled. Run each live attack manually."
-        : "Autoplay is paused. Run the next live attack when ready.";
+        : "The sequence is paused. Run the next attack or resume when ready.";
     }
-    return "Autoplay is armed for one three-attack pass.";
+    if (state.status === "idle") {
+      return "No request has been sent. Start the sequence or run the first attack manually.";
+    }
+    return "The sequence is ready for the next live attack.";
   }
 
   function render() {
@@ -343,17 +431,20 @@
     stagePayload.textContent = presentation.payload;
     stageOutcome.textContent = presentation.outcome;
     stageDelivery.textContent = presentation.delivery;
+    stageEvidence.textContent = presentation.evidence;
     count.textContent = String(state.neutralized);
-    latency.textContent = latest ? formatComputeLatency(latest.latencyMs) : "—";
+    latency.textContent = latest
+      ? formatComputeLatency(latest.latencyMs)
+      : "Not run";
     progress.textContent = `${state.neutralized} / ${ATTACKS.length}`;
     status.textContent = statusMessage();
     status.dataset.state = state.status;
 
-    toggleButton.textContent = state.auto
-      ? "Pause autoplay"
-      : "Resume autoplay";
+    startButton.disabled = state.status !== "idle";
+    toggleButton.textContent = state.auto ? "Pause sequence" : "Resume sequence";
     toggleButton.disabled =
       reducedMotion ||
+      state.status === "idle" ||
       state.status === "scanning" ||
       state.status === "complete" ||
       state.status === "unexpected" ||
@@ -362,11 +453,14 @@
       state.status === "scanning" || state.status === "complete";
     nextButton.textContent =
       state.status === "error" || state.status === "unexpected"
-        ? "Retry live attack"
-        : "Run next attack";
-    replayButton.disabled = state.status === "scanning";
+        ? "Retry attack"
+        : "Next attack";
+    replayButton.disabled =
+      state.status === "scanning" || state.status === "idle";
+    resetButton.disabled = state.status === "scanning";
 
     renderFeed();
+    renderSourceStamp();
     scheduleNext();
   }
 
@@ -386,7 +480,11 @@
         attack.request,
       );
       const result = client.assertScanResponse(payload);
-      state = transitionTheater(state, { type: "ATTACK_SUCCESS", result });
+      state = transitionTheater(state, {
+        type: "ATTACK_SUCCESS",
+        result,
+        checkedAt: new Date().toISOString(),
+      });
     } catch (error) {
       const message = client?.formatScanError
         ? client.formatScanError(error)
@@ -396,18 +494,32 @@
     render();
   }
 
+  startButton.addEventListener("click", () => {
+    state = transitionTheater(state, {
+      type: "START",
+      auto: !reducedMotion,
+    });
+    runNextAttack();
+  });
   toggleButton.addEventListener("click", () => {
     state = transitionTheater(state, {
       type: state.auto ? "PAUSE" : "RESUME",
     });
     render();
   });
-  nextButton.addEventListener("click", runNextAttack);
+  nextButton.addEventListener("click", () => {
+    state = transitionTheater(state, { type: "PAUSE" });
+    runNextAttack();
+  });
   replayButton.addEventListener("click", () => {
     state = transitionTheater(state, {
       type: "REPLAY",
       auto: !reducedMotion,
     });
+    runNextAttack();
+  });
+  resetButton.addEventListener("click", () => {
+    state = transitionTheater(state, { type: "RESET" });
     render();
   });
   reducedMotionQuery?.addEventListener?.("change", (event) => {

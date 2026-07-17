@@ -29,6 +29,7 @@ from warden.marketplace.render import (  # noqa: E402
     associate_badges,
     render_marketplace,
 )
+from warden.sitemap import write_crawler_files  # noqa: E402
 
 DEFAULT_SNAPSHOT = ROOT / "data" / "marketplace" / "agents-v1.jsonl"
 DEFAULT_OUTPUT = ROOT / "site" / "agents"
@@ -46,6 +47,18 @@ MAX_SAFE_UNIX_SECONDS = 9_007_199_254_740_991
 class EvidenceLinks:
     audit_by_id: dict[str, str]
     attestation_by_id: dict[str, str]
+
+
+def _crawler_site_root(args: argparse.Namespace) -> Path | None:
+    configured = getattr(args, "site_root", None)
+    if configured is not None:
+        expected_output = (configured / "agents").resolve()
+        if args.output.resolve() != expected_output:
+            raise RuntimeError("--site-root must own the marketplace output directory")
+        return configured
+    if args.output == DEFAULT_OUTPUT:
+        return ROOT / "site"
+    return None
 
 
 def _write_json_atomic(path: Path, document: dict[str, object]) -> None:
@@ -245,6 +258,9 @@ async def build(args: argparse.Namespace) -> None:
             "auditedCount": summary.audited_count,
         },
     )
+    site_root = _crawler_site_root(args)
+    if site_root is not None:
+        write_crawler_files(site_root)
     print(
         f"Indexed {summary.sampled} agents; "
         f"{summary.matched_count} public-text matches; "
@@ -270,6 +286,11 @@ def parse_args() -> argparse.Namespace:
         "--marketplace-summary",
         type=Path,
         default=DEFAULT_MARKETPLACE_SUMMARY,
+    )
+    parser.add_argument(
+        "--site-root",
+        type=Path,
+        help="Complete public site root whose crawler files should be regenerated.",
     )
     return parser.parse_args()
 

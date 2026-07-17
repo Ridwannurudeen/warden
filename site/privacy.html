@@ -38,7 +38,7 @@
       sizes="180x180"
       href="/assets/apple-touch-icon.png"
     />
-    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
+    <link rel="stylesheet" href="/styles.css?v=96b93423" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -64,37 +64,57 @@
         <details class="nav-group">
           <summary>Product</summary>
           <div class="nav-menu">
-            <a href="/playground">Playground</a>
+            <a href="/">Overview</a>
+            <a href="/playground">Live Playground</a>
             <a href="/theater">Attack Theater</a>
-            <a href="/agents">Marketplace index</a>
+            <a href="/hire">Use Warden</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Developers</summary>
           <div class="nav-menu">
+            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+            <a href="/integrate">Integrations</a>
             <a href="/docs">Documentation</a>
-            <a href="/integrate">Integrate</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Evidence</summary>
           <div class="nav-menu">
-            <a href="/verify">Verify APA</a>
-            <a href="/apa/log">Transparency log</a>
-            <a href="/trust">Trust Layer</a>
+            <a href="/verify">Verify an Attestation</a>
+            <a href="/apa/log">Transparency Log</a>
+            <a href="/badges">Endpoint Audit Records</a>
+            <a href="/agents">Marketplace Evidence Index</a>
+            <a href="/status">Service Status</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Research</summary>
+          <div class="nav-menu">
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/agents#methodology">Methodology</a>
+            <a href="/showcase">Product Tour</a>
           </div>
         </details>
         <div class="nav-mobile-actions">
-          <a class="button secondary" href="/hire">Hire on OKX.AI</a
-          ><a class="button primary" href="/playground">Run a live scan</a>
+          <a class="button secondary" href="/integrate">Integrate</a
+          ><a class="button primary" href="/playground">Run live scan</a>
         </div>
       </nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status" aria-label="Open API status"
-          ><span class="live-dot" data-health-dot aria-hidden="true"></span
-          ><span data-health-label>Checking API</span></a
-        ><a class="header-hire" href="/hire">Hire</a
-        ><a class="header-scan" href="/playground">Run scan</a
+        <a
+          class="status-pill"
+          href="/status"
+          aria-label="Service status: unknown"
+          data-health-state="unknown"
+          ><span
+            class="live-dot is-unknown"
+            data-health-dot
+            aria-hidden="true"
+          ></span
+          ><span data-health-label>Status unknown</span></a
+        ><a class="header-hire" href="/integrate">Integrate</a
+        ><a class="header-scan" href="/playground">Run live scan</a
         ><button
           class="theme-toggle"
           type="button"
@@ -107,6 +127,10 @@
     </header>
 
     <main id="main" class="page-shell site-main">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Overview</a><span aria-hidden="true">/</span
+        ><span aria-current="page">Privacy</span>
+      </nav>
       <section class="page-hero page-hero--compact">
         <p class="eyebrow">Privacy boundary</p>
         <h1>What is processed, persisted, and made public.</h1>
@@ -116,19 +140,21 @@
           Gauntlet-review store and public badge store implemented by the
           application.
         </p>
-        <p class="snapshot-note">Effective 17 July 2026.</p>
+        <p class="snapshot-note">
+          Last updated <time datetime="2026-07-17">17 July 2026</time>.
+        </p>
       </section>
 
       <div class="doc-layout legal-layout">
-        <aside class="doc-nav legal-nav" aria-label="Privacy sections">
+        <nav class="doc-nav legal-nav" aria-label="Privacy sections">
           <a href="#browser-data">Browser data</a>
           <a href="#scans-audits">Scans and audits</a>
           <a href="#gauntlet-retention">Gauntlet retention</a>
           <a href="#public-records">Public records</a>
           <a href="#operational-metadata">Operational metadata</a>
           <a href="#independent-service">Independent service</a>
-        </aside>
-        <article class="legal-copy">
+        </nav>
+        <article class="legal-copy" data-print-document>
           <section id="browser-data">
             <h2>Browser data</h2>
             <p>
@@ -231,6 +257,10 @@
               claim endorsement by OKX or OKLink. Their services and privacy
               practices are governed by their own terms.
             </p>
+            <p>
+              Read the <a class="text-link" href="/terms">Warden Terms</a> for
+              service authorization, payment, and disclaimer boundaries.
+            </p>
           </section>
         </article>
       </div>
@@ -239,18 +269,46 @@
     <footer class="site-footer page-shell">
       <div>
         <strong>Warden</strong
-        ><span>The immune system of the agent economy.</span
-        ><span>Independent service listed on OKX.AI.</span>
+        ><span>Verifiable pre-action security for AI agents.</span
+        ><span>Gate the action. Keep the proof.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
-        ><a href="/gauntlet">Gauntlet</a><a href="/showcase">Walkthrough</a
-        ><a href="/docs">Docs</a><a href="/badges">Audit badges</a
-        ><a href="/status">API status</a><a href="/privacy">Privacy</a
-        ><a href="/terms">Terms</a
-        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Product</span>
+          <a href="/">Overview</a>
+          <a href="/playground">Live Playground</a>
+          <a href="/theater">Attack Theater</a>
+          <a href="/hire">Use Warden</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Developers</span>
+          <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+          <a href="/integrate">Integrations</a>
+          <a href="/docs">Documentation</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Evidence</span>
+          <a href="/verify">Verify an Attestation</a>
+          <a href="/apa/log">Transparency Log</a>
+          <a href="/badges">Endpoint Audit Records</a>
+          <a href="/agents">Marketplace Evidence Index</a>
+          <a href="/status">Service Status</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Research</span>
+          <a href="/gauntlet">Gauntlet</a>
+          <a href="/agents#methodology">Methodology</a>
+          <a href="/showcase">Product Tour</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Policy</span>
+          <a href="/trust">Trust &amp; Security</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        </div>
       </nav>
     </footer>
-    <script src="/app.js?v=65a484d3" defer></script>
+    <script src="/app.js?v=5c7f3a4c" defer></script>
   </body>
 </html>

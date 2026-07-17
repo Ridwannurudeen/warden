@@ -63,25 +63,28 @@ def test_product_proof_snapshot_is_dated_and_authoritative():
     }
 
 
-def test_homepage_leads_with_verifiable_trust_and_one_consequential_journey():
+def test_homepage_leads_with_verifiable_pre_action_security_and_one_journey():
     page = (SITE / "index.html").read_text(encoding="utf-8")
     normalized = _normalized(page)
 
-    novelty = (
-        "The first agent-security service where you can cryptographically "
-        "verify what it blocked — a verdict you can check, not one you're "
-        "told to trust."
-    )
-    assert novelty in normalized
-    assert "verifiable trust" in normalized.lower()
-    assert "provable safety" in normalized.lower()
+    assert "Stop poisoned agent output before it becomes an action." in normalized
+    assert "Verifiable pre-action security" in normalized
+    assert "ALLOW, SANITIZE, or BLOCK" in normalized
+    assert "caller retains final authority" in normalized.lower()
+    assert "The first agent-security service" not in normalized
+    assert "provable safety" not in normalized.lower()
+    assert "no trust in Warden required" not in normalized
     assert page.index("data-product-proof") < page.index("data-incident-console")
-    assert page.index("data-incident-console") < page.index("data-home-proof")
-    assert page.index("data-home-proof") < page.index('id="labs"')
+    assert page.index("data-incident-console") < page.index('id="action-boundary"')
+    assert page.index('id="action-boundary"') < page.index("data-home-proof")
+    assert page.index("data-home-proof") < page.index('class="integration-preview"')
+    assert page.index('class="integration-preview"') < page.index("compare-section")
+    assert page.index("compare-section") < page.index("services-section")
+    assert page.index("services-section") < page.index('id="labs"')
     assert "external agent output" in normalized.lower()
     assert "consequential action" in normalized.lower()
     assert "withheld" in normalized.lower()
-    assert "safely transformed" in normalized.lower()
+    assert "transformed" in normalized.lower()
 
 
 def test_homepage_uses_proof_and_catalog_data_without_stale_number_literals():
@@ -121,13 +124,13 @@ def test_showcase_uses_the_same_product_proof_for_the_corpus_count():
     assert "<strong>122</strong>" not in showcase
 
 
-def test_okx_cta_is_honest_about_the_missing_direct_listing_url():
+def test_commercial_cta_and_marketplace_lookup_are_honest():
     page = (SITE / "index.html").read_text(encoding="utf-8")
 
+    assert 'class="button primary button--hero" href="/playground"' in page
     assert 'class="button primary button--hero" href="/hire"' in page
     assert 'href="https://www.okx.ai/"' in page
-    assert "Use Warden on OKX" in page
-    assert "Direct listing URL is not published" in page
+    assert "A direct listing URL is not published in this snapshot." in page
     assert 'data-proof-field="okx-instruction"' in page
     assert "agent/3808" not in page.lower()
 
@@ -146,6 +149,10 @@ def test_incident_console_and_offline_proof_expose_module_contracts():
         "data-incident-threat",
         "data-incident-receipt",
         "data-incident-sanitized",
+        "data-incident-source",
+        "data-incident-checked-at",
+        "data-incident-raw",
+        "data-incident-evidence",
     )
     proof_hooks = (
         "data-home-proof",
@@ -157,6 +164,9 @@ def test_incident_console_and_offline_proof_expose_module_contracts():
         "data-home-proof-attestation-id",
         "data-home-proof-chain-head",
         "data-home-proof-tamper-index",
+        "data-home-proof-key-id",
+        "data-home-proof-freshness",
+        "data-home-proof-checked-at",
     )
     for hook in (*incident_hooks, *proof_hooks):
         assert hook in page
@@ -181,6 +191,7 @@ def test_incident_console_and_offline_proof_expose_module_contracts():
         "/log.js",
         "/incident-console.js",
         "/home-proof.js",
+        "/home-examples.js",
     ]
     assert [script for script in scripts if script in expected] == expected
 
@@ -207,7 +218,7 @@ def test_shared_app_binds_the_offline_proof_without_network_access():
     assert not re.search(r"\bfetch\s*\(", proof_module)
 
 
-def test_experimental_surfaces_are_grouped_below_the_primary_proof_journey():
+def test_supporting_surfaces_are_grouped_below_the_primary_proof_journey():
     page = (SITE / "index.html").read_text(encoding="utf-8")
     labs = page.index('id="labs"')
 
@@ -221,7 +232,27 @@ def test_experimental_surfaces_are_grouped_below_the_primary_proof_journey():
         "/theater",
     ):
         assert page.index(f'href="{href}"', labs) > labs
-    assert "Labs &amp; trust" in page
+    assert "Supporting surfaces" in page
+    for group in (
+        "Try the product",
+        "Inspect evidence",
+        "Research and challenge",
+        "Marketplace intelligence",
+    ):
+        assert group in page
+
+
+def test_homepage_exposes_source_states_without_ambiguous_initial_placeholders():
+    page = (SITE / "index.html").read_text(encoding="utf-8")
+
+    for state in ("LIVE", "DATED", "ILLUSTRATIVE", "DEGRADED", "UNKNOWN"):
+        assert state in (SITE / "app.js").read_text(encoding="utf-8")
+    assert 'data-source-stamp="ILLUSTRATIVE"' in page
+    assert 'data-source-stamp="DATED"' in page
+    assert 'data-source-stamp="UNKNOWN"' in page
+    assert ">Loading" not in page
+    assert ">Checking" not in page
+    assert ">—<" not in page
 
 
 def test_homepage_runtime_resources_remain_same_origin():

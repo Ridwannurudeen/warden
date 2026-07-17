@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Browse issued Warden endpoint-audit badges and verify each record against its server-side signature."
+      content="Search Warden endpoint audit records, inspect their point-in-time results, and check each stored record's signed integrity."
     />
     <meta name="color-scheme" content="dark light" />
-    <title>Audit Badge Registry | Warden</title>
+    <title>Endpoint Audit Records | Warden</title>
     <link rel="canonical" href="https://warden.gudman.xyz/badges" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Warden" />
-    <meta property="og:title" content="Audit Badge Registry | Warden" />
+    <meta property="og:title" content="Endpoint Audit Records | Warden" />
     <meta
       property="og:description"
-      content="Browse issued Warden endpoint-audit badges and verify each record against its server-side signature."
+      content="Search Warden endpoint audit records, inspect their point-in-time results, and check each stored record's signed integrity."
     />
     <meta property="og:url" content="https://warden.gudman.xyz/badges" />
     <meta
@@ -29,7 +29,7 @@
     />
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
+    <link rel="stylesheet" href="/styles.css?v=96b93423" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -55,38 +55,58 @@
         <details class="nav-group">
           <summary>Product</summary>
           <div class="nav-menu">
-            <a href="/playground">Playground</a>
+            <a href="/">Overview</a>
+            <a href="/playground">Live Playground</a>
             <a href="/theater">Attack Theater</a>
-            <a href="/agents">Marketplace index</a>
+            <a href="/hire">Use Warden</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Developers</summary>
           <div class="nav-menu">
+            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+            <a href="/integrate">Integrations</a>
             <a href="/docs">Documentation</a>
-            <a href="/integrate">Integrate</a>
+          </div>
+        </details>
+        <details class="nav-group has-current">
+          <summary>Evidence</summary>
+          <div class="nav-menu">
+            <a href="/verify">Verify an Attestation</a>
+            <a href="/apa/log">Transparency Log</a>
+            <a href="/badges" aria-current="page">Endpoint Audit Records</a>
+            <a href="/agents">Marketplace Evidence Index</a>
+            <a href="/status">Service Status</a>
           </div>
         </details>
         <details class="nav-group">
-          <summary>Evidence</summary>
+          <summary>Research</summary>
           <div class="nav-menu">
-            <a href="/verify">Verify APA</a>
-            <a href="/apa/log">Transparency log</a>
-            <a href="/trust">Trust Layer</a>
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/agents#methodology">Methodology</a>
+            <a href="/showcase">Product Tour</a>
           </div>
         </details>
         <div class="nav-mobile-actions">
-          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
-          <a class="button primary" href="/playground">Run a live scan</a>
+          <a class="button secondary" href="/integrate">Integrate</a>
+          <a class="button primary" href="/playground">Run live scan</a>
         </div>
       </nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status" aria-label="Open API status"
-          ><span class="live-dot" data-health-dot aria-hidden="true"></span
-          ><span data-health-label>Checking API</span></a
+        <a
+          class="status-pill"
+          href="/status"
+          aria-label="Service status: unknown"
+          data-health-state="unknown"
+          ><span
+            class="live-dot is-unknown"
+            data-health-dot
+            aria-hidden="true"
+          ></span
+          ><span data-health-label>Status unknown</span></a
         >
-        <a class="header-hire" href="/hire">Hire</a>
-        <a class="header-scan" href="/playground">Run scan</a>
+        <a class="header-hire" href="/integrate">Integrate</a>
+        <a class="header-scan" href="/playground">Run live scan</a>
         <button
           class="theme-toggle"
           type="button"
@@ -99,14 +119,24 @@
     </header>
 
     <main id="main" class="page-shell site-main">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Home</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">Endpoint Audit Records</span>
+      </nav>
       <section class="page-hero">
-        <p class="eyebrow">Signed audit evidence</p>
-        <h1>Inspect issued records and their current integrity result.</h1>
+        <p class="eyebrow">Evidence / Endpoint audit records</p>
+        <h1>Inspect the result. Keep its limits attached.</h1>
         <p class="hero-text">
-          The registry calls <code>GET /api/badges</code>. Warden checks each
-          stored record's HMAC signature server-side and returns public audit
-          evidence only when the request succeeds.
+          Each record captures one completed endpoint audit against a fixed
+          battery. Warden checks stored-record integrity when this registry is
+          requested; the result remains point-in-time evidence, not
+          certification or continuous monitoring.
         </p>
+        <div class="hero-actions">
+          <a class="button primary" href="/hire">Request an endpoint audit</a>
+          <a class="button secondary" href="/trust">Read the proof boundary</a>
+        </div>
       </section>
 
       <section class="proof-strip" aria-label="Badge registry boundaries">
@@ -114,50 +144,45 @@
           <span>Evidence type</span><strong>Point-in-time audit</strong>
         </div>
         <div>
-          <span>Integrity check</span><strong>Per-record signature</strong>
+          <span>Integrity</span><strong>Server-checked signature</strong>
         </div>
-        <div>
-          <span>Audit battery</span><strong class="num">20 payloads</strong>
-        </div>
-        <div><span>Security guarantee</span><strong>None implied</strong></div>
+        <div><span>Freshness</span><strong>Issued timestamp shown</strong></div>
+        <div><span>Conclusion</span><strong>Not certification</strong></div>
       </section>
 
-      <section aria-labelledby="badge-process-title">
+      <section class="feature-panel" aria-labelledby="badge-process-title">
         <div class="section-heading">
-          <p class="eyebrow">Before the registry</p>
-          <h2 id="badge-process-title">How an audit becomes a badge</h2>
+          <p class="eyebrow">Evidence contract</p>
+          <h2 id="badge-process-title">Four facts stay separate.</h2>
           <p>
-            A badge is a signed record of one completed endpoint-audit result.
-            It is not a live monitor or a security certification.
+            The interface does not collapse authorization, audit outcome,
+            integrity, and time into a single trust seal.
           </p>
         </div>
         <ol class="badge-process">
           <li>
-            <span>01</span><strong>Attest authorization and run</strong>
+            <span>01</span><strong>Scope</strong>
             <p>
-              The caller must own or be authorized to test the public target;
-              the returned audit is not independent proof of permission.
+              The target host and fixed audit battery define what was checked.
             </p>
           </li>
           <li>
-            <span>02</span><strong>Record the result</strong>
+            <span>02</span><strong>Outcome</strong>
             <p>
-              An eligible completed audit stores its target, result, issue time,
-              and signature.
+              Grade, score, and cases blocked or flagged describe that one run.
             </p>
           </li>
           <li>
-            <span>03</span><strong>Verify integrity</strong>
+            <span>03</span><strong>Integrity</strong>
             <p>
-              The API recomputes the server-side signature for each registry
-              request.
+              The API recomputes the stored record's signature for this request.
             </p>
           </li>
           <li>
-            <span>04</span><strong>Read the boundaries</strong>
+            <span>04</span><strong>Time</strong>
             <p>
-              Target, result, time, and integrity remain separate facts on the
-              detail page.
+              The issue time bounds the evidence; no expiry or revocation model
+              is claimed for these legacy records.
             </p>
           </li>
         </ol>
@@ -165,10 +190,19 @@
 
       <section data-badge-registry>
         <div class="section-heading">
-          <p class="eyebrow">Issued records</p>
-          <h2>Public endpoint-audit registry</h2>
+          <p class="eyebrow">Public registry</p>
+          <h2>Find an endpoint audit record.</h2>
+          <p>
+            <span
+              class="source-stamp source-stamp--unknown"
+              data-badge-registry-source
+              data-source-stamp
+              data-source-state="unknown"
+              >UNKNOWN · registry not requested</span
+            >
+          </p>
           <p class="section-copy" data-badge-registry-status aria-live="polite">
-            Loading signed badge records...
+            No registry conclusion is available until the API responds.
           </p>
           <button
             class="button secondary"
@@ -179,39 +213,96 @@
             Retry registry
           </button>
         </div>
-        <div class="badge-grid" data-badge-list></div>
+        <div class="filter-bar" aria-label="Filter endpoint audit records">
+          <label for="badge-search">
+            Search audit ID or target
+            <input
+              id="badge-search"
+              type="search"
+              data-badge-search
+              autocomplete="off"
+              placeholder="agent.example or 16-character audit ID"
+            />
+          </label>
+          <label for="badge-integrity-filter">
+            Stored-record integrity
+            <select id="badge-integrity-filter" data-badge-integrity-filter>
+              <option value="all">All integrity states</option>
+              <option value="verified">Signature verified</option>
+              <option value="invalid">Signature invalid</option>
+            </select>
+          </label>
+        </div>
+        <p class="field-hint" data-badge-filter-status aria-live="polite">
+          Filters become available after the registry responds.
+        </p>
+        <div class="badge-grid" data-badge-list>
+          <p class="empty-state">
+            Registry state unknown. No record or integrity result is implied.
+          </p>
+        </div>
         <noscript
           ><p class="empty-state">
-            JavaScript is required to load and verify the badge registry.
+            JavaScript is required to request the endpoint audit registry.
+            Direct record URLs and the <code>GET /api/badges</code> contract
+            remain available.
           </p></noscript
         >
       </section>
 
-      <aside class="callout">
-        A valid signature proves that the displayed record was issued by the
-        Warden instance holding the configured badge key. It does not prove
-        permanent safety, ownership of the target, or protection against attacks
-        outside the tested battery.
+      <aside class="callout evidence-boundary">
+        <strong>This is point-in-time evidence, not certification.</strong>
+        A valid stored-record signature establishes integrity for the displayed
+        payload under the Warden instance's configured badge key. It does not
+        establish current endpoint safety, target ownership, continuous
+        protection, or coverage beyond the tested battery.
       </aside>
     </main>
 
     <footer class="site-footer page-shell">
       <div>
         <strong>Warden</strong
-        ><span>The immune system of the agent economy.</span
-        ><span>Independent service listed on OKX.AI.</span>
+        ><span>Verifiable pre-action security for AI agents.</span
+        ><span>Gate the action. Keep the proof.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a
-        ><a href="/playground">Run a scan</a><a href="/gauntlet">Gauntlet</a
-        ><a href="/showcase">Walkthrough</a
-        ><a href="/docs">Docs</a><a href="/badges" aria-current="page">Audit badges</a
-        ><a href="/status">API status</a><a href="/privacy">Privacy</a
-        ><a href="/terms">Terms</a
-        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Product</span>
+          <a href="/">Overview</a>
+          <a href="/playground">Live Playground</a>
+          <a href="/theater">Attack Theater</a>
+          <a href="/hire">Use Warden</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Developers</span>
+          <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+          <a href="/integrate">Integrations</a>
+          <a href="/docs">Documentation</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Evidence</span>
+          <a href="/verify">Verify an Attestation</a>
+          <a href="/apa/log">Transparency Log</a>
+          <a href="/badges">Endpoint Audit Records</a>
+          <a href="/agents">Marketplace Evidence Index</a>
+          <a href="/status">Service Status</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Research</span>
+          <a href="/gauntlet">Gauntlet</a>
+          <a href="/agents#methodology">Methodology</a>
+          <a href="/showcase">Product Tour</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Policy</span>
+          <a href="/trust">Trust &amp; Security</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        </div>
       </nav>
     </footer>
-    <script src="/app.js?v=65a484d3" defer></script>
+    <script src="/app.js?v=5c7f3a4c" defer></script>
     <script src="/badge.js" defer></script>
   </body>
 </html>

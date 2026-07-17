@@ -38,7 +38,7 @@
       sizes="180x180"
       href="/assets/apple-touch-icon.png"
     />
-    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
+    <link rel="stylesheet" href="/styles.css?v=96b93423" />
   </head>
   <body data-status-page>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -64,46 +64,58 @@
         <details class="nav-group">
           <summary>Product</summary>
           <div class="nav-menu">
-            <a href="/playground">Playground</a>
+            <a href="/">Overview</a>
+            <a href="/playground">Live Playground</a>
             <a href="/theater">Attack Theater</a>
-            <a href="/agents">Marketplace index</a>
+            <a href="/hire">Use Warden</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Developers</summary>
           <div class="nav-menu">
+            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+            <a href="/integrate">Integrations</a>
             <a href="/docs">Documentation</a>
-            <a href="/integrate">Integrate</a>
+          </div>
+        </details>
+        <details class="nav-group has-current">
+          <summary>Evidence</summary>
+          <div class="nav-menu">
+            <a href="/verify">Verify an Attestation</a>
+            <a href="/apa/log">Transparency Log</a>
+            <a href="/badges">Endpoint Audit Records</a>
+            <a href="/agents">Marketplace Evidence Index</a>
+            <a href="/status" aria-current="page">Service Status</a>
           </div>
         </details>
         <details class="nav-group">
-          <summary>Evidence</summary>
+          <summary>Research</summary>
           <div class="nav-menu">
-            <a href="/verify">Verify APA</a>
-            <a href="/apa/log">Transparency log</a>
-            <a href="/trust">Trust Layer</a>
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/agents#methodology">Methodology</a>
+            <a href="/showcase">Product Tour</a>
           </div>
         </details>
         <div class="nav-mobile-actions">
-          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
-          <a class="button primary" href="/playground">Run a live scan</a>
+          <a class="button secondary" href="/integrate">Integrate</a>
+          <a class="button primary" href="/playground">Run live scan</a>
         </div>
       </nav>
       <div class="header-actions">
         <a
           class="status-pill"
           href="/status"
-          aria-current="page"
-          aria-label="Open API status"
+          aria-label="Service status: unknown"
+          data-health-state="unknown"
           ><span
-            class="live-dot"
+            class="live-dot is-unknown"
             data-status-header-dot
             aria-hidden="true"
           ></span
-          ><span data-status-header-label>Checking API</span></a
+          ><span data-status-header-label>Status unknown</span></a
         >
-        <a class="header-hire" href="/hire">Hire</a>
-        <a class="header-scan" href="/playground">Run scan</a>
+        <a class="header-hire" href="/integrate">Integrate</a>
+        <a class="header-scan" href="/playground">Run live scan</a>
         <button
           class="theme-toggle"
           type="button"
@@ -116,9 +128,13 @@
     </header>
 
     <main id="main" class="page-shell site-main">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Home</a><span aria-hidden="true">/</span
+        ><span aria-current="page">Service Status</span>
+      </nav>
       <section class="page-hero">
-        <p class="eyebrow">Evidence, not implied guarantees</p>
-        <h1>What is reachable now, and what we actually know.</h1>
+        <p class="eyebrow">Evidence / Service status</p>
+        <h1>Live reachability and dated evidence, kept separate.</h1>
         <p class="hero-text">
           This page makes one same-origin <code>GET /health</code> request on
           initial load. Retry starts one new check. Marketplace, repository, and
@@ -130,6 +146,15 @@
         <div class="section-heading">
           <p class="eyebrow">Live browser check</p>
           <h2 id="live-status-title">Current API reachability</h2>
+          <p>
+            <span
+              class="source-stamp source-stamp--unknown"
+              data-status-live-source
+              data-source-stamp
+              data-source-state="unknown"
+              >UNKNOWN · health check not completed</span
+            >
+          </p>
           <div class="status-check-controls">
             <button
               class="button secondary"
@@ -143,7 +168,9 @@
         <div class="status-grid" aria-label="Current service facts">
           <div>
             <span>API reachability</span
-            ><strong data-status-api aria-live="polite">Checking now</strong>
+            ><strong data-status-api aria-live="polite"
+              >Unknown until checked</strong
+            >
           </div>
           <div>
             <span>Checked at</span
@@ -153,15 +180,21 @@
           </div>
           <div>
             <span>API version</span
-            ><strong class="num" data-status-version>--</strong>
+            ><strong class="num" data-status-version
+              >Unknown until checked</strong
+            >
           </div>
           <div>
             <span>Corpus entries</span
-            ><strong class="num" data-status-corpus>--</strong>
+            ><strong class="num" data-status-corpus
+              >Unknown until checked</strong
+            >
           </div>
           <div>
             <span>Analyzers loaded</span
-            ><strong class="num" data-status-analyzers>--</strong>
+            ><strong class="num" data-status-analyzers
+              >Unknown until checked</strong
+            >
           </div>
           <div>
             <span>Historical uptime</span
@@ -188,23 +221,38 @@
             availability remains “Not measured” and no achieved uptime is
             claimed.
           </p>
+          <p>
+            <span
+              class="source-stamp source-stamp--unknown"
+              data-monitor-source
+              data-source-stamp
+              data-source-state="unknown"
+              >UNKNOWN · readiness evidence not loaded</span
+            >
+          </p>
         </div>
         <div class="data-grid" aria-label="Readiness measurement evidence">
           <div>
             <span>Monitor state</span
-            ><strong data-monitor-state>Loading</strong>
+            ><strong data-monitor-state>Evidence not loaded</strong>
           </div>
           <div>
             <span>Evidence window</span
-            ><strong class="num" data-monitor-window>Loading</strong>
+            ><strong class="num" data-monitor-window
+              >Evidence not loaded</strong
+            >
           </div>
           <div>
             <span>Measured availability</span
-            ><strong class="num" data-monitor-availability>Loading</strong>
+            ><strong class="num" data-monitor-availability
+              >Not measured until evidence qualifies</strong
+            >
           </div>
           <div>
             <span>Latest readiness probe</span
-            ><strong class="num" data-monitor-latest>Loading</strong>
+            ><strong class="num" data-monitor-latest
+              >Evidence not loaded</strong
+            >
           </div>
         </div>
         <aside class="callout">
@@ -223,6 +271,15 @@
         <div class="section-heading">
           <p class="eyebrow">Source ledger</p>
           <h2 id="sources-title">Live and dated evidence stay separate</h2>
+          <p>
+            <span
+              class="source-stamp source-stamp--unknown"
+              data-status-metadata-source
+              data-source-stamp
+              data-source-state="unknown"
+              >UNKNOWN · dated build metadata not loaded</span
+            >
+          </p>
         </div>
         <dl class="status-source-grid">
           <div>
@@ -231,15 +288,21 @@
           </div>
           <div>
             <dt>Build metadata verified</dt>
-            <dd class="num" data-status-metadata-date>Loading</dd>
+            <dd class="num" data-status-metadata-date>
+              Dated metadata not loaded
+            </dd>
           </div>
           <div>
             <dt>Marketplace listing verified</dt>
-            <dd class="num" data-status-listing-date>Loading</dd>
+            <dd class="num" data-status-listing-date>
+              Dated metadata not loaded
+            </dd>
           </div>
           <div>
             <dt>Repository tests verified</dt>
-            <dd class="num" data-status-tests-date>Loading</dd>
+            <dd class="num" data-status-tests-date>
+              Dated metadata not loaded
+            </dd>
           </div>
         </dl>
       </section>
@@ -253,27 +316,43 @@
             committed as static metadata. They are not polled from OKX on each
             page load.
           </p>
+          <p>
+            <span
+              class="source-stamp source-stamp--unknown"
+              data-status-marketplace-source
+              data-source-stamp
+              data-source-state="unknown"
+              >UNKNOWN · marketplace snapshot not loaded</span
+            >
+          </p>
         </div>
         <div class="data-grid">
           <div>
             <span>Provider agent</span
-            ><strong class="num" data-status-agent>#3808</strong>
+            ><strong class="num" data-status-agent
+              >Dated metadata not loaded</strong
+            >
           </div>
           <div>
             <span>Listing status</span
-            ><strong data-status-listing>Loading</strong>
+            ><strong data-status-listing>Dated metadata not loaded</strong>
           </div>
           <div>
             <span>Service IDs</span
-            ><strong class="num" data-status-services>--</strong>
+            ><strong class="num" data-status-services
+              >Dated metadata not loaded</strong
+            >
           </div>
           <div>
             <span>Repository tests passed</span
-            ><strong class="num" data-status-tests>--</strong>
+            ><strong class="num" data-status-tests
+              >Dated metadata not loaded</strong
+            >
           </div>
         </div>
         <p class="caveat" data-status-tests-note>
-          Loading repository verification note...
+          Repository verification note is unavailable until dated metadata
+          loads.
         </p>
       </section>
 
@@ -286,16 +365,29 @@
             the benign corpus bytes. It identifies the exact two corpus files
             represented by this build.
           </p>
+          <p>
+            <span
+              class="source-stamp source-stamp--unknown"
+              data-status-corpus-source
+              data-source-stamp
+              data-source-state="unknown"
+              >UNKNOWN · corpus fingerprint not loaded</span
+            >
+          </p>
         </div>
         <div class="console-card">
           <dl class="data-list">
             <div>
               <dt>Fingerprint</dt>
-              <dd><code data-status-corpus-fingerprint>Loading</code></dd>
+              <dd>
+                <code data-status-corpus-fingerprint
+                  >Dated fingerprint not loaded</code
+                >
+              </dd>
             </div>
             <div>
-              <dt>Reason codes</dt>
-              <dd class="num">11</dd>
+              <dt>Reason-code contract</dt>
+              <dd><a href="/docs">Open the current reference</a></dd>
             </div>
             <div>
               <dt>Decision states</dt>
@@ -307,7 +399,7 @@
 
       <section aria-labelledby="evaluation-title">
         <div class="section-heading">
-          <p class="eyebrow">Measured security</p>
+          <p class="eyebrow">Measured security · dated benchmark</p>
           <h2 id="evaluation-title">
             Held-out recall, with the misses left visible.
           </h2>
@@ -317,33 +409,52 @@
             false positive. These authored cases are excluded from the scanner's
             training corpus and similarity examples.
           </p>
+          <p>
+            <span
+              class="source-stamp source-stamp--unknown"
+              data-evaluation-source
+              data-source-stamp
+              data-source-state="unknown"
+              >UNKNOWN · evaluation snapshot not loaded</span
+            >
+          </p>
         </div>
         <div class="data-grid" aria-label="Current held-out evaluation">
           <div>
             <span>Attack recall</span
-            ><strong class="num" data-evaluation-recall>Loading</strong>
+            ><strong class="num" data-evaluation-recall
+              >Evaluation snapshot not loaded</strong
+            >
           </div>
           <div>
             <span>Attacks detected</span
-            ><strong class="num" data-evaluation-attacks>Loading</strong>
+            ><strong class="num" data-evaluation-attacks
+              >Evaluation snapshot not loaded</strong
+            >
           </div>
           <div>
             <span>Benign false positives</span
             ><strong class="num" data-evaluation-false-positives
-              >Loading</strong
+              >Evaluation snapshot not loaded</strong
             >
           </div>
           <div>
             <span>False-positive rate</span
-            ><strong class="num" data-evaluation-fp-rate>Loading</strong>
+            ><strong class="num" data-evaluation-fp-rate
+              >Evaluation snapshot not loaded</strong
+            >
           </div>
           <div>
             <span>Measured at</span
-            ><strong class="num" data-evaluation-measured-at>Loading</strong>
+            ><strong class="num" data-evaluation-measured-at
+              >Evaluation snapshot not loaded</strong
+            >
           </div>
           <div>
             <span>Evaluation mode</span
-            ><strong data-evaluation-mode>Loading</strong>
+            ><strong data-evaluation-mode
+              >Evaluation snapshot not loaded</strong
+            >
           </div>
         </div>
         <aside class="callout">
@@ -364,6 +475,15 @@
           <p class="section-copy" data-payment-note>
             The address explorer link does not contain transaction-specific
             proof that a payment bought a Warden service.
+          </p>
+          <p>
+            <span
+              class="source-stamp source-stamp--unknown"
+              data-payment-source
+              data-source-stamp
+              data-source-state="unknown"
+              >UNKNOWN · payment evidence metadata not loaded</span
+            >
           </p>
           <div class="hero-actions">
             <a
@@ -387,19 +507,47 @@
     <footer class="site-footer page-shell">
       <div>
         <strong>Warden</strong
-        ><span>The immune system of the agent economy.</span
-        ><span>Independent service listed on OKX.AI.</span>
+        ><span>Verifiable pre-action security for AI agents.</span
+        ><span>Gate the action. Keep the proof.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
-        ><a href="/gauntlet">Gauntlet</a><a href="/showcase">Walkthrough</a
-        ><a href="/docs">Docs</a><a href="/badges">Audit badges</a
-        ><a href="/status" aria-current="page">API status</a
-        ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
-        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Product</span>
+          <a href="/">Overview</a>
+          <a href="/playground">Live Playground</a>
+          <a href="/theater">Attack Theater</a>
+          <a href="/hire">Use Warden</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Developers</span>
+          <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+          <a href="/integrate">Integrations</a>
+          <a href="/docs">Documentation</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Evidence</span>
+          <a href="/verify">Verify an Attestation</a>
+          <a href="/apa/log">Transparency Log</a>
+          <a href="/badges">Endpoint Audit Records</a>
+          <a href="/agents">Marketplace Evidence Index</a>
+          <a href="/status">Service Status</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Research</span>
+          <a href="/gauntlet">Gauntlet</a>
+          <a href="/agents#methodology">Methodology</a>
+          <a href="/showcase">Product Tour</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Policy</span>
+          <a href="/trust">Trust &amp; Security</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        </div>
       </nav>
     </footer>
-    <script src="/app.js?v=65a484d3" defer></script>
+    <script src="/app.js?v=5c7f3a4c" defer></script>
     <script src="/status.js" defer></script>
   </body>
 </html>

@@ -19,7 +19,7 @@
 
   function matchesAgentFilters(
     dataset,
-    { query = "", category = "", match = "", audit = "" } = {},
+    { query = "", category = "", match = "", audit = "", apa = "" } = {},
   ) {
     const categories = String(dataset.category || "")
       .split("|")
@@ -28,8 +28,42 @@
       matchesSearch(dataset.search, query) &&
       (!category || categories.includes(category)) &&
       (!match || dataset.match === match) &&
-      (!audit || dataset.audit === audit)
+      (!audit || dataset.audit === audit) &&
+      (!apa || dataset.apa === apa)
     );
+  }
+
+  function filtersFromSearchParams(value = "") {
+    const params =
+      value instanceof URLSearchParams
+        ? value
+        : new URLSearchParams(String(value).replace(/^\?/, ""));
+    return {
+      query: params.get("q") || "",
+      category: params.get("category") || "",
+      match: params.get("signal") || "",
+      audit: params.get("audit") || "",
+      apa: params.get("apa") || "",
+      sort: params.get("sort") || "",
+    };
+  }
+
+  function filtersToSearchParams(filters = {}) {
+    const params = new URLSearchParams();
+    for (const [parameter, value] of [
+      ["q", filters.query],
+      ["category", filters.category],
+      ["signal", filters.match],
+      ["audit", filters.audit],
+      ["apa", filters.apa],
+      ["sort", filters.sort],
+    ]) {
+      const normalized = String(value || "").trim();
+      if (normalized) {
+        params.set(parameter, normalized);
+      }
+    }
+    return params.toString();
   }
 
   function selectAgentRows(rows, filters = {}, limit = AGENT_PAGE_SIZE) {
@@ -129,6 +163,8 @@
   const api = {
     AGENT_PAGE_SIZE,
     compareAgentRows,
+    filtersFromSearchParams,
+    filtersToSearchParams,
     focusIndexAfterAgentExpansion,
     matchesAgentFilters,
     matchesDocumentFilters,
@@ -150,6 +186,7 @@
     const category = document.querySelector("[data-agent-category]");
     const match = document.querySelector("[data-agent-match]");
     const audit = document.querySelector("[data-agent-audit]");
+    const apa = document.querySelector("[data-agent-apa]");
     const sort = document.querySelector("[data-agent-sort]");
     const reset = document.querySelector("[data-agent-reset]");
     const controls = document.querySelector("[data-agent-controls]");
@@ -161,6 +198,23 @@
     let visibleLimit = AGENT_PAGE_SIZE;
 
     controls.hidden = false;
+
+    function setSelectValue(control, value) {
+      if (
+        value &&
+        [...control.options].some((option) => option.value === value)
+      ) {
+        control.value = value;
+      }
+    }
+
+    const initialFilters = filtersFromSearchParams(root.location?.search);
+    search.value = initialFilters.query;
+    setSelectValue(category, initialFilters.category);
+    setSelectValue(match, initialFilters.match);
+    setSelectValue(audit, initialFilters.audit);
+    setSelectValue(apa, initialFilters.apa);
+    setSelectValue(sort, initialFilters.sort);
 
     function orderRows() {
       orderedRows = [...rows].sort((left, right) =>
@@ -177,6 +231,7 @@
         category: category.value,
         match: match.value,
         audit: audit.value,
+        apa: apa.value,
       };
       const { matchingRows, renderedRows } = selectAgentRows(
         orderedRows,
@@ -190,10 +245,21 @@
       more.hidden = remaining === 0;
       more.textContent = `Show ${Math.min(AGENT_PAGE_SIZE, remaining).toLocaleString()} more agents`;
       empty.hidden = matchingRows.length !== 0;
+      const query = filtersToSearchParams({
+        ...filters,
+        sort: sort.value === "sold-desc" ? "" : sort.value,
+      });
+      if (root.history?.replaceState && root.location?.pathname) {
+        root.history.replaceState(
+          null,
+          "",
+          `${root.location.pathname}${query ? `?${query}` : ""}`,
+        );
+      }
     }
 
     search.addEventListener("input", () => renderAgents(true));
-    for (const control of [category, match, audit]) {
+    for (const control of [category, match, audit, apa]) {
       control.addEventListener("change", () => renderAgents(true));
     }
     sort.addEventListener("change", () => {
@@ -215,6 +281,7 @@
       category.value = "";
       match.value = "";
       audit.value = "";
+      apa.value = "";
       sort.value = "sold-desc";
       orderRows();
       renderAgents(true);

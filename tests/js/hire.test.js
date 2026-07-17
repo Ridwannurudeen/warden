@@ -117,6 +117,30 @@ test("commands use the selected snapshot service and complete the reviewable tas
   }
 });
 
+test("payment commands serialize only the acceptance that passed validation", () => {
+  const uncheckedAcceptance = {
+    ...fixture.scan.accepts[0],
+    asset: "0x0000000000000000000000000000000000000000",
+    amount: "1",
+    payTo: "not-an-address",
+  };
+  const commands = buildCommands({
+    providerAgentId: "3808",
+    service: services.scan,
+    accepts: [...fixture.scan.accepts, uncheckedAcceptance],
+    jobId: "job-123456",
+    shell: "powershell",
+    spendConfirmed: true,
+  });
+
+  assert.doesNotMatch(commands[1], /not-an-address/);
+  assert.doesNotMatch(
+    commands[1],
+    /0x0000000000000000000000000000000000000000/,
+  );
+  assert.doesNotMatch(commands[1], /"amount":"1"/);
+});
+
 test("challenge validation rejects a mismatched endpoint or asset", () => {
   const wrongEndpoint = structuredClone(fixture.scan);
   wrongEndpoint.resource.url = "https://attacker.example/scan";
@@ -149,6 +173,19 @@ test("challenge validation rejects a mismatched endpoint or asset", () => {
         services.scan,
       ),
     /amount/,
+  );
+
+  const invalidRecipient = structuredClone(fixture.scan);
+  invalidRecipient.accepts[0].payTo = "not-an-address";
+  assert.throws(
+    () =>
+      parsePaymentRequiredHeader(
+        Buffer.from(JSON.stringify(invalidRecipient), "utf8").toString(
+          "base64",
+        ),
+        services.scan,
+      ),
+    /recipient/,
   );
 });
 

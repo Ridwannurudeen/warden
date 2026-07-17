@@ -10,30 +10,36 @@ NAV_GROUPS = (
     (
         "Product",
         (
+            ("/", "Overview", "overview"),
+            ("/playground", "Live Playground", "playground"),
             ("/theater", "Attack Theater", "theater"),
-            ("/playground", "Playground", "playground"),
-            ("/agents", "Marketplace index", "agents"),
-            ("/gauntlet", "Gauntlet", "gauntlet"),
-            ("/showcase", "Walkthrough", "showcase"),
+            ("/hire", "Use Warden", "hire"),
         ),
     ),
     (
         "Developers",
         (
+            ("/integrate#sdk-first", "5-Minute Quickstart", "integrate-quickstart"),
+            ("/integrate", "Integrations", "integrate"),
             ("/docs", "Documentation", "docs"),
-            ("/integrate", "Integrate", "integrate"),
-            ("/trust", "Trust Layer", "trust"),
-            ("/status", "API status", "status"),
         ),
     ),
     (
         "Evidence",
         (
-            ("/verify", "Verify APA", "verify"),
-            ("/apa/log", "Transparency log", "apa-log"),
-            ("/badges", "Audit badges", "badges"),
-            ("/agents#methodology", "Public-text methodology", "agents-methodology"),
-            ("/gauntlet#policy", "Adversarial challenge", "gauntlet-policy"),
+            ("/verify", "Verify an Attestation", "verify"),
+            ("/apa/log", "Transparency Log", "apa-log"),
+            ("/badges", "Endpoint Audit Records", "badges"),
+            ("/agents", "Marketplace Evidence Index", "agents"),
+            ("/status", "Service Status", "status"),
+        ),
+    ),
+    (
+        "Research",
+        (
+            ("/gauntlet", "Gauntlet", "gauntlet"),
+            ("/agents#methodology", "Methodology", "agents-methodology"),
+            ("/showcase", "Product Tour", "showcase"),
         ),
     ),
 )
@@ -79,6 +85,25 @@ def page_shell(
         ),
     ]
     class_attribute = f' class="{html.escape(body_class, quote=True)}"' if body_class else ""
+    footer_groups = []
+    for group_name, items in NAV_GROUPS:
+        links = "".join(f'<a href="{href}">{label}</a>' for href, label, _ in items)
+        footer_groups.append(
+            '<div class="site-footer__col">'
+            f'<span class="site-footer__label">{group_name}</span>'
+            f"{links}"
+            "</div>"
+        )
+    footer_groups.append(
+        '<div class="site-footer__col">'
+        '<span class="site-footer__label">Policy</span>'
+        '<a href="/trust">Trust &amp; Security</a>'
+        '<a href="/privacy">Privacy</a>'
+        '<a href="/terms">Terms</a>'
+        '<a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>'
+        "</div>"
+    )
+    footer_navigation = "".join(footer_groups)
     return f"""<!doctype html>
 <html lang="en">
   <head>
@@ -104,18 +129,18 @@ def page_shell(
     <header class="site-header page-shell">
       <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
-      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>{_render_navigation(active)}<div class="nav-mobile-actions"><a class="button secondary" href="/hire">Hire on OKX.AI</a><a class="button primary" href="/playground">Run a live scan</a></div></nav>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>{_render_navigation(active)}<div class="nav-mobile-actions"><a class="button secondary" href="/integrate">Integrate</a><a class="button primary" href="/playground">Run live scan</a></div></nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status" aria-label="Open API status"><span class="live-dot" data-health-dot aria-hidden="true"></span><span data-health-label>Checking API</span></a>
-        <a class="header-hire" href="/hire">Hire</a>
-        <a class="header-scan" href="/playground">Run scan</a>
+        <a class="status-pill" href="/status" aria-label="Service status: unknown" data-health-state="unknown"><span class="live-dot is-unknown" data-health-dot aria-hidden="true"></span><span data-health-label>Status unknown</span></a>
+        <a class="header-hire" href="/integrate">Integrate</a>
+        <a class="header-scan" href="/playground">Run live scan</a>
         <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button>
       </div>
     </header>
     <main id="main" class="page-shell site-main">{body}</main>
     <footer class="site-footer page-shell">
-      <div><strong>Warden</strong><span>The immune system of the agent economy.</span><span>Independent service listed on OKX.AI.</span></div>
-      <nav aria-label="Footer"><a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a><a href="/showcase">Walkthrough</a><a href="/docs">Docs</a><a href="/badges">Evidence</a><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav>
+      <div><strong>Warden</strong><span>Verifiable pre-action security for AI agents.</span><span>Gate the action. Keep the proof.</span></div>
+      <nav aria-label="Footer">{footer_navigation}</nav>
     </footer>
     {"".join(script_tags)}
   </body>

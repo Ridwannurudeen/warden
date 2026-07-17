@@ -56,6 +56,9 @@ test("incident console starts closed until an explicit run", () => {
     "DRAIN BLOCKED — NO ACTION ACCEPTED",
   );
   assert.equal(incidentPresentation(state).verdict, "BLOCK");
+  assert.equal(incidentPresentation(state).sourceState, "illustrative");
+  assert.equal(incidentPresentation(state).checkedAt, "Not run");
+  assert.match(incidentPresentation(state).evidence, /not returned/i);
   assert.equal(transitionIncidentState(state, { type: "UNKNOWN" }), state);
 });
 
@@ -70,6 +73,8 @@ test("matching BLOCK verdicts prove the downstream action was withheld", () => {
   assert.equal(accepted.receipt.received_payload, null);
   assert.equal(state.phase, "withheld");
   assert.equal(incidentPresentation(state).outcome, "WITHHELD");
+  assert.equal(incidentPresentation(state).sourceState, "live");
+  assert.match(incidentPresentation(state).evidence, /not returned/i);
 });
 
 test("matching SANITIZE verdicts accept only the exact transformed payload", () => {
@@ -194,7 +199,10 @@ test("one run posts the same fixed body to the two exact endpoints sequentially"
     },
   };
 
-  const result = await runIncident(client);
+  const result = await runIncident(
+    client,
+    () => new Date("2026-07-17T20:10:00Z"),
+  );
 
   assert.equal(result.outcome, "WITHHELD");
   assert.equal(maxActive, 1);
@@ -208,4 +216,7 @@ test("one run posts the same fixed body to the two exact endpoints sequentially"
   assert.equal(calls[1].body, INCIDENT_REQUEST);
   assert.deepEqual(calls[0].body, calls[1].body);
   assert.deepEqual(Object.keys(INCIDENT_REQUEST), ["payload"]);
+  assert.equal(result.checkedAt, "2026-07-17T20:10:00.000Z");
+  assert.deepEqual(result.rawResponse.scan, scanResult());
+  assert.deepEqual(result.rawResponse.theater, theaterResult());
 });

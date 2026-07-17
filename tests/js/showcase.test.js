@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
@@ -20,6 +21,7 @@ test("showcase resets to a predictable no-scan state", () => {
     scanning: false,
     source: "none",
     result: null,
+    checkedAt: null,
     error: "",
   });
   assert.deepEqual(
@@ -52,10 +54,12 @@ test("live success and labeled fallback both unlock the verdict scene", () => {
   const live = transitionShowcase(scanning, {
     type: "SCAN_SUCCESS",
     result: EXAMPLE_RESULT,
+    checkedAt: "2026-07-17T12:00:00.000Z",
   });
   assert.equal(live.scene, 3);
   assert.equal(live.source, "live");
   assert.equal(live.result.verdict, "BLOCK");
+  assert.equal(live.checkedAt, "2026-07-17T12:00:00.000Z");
 
   const failed = transitionShowcase(gate, {
     type: "SCAN_ERROR",
@@ -66,6 +70,7 @@ test("live success and labeled fallback both unlock the verdict scene", () => {
   const fallback = transitionShowcase(failed, { type: "USE_FALLBACK" });
   assert.equal(fallback.scene, 3);
   assert.equal(fallback.source, "example");
+  assert.equal(fallback.checkedAt, null);
 });
 
 test("showcase rejects a valid response that does not prove the scripted stop", () => {
@@ -99,4 +104,19 @@ test("showcase live request uses the frozen drain-address demo shape", () => {
   assert.deepEqual(LIVE_REQUEST.context.expected_addresses, [
     "0x1111111111111111111111111111111111111111",
   ]);
+});
+
+test("showcase separates the live verdict from illustrative caller enforcement", () => {
+  const page = fs.readFileSync(
+    path.join(__dirname, "..", "..", "site", "showcase.html"),
+    "utf8",
+  );
+
+  assert.match(
+    page,
+    /LIVE verdict;\s+no wallet or\s+downstream action was invoked/,
+  );
+  assert.match(page, /Recommended caller action/);
+  assert.doesNotMatch(page, /The instruction stops before wallet execution/);
+  assert.doesNotMatch(page, /<dt>Prevented action<\/dt>/);
 });

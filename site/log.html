@@ -38,7 +38,7 @@
       sizes="180x180"
       href="/assets/apple-touch-icon.png"
     />
-    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
+    <link rel="stylesheet" href="/styles.css?v=96b93423" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -64,38 +64,58 @@
         <details class="nav-group">
           <summary>Product</summary>
           <div class="nav-menu">
-            <a href="/playground">Playground</a>
+            <a href="/">Overview</a>
+            <a href="/playground">Live Playground</a>
             <a href="/theater">Attack Theater</a>
-            <a href="/agents">Marketplace index</a>
+            <a href="/hire">Use Warden</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Developers</summary>
           <div class="nav-menu">
+            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+            <a href="/integrate">Integrations</a>
             <a href="/docs">Documentation</a>
-            <a href="/integrate">Integrate</a>
           </div>
         </details>
         <details class="nav-group has-current">
           <summary>Evidence</summary>
           <div class="nav-menu">
-            <a href="/verify">Verify APA</a>
-            <a href="/apa/log" aria-current="page">Transparency log</a>
-            <a href="/trust">Trust Layer</a>
+            <a href="/verify">Verify an Attestation</a>
+            <a href="/apa/log" aria-current="page">Transparency Log</a>
+            <a href="/badges">Endpoint Audit Records</a>
+            <a href="/agents">Marketplace Evidence Index</a>
+            <a href="/status">Service Status</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Research</summary>
+          <div class="nav-menu">
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/agents#methodology">Methodology</a>
+            <a href="/showcase">Product Tour</a>
           </div>
         </details>
         <div class="nav-mobile-actions">
-          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
-          <a class="button primary" href="/playground">Run a live scan</a>
+          <a class="button secondary" href="/integrate">Integrate</a>
+          <a class="button primary" href="/playground">Run live scan</a>
         </div>
       </nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status" aria-label="Open API status"
-          ><span class="live-dot" data-health-dot aria-hidden="true"></span
-          ><span data-health-label>Checking API</span></a
+        <a
+          class="status-pill"
+          href="/status"
+          aria-label="Service status: unknown"
+          data-health-state="unknown"
+          ><span
+            class="live-dot is-unknown"
+            data-health-dot
+            aria-hidden="true"
+          ></span
+          ><span data-health-label>Status unknown</span></a
         >
-        <a class="header-hire" href="/hire">Hire</a>
-        <a class="header-scan" href="/playground">Run scan</a>
+        <a class="header-hire" href="/integrate">Integrate</a>
+        <a class="header-scan" href="/playground">Run live scan</a>
         <button
           class="theme-toggle"
           type="button"
@@ -111,35 +131,86 @@
       id="main"
       class="page-shell site-main"
       data-apa-log
-      data-state="loading"
+      data-state="unknown"
     >
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Home</a><span aria-hidden="true">/</span
+        ><span aria-current="page">Transparency Log</span>
+      </nav>
       <section class="page-hero">
-        <p class="eyebrow">Shared evidence transparency</p>
-        <h1>Verify the published history, not a screenshot.</h1>
+        <p class="eyebrow">Evidence / Transparency ledger</p>
+        <h1>Recompute the chain. Do not trust the screenshot.</h1>
         <p class="hero-text">
           This page re-fetches <code>GET /apa/log</code> as JSON and recomputes
           every SHA-256 <code>prev_hash</code> link locally. APA issuance and
           status changes share one ordered chain with confirmed WARDEN BREAKER
           certificates.
         </p>
+        <div class="hero-actions">
+          <button class="button primary" type="button" data-apa-log-retry>
+            Fetch and verify the log
+          </button>
+          <a class="button secondary" href="/verify"
+            >Verify an attestation</a
+          >
+        </div>
       </section>
 
       <section
         class="proof-strip"
         aria-label="Transparency verification boundaries"
       >
-        <div><span>Source</span><strong>Live JSON log</strong></div>
+        <div><span>Source</span><strong>Same-origin JSON pages</strong></div>
         <div><span>Chain</span><strong>SHA-256</strong></div>
-        <div><span>Genesis</span><strong class="num">64 zeroes</strong></div>
-        <div><span>Result</span><strong>Continuity + prefix pin</strong></div>
+        <div><span>Head</span><strong>Issuer-signed checkpoint</strong></div>
+        <div><span>External pin</span><strong>Explicit when published</strong></div>
+      </section>
+
+      <section class="feature-panel" aria-labelledby="chain-model-title">
+        <div class="section-heading">
+          <p class="eyebrow">How continuity is checked</p>
+          <h2 id="chain-model-title">Each entry commits to the one before it.</h2>
+          <p>
+            The browser starts from the fixed genesis value, hashes each
+            canonical entry, follows every <code>prev_hash</code>, and compares
+            the computed head with the issuer-signed checkpoint.
+          </p>
+        </div>
+        <ol class="action-sequence">
+          <li>
+            <span>01</span><strong>Genesis</strong>
+            <p>Entry one must point to the documented 64-zero start value.</p>
+          </li>
+          <li>
+            <span>02</span><strong>Continuity</strong>
+            <p>Every next entry must point to the prior canonical entry hash.</p>
+          </li>
+          <li>
+            <span>03</span><strong>Signed head</strong>
+            <p>The recomputed head and count must match the signed checkpoint.</p>
+          </li>
+          <li>
+            <span>04</span><strong>Published prefix</strong>
+            <p>An external checkpoint, when present, pins an older prefix.</p>
+          </li>
+        </ol>
       </section>
 
       <section class="status-live-panel" aria-labelledby="log-status-title">
         <div class="section-heading">
-          <p class="eyebrow">Browser verification</p>
-          <h2 id="log-status-title">Current chain result</h2>
+          <p class="eyebrow">Local recomputation</p>
+          <h2 id="log-status-title">Current ledger result</h2>
+          <p>
+            <span
+              class="source-stamp source-stamp--unknown"
+              data-apa-log-source
+              data-source-stamp
+              data-source-state="unknown"
+              >UNKNOWN · log not checked</span
+            >
+          </p>
           <p data-apa-log-status role="status" aria-live="polite">
-            Fetching the current JSON log…
+            No chain result is available until the public material is fetched.
           </p>
           <button class="button secondary" type="button" data-apa-log-retry>
             Re-fetch and verify
@@ -148,11 +219,13 @@
         <div class="status-grid" aria-label="Current transparency log facts">
           <div>
             <span>Published entries</span
-            ><strong class="num" data-apa-log-total>Checking</strong>
+            ><strong class="num" data-apa-log-total
+              >Unknown until checked</strong
+            >
           </div>
           <div>
             <span>Chain result</span
-            ><strong data-apa-log-chain>Checking</strong>
+            ><strong data-apa-log-chain>Unknown until checked</strong>
           </div>
           <div>
             <span>Observed at</span
@@ -160,11 +233,17 @@
           </div>
           <div>
             <span>Computed head hash</span
-            ><strong class="num" data-apa-log-head>Checking</strong>
+            ><strong class="num" data-apa-log-head
+              >Unknown until checked</strong
+            >
           </div>
           <div>
-            <span>External-to-database checkpoint</span
-            ><strong data-apa-log-anchor>Checking</strong>
+            <span>Signed checkpoint</span
+            ><strong data-apa-log-checkpoint>Unknown until checked</strong>
+          </div>
+          <div>
+            <span>External prefix checkpoint</span
+            ><strong data-apa-log-anchor>Unknown until checked</strong>
           </div>
         </div>
       </section>
@@ -180,7 +259,9 @@
           </p>
         </div>
         <ol class="command-flow" data-apa-log-entries>
-          <li class="empty-state">Loading transparency entries…</li>
+          <li class="empty-state">
+            Ledger entries are unknown until verification is requested.
+          </li>
         </ol>
         <noscript
           ><p class="empty-state">
@@ -191,7 +272,47 @@
         >
       </section>
 
-      <aside class="callout">
+      <section class="snippet-card" aria-labelledby="local-ledger-tools-title">
+        <header>
+          <div>
+            <p class="eyebrow">Inspect and challenge</p>
+            <h2 id="local-ledger-tools-title">Keep the structured evidence.</h2>
+          </div>
+        </header>
+        <p>
+          The raw panel shows the normalized entries this browser verified.
+          Change one byte in a local copy to demonstrate that the signed
+          checkpoint rejects the mutation; the published log is never modified.
+        </p>
+        <div class="record-actions">
+          <button
+            class="button secondary"
+            type="button"
+            data-apa-log-copy-raw
+            disabled
+          >
+            Copy normalized JSON
+          </button>
+          <button
+            class="button secondary"
+            type="button"
+            data-apa-log-tamper
+            disabled
+          >
+            Change one byte locally
+          </button>
+          <p data-apa-log-tool-status aria-live="polite">
+            Fetch a valid non-empty log before running local tools.
+          </p>
+        </div>
+        <details>
+          <summary>Inspect normalized ledger JSON</summary>
+          <pre><code data-apa-log-raw>Normalized JSON is unavailable until the log is fetched.</code></pre>
+        </details>
+      </section>
+
+      <aside class="callout evidence-boundary">
+        <strong>What this verification does and does not establish.</strong>
         The live signed head detects changes relative to Warden's locally stored
         latest state. An operator-published checkpoint can additionally pin an
         older prefix outside that database; this page verifies the pin when one
@@ -209,19 +330,47 @@
     <footer class="site-footer page-shell">
       <div>
         <strong>Warden</strong
-        ><span>The immune system of the agent economy.</span
-        ><span>Independent service listed on OKX.AI.</span>
+        ><span>Verifiable pre-action security for AI agents.</span
+        ><span>Gate the action. Keep the proof.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
-        ><a href="/gauntlet">Gauntlet</a><a href="/showcase">Walkthrough</a
-        ><a href="/docs">Docs</a><a href="/badges">Audit badges</a
-        ><a href="/status">API status</a><a href="/privacy">Privacy</a
-        ><a href="/terms">Terms</a
-        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Product</span>
+          <a href="/">Overview</a>
+          <a href="/playground">Live Playground</a>
+          <a href="/theater">Attack Theater</a>
+          <a href="/hire">Use Warden</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Developers</span>
+          <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+          <a href="/integrate">Integrations</a>
+          <a href="/docs">Documentation</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Evidence</span>
+          <a href="/verify">Verify an Attestation</a>
+          <a href="/apa/log">Transparency Log</a>
+          <a href="/badges">Endpoint Audit Records</a>
+          <a href="/agents">Marketplace Evidence Index</a>
+          <a href="/status">Service Status</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Research</span>
+          <a href="/gauntlet">Gauntlet</a>
+          <a href="/agents#methodology">Methodology</a>
+          <a href="/showcase">Product Tour</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Policy</span>
+          <a href="/trust">Trust &amp; Security</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        </div>
       </nav>
     </footer>
-    <script src="/app.js?v=65a484d3" defer></script>
+    <script src="/app.js?v=5c7f3a4c" defer></script>
     <script src="/log.js" defer></script>
   </body>
 </html>

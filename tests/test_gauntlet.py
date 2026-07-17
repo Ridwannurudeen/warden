@@ -93,9 +93,7 @@ def test_allowed_claim_is_pending_and_never_auto_confirmed(tmp_path, monkeypatch
     assert stats.json()["corpus_size"] >= 118
 
 
-def test_gauntlet_normalizes_finder_format_controls_before_storage(
-    tmp_path, monkeypatch
-):
+def test_gauntlet_normalizes_finder_format_controls_before_storage(tmp_path, monkeypatch):
     store_path = tmp_path / "attempts.jsonl"
     monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", store_path)
 
@@ -129,9 +127,7 @@ def test_gauntlet_normalizes_finder_format_controls_before_storage(
         "\u202e\u200b",
     ],
 )
-def test_gauntlet_rejects_non_visible_finder_characters(
-    tmp_path, monkeypatch, finder
-):
+def test_gauntlet_rejects_non_visible_finder_characters(tmp_path, monkeypatch, finder):
     store_path = tmp_path / "attempts.jsonl"
     monkeypatch.setattr("warden.gauntlet_store._STORE_PATH", store_path)
 
@@ -382,9 +378,13 @@ def test_gauntlet_page_discloses_human_review_and_retention():
 
     assert "data-gauntlet-form" in page
     assert "data-gauntlet-stats" in page
+    assert 'data-source-state="unknown"' in page
     assert "human review" in normalized_page
     assert "pending claims retain" in normalized_page
     assert "confirmed bypass" in normalized_page
+    for state in ("pending review", "confirmed", "rejected", "duplicate", "detected"):
+        assert state in normalized_page
+    assert "no reward or bounty is promised" in normalized_page
     assert "not authenticated identities" in normalized_page
 
 

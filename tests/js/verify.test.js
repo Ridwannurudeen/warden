@@ -14,6 +14,7 @@ const {
   canonicalJson,
   decodeBase64Url,
   loadBreakerVerificationMaterial,
+  loadLatestAvailableAttestation,
   loadVerificationMaterial,
   parseBreakerQuery,
   parseVerifierInput,
@@ -800,6 +801,61 @@ test("material loader fetches only the canonical attestation path and issuer doc
   ]);
   assert.equal(material.attestation.attestation_id, ATTESTATION_ID);
   assert.equal(material.issuerDocument.issuer, "warden");
+});
+
+test("latest public loader skips duplicate missing records and returns exact public bytes", async () => {
+  const missingId = "f".repeat(32);
+  const calls = [];
+  const material = await loadLatestAvailableAttestation(
+    [
+      { seq: 1, attestation_id: ATTESTATION_ID },
+      { seq: 2, attestation_id: missingId },
+      { seq: 3, attestation_id: missingId },
+    ],
+    async (endpoint) => {
+      calls.push(endpoint);
+      if (endpoint === `/apa/attestation/${missingId}`) {
+        return response({}, 404);
+      }
+      if (endpoint === `/apa/attestation/${ATTESTATION_ID}`) {
+        return response({ attestation: fixture.attestation });
+      }
+      return response({}, 500);
+    },
+  );
+
+  assert.deepEqual(calls, [
+    `/apa/attestation/${missingId}`,
+    `/apa/attestation/${ATTESTATION_ID}`,
+  ]);
+  assert.equal(material.entry.seq, 1);
+  assert.deepEqual(material.attestation, fixture.attestation);
+});
+
+test("latest public loader rejects unavailable and mismatched public records", async () => {
+  const entries = [{ seq: 1, attestation_id: ATTESTATION_ID }];
+
+  await assert.rejects(
+    loadLatestAvailableAttestation(entries, async () => response({}, 404)),
+    (error) =>
+      error instanceof ApaVerifierError &&
+      error.kind === "network" &&
+      /currently unavailable/.test(error.message),
+  );
+  await assert.rejects(
+    loadLatestAvailableAttestation(entries, async () =>
+      response({
+        attestation: {
+          ...fixture.attestation,
+          attestation_id: "f".repeat(32),
+        },
+      }),
+    ),
+    (error) =>
+      error instanceof ApaVerifierError &&
+      error.kind === "parser" &&
+      /did not match/.test(error.message),
+  );
 });
 
 test("exported boundaries state APA, TOFU, and key-theft limits without a safety upgrade", () => {

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from warden.core.verdict import ReasonCode
 from warden.site_docs import load_reason_documents, render_docs
+from warden.site_render import NAV_GROUPS, page_shell
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -137,6 +138,75 @@ def test_docs_renderer_writes_index_and_one_page_per_reason(tmp_path):
     assert "not the result of scanning the redacted text" in secret_page
 
 
+def test_generated_shell_uses_canonical_information_architecture_and_unknown_status():
+    assert NAV_GROUPS == (
+        (
+            "Product",
+            (
+                ("/", "Overview", "overview"),
+                ("/playground", "Live Playground", "playground"),
+                ("/theater", "Attack Theater", "theater"),
+                ("/hire", "Use Warden", "hire"),
+            ),
+        ),
+        (
+            "Developers",
+            (
+                ("/integrate#sdk-first", "5-Minute Quickstart", "integrate-quickstart"),
+                ("/integrate", "Integrations", "integrate"),
+                ("/docs", "Documentation", "docs"),
+            ),
+        ),
+        (
+            "Evidence",
+            (
+                ("/verify", "Verify an Attestation", "verify"),
+                ("/apa/log", "Transparency Log", "apa-log"),
+                ("/badges", "Endpoint Audit Records", "badges"),
+                ("/agents", "Marketplace Evidence Index", "agents"),
+                ("/status", "Service Status", "status"),
+            ),
+        ),
+        (
+            "Research",
+            (
+                ("/gauntlet", "Gauntlet", "gauntlet"),
+                ("/agents#methodology", "Methodology", "agents-methodology"),
+                ("/showcase", "Product Tour", "showcase"),
+            ),
+        ),
+    )
+
+    rendered = page_shell(
+        "Generated shell",
+        "Shell contract test.",
+        "<section>Content</section>",
+        active="agents",
+    )
+
+    assert rendered.count('<details class="nav-group') == 4
+    assert "<summary>Evidence</summary>" in rendered
+    assert '<a href="/agents" aria-current="page">Marketplace Evidence Index</a>' in rendered
+    assert rendered.count('aria-current="page"') == 1
+    assert 'aria-label="Service status: unknown"' in rendered
+    assert 'data-health-state="unknown"' in rendered
+    assert ">Status unknown</span>" in rendered
+    assert "Checking API" not in rendered
+    assert '<a class="header-hire" href="/integrate">Integrate</a>' in rendered
+    assert '<a class="header-scan" href="/playground">Run live scan</a>' in rendered
+    footer = re.search(
+        r'<footer class="site-footer page-shell">(?P<body>.*?)</footer>',
+        rendered,
+        re.DOTALL,
+    )
+    assert footer
+    for group_name, items in NAV_GROUPS:
+        assert f'<span class="site-footer__label">{group_name}</span>' in footer.group("body")
+        for href, label, _ in items:
+            assert f'<a href="{href}">{label}</a>' in footer.group("body")
+    assert 'aria-current="page"' not in footer.group("body")
+
+
 def test_build_site_publishes_apa_spec_byte_identically(tmp_path):
     docs_output = tmp_path / "docs"
     spec_output = tmp_path / "spec" / "APA-SPEC.md"
@@ -205,16 +275,9 @@ def test_required_multi_page_routes_exist_with_shared_navigation():
     assert all(path.exists() for path in required)
     social_card = SITE / "assets" / "warden-social-card.png"
     assert social_card.exists() and social_card.stat().st_size > 0
-    og_card = SITE / "assets" / "og.png"
-    assert og_card.exists() and og_card.stat().st_size > 0
     for path in required:
         source = path.read_text(encoding="utf-8")
-        expected_card = (
-            "https://warden.gudman.xyz/assets/og.png"
-            if path == SITE / "index.html"
-            else "https://warden.gudman.xyz/assets/warden-social-card.png"
-        )
-        assert expected_card in source
+        assert "https://warden.gudman.xyz/assets/warden-social-card.png" in source
         assert 'name="twitter:image"' in source
         assert "warden-social-card.svg" not in source
         audit = _audit_page(path)
@@ -239,15 +302,15 @@ def test_every_site_shell_links_complete_trust_navigation():
         )
         assert header, path
         assert footer, path
-        for href in ("/theater", "/trust", "/verify", "/apa/log"):
+        for href in ("/theater", "/verify", "/apa/log"):
             assert f'href="{href}"' in header.group("body"), path
-        assert 'href="/theater"' in footer.group("body"), path
-        assert "The immune system of the agent economy." in footer.group("body"), path
+        for href in ("/theater", "/trust", "/privacy", "/terms"):
+            assert f'href="{href}"' in footer.group("body"), path
+        assert "Warden" in footer.group("body"), path
 
 
-def test_trust_evidence_pages_mark_the_correct_navigation_item_current():
+def test_evidence_pages_mark_navigation_and_breadcrumb_context():
     pages = (
-        ("trust.html", "Evidence", "/trust"),
         ("verify.html", "Evidence", "/verify"),
         ("log.html", "Evidence", "/apa/log"),
     )
@@ -262,16 +325,22 @@ def test_trust_evidence_pages_mark_the_correct_navigation_item_current():
         )
         assert current_group, filename
         assert f'href="{href}" aria-current="page"' in current_group.group("body")
-        assert source.count('aria-current="page"') == 1
+        assert 'class="breadcrumbs"' in source
+
+    trust = (SITE / "trust.html").read_text(encoding="utf-8")
+    assert 'aria-current="page">Trust Architecture' in trust
+    assert 'href="/trust"' in trust
+    assert 'href="/trust" aria-current="page"' not in trust
 
 
 def test_top_nav_is_curated_and_utility_pages_live_in_footer():
     curated_groups = {
-        "Product": ["/playground", "/theater", "/agents"],
-        "Developers": ["/docs", "/integrate"],
-        "Evidence": ["/verify", "/apa/log", "/trust"],
+        "Product": ["/", "/playground", "/theater", "/hire"],
+        "Developers": ["/integrate#sdk-first", "/integrate", "/docs"],
+        "Evidence": ["/verify", "/apa/log", "/badges", "/agents", "/status"],
+        "Research": ["/gauntlet", "/agents#methodology", "/showcase"],
     }
-    relocated_to_footer = ("/gauntlet", "/showcase", "/status", "/badges")
+    policy_footer = ("/trust", "/privacy", "/terms")
     top_level_pages = [
         "index.html",
         "theater.html",
@@ -308,7 +377,7 @@ def test_top_nav_is_curated_and_utility_pages_live_in_footer():
             re.DOTALL,
         )
         assert footer, filename
-        for href in relocated_to_footer:
+        for href in policy_footer:
             assert f'href="{href}"' in footer.group("body"), (filename, href)
 
 
@@ -352,11 +421,52 @@ def test_shared_styles_support_light_dark_mobile_and_new_surfaces():
     assert "prefers-reduced-motion: reduce" in (SITE / "theater.js").read_text(encoding="utf-8")
 
 
+def test_shared_shell_design_system_exposes_evidence_and_archetype_contracts():
+    css = (SITE / "styles.css").read_text(encoding="utf-8")
+
+    for state in ("LIVE", "DATED", "ILLUSTRATIVE", "DEGRADED", "UNKNOWN"):
+        assert f'[data-source-state="{state}"]' in css
+        assert f'[data-source-stamp="{state}"]' in css
+
+    for selector in (
+        ".source-stamp",
+        ".evidence-boundary",
+        ".breadcrumbs",
+        ".action-boundary",
+        ".signed-receipt",
+        ".async-state-panel",
+        '.async-state-panel[data-state="loading"]',
+        'body[data-page-archetype="landing"]',
+        'body[data-page-archetype="lab"]',
+        'body[data-page-archetype="evidence"]',
+        'body[data-page-archetype="commerce"]',
+        'body[data-page-archetype="marketplace"]',
+        'body[data-page-archetype="docs"]',
+        ".showcase-progress--sticky",
+        'del[data-diff="removed"]',
+        'ins[data-diff="added"]',
+        ".hero-proof-chips",
+        ".hero-example-tabs",
+        ".action-boundary-mini",
+        ".raw-evidence",
+        ".integration-preview__code",
+        ".labs-grid > article",
+    ):
+        assert selector in css
+
+    assert "@media (max-width: 380px)" in css
+    assert "height: 100dvh" in css
+    assert "env(safe-area-inset-bottom)" in css
+    assert "min-height: 44px" in css
+    assert "overscroll-behavior-inline: contain" in css
+    assert "prefers-reduced-motion: reduce" in css
+
+
 def test_attack_theater_is_real_owned_one_pass_surface():
     page = (SITE / "theater.html").read_text(encoding="utf-8")
     script = (SITE / "theater.js").read_text(encoding="utf-8")
 
-    assert "Attack Theater · live immune response · one pass" in page
+    assert "Attack Theater · controlled incident sequence" in page
     assert "live demo scanner" not in page
     assert "Warden-owned demo agent" in page
     assert "data-theater" in page
@@ -366,7 +476,7 @@ def test_attack_theater_is_real_owned_one_pass_surface():
     assert "data-theater-stage-delivery" in page
     assert "data-theater-toggle" in page
     assert "data-theater-next" in page
-    assert "AWAITING LIVE VERDICT" in page
+    assert "NOT RUN" in page
     assert "SANITIZE \u00b7 PROMPT_INJECTION" not in page
     assert page.index("/scan-client.js") < page.index("/theater.js")
     assert '"/api/demo/theater"' in script
@@ -617,6 +727,21 @@ def test_shared_styles_meet_wcag_contrast_contract():
     assert "background: var(--mint)" in allow_rules[-1]
 
 
+def test_primary_navigation_controls_meet_the_touch_target_floor():
+    css = (SITE / "styles.css").read_text(encoding="utf-8")
+
+    nav_link = re.search(r"\.nav-menu a\s*\{(?P<body>[^}]*)\}", css, re.DOTALL)
+    assert nav_link
+    assert "min-height: 44px" in nav_link.group("body")
+    header_override = re.search(
+        r"\.header-hire,\s*\.header-scan\s*\{(?P<body>[^}]*)\}",
+        css,
+        re.DOTALL,
+    )
+    assert header_override
+    assert "min-height: 40px" not in header_override.group("body")
+
+
 def test_hire_readiness_and_shell_controls_match_semantic_styles():
     hire = (SITE / "hire.html").read_text(encoding="utf-8")
     css = (SITE / "styles.css").read_text(encoding="utf-8")
@@ -691,10 +816,12 @@ def test_home_playground_badges_integrations_and_status_are_real_surfaces():
     integrate = (SITE / "integrate.html").read_text(encoding="utf-8")
     status = (SITE / "status.html").read_text(encoding="utf-8")
 
-    assert "The first agent-security service where you can cryptographically" in home
+    assert "Stop poisoned agent output before it becomes an action." in home
     assert "data-product-proof" in home
     assert "data-incident-console" in home
     assert "data-home-proof" in home
+    assert "data-hero-examples" in home
+    assert 'id="action-boundary"' in home
     assert "data-service-snapshot" in home
     assert 'class="button primary button--hero" href="/hire"' in home
     assert 'class="button secondary" href="/integrate"' in home
@@ -719,10 +846,8 @@ def test_gauntlet_breaker_board_is_empty_honest_and_requires_public_credit_conse
     privacy = " ".join(privacy_source.lower().split())
 
     assert "warden signs its own defeats" in gauntlet
-    assert (
-        "every attack that beat us, cryptographically proven, already in our benchmark."
-        in gauntlet
-    )
+    assert "only human-confirmed, reproducible bypasses become signed" in gauntlet
+    assert "an allow candidate is not a confirmed bypass" in gauntlet
     assert "data-breaker-board" in gauntlet_source
     assert "data-breaker-empty" in gauntlet_source
     assert "data-breaker-certificate" in gauntlet_source

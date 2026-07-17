@@ -47,7 +47,7 @@
       target: badgeValue(badge.target_host, "Unavailable"),
       grade: badgeValue(badge.grade, "Unavailable"),
       score: scoreLabel(badge.score),
-      blocked: `${badgeValue(badge.blocked, "--")} / ${badgeValue(badge.total, "--")}`,
+      blocked: `${badgeValue(badge.blocked, "Unavailable")} / ${badgeValue(badge.total, "Unavailable")}`,
       issuedAt: badgeValue(badge.issued_at, "Unavailable"),
       signature: badgeValue(badge.signature, "Unavailable"),
       verified: entry?.verified === true,
@@ -56,8 +56,8 @@
 
   const BADGE_STATES = {
     loading: {
-      heading: "Checking badge",
-      integrity: "Pending",
+      heading: "Requesting audit record",
+      integrity: "Unknown until checked",
       className: "status-label status-label--pending",
     },
     invalid: {
@@ -130,6 +130,7 @@
 
   const document = root.document;
   let detailShareUrl = "";
+  let registryEntries = [];
 
   function text(selector, value) {
     const element = document.querySelector(selector);
@@ -145,6 +146,21 @@
     const state = badgeState(stateName);
     element.textContent = state.integrity;
     element.className = state.className;
+  }
+
+  function sourceStamp(selector, state, message) {
+    const element = document.querySelector(selector);
+    if (!element) {
+      return;
+    }
+    element.dataset.sourceStamp = state;
+    element.className = `source-stamp source-stamp--${state}`;
+    root.WardenUI?.applySourceStamp(element, state);
+    element.textContent = `${state.toUpperCase()} · ${message}`;
+    element.setAttribute(
+      "aria-label",
+      `Source state: ${state.toUpperCase()}. ${message}`,
+    );
   }
 
   function createFact(label, value, numeric) {
@@ -170,7 +186,7 @@
 
     const eyebrow = document.createElement("p");
     eyebrow.className = "eyebrow";
-    eyebrow.textContent = `Audit ${view.auditId}`;
+    eyebrow.textContent = `Record ${view.auditId}`;
 
     const heading = document.createElement("h3");
     heading.textContent = view.target;
@@ -178,8 +194,8 @@
     const facts = document.createElement("dl");
     facts.className = "badge-card-facts";
     facts.append(
-      createFact("Result", `Grade ${view.grade} · ${view.score}`, false),
-      createFact("Time", view.issuedAt, true),
+      createFact("Audit outcome", `Grade ${view.grade} · ${view.score}`, false),
+      createFact("Issued", view.issuedAt, true),
       createFact("Target", view.target, false),
     );
 
@@ -200,19 +216,70 @@
     list.replaceChildren(state);
   }
 
+  function filteredRegistryEntries() {
+    const query = String(
+      document.querySelector("[data-badge-search]")?.value || "",
+    )
+      .trim()
+      .toLocaleLowerCase("en-US");
+    const integrity =
+      document.querySelector("[data-badge-integrity-filter]")?.value || "all";
+    return registryEntries.filter((entry) => {
+      const view = badgeViewModel(entry);
+      const matchesQuery =
+        !query ||
+        `${view.auditId} ${view.target} ${view.grade}`
+          .toLocaleLowerCase("en-US")
+          .includes(query);
+      const matchesIntegrity =
+        integrity === "all" ||
+        (integrity === "verified" && view.verified) ||
+        (integrity === "invalid" && !view.verified);
+      return matchesQuery && matchesIntegrity;
+    });
+  }
+
+  function renderRegistryFilters(container) {
+    const visible = filteredRegistryEntries();
+    const list = container.querySelector("[data-badge-list]");
+    if (visible.length === 0) {
+      registryMessage(
+        container,
+        registryEntries.length === 0
+          ? "No endpoint audit records have been issued."
+          : "No endpoint audit records match these filters.",
+      );
+    } else {
+      list.replaceChildren(...visible.map(createBadgeCard));
+    }
+    text(
+      "[data-badge-filter-status]",
+      `${visible.length.toLocaleString()} of ${registryEntries.length.toLocaleString()} records shown.`,
+    );
+  }
+
   async function loadRegistry(container) {
     const status = document.querySelector("[data-badge-registry-status]");
-    const list = container.querySelector("[data-badge-list]");
     const retry = document.querySelector("[data-badge-registry-retry]");
     container.dataset.state = "loading";
-    status.textContent = "Loading signed badge records...";
+    status.textContent =
+      "Requesting endpoint audit records. No integrity conclusion is available yet.";
+    sourceStamp(
+      "[data-badge-registry-source]",
+      "unknown",
+      "request in progress",
+    );
     retry.hidden = true;
     retry.disabled = true;
-    registryMessage(container, "Loading registry...");
+    registryMessage(
+      container,
+      "Registry request in progress. No record or integrity result is implied.",
+    );
     try {
       const response = await root.fetch("/api/badges", {
         headers: { accept: "application/json" },
         cache: "no-store",
+        signal: root.AbortSignal?.timeout?.(10_000),
       });
       if (!response.ok) {
         throw new Error(`Registry request failed with HTTP ${response.status}`);
@@ -221,26 +288,46 @@
       if (!Array.isArray(payload.badges)) {
         throw new Error("Registry response omitted the badges array");
       }
+      if (
+        !Number.isInteger(payload.total) ||
+        payload.total !== payload.badges.length
+      ) {
+        throw new Error("Registry response total does not match its records");
+      }
       const badges = payload.badges;
+      registryEntries = badges;
+      const observedAt = new Date().toISOString();
+      sourceStamp(
+        "[data-badge-registry-source]",
+        "live",
+        `API response checked ${observedAt}`,
+      );
       if (badges.length === 0) {
         container.dataset.state = "empty";
         status.textContent =
-          "No issued badge records are currently in the registry.";
-        registryMessage(
-          container,
-          "Empty registry. A badge appears only after an eligible completed endpoint audit is issued and stored.",
-        );
+          "The live registry response contains no issued endpoint audit records.";
+        renderRegistryFilters(container);
         return;
       }
       container.dataset.state = "ready";
-      list.replaceChildren(...badges.map(createBadgeCard));
-      status.textContent = `${badges.length.toLocaleString()} issued badge record${badges.length === 1 ? "" : "s"}. Integrity was checked by the API for this request.`;
+      renderRegistryFilters(container);
+      status.textContent = `${badges.length.toLocaleString()} issued endpoint audit record${badges.length === 1 ? "" : "s"}. Stored-record integrity was checked by the API for this request.`;
     } catch (error) {
       container.dataset.state = "error";
+      registryEntries = [];
+      sourceStamp(
+        "[data-badge-registry-source]",
+        "degraded",
+        `registry unavailable ${new Date().toISOString()}`,
+      );
       status.textContent = `${error.message}.`;
       registryMessage(
         container,
         "Registry unavailable. No verification result is implied.",
+      );
+      text(
+        "[data-badge-filter-status]",
+        "Filters are unavailable because the registry did not respond.",
       );
       retry.hidden = false;
       retry.disabled = false;
@@ -259,13 +346,18 @@
   }
 
   function resetDetailValues(auditId) {
-    text("[data-badge-audit-id]", auditId || "--");
-    text("[data-badge-target]", "--");
-    text("[data-badge-grade]", "--");
-    text("[data-badge-score]", "--");
-    text("[data-badge-blocked]", "--");
-    text("[data-badge-issued]", "--");
-    text("[data-badge-signature]", "--");
+    const unavailable = "Not available until requested";
+    text("[data-badge-audit-id]", auditId || unavailable);
+    text("[data-badge-target]", unavailable);
+    text("[data-badge-grade]", unavailable);
+    text("[data-badge-score]", unavailable);
+    text("[data-badge-blocked]", unavailable);
+    text("[data-badge-issued]", unavailable);
+    text("[data-badge-signature]", unavailable);
+    text(
+      "[data-badge-raw-json]",
+      "Record JSON is unavailable until the lookup succeeds.",
+    );
     text("[data-badge-action-status]", "");
     detailShareUrl = "";
     for (const button of document.querySelectorAll(
@@ -275,7 +367,7 @@
     }
   }
 
-  function renderDetail(view) {
+  function renderDetail(view, rawRecord) {
     text("[data-badge-audit-id]", view.auditId);
     text("[data-badge-target]", view.target);
     text("[data-badge-grade]", view.grade);
@@ -283,6 +375,7 @@
     text("[data-badge-blocked]", view.blocked);
     text("[data-badge-issued]", view.issuedAt);
     text("[data-badge-signature]", view.signature);
+    text("[data-badge-raw-json]", JSON.stringify(rawRecord, null, 2));
   }
 
   async function loadDetail() {
@@ -293,10 +386,20 @@
       root.location.pathname,
     );
     resetDetailValues(auditId);
+    sourceStamp(
+      "[data-badge-detail-source]",
+      "unknown",
+      "record not requested",
+    );
     retry.hidden = true;
     retry.disabled = true;
 
     if (!auditId) {
+      sourceStamp(
+        "[data-badge-detail-source]",
+        "unknown",
+        "audit identifier missing",
+      );
       setDetailState(
         container,
         "invalid",
@@ -305,6 +408,11 @@
       return;
     }
     if (!isValidAuditId(auditId)) {
+      sourceStamp(
+        "[data-badge-detail-source]",
+        "unknown",
+        "audit identifier is invalid",
+      );
       setDetailState(
         container,
         "invalid",
@@ -313,13 +421,23 @@
       return;
     }
 
-    setDetailState(container, "loading", "Checking the issued record...");
+    setDetailState(
+      container,
+      "loading",
+      "Requesting the issued record. No integrity conclusion is available yet.",
+    );
+    sourceStamp(
+      "[data-badge-detail-source]",
+      "unknown",
+      "request in progress",
+    );
     try {
       const response = await root.fetch(
         `/badge/${encodeURIComponent(auditId)}`,
         {
           headers: { accept: "application/json" },
           cache: "no-store",
+          signal: root.AbortSignal?.timeout?.(10_000),
         },
       );
       if (response.status === 404) {
@@ -327,6 +445,11 @@
           container,
           "empty",
           "No issued badge record exists for this audit ID.",
+        );
+        sourceStamp(
+          "[data-badge-detail-source]",
+          "live",
+          `no record found ${new Date().toISOString()}`,
         );
         retry.hidden = false;
         retry.disabled = false;
@@ -341,7 +464,7 @@
       if (!isValidAuditId(view.auditId) || view.auditId !== auditId) {
         throw new Error("Badge response did not match the requested audit ID");
       }
-      renderDetail(view);
+      renderDetail(view, payload.badge);
       const stateName = view.verified ? "verified" : "signature-invalid";
       setDetailState(
         container,
@@ -349,6 +472,11 @@
         view.verified
           ? "The stored public record matches its server-side signature."
           : "The stored public record does not match its server-side signature.",
+      );
+      sourceStamp(
+        "[data-badge-detail-source]",
+        "live",
+        `integrity checked ${new Date().toISOString()}`,
       );
       detailShareUrl = safeBadgeShareUrl(root.location.href, auditId);
       for (const button of document.querySelectorAll(
@@ -358,6 +486,11 @@
       }
     } catch (error) {
       setDetailState(container, "error", `${error.message}.`);
+      sourceStamp(
+        "[data-badge-detail-source]",
+        "degraded",
+        `lookup unavailable ${new Date().toISOString()}`,
+      );
       retry.hidden = false;
       retry.disabled = false;
     }
@@ -374,6 +507,14 @@
         loadRegistry(registry);
       });
     loadRegistry(registry);
+    for (const control of document.querySelectorAll(
+      "[data-badge-search], [data-badge-integrity-filter]",
+    )) {
+      control.addEventListener("input", () => renderRegistryFilters(registry));
+      control.addEventListener("change", () =>
+        renderRegistryFilters(registry),
+      );
+    }
   }
 
   const detail = document.querySelector("[data-badge-detail]");

@@ -188,6 +188,11 @@
         threat: state.result.threatClasses.join(", "),
         receipt: "invoked=false; received_payload=null",
         sanitized: "Not delivered",
+        sourceState: "live",
+        checkedAt: state.result.checkedAt || "Live check time unavailable",
+        raw: JSON.stringify(state.result.rawResponse || {}, null, 2),
+        evidence:
+          "Signed APA evidence was not returned by this demo envelope; the downstream action receipt is live but unsigned.",
       };
     }
     if (state.phase === "transformed") {
@@ -199,6 +204,11 @@
         threat: state.result.threatClasses.join(", "),
         receipt: "invoked=true; transformed payload matched",
         sanitized: state.result.sanitizedPayload,
+        sourceState: "live",
+        checkedAt: state.result.checkedAt || "Live check time unavailable",
+        raw: JSON.stringify(state.result.rawResponse || {}, null, 2),
+        evidence:
+          "Signed APA evidence was not returned by this demo envelope; the downstream action receipt is live but unsigned.",
       };
     }
     if (state.phase === "running") {
@@ -210,6 +220,10 @@
         threat: "DRAIN_ADDRESS expected",
         receipt: "Not accepted",
         sanitized: "Not accepted",
+        sourceState: "unknown",
+        checkedAt: "Request in progress",
+        raw: "No complete response accepted.",
+        evidence: "Signed evidence state is not established.",
       };
     }
     if (state.phase === "error") {
@@ -220,6 +234,10 @@
         threat: "DRAIN_ADDRESS expected",
         receipt: "Not accepted",
         sanitized: "Not accepted",
+        sourceState: "degraded",
+        checkedAt: "Live check did not complete",
+        raw: "No response was accepted as evidence.",
+        evidence: "Signed evidence state is unavailable.",
       };
     }
     return {
@@ -231,10 +249,15 @@
         "DRAIN_ADDRESS — 0x2222222222222222222222222222222222222222 detected",
       receipt: "Action withheld — invoked=false, nothing delivered",
       sanitized: "Not delivered",
+      sourceState: "illustrative",
+      checkedAt: "Not run",
+      raw: "Run the live incident to inspect the raw responses.",
+      evidence:
+        "Signed APA evidence is not returned by the illustrative preview.",
     };
   }
 
-  async function runIncident(client) {
+  async function runIncident(client, now = () => new Date()) {
     if (
       !client ||
       typeof client.postJson !== "function" ||
@@ -250,7 +273,14 @@
       INCIDENT_REQUEST,
     );
     const theaterResult = client.assertScanResponse(theaterPayload);
-    return validateIncidentResults(scanResult, theaterResult);
+    return {
+      ...validateIncidentResults(scanResult, theaterResult),
+      checkedAt: now().toISOString(),
+      rawResponse: {
+        scan: scanResult,
+        theater: theaterResult,
+      },
+    };
   }
 
   const api = {
@@ -293,7 +323,11 @@
     threat: consoleRoot.querySelector("[data-incident-threat]"),
     receipt: consoleRoot.querySelector("[data-incident-receipt]"),
     sanitized: consoleRoot.querySelector("[data-incident-sanitized]"),
+    checkedAt: consoleRoot.querySelector("[data-incident-checked-at]"),
+    raw: consoleRoot.querySelector("[data-incident-raw]"),
+    evidence: consoleRoot.querySelector("[data-incident-evidence]"),
   };
+  const sourceStamp = consoleRoot.querySelector("[data-incident-source]");
   let state = createIncidentState();
 
   function render() {
@@ -303,6 +337,9 @@
       if (element) {
         element.textContent = presentation[name];
       }
+    }
+    if (sourceStamp && root.WardenUI?.applySourceStamp) {
+      root.WardenUI.applySourceStamp(sourceStamp, presentation.sourceState);
     }
     runButton.disabled = state.phase === "running";
     if (retryButton) {

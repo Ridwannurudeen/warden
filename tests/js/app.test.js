@@ -8,17 +8,23 @@ const test = require("node:test");
 const appApi = require(path.join(__dirname, "..", "..", "site", "app.js"));
 
 const {
+  applyAsyncPanelState,
+  applySourceStamp,
   catalogServiceByKey,
   copyButtonBaseLabel,
   cycleFocusIndex,
   focusStatusTarget,
+  healthStatusPresentation,
+  homeProofEvidence,
   isHealthyResponse,
   isOutsideNavigationPointer,
   marketplaceCoverageText,
+  normalizeAsyncPanelState,
   normalizeEvidenceCount,
   normalizeMarketplaceSummary,
   normalizeProductProof,
   resolveTheme,
+  sourceStampPresentation,
   summaryToRestoreOnEscape,
 } = appApi;
 
@@ -41,6 +47,165 @@ test("header reachability accepts only the documented healthy response", () => {
   assert.equal(isHealthyResponse({ status: "degraded" }), false);
   assert.equal(isHealthyResponse({}), false);
   assert.equal(isHealthyResponse(null), false);
+});
+
+test("source stamps normalize the five honest evidence states", () => {
+  const expected = {
+    LIVE: "Observed live in this browser session.",
+    DATED: "Dated snapshot; not a live claim.",
+    ILLUSTRATIVE: "Illustrative example; not observed evidence.",
+    DEGRADED: "Source is incomplete or currently degraded.",
+    UNKNOWN: "Source state has not been established.",
+  };
+
+  for (const [state, description] of Object.entries(expected)) {
+    assert.deepEqual(sourceStampPresentation(state.toLowerCase()), {
+      state,
+      label: state,
+      description,
+    });
+  }
+  assert.equal(sourceStampPresentation("unsupported").state, "UNKNOWN");
+  assert.equal(sourceStampPresentation(null).state, "UNKNOWN");
+});
+
+test("source-stamp behavior updates state, visible label, and accessible copy", () => {
+  const label = { textContent: "" };
+  const attributes = new Map();
+  const classes = new Set(["source-stamp", "source-stamp--unknown"]);
+  const stamp = {
+    dataset: { sourceStamp: "dated" },
+    classList: {
+      add(...values) {
+        values.forEach((value) => classes.add(value));
+      },
+      remove(...values) {
+        values.forEach((value) => classes.delete(value));
+      },
+    },
+    querySelector(selector) {
+      assert.equal(selector, "[data-source-stamp-label]");
+      return label;
+    },
+    getAttribute(name) {
+      return attributes.get(name) || null;
+    },
+    setAttribute(name, value) {
+      attributes.set(name, value);
+    },
+  };
+
+  assert.equal(applySourceStamp(stamp).state, "DATED");
+  assert.equal(stamp.dataset.sourceState, "DATED");
+  assert.equal(stamp.dataset.sourceStamp, "DATED");
+  assert.equal(label.textContent, "DATED");
+  assert.match(attributes.get("aria-label"), /Dated snapshot/);
+  assert.equal(classes.has("source-stamp--dated"), true);
+  assert.equal(classes.has("source-stamp--unknown"), false);
+  assert.equal(applySourceStamp(stamp, "LIVE").state, "LIVE");
+  assert.equal(stamp.dataset.sourceState, "LIVE");
+  assert.equal(label.textContent, "LIVE");
+  assert.match(attributes.get("aria-label"), /Observed live/);
+  assert.equal(classes.has("source-stamp--live"), true);
+  assert.equal(classes.has("source-stamp--dated"), false);
+  assert.equal(applySourceStamp(null, "LIVE"), null);
+});
+
+test("shared initialization manages legacy and canonical source-stamp markup", () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, "..", "..", "site", "app.js"),
+    "utf8",
+  );
+
+  assert.match(
+    source,
+    /querySelectorAll\(\s*"\[data-source-stamp\], \.source-stamp\[data-source-state\]"/,
+  );
+});
+
+test("evaluation fetch failures retain explicit metric labels", () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, "..", "..", "site", "app.js"),
+    "utf8",
+  );
+
+  assert.match(source, /Recall unavailable/);
+  assert.match(source, /False-positive rate unavailable/);
+  assert.match(source, /Evaluation corpus unavailable/);
+  assert.doesNotMatch(
+    source,
+    /element\.dataset\.evalStat === "benign-cases"\s*\?\s*"Evaluation snapshot unavailable"\s*:\s*"—"/,
+  );
+});
+
+test("async-panel behavior exposes loading and settled states without stale busy state", () => {
+  const status = { textContent: "" };
+  const attributes = new Map();
+  const panel = {
+    dataset: {},
+    querySelector(selector) {
+      assert.equal(selector, "[data-async-status]");
+      return status;
+    },
+    setAttribute(name, value) {
+      attributes.set(name, value);
+    },
+    removeAttribute(name) {
+      attributes.delete(name);
+    },
+  };
+
+  assert.equal(normalizeAsyncPanelState(" Loading "), "loading");
+  assert.equal(normalizeAsyncPanelState("unsupported"), "unknown");
+  assert.equal(applyAsyncPanelState(panel, "loading", "Loading evidence"), "loading");
+  assert.equal(panel.dataset.asyncState, "loading");
+  assert.equal(attributes.get("aria-busy"), "true");
+  assert.equal(status.textContent, "Loading evidence");
+  assert.equal(applyAsyncPanelState(panel, "degraded", "Partial evidence"), "degraded");
+  assert.equal(attributes.has("aria-busy"), false);
+  assert.equal(status.textContent, "Partial evidence");
+  assert.equal(applyAsyncPanelState(null, "ready"), null);
+});
+
+test("header status starts unknown and maps only observed results to live or unavailable", () => {
+  assert.deepEqual(healthStatusPresentation("unknown", false), {
+    state: "unknown",
+    label: "Status unknown",
+    ariaLabel: "Service status: unknown",
+    dotClass: "is-unknown",
+  });
+  assert.equal(healthStatusPresentation("live", false).label, "API live");
+  assert.equal(healthStatusPresentation("live", true).label, "API ok");
+  assert.equal(
+    healthStatusPresentation("unavailable", false).label,
+    "API unavailable",
+  );
+  assert.equal(healthStatusPresentation("checking", false).state, "unknown");
+});
+
+test("home proof evidence exposes key, freshness, and browser check time", () => {
+  assert.deepEqual(
+    homeProofEvidence(
+      {
+        material: {
+          attestation: { attestation_id: "0123456789abcdef" },
+          issuerDocument: { keys: [{ kid: "python-fixture-1" }] },
+        },
+        attestation: { freshness: "archival" },
+        honestChain: { headHash: "a".repeat(64) },
+        tamper: { entryIndex: 1 },
+      },
+      "2026-07-17T21:15:00.000Z",
+    ),
+    {
+      attestationId: "0123456789abcdef",
+      chainHead: "a".repeat(64),
+      tamperIndex: "Entry 2",
+      keyId: "python-fixture-1",
+      freshness: "archival",
+      checkedAt: "2026-07-17T21:15:00.000Z",
+    },
+  );
 });
 
 test("shared app leaves marketplace filtering to the route module", () => {

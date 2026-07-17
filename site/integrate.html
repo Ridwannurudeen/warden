@@ -8,11 +8,11 @@
       content="Verified OnchainOS, x402, Python, TypeScript, and local MCP integration patterns for Warden."
     />
     <meta name="color-scheme" content="dark light" />
-    <title>Integrate Warden</title>
+    <title>Integrations | Warden</title>
     <link rel="canonical" href="https://warden.gudman.xyz/integrate" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Warden" />
-    <meta property="og:title" content="Integrate Warden" />
+    <meta property="og:title" content="Integrations | Warden" />
     <meta
       property="og:description"
       content="Verified OnchainOS, x402, Python, TypeScript, and local MCP integration patterns for Warden."
@@ -27,9 +27,18 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/assets/favicon-32.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/assets/apple-touch-icon.png"
+    />
+    <link rel="stylesheet" href="/styles.css?v=96b93423" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -55,38 +64,58 @@
         <details class="nav-group">
           <summary>Product</summary>
           <div class="nav-menu">
-            <a href="/playground">Playground</a>
+            <a href="/">Overview</a>
+            <a href="/playground">Live Playground</a>
             <a href="/theater">Attack Theater</a>
-            <a href="/agents">Marketplace index</a>
+            <a href="/hire">Use Warden</a>
           </div>
         </details>
         <details class="nav-group has-current">
           <summary>Developers</summary>
           <div class="nav-menu">
+            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+            <a href="/integrate" aria-current="page">Integrations</a>
             <a href="/docs">Documentation</a>
-            <a href="/integrate" aria-current="page">Integrate</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Evidence</summary>
           <div class="nav-menu">
-            <a href="/verify">Verify APA</a>
-            <a href="/apa/log">Transparency log</a>
-            <a href="/trust">Trust Layer</a>
+            <a href="/verify">Verify an Attestation</a>
+            <a href="/apa/log">Transparency Log</a>
+            <a href="/badges">Endpoint Audit Records</a>
+            <a href="/agents">Marketplace Evidence Index</a>
+            <a href="/status">Service Status</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Research</summary>
+          <div class="nav-menu">
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/agents#methodology">Methodology</a>
+            <a href="/showcase">Product Tour</a>
           </div>
         </details>
         <div class="nav-mobile-actions">
-          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
-          <a class="button primary" href="/playground">Run a live scan</a>
+          <a class="button secondary" href="/integrate">Integrate</a>
+          <a class="button primary" href="/playground">Run live scan</a>
         </div>
       </nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status" aria-label="Open API status"
-          ><span class="live-dot" data-health-dot aria-hidden="true"></span
-          ><span data-health-label>Checking API</span></a
+        <a
+          class="status-pill"
+          href="/status"
+          aria-label="Service status: unknown"
+          data-health-state="unknown"
+          ><span
+            class="live-dot is-unknown"
+            data-health-dot
+            aria-hidden="true"
+          ></span
+          ><span data-health-label>Status unknown</span></a
         >
-        <a class="header-hire" href="/hire">Hire</a>
-        <a class="header-scan" href="/playground">Run scan</a>
+        <a class="header-hire" href="/integrate">Integrate</a>
+        <a class="header-scan" href="/playground">Run live scan</a>
         <button
           class="theme-toggle"
           type="button"
@@ -116,12 +145,46 @@
       >
         <header>
           <div>
-            <p class="eyebrow">Python + TypeScript SDKs · source install</p>
+            <p class="eyebrow">Verified source path · five minutes</p>
             <h2 id="sdk-first-title">
-              Choose the enforcement boundary before the agent acts.
+              Put Warden before one action in five minutes.
             </h2>
           </div>
         </header>
+        <ol
+          class="action-sequence"
+          data-five-minute-path
+          aria-label="Five-minute Warden integration"
+        >
+          <li>
+            <span>0–1 min</span><strong>Place the boundary</strong>
+            <p>
+              Identify the untrusted text immediately before a model, tool,
+              wallet, or outbound request consumes it.
+            </p>
+          </li>
+          <li>
+            <span>1–2 min</span><strong>Install from source</strong>
+            <p>
+              Use the repository packages below; no PyPI or npm publication is
+              claimed.
+            </p>
+          </li>
+          <li>
+            <span>2–4 min</span><strong>Gate all three decisions</strong>
+            <p>
+              ALLOW uses the original, SANITIZE uses only the returned safe
+              text, and BLOCK stops the action.
+            </p>
+          </li>
+          <li>
+            <span>4–5 min</span><strong>Prove failure behavior</strong>
+            <p>
+              Exercise BLOCK plus a timeout before shipping; enforcement should
+              fail closed.
+            </p>
+          </li>
+        </ol>
         <p>
           Install the Python service and SDK from this repository. The package
           currently named
@@ -129,7 +192,7 @@
           publish a PyPI install command here.
         </p>
         <pre><code>python -m pip install -e . -e sdk/python</code></pre>
-        <h3>Local enforcement</h3>
+        <h3>Python local enforcement — recommended</h3>
         <p>
           Local mode runs <code>WardenEngine</code> in the caller's process. It
           has no network dependency or hosted quota, fails closed, returns
@@ -172,9 +235,20 @@ const result = await warden.scan(untrustedText);</code></pre>
           <code>failOpen: false</code> makes those hosted failures throw; it
           does not move detection in-process.
         </p>
+        <p class="caveat">
+          Five-minute acceptance check: a known attack must raise
+          <code>WardenBlocked</code> locally, a SANITIZE result must replace the
+          original text, and a simulated hosted failure must never reach an
+          action when <code>fail_open=False</code> or
+          <code>failOpen: false</code>.
+        </p>
       </section>
 
-      <ol class="action-sequence" aria-label="Warden action-gating sequence">
+      <ol
+        class="action-sequence"
+        data-placement-diagram
+        aria-label="Warden action-gating sequence"
+      >
         <li>
           <span>01</span><strong>Receive</strong>
           <p>Keep the source payload inert.</p>
@@ -208,8 +282,16 @@ const result = await warden.scan(untrustedText);</code></pre>
           <h2 id="catalog-title">
             Choose the service used by every hosted example
           </h2>
-          <p data-integrate-catalog-status aria-live="polite">
-            Loading the normalized service catalog...
+          <p>
+            <span
+              class="source-stamp"
+              data-integrate-catalog-stamp
+              data-source-stamp="UNKNOWN"
+              ><span data-source-stamp-label>UNKNOWN</span></span
+            >
+            <span data-integrate-catalog-status aria-live="polite"
+              >Service catalog not requested.</span
+            >
           </p>
           <button
             class="button secondary"
@@ -224,23 +306,25 @@ const result = await warden.scan(untrustedText);</code></pre>
         <dl class="data-list integration-service-facts" aria-live="polite">
           <div>
             <dt>Service</dt>
-            <dd data-integrate-service-name>Loading</dd>
+            <dd data-integrate-service-name>Catalog not available</dd>
           </div>
           <div>
             <dt>Service ID</dt>
-            <dd class="num" data-integrate-service-id>--</dd>
+            <dd class="num" data-integrate-service-id>Not established</dd>
           </div>
           <div>
             <dt>Price</dt>
-            <dd class="num" data-integrate-service-price>--</dd>
+            <dd class="num" data-integrate-service-price>Not established</dd>
           </div>
           <div>
             <dt>Network</dt>
-            <dd data-integrate-service-network>--</dd>
+            <dd data-integrate-service-network>Not established</dd>
           </div>
           <div>
             <dt>Endpoint</dt>
-            <dd><code data-integrate-service-endpoint>--</code></dd>
+            <dd>
+              <code data-integrate-service-endpoint>Not established</code>
+            </dd>
           </div>
         </dl>
       </section>
@@ -347,7 +431,7 @@ const result = await warden.scan(untrustedText);</code></pre>
             The operator still reviews task creation, the x402 spend, the
             returned result, completion, and any feedback.
           </p>
-          <pre><code id="onchainos-prompt" data-integration-example="onchainos">Loading catalog-backed prompt...</code></pre>
+          <pre><code id="onchainos-prompt" data-integration-example="onchainos">Catalog-backed prompt not available.</code></pre>
         </article>
 
         <article
@@ -375,7 +459,7 @@ const result = await warden.scan(untrustedText);</code></pre>
             Payment construction and signing belong to the wallet layer. The
             replay process receives only the resulting payment signature.
           </p>
-          <pre><code id="curl-snippet" data-integration-example="curl">Loading catalog-backed curl...</code></pre>
+          <pre><code id="curl-snippet" data-integration-example="curl">Catalog-backed curl not available.</code></pre>
         </article>
 
         <article
@@ -404,7 +488,7 @@ const result = await warden.scan(untrustedText);</code></pre>
             sanitization. The selected audit example validates score, grade,
             results, and recommendations.
           </p>
-          <pre><code id="python-snippet" data-integration-example="python">Loading catalog-backed Python...</code></pre>
+          <pre><code id="python-snippet" data-integration-example="python">Catalog-backed Python not available.</code></pre>
         </article>
 
         <article
@@ -433,7 +517,7 @@ const result = await warden.scan(untrustedText);</code></pre>
             scan union or a validated endpoint-audit report. The payment
             signature stays in the server or agent runtime.
           </p>
-          <pre><code id="typescript-snippet" data-integration-example="typescript">Loading catalog-backed TypeScript...</code></pre>
+          <pre><code id="typescript-snippet" data-integration-example="typescript">Catalog-backed TypeScript not available.</code></pre>
         </article>
 
         <article
@@ -462,8 +546,118 @@ const result = await warden.scan(untrustedText);</code></pre>
             <code>scan_payload</code> and <code>audit_agent</code>. It does not
             purchase the hosted x402 service.
           </p>
-          <pre><code id="mcp-snippet" data-integration-example="mcp">Loading local MCP configuration...</code></pre>
+          <pre><code id="mcp-snippet" data-integration-example="mcp">Local MCP configuration not available.</code></pre>
         </article>
+        <p class="caveat" data-copy-status role="status" aria-live="polite">
+          No integration example copied.
+        </p>
+      </section>
+
+      <section id="frameworks" aria-labelledby="frameworks-title">
+        <div class="section-heading">
+          <p class="eyebrow">Adapters present in this repository</p>
+          <h2 id="frameworks-title">
+            Put the same local guard inside your framework.
+          </h2>
+          <p>
+            These Python adapters are source-installed optional extras. Each
+            example uses local, fail-closed enforcement before untrusted text
+            reaches the next component.
+          </p>
+        </div>
+        <div class="decision-grid">
+          <article>
+            <strong>LangChain</strong>
+            <p>
+              Insert the runnable between retrieval and the prompt. BLOCK raises
+              <code>WardenBlocked</code>; SANITIZE forwards only safe text.
+            </p>
+            <pre><code>from warden_guard import WardenClient
+from warden_guard.langchain_guard import WardenGuardRunnable
+
+guard = WardenGuardRunnable(WardenClient(local=True, fail_open=False))
+chain = retriever | guard | prompt | model</code></pre>
+          </article>
+          <article>
+            <strong>LlamaIndex</strong>
+            <p>
+              The node postprocessor drops BLOCKed nodes and replaces SANITIZEd
+              LLM-visible content while excluding the original metadata.
+            </p>
+            <pre><code>from warden_guard import WardenClient
+from warden_guard.llamaindex_guard import WardenNodePostprocessor
+
+guard = WardenNodePostprocessor(WardenClient(local=True, fail_open=False))
+engine = index.as_query_engine(node_postprocessors=[guard])</code></pre>
+          </article>
+          <article>
+            <strong>FastAPI / ASGI</strong>
+            <p>
+              The middleware short-circuits BLOCK with HTTP 400. Its default
+              extractor replays a sanitized body; a custom extractor blocks
+              SANITIZE because it cannot safely rewrite the original body.
+            </p>
+            <pre><code>from fastapi import FastAPI
+from warden_guard import WardenClient, WardenGuard
+
+app = FastAPI()
+app.add_middleware(
+    WardenGuard,
+    client=WardenClient(local=True, fail_open=False),
+)</code></pre>
+          </article>
+          <article>
+            <strong>Framework-neutral TextGuard</strong>
+            <p>
+              <code>TextGuard</code> and <code>AsyncTextGuard</code> expose the
+              same strict one-input boundary without a framework dependency.
+            </p>
+            <pre><code>from warden_guard import TextGuard, WardenClient
+
+guard = TextGuard(WardenClient(local=True, fail_open=False))
+safe_text = guard(untrusted_text)</code></pre>
+          </article>
+        </div>
+      </section>
+
+      <section id="operating-boundary" aria-labelledby="operating-title">
+        <div class="section-heading">
+          <p class="eyebrow">Production operating contract</p>
+          <h2 id="operating-title">
+            Decide failure, retry, privacy, and wallet policy before launch.
+          </h2>
+        </div>
+        <div class="decision-grid">
+          <article>
+            <strong>Fail open vs. Fail closed</strong>
+            <p>
+              The free hosted SDK defaults to fail open with an 8 seconds
+              timeout, so transport failures become ALLOW and it is telemetry,
+              not enforcement. Use local
+              <code>fail_open=False</code> or hosted
+              <code>failOpen: false</code> when failure must stop the action.
+            </p>
+          </article>
+          <article>
+            <strong>Timeouts and retries</strong>
+            <p>
+              The direct paid examples use 30 seconds. Bound any retry before
+              the downstream action. Do not automatically retry a paid replay;
+              first determine settlement state, fetch fresh 402 terms, and
+              validate endpoint, network, asset, amount, and recipient again.
+            </p>
+          </article>
+          <article>
+            <strong>Privacy, secrets, and wallet boundary</strong>
+            <p>
+              Send only payloads and audit targets you are authorized to
+              process. Keep secrets out of request bodies and logs. A wallet
+              layer constructs and signs payment; server or agent code receives
+              only <code>PAYMENT-SIGNATURE</code>. Never ship it in browser
+              code.
+            </p>
+          </article>
+        </div>
       </section>
 
       <section aria-labelledby="decision-title">
@@ -507,19 +701,47 @@ const result = await warden.scan(untrustedText);</code></pre>
     <footer class="site-footer page-shell">
       <div>
         <strong>Warden</strong
-        ><span>The immune system of the agent economy.</span
-        ><span>Independent service listed on OKX.AI.</span>
+        ><span>Verifiable pre-action security for AI agents.</span
+        ><span>Gate the action. Keep the proof.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
-        ><a href="/gauntlet">Gauntlet</a
-        ><a href="/showcase">Walkthrough</a><a href="/docs">Docs</a
-        ><a href="/badges">Audit badges</a><a href="/status">API status</a
-        ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
-        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Product</span>
+          <a href="/">Overview</a>
+          <a href="/playground">Live Playground</a>
+          <a href="/theater">Attack Theater</a>
+          <a href="/hire">Use Warden</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Developers</span>
+          <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+          <a href="/integrate">Integrations</a>
+          <a href="/docs">Documentation</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Evidence</span>
+          <a href="/verify">Verify an Attestation</a>
+          <a href="/apa/log">Transparency Log</a>
+          <a href="/badges">Endpoint Audit Records</a>
+          <a href="/agents">Marketplace Evidence Index</a>
+          <a href="/status">Service Status</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Research</span>
+          <a href="/gauntlet">Gauntlet</a>
+          <a href="/agents#methodology">Methodology</a>
+          <a href="/showcase">Product Tour</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Policy</span>
+          <a href="/trust">Trust &amp; Security</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        </div>
       </nav>
     </footer>
-    <script src="/app.js?v=65a484d3" defer></script>
+    <script src="/app.js?v=5c7f3a4c" defer></script>
     <script src="/integrate.js" defer></script>
   </body>
 </html>

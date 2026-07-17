@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Run Warden's real deterministic fast-path scanner free in the browser."
+      content="Run Warden's real deterministic fast-path scanner before an AI agent takes a consequential action."
     />
     <meta name="color-scheme" content="dark light" />
-    <title>Payload Playground | Warden</title>
+    <title>Live Payload Playground | Warden</title>
     <link rel="canonical" href="https://warden.gudman.xyz/playground" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Warden" />
-    <meta property="og:title" content="Payload Playground | Warden" />
+    <meta property="og:title" content="Live Payload Playground | Warden" />
     <meta
       property="og:description"
-      content="Run Warden's real deterministic fast-path scanner free in the browser."
+      content="Inspect an untrusted payload at the action boundary and receive an ALLOW, SANITIZE, or BLOCK decision."
     />
     <meta property="og:url" content="https://warden.gudman.xyz/playground" />
     <meta
@@ -29,7 +29,7 @@
     />
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
+    <link rel="stylesheet" href="/styles.css?v=96b93423" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -55,40 +55,50 @@
         <details class="nav-group has-current">
           <summary>Product</summary>
           <div class="nav-menu">
-            <a href="/playground" aria-current="page">Playground</a>
+            <a href="/">Overview</a>
+            <a href="/playground" aria-current="page">Live Playground</a>
             <a href="/theater">Attack Theater</a>
-            <a href="/agents">Marketplace index</a>
+            <a href="/hire">Use Warden</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Developers</summary>
           <div class="nav-menu">
+            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+            <a href="/integrate">Integrations</a>
             <a href="/docs">Documentation</a>
-            <a href="/integrate">Integrate</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Evidence</summary>
           <div class="nav-menu">
-            <a href="/verify">Verify APA</a>
-            <a href="/apa/log">Transparency log</a>
-            <a href="/trust">Trust Layer</a>
+            <a href="/verify">Verify an Attestation</a>
+            <a href="/apa/log">Transparency Log</a>
+            <a href="/badges">Endpoint Audit Records</a>
+            <a href="/agents">Marketplace Evidence Index</a>
+            <a href="/status">Service Status</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Research</summary>
+          <div class="nav-menu">
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/agents#methodology">Methodology</a>
+            <a href="/showcase">Product Tour</a>
           </div>
         </details>
         <div class="nav-mobile-actions">
-          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
-          <a class="button primary" href="/playground">Run a live scan</a>
+          <a class="button secondary" href="/integrate">Integrate</a>
+          <a class="button primary" href="/playground">Run live scan</a>
         </div>
       </nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status" aria-label="Open API status"
-          ><span class="live-dot" data-health-dot aria-hidden="true"></span
-          ><span data-health-label>Checking API</span></a
+        <a class="status-pill" href="/status" aria-label="Service status: unknown" data-health-state="unknown"
+          ><span class="live-dot is-unknown" data-health-dot aria-hidden="true"></span
+          ><span data-health-label>Status unknown</span></a
         >
-        <a class="header-hire" href="/hire">Hire</a>
-        <a class="header-scan" href="/playground" aria-current="page"
-          >Run scan</a
-        >
+        <a class="header-hire" href="/integrate">Integrate</a>
+        <a class="header-scan" href="/playground">Run live scan</a>
         <button
           class="theme-toggle"
           type="button"
@@ -103,12 +113,13 @@
     <main id="main" class="page-shell site-main">
       <section class="page-hero page-hero--compact page-hero--visual">
         <div>
-          <p class="eyebrow">Free deterministic fast path</p>
-          <h1>See what happens before the agent acts.</h1>
+          <p class="eyebrow">Live product · no account required</p>
+          <h1>Put the payload at the action boundary.</h1>
           <p class="hero-text">
             Paste untrusted content, add the recipients your agent actually
-            expects, and run Warden's real deterministic fast path. The result
-            tells the integrating agent whether to continue, sanitize, or stop.
+            expects, then run Warden's deterministic fast path. The response
+            tells the caller whether to continue, review a transformed payload,
+            or withhold the proposed action.
           </p>
         </div>
         <aside class="hero-receipt hero-receipt--compact" aria-label="Example signed attestation receipt">
@@ -131,7 +142,13 @@
             Verdict independently verifiable
           </p>
           <p class="hero-receipt__note">
-            Illustrative receipt — <a href="/verify">verify a real one</a>.
+            <span
+              class="source-stamp source-stamp--illustrative"
+              data-source-state="illustrative"
+              ><strong>ILLUSTRATIVE</strong> Safe example; no request
+              sent.</span
+            >
+            <a href="/verify">Verify a real attestation</a>.
           </p>
         </aside>
       </section>
@@ -142,6 +159,7 @@
         <span>4,000-character payload cap</span>
         <span>Maximum 20 trusted recipients</span>
         <span>No thorough <code>CORPUS_MATCH</code> check</span>
+        <span>No account or wallet required</span>
       </aside>
 
       <section
@@ -178,6 +196,7 @@
           <p class="field-hint" id="demo-payload-hint">
             Press Ctrl+Enter or Cmd+Enter to run the scan without leaving the
             editor.
+            <span data-demo-character-count>0 / 4,000 characters</span>
           </p>
           <p
             class="field-error"
@@ -239,7 +258,8 @@
             </button>
           </div>
           <p class="scan-status" data-demo-status aria-live="polite">
-            Loading curated examples...
+            Curated examples are requested from this Warden instance. You can
+            write a custom payload now.
           </p>
           <div class="scan-error" data-demo-error role="alert" hidden>
             <p data-demo-error-message></p>
@@ -254,6 +274,14 @@
         </form>
 
         <div class="scan-result-panel">
+          <p
+            class="source-stamp source-stamp--unknown"
+            data-demo-source-stamp
+            data-source-state="unknown"
+            aria-live="polite"
+          >
+            <strong>UNKNOWN</strong> No scan has run for this payload.
+          </p>
           <div class="scan-empty-state" data-demo-empty>
             <p class="eyebrow">02 / Warden decision</p>
             <h2>Ready at the action boundary.</h2>
@@ -274,8 +302,8 @@
             <div class="verdict-summary" data-demo-verdict-panel>
               <p class="eyebrow">02 / Recommended next action</p>
               <div class="verdict-heading-row">
-                <h2 id="demo-result-heading" data-demo-verdict>Waiting</h2>
-                <span class="status-label" data-demo-risk>--</span>
+                <h2 id="demo-result-heading" data-demo-verdict>Not run</h2>
+                <span class="status-label" data-demo-risk>Not established</span>
               </div>
               <p class="recommended-action" data-demo-action></p>
               <p data-demo-summary></p>
@@ -290,11 +318,11 @@
 
             <section class="result-grid" aria-label="Scan facts">
               <div>
-                <span>Decision</span><strong data-demo-decision>--</strong>
+                <span>Decision</span><strong data-demo-decision>Not run</strong>
               </div>
               <div>
                 <span>Risk severity</span
-                ><strong data-demo-risk-value>--</strong>
+                ><strong data-demo-risk-value>Not established</strong>
               </div>
               <div>
                 <span>Detections</span
@@ -302,7 +330,11 @@
               </div>
               <div>
                 <span>Latency</span
-                ><strong class="num" data-demo-latency>--</strong>
+                ><strong class="num" data-demo-latency>Not measured</strong>
+              </div>
+              <div>
+                <span>Response received</span
+                ><strong class="num" data-demo-checked-at>Not run</strong>
               </div>
             </section>
 
@@ -356,22 +388,47 @@
     </main>
 
     <footer class="site-footer page-shell">
-      <div>
+      <div class="site-footer__brand">
         <strong>Warden</strong
-        ><span>The immune system of the agent economy.</span
-        ><span>Independent service listed on OKX.AI.</span>
+        ><span>Verifiable pre-action security for AI agents.</span
+        ><span>Gate the action. Keep the proof.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a
-        ><a href="/playground">Run a scan</a><a href="/gauntlet">Gauntlet</a
-        ><a href="/showcase">Walkthrough</a
-        ><a href="/docs">Docs</a><a href="/badges">Audit badges</a
-        ><a href="/status">API status</a><a href="/privacy">Privacy</a
-        ><a href="/terms">Terms</a
-        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Product</span>
+          <a href="/">Overview</a><a href="/playground">Live Playground</a
+          ><a href="/theater">Attack Theater</a
+          ><a href="/hire">Use Warden</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Developers</span>
+          <a href="/integrate#sdk-first">5-Minute Quickstart</a
+          ><a href="/integrate">Integrations</a
+          ><a href="/docs">Documentation</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Evidence</span>
+          <a href="/verify">Verify an Attestation</a
+          ><a href="/apa/log">Transparency Log</a
+          ><a href="/badges">Endpoint Audit Records</a
+          ><a href="/agents">Marketplace Evidence Index</a
+          ><a href="/status">Service Status</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Research</span>
+          <a href="/gauntlet">Gauntlet</a
+          ><a href="/agents#methodology">Methodology</a
+          ><a href="/showcase">Product Tour</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Policy</span>
+          <a href="/trust">Trust &amp; Security</a
+          ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
+          ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        </div>
       </nav>
     </footer>
-    <script src="/app.js?v=65a484d3" defer></script>
+    <script src="/app.js?v=5c7f3a4c" defer></script>
     <script src="/scan-client.js" defer></script>
     <script src="/playground.js" defer></script>
   </body>

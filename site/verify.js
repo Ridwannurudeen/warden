@@ -566,6 +566,7 @@
       response = await fetchImpl(endpoint, {
         headers: { accept: "application/json" },
         cache: "no-store",
+        signal: root.AbortSignal?.timeout?.(10_000),
       });
     } catch (error) {
       throw new ApaVerifierError(
@@ -609,6 +610,63 @@
       issuerRequest,
     ]);
     return { attestation, issuerDocument };
+  }
+
+  async function loadLatestAvailableAttestation(entries, fetchImpl) {
+    if (!Array.isArray(entries)) {
+      throw new ApaVerifierError(
+        "Transparency-log lookup did not return an entry list",
+        { kind: "parser" },
+      );
+    }
+    const seen = new Set();
+    let candidateFound = false;
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      const entry = entries[index];
+      const attestationId = entry?.attestation_id;
+      if (
+        typeof attestationId !== "string" ||
+        !ATTESTATION_ID.test(attestationId) ||
+        seen.has(attestationId)
+      ) {
+        continue;
+      }
+      candidateFound = true;
+      seen.add(attestationId);
+      try {
+        const envelope = await fetchJson(
+          `/apa/attestation/${attestationId}`,
+          fetchImpl,
+        );
+        const attestation = extractAttestation(envelope);
+        if (attestation.attestation_id !== attestationId) {
+          throw new ApaVerifierError(
+            "The public attestation did not match its transparency-log identifier",
+            { kind: "parser" },
+          );
+        }
+        return { attestation, entry };
+      } catch (error) {
+        if (
+          error instanceof ApaVerifierError &&
+          error.kind === "http" &&
+          error.status === 404
+        ) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    if (!candidateFound) {
+      throw new ApaVerifierError(
+        "The public log contains no APA attestation to load",
+        { kind: "network" },
+      );
+    }
+    throw new ApaVerifierError(
+      "Logged APA identifiers are currently unavailable from the public attestation endpoint. Use the dated signed reference sample instead",
+      { kind: "network" },
+    );
   }
 
   async function loadBreakerVerificationMaterial(certificateId, fetchImpl) {
@@ -1085,6 +1143,7 @@
     extractAttestation,
     formatUnixTime,
     loadBreakerVerificationMaterial,
+    loadLatestAvailableAttestation,
     loadVerificationMaterial,
     parseBreakerQuery,
     parseVerifierInput,
@@ -1111,12 +1170,43 @@
   const emptyPanel = document.querySelector("[data-apa-verify-empty]");
   const errorPanel = document.querySelector("[data-apa-verify-error]");
   const submitButton = form?.querySelector('button[type="submit"]');
+  const fileInput = document.querySelector("[data-apa-verify-file]");
+  const latestButtons = document.querySelectorAll("[data-apa-load-latest]");
+  const referenceButtons = document.querySelectorAll(
+    "[data-apa-verify-reference]",
+  );
+  let verificationBusy = false;
 
   function text(selector, value) {
     const element = document.querySelector(selector);
     if (element) {
       element.textContent = value;
     }
+  }
+
+  function sourceStamp(state, message) {
+    const element = document.querySelector("[data-apa-verification-source]");
+    if (!element) {
+      return;
+    }
+    element.dataset.sourceStamp = state;
+    element.className = `source-stamp source-stamp--${state}`;
+    root.WardenUI?.applySourceStamp(element, state);
+    element.textContent = `${state.toUpperCase()} · ${message}`;
+    element.setAttribute(
+      "aria-label",
+      `Source state: ${state.toUpperCase()}. ${message}`,
+    );
+  }
+
+  function verificationTime(selector) {
+    const value = new Date().toISOString();
+    const element = document.querySelector(selector);
+    if (element) {
+      element.textContent = value;
+      element.dateTime = value;
+    }
+    return value;
   }
 
   function renderBoundaries() {
@@ -1126,17 +1216,27 @@
   }
 
   function setBusy(busy) {
+    verificationBusy = busy;
     if (submitButton) {
       submitButton.disabled = busy;
       submitButton.textContent = busy
         ? "Verifying in this browser..."
         : "Verify independently";
     }
+    if (fileInput) {
+      fileInput.disabled = busy;
+    }
+    for (const button of latestButtons) {
+      button.disabled = busy;
+    }
+    for (const button of referenceButtons) {
+      button.disabled = busy;
+    }
   }
 
   function verificationMessage(verification) {
     if (verification.accepted) {
-      return "Signature, expiry, and active status all pass independent browser verification.";
+      return "Signature, expiry, and active status pass independent browser verification. This does not establish universal endpoint safety.";
     }
     if (verification.code === "signature-invalid") {
       return "No issuer key applicable at the signed verification time validates this record. The attestation is rejected.";
@@ -1147,7 +1247,14 @@
     return `The issuer signature is valid, but the signed status is ${verification.effectiveStatus}.`;
   }
 
-  function renderVerification(attestation, verification) {
+  function renderVerification(
+    attestation,
+    verification,
+    {
+      sourceState = "live",
+      sourceDescription = "browser check completed",
+    } = {},
+  ) {
     const view = attestationViewModel(attestation, verification);
     const statusLabel = document.querySelector("[data-apa-verification-label]");
     if (statusLabel) {
@@ -1180,6 +1287,8 @@
     text("[data-apa-effective-status]", view.effectiveStatus);
     text("[data-apa-verified-at]", view.verifiedAt);
     text("[data-apa-expires-at]", view.expiresAt);
+    const checkedAt = verificationTime("[data-apa-verification-time]");
+    sourceStamp(sourceState, `${sourceDescription} ${checkedAt}`);
     if (breakerResultPanel) {
       breakerResultPanel.hidden = true;
     }
@@ -1250,6 +1359,8 @@
     text("[data-breaker-log-sequence]", view.logSequence);
     text("[data-breaker-log-state]", view.logState);
     text("[data-breaker-checkpoint-head]", view.checkpointHead);
+    const checkedAt = verificationTime("[data-breaker-verification-time]");
+    sourceStamp("live", `browser check completed ${checkedAt}`);
     resultPanel.hidden = true;
     emptyPanel.hidden = true;
     errorPanel.hidden = true;
@@ -1265,6 +1376,13 @@
         : "The attestation could not be verified.",
     );
     text("[data-apa-verify-status]", "No verification result was accepted.");
+    const degraded =
+      error instanceof ApaVerifierError &&
+      ["network", "http", "unsupported"].includes(error.kind);
+    sourceStamp(
+      degraded ? "degraded" : "unknown",
+      `${degraded ? "verification unavailable" : "no result accepted"} ${new Date().toISOString()}`,
+    );
     resultPanel.hidden = true;
     if (breakerResultPanel) {
       breakerResultPanel.hidden = true;
@@ -1289,6 +1407,7 @@
       "[data-apa-verify-status]",
       "Fetching public material and verifying with WebCrypto Ed25519...",
     );
+    sourceStamp("unknown", "verification in progress");
     try {
       const resolved = parseVerifierInput(input.value, root.location.href);
       const material = await loadVerificationMaterial(
@@ -1318,6 +1437,7 @@
       "[data-apa-verify-status]",
       "Fetching the certificate, issuer keys, every transparency-log page, and the signed checkpoint...",
     );
+    sourceStamp("unknown", "BREAKER verification in progress");
     try {
       const material = await loadBreakerVerificationMaterial(
         certificateId,
@@ -1340,6 +1460,145 @@
       setBusy(false);
     }
   }
+
+  async function loadLatestPublicAttestation() {
+    if (
+      !transparencyLog ||
+      typeof transparencyLog.fetchLogPages !== "function"
+    ) {
+      renderError(
+        new ApaVerifierError("Transparency-log lookup is unavailable", {
+          kind: "unsupported",
+        }),
+      );
+      return;
+    }
+    for (const button of latestButtons) {
+      button.disabled = true;
+    }
+    sourceStamp("unknown", "finding latest public attestation");
+    text(
+      "[data-apa-verify-status]",
+      "Reading the public transparency log for its latest APA attestation...",
+    );
+    try {
+      const entries = await transparencyLog.fetchLogPages(
+        root.fetch?.bind(root),
+      );
+      const { attestation, entry } = await loadLatestAvailableAttestation(
+        entries,
+        root.fetch?.bind(root),
+      );
+      input.value = JSON.stringify(attestation, null, 2);
+      text(
+        "[data-apa-file-status]",
+        `Loaded public attestation ${attestation.attestation_id} from log entry ${entry.seq}. Verification will use these exact public bytes.`,
+      );
+      form.requestSubmit();
+    } catch (error) {
+      renderError(error);
+    } finally {
+      if (!verificationBusy) {
+        for (const button of latestButtons) {
+          button.disabled = false;
+        }
+      }
+    }
+  }
+
+  async function verifySignedReference() {
+    const material = root.WardenHomeProof?.referenceMaterial?.();
+    if (!material?.attestation || !material?.issuerDocument) {
+      renderError(
+        new ApaVerifierError("The signed reference sample is unavailable", {
+          kind: "unsupported",
+        }),
+      );
+      return;
+    }
+    setBusy(true);
+    errorPanel.hidden = true;
+    text(
+      "[data-apa-verify-status]",
+      "Verifying the dated signed reference with WebCrypto Ed25519...",
+    );
+    sourceStamp("dated", "reference verification in progress");
+    try {
+      const verification = await verifyApaAttestation(
+        material.attestation,
+        material.issuerDocument,
+      );
+      input.value = JSON.stringify(material.attestation, null, 2);
+      renderVerification(material.attestation, verification, {
+        sourceState: "dated",
+        sourceDescription: "embedded signed reference checked",
+      });
+      text(
+        "[data-apa-file-status]",
+        "The embedded signed reference was generated on 14 July 2026 and checked locally. It is archival evidence, not a current endpoint claim.",
+      );
+      text(
+        "[data-apa-verify-status]",
+        "Dated reference verification complete.",
+      );
+    } catch (error) {
+      renderError(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadJsonFile(file) {
+    if (!file) {
+      return;
+    }
+    if (file.size > 256 * 1024) {
+      renderError(
+        new ApaVerifierError("JSON files must not exceed 256 KiB", {
+          kind: "input",
+        }),
+      );
+      return;
+    }
+    try {
+      input.value = await file.text();
+      text(
+        "[data-apa-file-status]",
+        `${file.name} loaded locally (${file.size.toLocaleString("en-US")} bytes). Select Verify independently to check it.`,
+      );
+      sourceStamp("unknown", "local file loaded; verification not run");
+      errorPanel.hidden = true;
+    } catch (error) {
+      renderError(
+        new ApaVerifierError("The selected JSON file could not be read", {
+          kind: "input",
+          cause: error,
+        }),
+      );
+    }
+  }
+
+  for (const button of latestButtons) {
+    button.addEventListener("click", loadLatestPublicAttestation);
+  }
+  for (const button of referenceButtons) {
+    button.addEventListener("click", verifySignedReference);
+  }
+  fileInput?.addEventListener("change", () => {
+    void loadJsonFile(fileInput.files?.[0]);
+  });
+  form.addEventListener("dragover", (event) => {
+    if (event.dataTransfer?.types.includes("Files")) {
+      event.preventDefault();
+    }
+  });
+  form.addEventListener("drop", (event) => {
+    const file = event.dataTransfer?.files?.[0];
+    if (file) {
+      event.preventDefault();
+      void loadJsonFile(file);
+    }
+  });
 
   try {
     const breakerId = parseBreakerQuery(root.location.search);

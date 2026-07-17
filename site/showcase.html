@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="A controlled 90-second demonstration of Warden stopping a poisoned payment instruction before wallet execution."
+      content="A six-scene product tour of Warden evaluating a poisoned payment instruction before any wallet call."
     />
     <meta name="color-scheme" content="dark light" />
-    <title>Walkthrough | Warden</title>
+    <title>Product Tour | Warden</title>
     <link rel="canonical" href="https://warden.gudman.xyz/showcase" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Warden" />
-    <meta property="og:title" content="Warden Walkthrough" />
+    <meta property="og:title" content="Warden Product Tour" />
     <meta
       property="og:description"
-      content="Watch a poisoned payment instruction stop at Warden's deterministic action gate."
+      content="Follow untrusted output through Warden's action boundary, verdict, and evidence surfaces."
     />
     <meta property="og:url" content="https://warden.gudman.xyz/showcase" />
     <meta
@@ -29,7 +29,7 @@
     />
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
+    <link rel="stylesheet" href="/styles.css?v=96b93423" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -55,37 +55,49 @@
         <details class="nav-group">
           <summary>Product</summary>
           <div class="nav-menu">
-            <a href="/playground">Playground</a>
+            <a href="/">Overview</a>
+            <a href="/playground">Live Playground</a>
             <a href="/theater">Attack Theater</a>
-            <a href="/agents">Marketplace index</a>
+            <a href="/hire">Use Warden</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Developers</summary>
           <div class="nav-menu">
+            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+            <a href="/integrate">Integrations</a>
             <a href="/docs">Documentation</a>
-            <a href="/integrate">Integrate</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Evidence</summary>
           <div class="nav-menu">
-            <a href="/verify">Verify APA</a>
-            <a href="/apa/log">Transparency log</a>
-            <a href="/trust">Trust Layer</a>
+            <a href="/verify">Verify an Attestation</a>
+            <a href="/apa/log">Transparency Log</a>
+            <a href="/badges">Endpoint Audit Records</a>
+            <a href="/agents">Marketplace Evidence Index</a>
+            <a href="/status">Service Status</a>
+          </div>
+        </details>
+        <details class="nav-group has-current">
+          <summary>Research</summary>
+          <div class="nav-menu">
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/agents#methodology">Methodology</a>
+            <a href="/showcase" aria-current="page">Product Tour</a>
           </div>
         </details>
         <div class="nav-mobile-actions">
-          <a class="button secondary" href="/hire">Hire on OKX.AI</a
-          ><a class="button primary" href="/playground">Run a live scan</a>
+          <a class="button secondary" href="/integrate">Integrate</a
+          ><a class="button primary" href="/playground">Run live scan</a>
         </div>
       </nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status" aria-label="Open API status"
-          ><span class="live-dot" data-health-dot aria-hidden="true"></span
-          ><span data-health-label>Checking API</span></a
-        ><a class="header-hire" href="/hire">Hire</a
-        ><a class="header-scan" href="/playground">Run scan</a
+        <a class="status-pill" href="/status" aria-label="Service status: unknown" data-health-state="unknown"
+          ><span class="live-dot is-unknown" data-health-dot aria-hidden="true"></span
+          ><span data-health-label>Status unknown</span></a
+        ><a class="header-hire" href="/integrate">Integrate</a
+        ><a class="header-scan" href="/playground">Run live scan</a
         ><button
           class="theme-toggle"
           type="button"
@@ -97,14 +109,20 @@
       </div>
     </header>
 
-    <main id="main" class="page-shell site-main showcase-main" data-showcase>
+    <main
+      id="main"
+      class="page-shell site-main showcase-main"
+      data-showcase
+      aria-keyshortcuts="ArrowLeft ArrowRight"
+    >
       <section class="showcase-header">
         <div>
-          <p class="eyebrow">Guided walkthrough · six scenes · no payment</p>
-          <h1>One poisoned instruction. One stopped action.</h1>
+          <p class="eyebrow">Product Tour · six scenes · no payment</p>
+          <h1>Follow unsafe output from instruction to verdict.</h1>
           <p class="hero-text">
-            A controlled walkthrough of Warden's runtime boundary, using the
-            real free demo API only after you activate it.
+            One poisoned instruction. One explicit verdict. This guided tour
+            uses the real free demo API only after you activate it and never
+            calls a wallet.
           </p>
         </div>
         <div class="showcase-settings">
@@ -117,7 +135,10 @@
         </div>
       </section>
 
-      <ol class="showcase-progress" aria-label="Showcase progress">
+      <ol
+        class="showcase-progress showcase-progress--sticky"
+        aria-label="Product Tour progress"
+      >
         <li data-showcase-step="0"><span>01</span>Poisoned output</li>
         <li data-showcase-step="1"><span>02</span>Trusted context</li>
         <li data-showcase-step="2"><span>03</span>Action gate</li>
@@ -132,12 +153,19 @@
         <section class="showcase-scene" data-showcase-scene="0">
           <div class="scene-copy">
             <p class="eyebrow">Scene 01 · Example input</p>
+            <p
+              class="source-stamp source-stamp--illustrative"
+              data-source-state="illustrative"
+            >
+              <strong>ILLUSTRATIVE</strong> Safe staged input; no request sent.
+            </p>
             <h2>An external service returns a new payment recipient.</h2>
             <p>
               The response looks operational, but its recipient was supplied by
               untrusted text after the agent had already established a
               legitimate settlement address.
             </p>
+            <a href="/playground">Open the Live Playground</a>
           </div>
           <div class="scene-artifact scene-payload">
             <span class="console-label">Incoming service output · example</span>
@@ -150,12 +178,20 @@
         <section class="showcase-scene" data-showcase-scene="1" hidden>
           <div class="scene-copy">
             <p class="eyebrow">Scene 02 · Trusted context</p>
+            <p
+              class="source-stamp source-stamp--illustrative"
+              data-source-state="illustrative"
+            >
+              <strong>ILLUSTRATIVE</strong> Trusted and untrusted values shown
+              side by side.
+            </p>
             <h2>The operator already knows the intended recipient.</h2>
             <p>
               Warden receives the exact untrusted payload plus the smallest
               useful piece of trusted policy context. It does not ask a model to
               guess which address is correct.
             </p>
+            <a href="/docs/drain-address">Inspect the detector boundary</a>
           </div>
           <div class="recipient-compare">
             <div>
@@ -173,6 +209,13 @@
         <section class="showcase-scene" data-showcase-scene="2" hidden>
           <div class="scene-copy">
             <p class="eyebrow">Scene 03 · Explicit live action</p>
+            <p
+              class="source-stamp source-stamp--unknown"
+              data-showcase-request-source
+              data-source-state="unknown"
+            >
+              <strong>UNKNOWN</strong> No verdict exists until you run the scan.
+            </p>
             <h2>Run the real deterministic fast path.</h2>
             <p>
               This button calls <code>POST /api/demo/scan</code>. It does not
@@ -192,7 +235,7 @@
                 data-showcase-fallback
                 hidden
               >
-                Use labeled example fallback
+                Use illustrative example
               </button>
             </div>
             <p
@@ -204,6 +247,7 @@
             >
               The scan runs only when you activate the button.
             </p>
+            <a href="/playground">Open the complete scan workspace</a>
           </div>
           <div class="showcase-gate" aria-label="Warden action gate">
             <span class="gate-rail gate-rail--left" aria-hidden="true"></span>
@@ -217,11 +261,25 @@
 
         <section class="showcase-scene" data-showcase-scene="3" hidden>
           <div class="scene-copy">
-            <p class="eyebrow" data-showcase-result-source>Result</p>
-            <h2>The instruction stops before wallet execution.</h2>
+            <p
+              class="source-stamp source-stamp--unknown"
+              data-showcase-result-source
+              data-showcase-source-stamp
+              data-source-state="unknown"
+            >
+              <strong>UNKNOWN</strong> Result not established.
+            </p>
+            <h2>Warden returns BLOCK; this tour does not invoke a wallet.</h2>
             <p data-showcase-recommendation>
               Block the transfer and verify the intended recipient.
             </p>
+            <p class="inline-notice">
+              <strong>Proof boundary:</strong> LIVE verdict; no wallet or
+              downstream action was invoked. ILLUSTRATIVE verdicts are safe
+              local examples. Caller-side withholding is a recommended
+              integration action, not a receipt from this tour.
+            </p>
+            <a href="/verify">Open the attestation verifier</a>
           </div>
           <div
             class="showcase-result"
@@ -238,8 +296,8 @@
                 <dd data-showcase-risk>CRITICAL</dd>
               </div>
               <div>
-                <dt>Prevented action</dt>
-                <dd>Transfer to payload-supplied address</dd>
+                <dt>Recommended caller action</dt>
+                <dd>Withhold transfer to payload-supplied address</dd>
               </div>
               <div>
                 <dt>Sanitized output</dt>
@@ -262,6 +320,13 @@
         <section class="showcase-scene" data-showcase-scene="4" hidden>
           <div class="scene-copy">
             <p class="eyebrow">Scene 05 · Production path</p>
+            <p
+              class="source-stamp source-stamp--illustrative"
+              data-source-state="illustrative"
+            >
+              <strong>ILLUSTRATIVE</strong> Integration sequence; no wallet
+              action is performed here.
+            </p>
             <h2>Place the same decision contract before the next action.</h2>
             <p>
               Builders can call Warden through a reviewable OKX task, raw x402,
@@ -315,6 +380,13 @@
         >
           <div class="scene-copy">
             <p class="eyebrow">Scene 06 · Honest evidence</p>
+            <p
+              class="source-stamp source-stamp--unknown"
+              data-product-proof-status
+              data-source-state="unknown"
+            >
+              <strong>UNKNOWN</strong> Dated product proof has not resolved.
+            </p>
             <h2>Runtime control, with the limits visible.</h2>
             <p>
               Warden complements listing-time review. Public-text signals do not
@@ -323,13 +395,15 @@
             </p>
             <div class="hero-actions">
               <a class="button primary button--hero" href="/playground"
-                >Put Warden before the next action</a
+                >Run a live scan</a
+              ><a class="button secondary" href="/trust"
+                >Inspect the trust architecture</a
               >
             </div>
           </div>
           <div class="boundary-checklist">
             <div>
-              <strong data-proof-field="corpus-total">—</strong
+              <strong data-proof-field="corpus-total">Not resolved</strong
               ><span>versioned corpus cases</span>
             </div>
             <div><strong>11</strong><span>documented reason codes</span></div>
@@ -342,7 +416,7 @@
         </section>
       </div>
 
-      <nav class="showcase-controls" aria-label="Showcase controls">
+      <nav class="showcase-controls" aria-label="Product Tour controls">
         <button class="button secondary" type="button" data-showcase-previous>
           Previous scene</button
         ><button class="button primary" type="button" data-showcase-next>
@@ -352,22 +426,47 @@
     </main>
 
     <footer class="site-footer page-shell">
-      <div>
+      <div class="site-footer__brand">
         <strong>Warden</strong
-        ><span>The immune system of the agent economy.</span
-        ><span>Independent service listed on OKX.AI.</span>
+        ><span>Verifiable pre-action security for AI agents.</span
+        ><span>Gate the action. Keep the proof.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a
-        ><a href="/playground">Run a scan</a><a href="/gauntlet">Gauntlet</a
-        ><a href="/showcase" aria-current="page">Walkthrough</a
-        ><a href="/docs">Docs</a><a href="/badges">Audit badges</a
-        ><a href="/status">API status</a><a href="/privacy">Privacy</a
-        ><a href="/terms">Terms</a
-        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Product</span>
+          <a href="/">Overview</a><a href="/playground">Live Playground</a
+          ><a href="/theater">Attack Theater</a
+          ><a href="/hire">Use Warden</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Developers</span>
+          <a href="/integrate#sdk-first">5-Minute Quickstart</a
+          ><a href="/integrate">Integrations</a
+          ><a href="/docs">Documentation</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Evidence</span>
+          <a href="/verify">Verify an Attestation</a
+          ><a href="/apa/log">Transparency Log</a
+          ><a href="/badges">Endpoint Audit Records</a
+          ><a href="/agents">Marketplace Evidence Index</a
+          ><a href="/status">Service Status</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Research</span>
+          <a href="/gauntlet">Gauntlet</a
+          ><a href="/agents#methodology">Methodology</a
+          ><a href="/showcase">Product Tour</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Policy</span>
+          <a href="/trust">Trust &amp; Security</a
+          ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
+          ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        </div>
       </nav>
     </footer>
-    <script src="/app.js?v=65a484d3" defer></script>
+    <script src="/app.js?v=5c7f3a4c" defer></script>
     <script src="/scan-client.js" defer></script>
     <script src="/showcase.js" defer></script>
   </body>

@@ -259,18 +259,164 @@
     return value?.status === "ok";
   }
 
+  const SOURCE_STAMP_PRESENTATIONS = Object.freeze({
+    LIVE: Object.freeze({
+      label: "LIVE",
+      description: "Observed live in this browser session.",
+    }),
+    DATED: Object.freeze({
+      label: "DATED",
+      description: "Dated snapshot; not a live claim.",
+    }),
+    ILLUSTRATIVE: Object.freeze({
+      label: "ILLUSTRATIVE",
+      description: "Illustrative example; not observed evidence.",
+    }),
+    DEGRADED: Object.freeze({
+      label: "DEGRADED",
+      description: "Source is incomplete or currently degraded.",
+    }),
+    UNKNOWN: Object.freeze({
+      label: "UNKNOWN",
+      description: "Source state has not been established.",
+    }),
+  });
+
+  function sourceStampPresentation(value) {
+    const state =
+      typeof value === "string" ? value.trim().toUpperCase() : "UNKNOWN";
+    const presentation =
+      SOURCE_STAMP_PRESENTATIONS[state] ||
+      SOURCE_STAMP_PRESENTATIONS.UNKNOWN;
+    return {
+      state: presentation.label,
+      label: presentation.label,
+      description: presentation.description,
+    };
+  }
+
+  function applySourceStamp(element, value) {
+    if (!element?.dataset) {
+      return null;
+    }
+    const presentation = sourceStampPresentation(
+      value || element.dataset.sourceState || element.dataset.sourceStamp,
+    );
+    element.dataset.sourceState = presentation.state;
+    element.dataset.sourceStamp = presentation.state;
+    const modifierClasses = Object.keys(SOURCE_STAMP_PRESENTATIONS).map(
+      (state) => `source-stamp--${state.toLowerCase()}`,
+    );
+    element.classList?.remove(...modifierClasses);
+    element.classList?.add(
+      `source-stamp--${presentation.state.toLowerCase()}`,
+    );
+    const label = element.querySelector?.("[data-source-stamp-label]");
+    if (label) {
+      label.textContent = presentation.label;
+    }
+    if (
+      !element.getAttribute?.("aria-label") ||
+      element.dataset.sourceAriaManaged === "true"
+    ) {
+      element.setAttribute?.(
+        "aria-label",
+        `Source state: ${presentation.label}. ${presentation.description}`,
+      );
+      element.dataset.sourceAriaManaged = "true";
+    }
+    return presentation;
+  }
+
+  const ASYNC_PANEL_STATES = new Set([
+    "idle",
+    "loading",
+    "ready",
+    "empty",
+    "error",
+    "degraded",
+    "unknown",
+  ]);
+
+  function normalizeAsyncPanelState(value) {
+    const state =
+      typeof value === "string" ? value.trim().toLowerCase() : "unknown";
+    return ASYNC_PANEL_STATES.has(state) ? state : "unknown";
+  }
+
+  function applyAsyncPanelState(element, value, message) {
+    if (!element?.dataset) {
+      return null;
+    }
+    const state = normalizeAsyncPanelState(value);
+    element.dataset.state = state;
+    element.dataset.asyncState = state;
+    if (state === "loading") {
+      element.setAttribute?.("aria-busy", "true");
+    } else {
+      element.removeAttribute?.("aria-busy");
+    }
+    const status = element.querySelector?.("[data-async-status]");
+    if (status && typeof message === "string") {
+      status.textContent = message;
+    }
+    return state;
+  }
+
+  function healthStatusPresentation(value, detailed) {
+    if (value === "live") {
+      return {
+        state: "live",
+        label: detailed ? "API ok" : "API live",
+        ariaLabel: "API status: live",
+        dotClass: "is-ok",
+      };
+    }
+    if (value === "unavailable") {
+      return {
+        state: "unavailable",
+        label: "API unavailable",
+        ariaLabel: "API status: unavailable",
+        dotClass: "is-offline",
+      };
+    }
+    return {
+      state: "unknown",
+      label: detailed ? "API status unknown" : "Status unknown",
+      ariaLabel: "Service status: unknown",
+      dotClass: "is-unknown",
+    };
+  }
+
+  function homeProofEvidence(result, checkedAt) {
+    return {
+      attestationId: result.material.attestation.attestation_id,
+      chainHead: result.honestChain.headHash,
+      tamperIndex: `Entry ${result.tamper.entryIndex + 1}`,
+      keyId: result.material.issuerDocument.keys[0].kid,
+      freshness: result.attestation.freshness,
+      checkedAt,
+    };
+  }
+
   const api = {
+    applyAsyncPanelState,
+    applySourceStamp,
     catalogServiceByKey,
     copyButtonBaseLabel,
     cycleFocusIndex,
     focusStatusTarget,
+    healthStatusPresentation,
+    homeProofEvidence,
     isHealthyResponse,
     isOutsideNavigationPointer,
     marketplaceCoverageText,
+    normalizeAsyncPanelState,
     normalizeEvidenceCount,
     normalizeMarketplaceSummary,
     normalizeProductProof,
     resolveTheme,
+    sourceStampPresentation,
     summaryToRestoreOnEscape,
   };
   if (typeof module !== "undefined" && module.exports) {
@@ -284,6 +430,15 @@
 
   const document = root.document;
   document.documentElement.classList.add("js-enabled");
+
+  for (const stamp of document.querySelectorAll(
+    "[data-source-stamp], .source-stamp[data-source-state]",
+  )) {
+    applySourceStamp(stamp);
+  }
+  for (const panel of document.querySelectorAll("[data-async-panel]")) {
+    applyAsyncPanelState(panel, panel.dataset.state || "unknown");
+  }
 
   const prefersReducedMotion =
     root.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
@@ -366,6 +521,7 @@
   const navToggle = document.querySelector("[data-nav-toggle]");
   const siteNav = document.querySelector("[data-site-nav]");
   if (navToggle && siteNav) {
+    siteNav.dataset.state = "closed";
     const navClose = document.createElement("button");
     navClose.className = "nav-close";
     navClose.type = "button";
@@ -395,6 +551,7 @@
 
     function setNavigation(open, restoreFocus) {
       siteNav.classList.toggle("is-open", open);
+      siteNav.dataset.state = open ? "open" : "closed";
       document.body.classList.toggle("nav-open", open);
       navToggle.setAttribute("aria-expanded", String(open));
       setNavigationIsolation(open);
@@ -486,6 +643,28 @@
     document.querySelectorAll("[data-health-label]"),
   );
   const healthDots = Array.from(document.querySelectorAll("[data-health-dot]"));
+
+  function renderHealthStatus(state) {
+    for (const label of healthLabels) {
+      const presentation = healthStatusPresentation(
+        state,
+        label.dataset.healthDetail === "full",
+      );
+      label.textContent = presentation.label;
+      const link = label.closest("a");
+      if (link) {
+        link.dataset.healthState = presentation.state;
+        link.setAttribute("aria-label", presentation.ariaLabel);
+      }
+    }
+    for (const dot of healthDots) {
+      const presentation = healthStatusPresentation(state, false);
+      dot.classList.remove("is-unknown", "is-ok", "is-offline");
+      dot.classList.add(presentation.dotClass);
+    }
+  }
+
+  renderHealthStatus("unknown");
   if (
     !document.querySelector("[data-status-page]") &&
     (healthLabels.length || healthDots.length)
@@ -505,27 +684,10 @@
         if (!isHealthyResponse(health)) {
           throw new Error("Malformed health response");
         }
-        for (const label of healthLabels) {
-          label.textContent =
-            label.dataset.healthDetail === "full"
-              ? `API ${health.status}`
-              : "API live";
-          label.closest("a")?.setAttribute("aria-label", "API status: live");
-        }
-        for (const dot of healthDots) {
-          dot.classList.add("is-ok");
-        }
+        renderHealthStatus("live");
       })
       .catch(() => {
-        for (const label of healthLabels) {
-          label.textContent = "API unavailable";
-          label
-            .closest("a")
-            ?.setAttribute("aria-label", "API status: unavailable");
-        }
-        for (const dot of healthDots) {
-          dot.classList.add("is-offline");
-        }
+        renderHealthStatus("unavailable");
       });
   }
 
@@ -569,13 +731,16 @@
         }
         productProof.dataset.state = "ready";
         if (productProofStatus) {
-          productProofStatus.textContent = `Dated product proof loaded · ${proof.verifiedAt}`;
+          applySourceStamp(productProofStatus, "DATED");
+          productProofStatus.textContent = `DATED · product proof loaded ${proof.verifiedAt}`;
         }
       })
       .catch(() => {
         productProof.dataset.state = "unavailable";
         if (productProofStatus) {
-          productProofStatus.textContent = "Dated product proof unavailable";
+          applySourceStamp(productProofStatus, "DEGRADED");
+          productProofStatus.textContent =
+            "DEGRADED · dated product proof unavailable";
         }
       });
   }
@@ -620,11 +785,15 @@
       })
       .catch(() => {
         evalStats.dataset.state = "unavailable";
+        const unavailableCopy = {
+          recall: "Recall unavailable",
+          "fp-rate": "False-positive rate unavailable",
+          "benign-cases": "Evaluation corpus unavailable",
+        };
         for (const element of evalStats.querySelectorAll("[data-eval-stat]")) {
           element.textContent =
-            element.dataset.evalStat === "benign-cases"
-              ? "Evaluation snapshot unavailable"
-              : "—";
+            unavailableCopy[element.dataset.evalStat] ||
+            "Evaluation metric unavailable";
         }
       });
   }
@@ -646,6 +815,9 @@
     const tamperIndex = proofRoot.querySelector(
       "[data-home-proof-tamper-index]",
     );
+    const keyId = proofRoot.querySelector("[data-home-proof-key-id]");
+    const freshness = proofRoot.querySelector("[data-home-proof-freshness]");
+    const checkedAt = proofRoot.querySelector("[data-home-proof-checked-at]");
     if (!runButton || !status) {
       return;
     }
@@ -688,15 +860,24 @@
         renderCheck(tamper, presentation.tamperedChain);
         status.textContent = presentation.summary;
         proofRoot.dataset.state = presentation.passed ? "verified" : "rejected";
+        const evidence = homeProofEvidence(result, new Date().toISOString());
         if (attestationId) {
-          attestationId.textContent =
-            result.material.attestation.attestation_id;
+          attestationId.textContent = evidence.attestationId;
         }
         if (chainHead) {
-          chainHead.textContent = result.honestChain.headHash;
+          chainHead.textContent = evidence.chainHead;
         }
         if (tamperIndex) {
-          tamperIndex.textContent = `Entry ${result.tamper.entryIndex + 1}`;
+          tamperIndex.textContent = evidence.tamperIndex;
+        }
+        if (keyId) {
+          keyId.textContent = evidence.keyId;
+        }
+        if (freshness) {
+          freshness.textContent = evidence.freshness;
+        }
+        if (checkedAt) {
+          checkedAt.textContent = evidence.checkedAt;
         }
       } catch (error) {
         proofRoot.dataset.state = "error";
@@ -719,6 +900,7 @@
   const serviceCatalog = document.querySelector("[data-service-catalog]");
   if (serviceCatalog) {
     const serviceSnapshot = document.querySelector("[data-service-snapshot]");
+    const serviceStamp = document.querySelector("[data-service-stamp]");
     root
       .fetch("/data/warden-services.json", {
         headers: { accept: "application/json" },
@@ -751,17 +933,20 @@
         if (serviceSnapshot) {
           serviceSnapshot.textContent = `Catalog snapshot ${catalog.snapshotFetchedAt}`;
         }
+        applySourceStamp(serviceStamp, "DATED");
       })
       .catch(() => {
         serviceCatalog.dataset.snapshot = "dated-fallback";
         if (serviceSnapshot) {
           serviceSnapshot.textContent = `Committed catalog snapshot ${serviceSnapshot.dataset.fallbackSnapshot}`;
         }
+        applySourceStamp(serviceStamp, "DEGRADED");
       });
   }
 
   const homeBadgeCount = document.querySelector("[data-home-badge-count]");
   const homeBadgeSource = document.querySelector("[data-home-badge-source]");
+  const homeBadgeStamp = document.querySelector("[data-home-badge-stamp]");
   if (homeBadgeCount) {
     root
       .fetch("/api/badges", {
@@ -782,17 +967,20 @@
         if (homeBadgeSource) {
           homeBadgeSource.textContent = "Live signed-record registry";
         }
+        applySourceStamp(homeBadgeStamp, "LIVE");
       })
       .catch(() => {
-        homeBadgeCount.textContent = "—";
+        homeBadgeCount.textContent = "Unavailable";
         if (homeBadgeSource) {
           homeBadgeSource.textContent = "Live registry unavailable";
         }
+        applySourceStamp(homeBadgeStamp, "DEGRADED");
       });
   }
 
   const homeBypassCount = document.querySelector("[data-home-bypass-count]");
   const homeBypassSource = document.querySelector("[data-home-bypass-source]");
+  const homeBypassStamp = document.querySelector("[data-home-bypass-stamp]");
   if (homeBypassCount) {
     root
       .fetch("/api/demo/gauntlet/stats", {
@@ -813,12 +1001,14 @@
         if (homeBypassSource) {
           homeBypassSource.textContent = "Live human-confirmed Gauntlet count";
         }
+        applySourceStamp(homeBypassStamp, "LIVE");
       })
       .catch(() => {
-        homeBypassCount.textContent = "—";
+        homeBypassCount.textContent = "Unavailable";
         if (homeBypassSource) {
           homeBypassSource.textContent = "Live Gauntlet count unavailable";
         }
+        applySourceStamp(homeBypassStamp, "DEGRADED");
       });
   }
 

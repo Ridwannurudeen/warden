@@ -75,6 +75,10 @@ def _initials(name: str) -> str:
     return f"{words[0][0]}{words[1][0]}".upper()
 
 
+def _language_attribute(value: object) -> str:
+    return ' lang="und"' if any(ord(character) > 127 for character in str(value)) else ""
+
+
 def _number(value: int | None) -> str:
     return "Not reported" if value is None else f"{value:,}"
 
@@ -392,13 +396,13 @@ def _render_services(indexed: IndexedAgent) -> str:
         rows.append(
             f"""<article class="service-card">
   <p class="eyebrow">Service #{_escape(service.service_id)}</p>
-  <h3>{_escape(service.service_name or "Unnamed service")}</h3>
+  <h3{_language_attribute(service.service_name)}>{_escape(service.service_name or "Unnamed service")}</h3>
   <dl class="data-list">
     <div><dt>Type</dt><dd>{_escape(service.service_type or "Not reported")}</dd></div>
     <div><dt>Fee amount</dt><dd class="num">{fee}</dd></div>
     <div><dt>Endpoint</dt><dd><code>{endpoint}</code></dd></div>
   </dl>
-  <p>{_escape(service.service_description or "No public service description.")}</p>
+  <p{_language_attribute(service.service_description)}>{_escape(service.service_description or "No public service description.")}</p>
 </article>"""
         )
     return "".join(rows)
@@ -466,9 +470,11 @@ def _render_agent_page(
 <section class="agent-hero">
   <div class="agent-avatar" aria-hidden="true">{_escape(_initials(agent.name))}</div>
   <div>
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><a href="/agents">Marketplace Evidence Index</a><span aria-hidden="true">/</span><span>Agent #{_escape(agent.agent_id)}</span></nav>
     <p class="eyebrow">Marketplace agent #{_escape(agent.agent_id)}</p>
-    <h1>{_escape(agent.name or "Unnamed agent")}</h1>
-    <p class="hero-text">{_escape(agent.profile_description or "No public profile description.")}</p>
+    <h1{_language_attribute(agent.name)}>{_escape(agent.name or "Unnamed agent")}</h1>
+    <p class="hero-text"{_language_attribute(agent.profile_description)}>{_escape(agent.profile_description or "No public profile description.")}</p>
+    <span class="source-stamp" data-source-stamp="DATED"><span data-source-stamp-label>DATED</span></span>
     <p class="source-link">{avatar_link} | <a href="https://www.okx.ai/" rel="noreferrer">Open OKX.AI and search Agent #{_escape(agent.agent_id)}</a></p>
   </div>
 </section>
@@ -507,10 +513,11 @@ def _render_agent_page(
 <p class="snapshot-note">{_escape(_coverage_text(coverage))}</p>
 """
     return page_shell(
-        f"{agent.name or 'Unnamed agent'} | Warden Security Index",
+        f"{agent.name or 'Unnamed agent'} · Agent #{agent.agent_id} | Warden Marketplace Evidence Index",
         f"Public listing-text scan for OKX.AI Agent #{agent.agent_id}.",
         body,
         active="agents",
+        body_class="page-archetype--marketplace",
         canonical_path=f"/agents/{agent.agent_id}",
     )
 
@@ -548,6 +555,7 @@ def _render_index_page(
             if agent.agent_id in attested_agent_ids
             else "No linked APA guard proof"
         )
+        apa_state = "attested" if agent.agent_id in attested_agent_ids else "not-attested"
         categories_text = ", ".join(agent.category_codes) or "Uncategorized"
         category_data = "|".join(agent.category_codes)
         search_text = " ".join(
@@ -586,8 +594,8 @@ def _render_index_page(
             f"{buyer_review_label}: {_buyer_review(agent.security_rate)}"
         )
         rows.append(
-            f"""<a class="agent-row" href="/agents/{_escape(agent.agent_id)}" aria-label="{_escape(row_label)}" data-agent-row data-search="{_escape(search_text)}" data-category="{_escape(category_data)}" data-match="{match_state}" data-audit="{audit_state}" data-name="{_escape(agent.name.casefold())}" data-agent-id="{_escape(agent.agent_id)}" data-sold="{sold_sort}" data-review="{review_sort}">
-  <span><strong>{_escape(agent.name or "Unnamed agent")}</strong><small>Agent #{_escape(agent.agent_id)}</small></span>
+            f"""<a class="agent-row" href="/agents/{_escape(agent.agent_id)}" aria-label="{_escape(row_label)}" data-agent-row data-search="{_escape(search_text)}" data-category="{_escape(category_data)}" data-match="{match_state}" data-audit="{audit_state}" data-apa="{apa_state}" data-name="{_escape(agent.name.casefold())}" data-agent-id="{_escape(agent.agent_id)}" data-sold="{sold_sort}" data-review="{review_sort}">
+  <span><strong{_language_attribute(agent.name)}>{_escape(agent.name or "Unnamed agent")}</strong><small>Agent #{_escape(agent.agent_id)}</small></span>
   <span data-label="Category">{_escape(categories_text)}</span>
   <span class="num" data-label="{_escape(sold_label)}">{_number(agent.sold_count)}</span>
   <span data-label="Public text"><strong>{_escape(public_text_label)}</strong><small>{_escape(indexed.verdict or "NOT_SCANNED")}</small></span>
@@ -599,9 +607,19 @@ def _render_index_page(
     agent_label = "agent" if summary.sampled == 1 else "agents"
     body = f"""
 <section class="index-hero">
-  <p class="eyebrow">OKX.AI marketplace security index</p>
-  <h1><span class="num">{summary.sampled}</span> {agent_label} indexed</h1>
-  <p class="hero-text">{summary.matched_count} with deterministic pattern matches in public listing text | {summary.audited_count} with linked signed endpoint-audit records.</p>
+  <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span>Marketplace Evidence Index</span></nav>
+  <p class="eyebrow">Qualified marketplace evidence</p>
+  <h1>Marketplace Evidence Index</h1>
+  <p class="hero-text"><span class="num">{summary.sampled}</span> {agent_label} in this dated discovery response. This is not a universal ranking of agent safety.</p>
+  <span class="source-stamp" data-source-stamp="{"DATED" if coverage.sampled == coverage.expected and coverage.dropped == 0 else "DEGRADED"}"><span data-source-stamp-label>{"DATED" if coverage.sampled == coverage.expected and coverage.dropped == 0 else "DEGRADED"}</span></span>
+  <div class="data-grid" aria-label="Marketplace evidence snapshot">
+    <div><span>Snapshot timestamp</span><strong><time datetime="{_escape(coverage.captured_at)}">{_escape(coverage.captured_at)}</time></strong></div>
+    <div><span>Sampled</span><strong class="num">{summary.sampled}</strong></div>
+    <div><span>Expected discovery total</span><strong class="num">{summary.expected}</strong></div>
+    <div><span>Missing or degraded</span><strong class="num">{summary.dropped}</strong></div>
+    <div><span>Public-text signals</span><strong class="num">{summary.matched_count}</strong></div>
+    <div><span>Linked signed endpoint audits</span><strong class="num">{summary.audited_count}</strong></div>
+  </div>
   <p class="caveat"><strong>Public listing text only.</strong> {_escape(_coverage_text(coverage))} A text signal is not a finding that an agent is malicious, compromised, or unsafe.</p>
 </section>
 <details class="methodology-drawer" id="methodology">
@@ -624,6 +642,7 @@ def _render_index_page(
   <label>Category<select data-agent-category><option value="">All categories</option>{options}</select></label>
   <label>Public-text signal<select data-agent-match><option value="">All public-text results</option><option value="signal">Pattern match</option><option value="none">No pattern match</option><option value="unscanned">No public text to scan</option></select></label>
   <label>Endpoint audit<select data-agent-audit><option value="">All audit states</option><option value="audited">Linked signed audit</option><option value="not-audited">No linked audit</option></select></label>
+  <label>APA guard proof<select data-agent-apa><option value="">All guard-proof states</option><option value="attested">Linked signed guard proof</option><option value="not-attested">No linked guard proof</option></select></label>
   <label>Sort<select data-agent-sort><option value="sold-desc">Sold count, high to low</option><option value="name-asc">Name, A to Z</option><option value="review-desc">Buyer review, high to low</option><option value="signal-first">Public-text signals first</option><option value="audit-first">Linked audits first</option></select></label>
   <button class="button secondary" type="button" data-agent-reset>Clear filters</button>
 </section>
@@ -637,11 +656,12 @@ def _render_index_page(
 </section>
 """
     return page_shell(
-        "Marketplace Security Index | Warden",
+        "Marketplace Evidence Index | Warden",
         "Public listing-text scans for agents returned by the OKX.AI marketplace sweep.",
         body,
         active="agents",
         scripts=("agents.js",),
+        body_class="page-archetype--marketplace",
         canonical_path="/agents",
     )
 

@@ -399,6 +399,9 @@
   }
 
   const status = document.querySelector("[data-gauntlet-status]");
+  const resultSource = document.querySelector(
+    "[data-gauntlet-result-source]",
+  );
   const result = document.querySelector("[data-gauntlet-result]");
   const errorPanel = document.querySelector("[data-gauntlet-error]");
   const errorMessage = document.querySelector("[data-gauntlet-error-message]");
@@ -437,6 +440,15 @@
     status.dataset.state = state;
   }
 
+  function setSourceStamp(element, state, message) {
+    element.dataset.sourceState = state;
+    element.className = `source-stamp source-stamp--${state}`;
+    element.replaceChildren();
+    const label = document.createElement("strong");
+    label.textContent = state.toUpperCase();
+    element.append(label, ` ${message}`);
+  }
+
   function setConsentError(message = "") {
     consentError.textContent = message;
     consentError.hidden = !message;
@@ -459,7 +471,11 @@
     const requestId = ++statsRequestId;
     statsPanel.setAttribute("aria-busy", "true");
     statsRetry.hidden = true;
-    statsStatus.textContent = "Loading live Gauntlet counters...";
+    setSourceStamp(
+      statsStatus,
+      "unknown",
+      "Request in progress; current counters are not established.",
+    );
     try {
       const stats = deriveGauntletStats(
         await getJson("/api/demo/gauntlet/stats"),
@@ -468,14 +484,21 @@
         return;
       }
       renderGauntletStats(stats, document, zeroState);
-      statsStatus.textContent =
-        "Live counters loaded from this Warden instance.";
+      setSourceStamp(
+        statsStatus,
+        "live",
+        `Counters fetched from this Warden instance at ${new Date().toISOString()}.`,
+      );
     } catch (error) {
       if (!isCurrentGauntletStatsRequest(requestId, statsRequestId)) {
         return;
       }
       renderGauntletStats(null, document, zeroState);
-      statsStatus.textContent = formatScanError(error);
+      setSourceStamp(
+        statsStatus,
+        "degraded",
+        `${formatScanError(error)} No counter value is presented as current.`,
+      );
       statsRetry.hidden = false;
     } finally {
       if (isCurrentGauntletStatsRequest(requestId, statsRequestId)) {
@@ -507,8 +530,11 @@
     clearBreakerEvidence();
     if (leaderboard.zeroConfirmed) {
       breakerEmpty.hidden = false;
-      breakerStatus.textContent =
-        "No human-confirmed BREAKER certificates have been issued.";
+      setSourceStamp(
+        breakerStatus,
+        "live",
+        `No human-confirmed BREAKER certificates were returned at ${new Date().toISOString()}.`,
+      );
       return;
     }
 
@@ -555,14 +581,22 @@
     );
     latestVerify.href = latest.verifyHref;
     breakerCertificate.hidden = false;
-    breakerStatus.textContent = `${leaderboard.total.toLocaleString()} human-confirmed BREAKER certificate${leaderboard.total === 1 ? "" : "s"} loaded.`;
+    setSourceStamp(
+      breakerStatus,
+      "live",
+      `${leaderboard.total.toLocaleString()} human-confirmed BREAKER certificate${leaderboard.total === 1 ? "" : "s"} fetched at ${new Date().toISOString()}.`,
+    );
   }
 
   async function loadBreakers() {
     const requestId = ++breakerRequestId;
     breakerBoard.setAttribute("aria-busy", "true");
     breakerRetry.hidden = true;
-    breakerStatus.textContent = "Loading public BREAKER certificates...";
+    setSourceStamp(
+      breakerStatus,
+      "unknown",
+      "Request in progress; the public certificate board is not established.",
+    );
     try {
       const leaderboard = deriveBreakerLeaderboard(
         await getJson("/api/demo/gauntlet/breakers"),
@@ -577,7 +611,11 @@
         return;
       }
       clearBreakerEvidence();
-      breakerStatus.textContent = formatScanError(error);
+      setSourceStamp(
+        breakerStatus,
+        "degraded",
+        `${formatScanError(error)} No certificate row is presented as current.`,
+      );
       breakerRetry.hidden = false;
     } finally {
       if (requestId === breakerRequestId) {
@@ -605,6 +643,14 @@
       "No reason code returned";
     document.querySelector("[data-gauntlet-claim-id]").textContent =
       presentation.receipt.claim_id || "Not applicable";
+    const receivedAt = new Date().toISOString();
+    document.querySelector("[data-gauntlet-checked-at]").textContent =
+      receivedAt;
+    setSourceStamp(
+      resultSource,
+      "live",
+      `Validated response received from this Warden instance at ${receivedAt}.`,
+    );
     document.querySelector("[data-gauntlet-receipt-json]").textContent =
       JSON.stringify(presentation.receipt, null, 2);
     document.querySelector("[data-gauntlet-json]").textContent = JSON.stringify(
@@ -639,6 +685,13 @@
           ? "Challenge input changed. Submit again for the current payload."
           : "Authorization changed. Submit or retry only after confirming it.",
       );
+      setSourceStamp(
+        resultSource,
+        "unknown",
+        clearRequest
+          ? "Challenge input changed; the previous response no longer applies."
+          : "Authorization changed; no response is current for this consent state.",
+      );
     }
   }
 
@@ -649,6 +702,11 @@
     errorPanel.hidden = true;
     result.hidden = true;
     setStatus("Running the real Warden fast-path scan...", "loading");
+    setSourceStamp(
+      resultSource,
+      "unknown",
+      "Request in progress; no challenge response has been accepted.",
+    );
     try {
       const data = assertScanResponse(
         await postJson("/api/demo/gauntlet", request),
@@ -667,6 +725,11 @@
       errorMessage.textContent = formatScanError(error);
       errorPanel.hidden = false;
       setStatus("No valid challenge receipt was accepted.", "error");
+      setSourceStamp(
+        resultSource,
+        "degraded",
+        "The request did not produce a valid challenge receipt. Do not treat it as a verdict.",
+      );
     } finally {
       if (isCurrentGauntletRequest(requestId, submissionRequestId)) {
         setBusy(false);
@@ -767,6 +830,11 @@
       result.hidden = true;
       lastRequest = null;
       setStatus("Ready for an authorized challenge.");
+      setSourceStamp(
+        resultSource,
+        "unknown",
+        "No challenge response has been accepted.",
+      );
     }, 0);
   });
   retryButton.addEventListener("click", () => {

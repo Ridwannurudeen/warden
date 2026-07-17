@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://warden.gudman.xyz/</loc></url>
+  <url><loc>https://warden.gudman.xyz/agents</loc></url>
+  <url><loc>https://warden.gudman.xyz/apa/log</loc></url>
+  <url><loc>https://warden.gudman.xyz/badge</loc></url>
+  <url><loc>https://warden.gudman.xyz/badges</loc></url>
+  <url><loc>https://warden.gudman.xyz/docs</loc></url>
+  <url><loc>https://warden.gudman.xyz/docs/corpus-match</loc></url>
+  <url><loc>https://warden.gudman.xyz/docs/drain-address</loc></url>
+  <url><loc>https://warden.gudman.xyz/docs/encoding-trick</loc></url>
+  <url><loc>https://warden.gudman.xyz/docs/hidden-unicode</loc></url>
+  <url><loc>https://warden.gudman.xyz/docs/malicious-link</loc></url>
+  <url><loc>https://warden.gudman.xyz/docs/prompt-injection</loc></url>
+  <url><loc>https://warden.gudman.xyz/docs/role-override</loc></url>
+  <url><loc>https://warden.gudman.xyz/docs/secret-exfil</loc></url>
+  <url><loc>https://warden.gudman.xyz/docs/statistical-anomaly</loc></url>
+  <url><loc>https://warden.gudman.xyz/docs/tool-hijack</loc></url>
+  <url><loc>https://warden.gudman.xyz/docs/web3-injection</loc></url>
+  <url><loc>https://warden.gudman.xyz/gauntlet</loc></url>
+  <url><loc>https://warden.gudman.xyz/hire</loc></url>
+  <url><loc>https://warden.gudman.xyz/integrate</loc></url>
+  <url><loc>https://warden.gudman.xyz/playground</loc></url>
+  <url><loc>https://warden.gudman.xyz/privacy</loc></url>
+  <url><loc>https://warden.gudman.xyz/showcase</loc></url>
+  <url><loc>https://warden.gudman.xyz/status</loc></url>
+  <url><loc>https://warden.gudman.xyz/terms</loc></url>
+  <url><loc>https://warden.gudman.xyz/theater</loc></url>
+  <url><loc>https://warden.gudman.xyz/trust</loc></url>
+  <url><loc>https://warden.gudman.xyz/verify</loc></url>
+</urlset>

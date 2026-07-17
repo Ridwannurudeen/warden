@@ -5,20 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Hire Warden through the reviewable OKX agent task flow."
+      content="Use Warden through a four-step, reviewable x402 task flow."
     />
     <meta name="color-scheme" content="dark light" />
-    <title>Hire Warden | Reviewable x402 Task Flow</title>
+    <title>Use Warden | Warden</title>
     <link rel="canonical" href="https://warden.gudman.xyz/hire" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Warden" />
-    <meta
-      property="og:title"
-      content="Hire Warden | Reviewable x402 Task Flow"
-    />
+    <meta property="og:title" content="Use Warden | Warden" />
     <meta
       property="og:description"
-      content="Hire Warden through the reviewable OKX agent task flow."
+      content="Use Warden through a four-step, reviewable x402 task flow."
     />
     <meta property="og:url" content="https://warden.gudman.xyz/hire" />
     <meta
@@ -30,9 +27,18 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/assets/favicon-32.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/assets/apple-touch-icon.png"
+    />
+    <link rel="stylesheet" href="/styles.css?v=96b93423" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -55,43 +61,61 @@
         Menu
       </button>
       <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
-        <details class="nav-group">
+        <details class="nav-group has-current">
           <summary>Product</summary>
           <div class="nav-menu">
-            <a href="/playground">Playground</a>
+            <a href="/">Overview</a>
+            <a href="/playground">Live Playground</a>
             <a href="/theater">Attack Theater</a>
-            <a href="/agents">Marketplace index</a>
+            <a href="/hire" aria-current="page">Use Warden</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Developers</summary>
           <div class="nav-menu">
+            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+            <a href="/integrate">Integrations</a>
             <a href="/docs">Documentation</a>
-            <a href="/integrate">Integrate</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Evidence</summary>
           <div class="nav-menu">
-            <a href="/verify">Verify APA</a>
-            <a href="/apa/log">Transparency log</a>
-            <a href="/trust">Trust Layer</a>
+            <a href="/verify">Verify an Attestation</a>
+            <a href="/apa/log">Transparency Log</a>
+            <a href="/badges">Endpoint Audit Records</a>
+            <a href="/agents">Marketplace Evidence Index</a>
+            <a href="/status">Service Status</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Research</summary>
+          <div class="nav-menu">
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/agents#methodology">Methodology</a>
+            <a href="/showcase">Product Tour</a>
           </div>
         </details>
         <div class="nav-mobile-actions">
-          <a class="button secondary" href="/hire" aria-current="page"
-            >Hire on OKX.AI</a
-          >
-          <a class="button primary" href="/playground">Run a live scan</a>
+          <a class="button secondary" href="/integrate">Integrate</a>
+          <a class="button primary" href="/playground">Run live scan</a>
         </div>
       </nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status" aria-label="Open API status"
-          ><span class="live-dot" data-health-dot aria-hidden="true"></span
-          ><span data-health-label>Checking API</span></a
+        <a
+          class="status-pill"
+          href="/status"
+          aria-label="Service status: unknown"
+          data-health-state="unknown"
+          ><span
+            class="live-dot is-unknown"
+            data-health-dot
+            aria-hidden="true"
+          ></span
+          ><span data-health-label>Status unknown</span></a
         >
-        <a class="header-hire" href="/hire" aria-current="page">Hire</a>
-        <a class="header-scan" href="/playground">Run scan</a>
+        <a class="header-hire" href="/integrate">Integrate</a>
+        <a class="header-scan" href="/playground">Run live scan</a>
         <button
           class="theme-toggle"
           type="button"
@@ -105,13 +129,12 @@
 
     <main id="main" class="page-shell site-main">
       <section class="index-hero">
-        <p class="eyebrow">Agent operator checkout</p>
-        <h1>Hire Warden through the task flow.</h1>
+        <p class="eyebrow">Reviewable operator checkout</p>
+        <h1>Use Warden.</h1>
         <p class="hero-text">
-          This four-step command builder creates a reviewable task, prepares the
-          selected x402 payment, and leaves feedback locked until you confirm
-          the result. The browser never creates, signs, pays, completes, or
-          reviews a task.
+          Follow one four-step task flow: create the job, authorize the current
+          x402 terms, confirm the returned verdict, then leave optional honest
+          feedback. Each boundary stays visible before a command unlocks.
         </p>
         <p class="caveat">
           <strong>Before you begin:</strong> you need an OKX User-role agent
@@ -168,8 +191,16 @@
       >
         <p class="eyebrow">Configure</p>
         <h2 id="configure-title">Choose a live marketplace service</h2>
-        <p data-catalog-status aria-live="polite">
-          Loading the normalized service catalog...
+        <p>
+          <span
+            class="source-stamp"
+            data-hire-catalog-stamp
+            data-source-stamp="UNKNOWN"
+            ><span data-source-stamp-label>UNKNOWN</span></span
+          >
+          <span data-catalog-status aria-live="polite"
+            >Service catalog not requested.</span
+          >
         </p>
         <button
           class="button secondary"
@@ -197,121 +228,158 @@
               aria-live="polite"
             ></span
           ></label>
-          <label
-            >Your reviewer agent ID<input
-              data-reviewer-id
-              aria-describedby="reviewer-id-help reviewer-id-error"
-              inputmode="numeric"
-              autocomplete="off"
-              placeholder="Your User-role agent ID" /><span
-              id="reviewer-id-help"
-              class="field-help"
-              >Optional until step 4; Warden identities cannot review
-              Warden.</span
-            ><span
-              id="reviewer-id-error"
-              class="field-error"
-              data-reviewer-id-error
-              aria-live="polite"
-            ></span
-          ></label>
-          <label
-            >Review score<input
-              data-review-score
-              aria-describedby="review-score-error"
-              type="number"
-              min="0"
-              max="5"
-              step="0.01"
-              value="5" /><span
-              id="review-score-error"
-              class="field-error"
-              data-review-score-error
-              aria-live="polite"
-            ></span
-          ></label>
         </div>
-        <fieldset class="segmented-control" data-shell-group>
-          <legend>Command shell</legend>
-          <div class="segmented-control-options">
+        <details class="methodology-drawer" data-hire-advanced>
+          <summary>Advanced and optional fields</summary>
+          <div class="feature-panel">
+            <div class="form-grid">
+              <label
+                >Your reviewer agent ID<input
+                  data-reviewer-id
+                  aria-describedby="reviewer-id-help reviewer-id-error"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  placeholder="Your User-role agent ID" /><span
+                  id="reviewer-id-help"
+                  class="field-help"
+                  >Optional until step 4; Warden identities cannot review
+                  Warden.</span
+                ><span
+                  id="reviewer-id-error"
+                  class="field-error"
+                  data-reviewer-id-error
+                  aria-live="polite"
+                ></span
+              ></label>
+              <label
+                >Review score<input
+                  data-review-score
+                  aria-describedby="review-score-error"
+                  type="number"
+                  min="0"
+                  max="5"
+                  step="0.01"
+                  value="5" /><span
+                  id="review-score-error"
+                  class="field-error"
+                  data-review-score-error
+                  aria-live="polite"
+                ></span
+              ></label>
+            </div>
+            <fieldset class="segmented-control" data-shell-group>
+              <legend>Command shell</legend>
+              <div class="segmented-control-options">
+                <label
+                  ><input
+                    type="radio"
+                    name="hire-shell"
+                    value="powershell"
+                    checked
+                  /><span>PowerShell</span></label
+                >
+                <label
+                  ><input type="radio" name="hire-shell" value="posix" /><span
+                    >POSIX shell</span
+                  ></label
+                >
+              </div>
+              <p class="field-help">
+                Step 2 passes JSON arguments (<code>--accepts</code>,
+                <code>--body</code>). On Windows PowerShell 5.1 or PowerShell
+                7.2 and earlier, embedded quotes can be mangled when handed to
+                the <code>onchainos</code> binary. Use PowerShell 7.3+ with
+                native argument passing, select POSIX shell, or paste the
+                command into a script file.
+              </p>
+            </fieldset>
             <label
-              ><input
-                type="radio"
-                name="hire-shell"
-                value="powershell"
-                checked
-              /><span>PowerShell</span></label
-            >
-            <label
-              ><input type="radio" name="hire-shell" value="posix" /><span
-                >POSIX shell</span
-              ></label
-            >
+              >Request body override<textarea
+                data-request-body
+                aria-describedby="request-body-help request-body-error"
+                rows="8"
+                spellcheck="false"
+              ></textarea>
+              <span id="request-body-help" class="field-help"
+                >The catalog supplies a safe default. Any override is embedded
+                in the generated command and may remain in shell history.</span
+              >
+              <span
+                id="request-body-error"
+                class="field-error"
+                data-request-body-error
+                aria-live="polite"
+              ></span>
+            </label>
+            <p class="caveat">
+              Do not submit confidential material. For endpoint audits, use only
+              a target you are authorized to test.
+            </p>
           </div>
-          <p class="field-help">
-            Step 2 passes JSON arguments (<code>--accepts</code>,
-            <code>--body</code>). On Windows PowerShell 5.1 or PowerShell 7.2
-            and earlier, embedded quotes can be mangled when handed to the
-            <code>onchainos</code> binary — use PowerShell 7.3+ (native argument
-            passing) or the POSIX shell option, or paste the command into a
-            script file.
-          </p>
-        </fieldset>
-        <label
-          >Request body<textarea
-            data-request-body
-            aria-describedby="request-body-help request-body-error"
-            rows="8"
-            spellcheck="false"
-          ></textarea>
-          <span id="request-body-help" class="field-help"
-            >Embedded in the generated command and potentially retained in shell
-            history.</span
-          >
-          <span
-            id="request-body-error"
-            class="field-error"
-            data-request-body-error
-            aria-live="polite"
-          ></span>
-        </label>
-        <p class="caveat">
-          Do not submit confidential material. For endpoint audits, use only a
-          target you are authorized to test.
-        </p>
-        <section class="service-facts" aria-labelledby="service-facts-title">
+        </details>
+        <aside
+          class="service-facts"
+          data-purchase-summary
+          aria-labelledby="service-facts-title"
+        >
           <h3 id="service-facts-title">Selected purchase boundary</h3>
           <dl class="data-list" data-service-summary aria-live="polite">
             <div>
               <dt>Service</dt>
-              <dd data-service-name>Loading</dd>
+              <dd data-service-name>Catalog not available</dd>
             </div>
             <div>
               <dt>Service ID</dt>
-              <dd class="num" data-service-id>--</dd>
+              <dd class="num" data-service-id>Not established</dd>
+            </div>
+            <div>
+              <dt>Job state</dt>
+              <dd data-summary-job>Required after step 1</dd>
+            </div>
+            <div>
+              <dt>Reviewer</dt>
+              <dd data-summary-reviewer>Optional after the verdict</dd>
             </div>
             <div>
               <dt>Price</dt>
-              <dd class="num" data-service-price>--</dd>
+              <dd class="num" data-service-price>Not established</dd>
             </div>
             <div>
               <dt>Token</dt>
-              <dd><code data-service-token>--</code></dd>
+              <dd><code data-service-token>Not established</code></dd>
             </div>
             <div>
               <dt>Network</dt>
-              <dd><code data-service-network>--</code></dd>
+              <dd><code data-service-network>Not established</code></dd>
             </div>
             <div>
               <dt>Endpoint</dt>
-              <dd><code data-service-endpoint>--</code></dd>
+              <dd><code data-service-endpoint>Not established</code></dd>
+            </div>
+            <div>
+              <dt>Payment recipient</dt>
+              <dd>
+                <code data-service-recipient
+                  >Not established until live terms match</code
+                >
+              </dd>
             </div>
             <div>
               <dt>Accepted terms</dt>
-              <dd data-service-accepts>Waiting</dd>
+              <dd data-service-accepts>Live terms not requested</dd>
+            </div>
+            <div>
+              <dt>Payment state</dt>
+              <dd data-summary-payment>No browser payment attempted</dd>
+            </div>
+            <div>
+              <dt>Signing boundary</dt>
+              <dd data-summary-signing>
+                CLI wallet only; this browser never signs
+              </dd>
             </div>
           </dl>
-        </section>
+        </aside>
       </section>
 
       <section aria-labelledby="challenge-title">
@@ -327,10 +395,18 @@
           </p>
         </div>
         <div class="console-card">
-          <p data-accepts-status aria-live="polite">
-            Waiting for service data...
+          <p>
+            <span
+              class="source-stamp"
+              data-hire-challenge-stamp
+              data-source-stamp="UNKNOWN"
+              ><span data-source-stamp-label>UNKNOWN</span></span
+            >
+            <span data-accepts-status aria-live="polite"
+              >Current payment terms not requested.</span
+            >
           </p>
-          <pre><code data-accepts-output>[]</code></pre>
+          <pre><code data-accepts-output>No live terms requested.</code></pre>
           <button class="button secondary" type="button" data-refresh-accepts>
             Retry current payment terms
           </button>
@@ -361,7 +437,7 @@
               current marketplace service, with a budget and x402 payment mode
               matching the selected service.
             </p>
-            <pre><code data-command-step="1">Loading...</code></pre>
+            <pre><code data-command-step="1">Complete readiness and verify current terms.</code></pre>
             <button
               type="button"
               class="copy-button"
@@ -445,6 +521,9 @@
             </button>
           </li>
         </ol>
+        <p class="caveat" data-copy-status role="status" aria-live="polite">
+          No command copied.
+        </p>
         <p class="caveat">
           <strong>If your task freezes in <code>accepted</code>:</strong> a task
           created with x402 payment mode may come back with
@@ -465,20 +544,47 @@
     <footer class="site-footer page-shell">
       <div>
         <strong>Warden</strong
-        ><span>The immune system of the agent economy.</span
-        ><span>Independent service listed on OKX.AI.</span>
+        ><span>Verifiable pre-action security for AI agents.</span
+        ><span>Gate the action. Keep the proof.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a
-        ><a href="/playground">Run a scan</a><a href="/gauntlet">Gauntlet</a
-        ><a href="/showcase">Walkthrough</a
-        ><a href="/docs">Docs</a><a href="/badges">Audit badges</a
-        ><a href="/status">API status</a><a href="/privacy">Privacy</a
-        ><a href="/terms">Terms</a
-        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Product</span>
+          <a href="/">Overview</a>
+          <a href="/playground">Live Playground</a>
+          <a href="/theater">Attack Theater</a>
+          <a href="/hire">Use Warden</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Developers</span>
+          <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+          <a href="/integrate">Integrations</a>
+          <a href="/docs">Documentation</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Evidence</span>
+          <a href="/verify">Verify an Attestation</a>
+          <a href="/apa/log">Transparency Log</a>
+          <a href="/badges">Endpoint Audit Records</a>
+          <a href="/agents">Marketplace Evidence Index</a>
+          <a href="/status">Service Status</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Research</span>
+          <a href="/gauntlet">Gauntlet</a>
+          <a href="/agents#methodology">Methodology</a>
+          <a href="/showcase">Product Tour</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Policy</span>
+          <a href="/trust">Trust &amp; Security</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        </div>
       </nav>
     </footer>
-    <script src="/app.js?v=65a484d3" defer></script>
+    <script src="/app.js?v=5c7f3a4c" defer></script>
     <script src="/hire.js" defer></script>
   </body>
 </html>

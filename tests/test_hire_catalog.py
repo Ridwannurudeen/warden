@@ -80,4 +80,7 @@ def test_hire_page_is_task_first_and_contains_no_stale_service_ids():
     assert "task flow" in page.lower()
     assert "18954" not in page
     assert "18955" not in page
-    assert "private key" not in page.lower()
+    assert "data-purchase-summary" in page
+    assert "data-hire-advanced" in page
+    normalized_page = " ".join(page.lower().split())
+    assert "never receives wallet credentials or signing material" in normalized_page

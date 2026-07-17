@@ -79,6 +79,23 @@ test("raw x402 curl has valid continuation lines and required request fields", (
   assert.match(examples.curl, /--data/);
 });
 
+test("paid HTTP examples use finite timeouts and never automate payment replay", () => {
+  const service = catalog.services.find(
+    (candidate) => candidate.key === "scan",
+  );
+  const examples = buildIntegrationExamples({
+    providerAgentId: catalog.providerAgentId,
+    service,
+  });
+
+  assert.match(examples.python, /timeout=30/);
+  assert.match(examples.typescript, /AbortSignal\.timeout\(30_000\)/);
+  for (const example of [examples.python, examples.typescript]) {
+    assert.match(example, /Do not automatically retry/i);
+    assert.doesNotMatch(example, /\bwhile\s*\(|\bfor\s*\(.*retry/is);
+  }
+});
+
 test("integration examples reject non-canonical endpoints before generating code", () => {
   const service = catalog.services.find(
     (candidate) => candidate.key === "scan",

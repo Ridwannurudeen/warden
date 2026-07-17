@@ -34,6 +34,7 @@
       scanning: false,
       source: "none",
       result: null,
+      checkedAt: null,
       error: "",
     };
   }
@@ -72,6 +73,7 @@
           scanning: false,
           source: "none",
           result: null,
+          checkedAt: null,
           error:
             "The live scan returned a valid but unexpected outcome. Use the labeled example fallback for this scripted walkthrough.",
         };
@@ -82,6 +84,8 @@
         scanning: false,
         source: "live",
         result: event.result,
+        checkedAt:
+          typeof event.checkedAt === "string" ? event.checkedAt : null,
         error: "",
       };
     }
@@ -91,6 +95,7 @@
         scanning: false,
         source: "none",
         result: null,
+        checkedAt: null,
         error: String(event.message || "The live scan could not be completed."),
       };
     }
@@ -101,6 +106,7 @@
         scanning: false,
         source: "example",
         result: EXAMPLE_RESULT,
+        checkedAt: null,
         error: "",
       };
     }
@@ -151,6 +157,9 @@
   const runButton = document.querySelector("[data-showcase-run]");
   const fallbackButton = document.querySelector("[data-showcase-fallback]");
   const scanStatus = document.querySelector("[data-showcase-status]");
+  const requestSource = document.querySelector(
+    "[data-showcase-request-source]",
+  );
   const announcer = document.querySelector("[data-showcase-announcer]");
   const reducedMotionQuery = root.matchMedia?.(
     "(prefers-reduced-motion: reduce)",
@@ -167,14 +176,30 @@
     }
   }
 
+  function renderSourceStamp(element, sourceState, message) {
+    element.dataset.sourceState = sourceState;
+    element.className = `source-stamp source-stamp--${sourceState}`;
+    element.replaceChildren();
+    const sourceLabel = document.createElement("strong");
+    sourceLabel.textContent = sourceState.toUpperCase();
+    element.append(sourceLabel, ` ${message}`);
+  }
+
   function renderResult() {
     if (!state.result) {
       return;
     }
-    text(
-      "[data-showcase-result-source]",
-      state.source === "live" ? "Live demo result" : "Labeled example fallback",
+    const sourceStamp = document.querySelector(
+      "[data-showcase-source-stamp]",
     );
+    const sourceState = state.source === "live" ? "live" : "illustrative";
+    const sourceMessage =
+      state.source === "live"
+        ? state.checkedAt
+          ? `Validated response received at ${state.checkedAt}.`
+          : "Validated response received during this session."
+        : "Safe local example; no production response is claimed.";
+    renderSourceStamp(sourceStamp, sourceState, sourceMessage);
     text("[data-showcase-verdict]", state.result.verdict);
     text("[data-showcase-risk]", state.result.risk_level);
     text(
@@ -264,6 +289,39 @@
       : state.scanning
         ? "loading"
         : "ready";
+    if (state.error) {
+      renderSourceStamp(
+        requestSource,
+        "degraded",
+        "The live request did not produce the scripted result. No live outcome is shown.",
+      );
+    } else if (state.scanning) {
+      renderSourceStamp(
+        requestSource,
+        "unknown",
+        "Request in progress; no result has been accepted.",
+      );
+    } else if (state.source === "live") {
+      renderSourceStamp(
+        requestSource,
+        "live",
+        state.checkedAt
+          ? `Validated response received at ${state.checkedAt}.`
+          : "Validated response received during this session.",
+      );
+    } else if (state.source === "example") {
+      renderSourceStamp(
+        requestSource,
+        "illustrative",
+        "Safe local example selected; no production response is claimed.",
+      );
+    } else {
+      renderSourceStamp(
+        requestSource,
+        "unknown",
+        "No verdict exists until you run the scan.",
+      );
+    }
     renderResult();
     if (sceneChanged) {
       const activeScene = scenes.find(
@@ -316,7 +374,11 @@
       }
       const payload = await client.postJson("/api/demo/scan", LIVE_REQUEST);
       const result = client.assertScanResponse(payload);
-      state = transitionShowcase(state, { type: "SCAN_SUCCESS", result });
+      state = transitionShowcase(state, {
+        type: "SCAN_SUCCESS",
+        result,
+        checkedAt: new Date().toISOString(),
+      });
     } catch (error) {
       const message = client?.formatScanError
         ? client.formatScanError(error)
@@ -324,6 +386,29 @@
       state = transitionShowcase(state, { type: "SCAN_ERROR", message });
     }
     render({ focusScene: state.scene === 3 });
+  });
+
+  rootElement.addEventListener("keydown", (event) => {
+    if (
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      ["INPUT", "SELECT", "TEXTAREA", "BUTTON", "A"].includes(
+        event.target?.tagName,
+      )
+    ) {
+      return;
+    }
+    if (event.key === "ArrowLeft" && !previousButton.disabled) {
+      event.preventDefault();
+      state = transitionShowcase(state, { type: "PREVIOUS" });
+      render({ focusScene: true });
+    } else if (event.key === "ArrowRight" && !nextButton.disabled) {
+      event.preventDefault();
+      state = transitionShowcase(state, { type: "NEXT" });
+      render({ focusScene: true });
+    }
   });
 
   reducedMotionQuery?.addEventListener?.("change", (event) => {

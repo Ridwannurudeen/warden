@@ -54,7 +54,7 @@ test("badge view model keeps integrity, result, target, and time fields separate
 });
 
 test("badge state labels distinguish lookup failures from signature failure", () => {
-  assert.equal(badgeState("loading").integrity, "Pending");
+  assert.equal(badgeState("loading").integrity, "Unknown until checked");
   assert.equal(badgeState("invalid").integrity, "Not checked");
   assert.equal(badgeState("empty").integrity, "No issued record");
   assert.equal(badgeState("error").integrity, "Unavailable");

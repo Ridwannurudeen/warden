@@ -492,7 +492,12 @@ def test_renderer_escapes_content_handles_zero_services_and_verifies_badge(tmp_p
     assert "No services listed" in agent_html
     assert "<span>Sold at snapshot</span>" in agent_html
     assert "<span>Buyer review at snapshot</span>" in agent_html
-    assert "1</span> agent indexed" in index_html
+    assert "Marketplace Evidence Index" in index_html
+    assert '<span class="num">1</span> agent in this dated discovery response' in index_html
+    assert (
+        "<title>&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; · Agent #3808 | Warden Marketplace Evidence Index</title>"
+        in agent_html
+    )
     assert 'src="http' not in agent_html
     assert 'rel="canonical" href="https://warden.gudman.xyz/agents/3808"' in agent_html
 
@@ -516,6 +521,25 @@ def test_renderer_ignores_malformed_avatar_urls(tmp_path, profile_picture):
     agent_html = (tmp_path / "3808.html").read_text(encoding="utf-8")
     assert "Marketplace avatar unavailable" in agent_html
     assert "View marketplace avatar" not in agent_html
+
+
+def test_renderer_marks_unclassified_multilingual_listing_text_as_undetermined(tmp_path):
+    indexed = IndexedAgent(
+        agent=_agent(name="安全代理", profileDescription="公开服务说明"),
+        verdict="ALLOW",
+        risk_level="NONE",
+        threat_classes=[],
+        fields_scanned=1,
+        rationale="No injection patterns were detected.",
+    )
+
+    render_marketplace([indexed], tmp_path, coverage=_coverage(sampled=1))
+
+    agent_html = (tmp_path / "3808.html").read_text(encoding="utf-8")
+    index_html = (tmp_path / "index.html").read_text(encoding="utf-8")
+    assert '<h1 lang="und">安全代理</h1>' in agent_html
+    assert '<p class="hero-text" lang="und">公开服务说明</p>' in agent_html
+    assert '<strong lang="und">安全代理</strong>' in index_html
 
 
 def test_renderer_does_not_attach_tampered_badge(tmp_path, monkeypatch):
@@ -603,6 +627,7 @@ def test_marketplace_index_renders_search_filters_sorting_and_separate_evidence_
         "data-agent-category",
         "data-agent-match",
         "data-agent-audit",
+        "data-agent-apa",
         "data-agent-sort",
         "data-agent-reset",
         "data-agent-controls",
@@ -623,6 +648,11 @@ def test_marketplace_index_renders_search_filters_sorting_and_separate_evidence_
     assert 'data-match="unscanned"' in index_html
     assert 'data-audit="audited"' in index_html
     assert 'data-audit="not-audited"' in index_html
+    assert 'data-apa="not-attested"' in index_html
+    assert "Marketplace Evidence Index" in index_html
+    assert 'data-source-stamp="DATED"' in index_html
+    assert "Expected discovery total" in index_html
+    assert "Missing or degraded" in index_html
     assert "Public listing text only" in index_html
     assert "<span>Sold at 2026-07-13 snapshot</span>" in index_html
     assert "<span>Buyer review at 2026-07-13 snapshot</span>" in index_html
@@ -1200,6 +1230,7 @@ def test_renderer_keeps_apa_guard_proof_separate_from_audit_and_certification(tm
     assert f"/apa/attestation/{record['attestation_id']}" in agent_html
     assert "not an endpoint audit or security certification" in agent_html
     assert "Linked signed APA guard proof; open record for current status" in index_html
+    assert 'data-apa="attested"' in index_html
     assert "APA guard proof: active" not in index_html
     assert 'data-audit="audited"' not in index_html
     assert "Verified audit badge" not in agent_html

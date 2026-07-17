@@ -258,6 +258,21 @@
     }
   }
 
+  function sourceStamp(selector, state, message) {
+    const element = document.querySelector(selector);
+    if (!element) {
+      return;
+    }
+    element.dataset.sourceStamp = state;
+    element.className = `source-stamp source-stamp--${state}`;
+    root.WardenUI?.applySourceStamp(element, state);
+    element.textContent = `${state.toUpperCase()} · ${message}`;
+    element.setAttribute(
+      "aria-label",
+      `Source state: ${state.toUpperCase()}. ${message}`,
+    );
+  }
+
   function setCheckedAt(value) {
     if (!checkedAt) {
       return;
@@ -275,6 +290,16 @@
     if (headerLabel) {
       headerLabel.textContent = state === "ok" ? "API live" : "API unavailable";
     }
+    const statusLink = headerLabel?.closest("a");
+    if (statusLink) {
+      statusLink.dataset.healthState = state === "ok" ? "live" : "degraded";
+      statusLink.setAttribute(
+        "aria-label",
+        state === "ok"
+          ? "Service status: API reachable now"
+          : "Service status: API unavailable now",
+      );
+    }
     if (headerDot) {
       headerDot.classList.remove("is-ok", "is-offline");
       headerDot.classList.add(state === "ok" ? "is-ok" : "is-offline");
@@ -283,16 +308,22 @@
 
   async function loadHealth() {
     healthRetry.disabled = true;
-    healthState.textContent = "Checking now";
+    healthState.textContent = "Unknown while check runs";
     healthState.className = "";
+    sourceStamp(
+      "[data-status-live-source]",
+      "unknown",
+      "health check in progress",
+    );
     text(
       "[data-status-live-note]",
-      "Checking current reachability. Historical uptime is not measured by this page.",
+      "Health request in progress. Historical uptime is not measured by this page.",
     );
     try {
       const response = await root.fetch("/health", {
         headers: { accept: "application/json" },
         cache: "no-store",
+        signal: root.AbortSignal?.timeout?.(10_000),
       });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -301,6 +332,11 @@
       const observedAt = formatCheckedAt(new Date());
       setCheckedAt(observedAt);
       setHealthVisual("ok", "Reachable now");
+      sourceStamp(
+        "[data-status-live-source]",
+        "live",
+        `GET /health answered ${observedAt}`,
+      );
       text("[data-status-version]", health.version);
       text("[data-status-corpus]", health.corpusCount.toLocaleString());
       text("[data-status-analyzers]", health.analyzerCount.toLocaleString());
@@ -312,6 +348,11 @@
       const observedAt = formatCheckedAt(new Date());
       setCheckedAt(observedAt);
       setHealthVisual("error", "Unavailable now");
+      sourceStamp(
+        "[data-status-live-source]",
+        "degraded",
+        `GET /health unavailable ${observedAt}`,
+      );
       text("[data-status-version]", "Unavailable");
       text("[data-status-corpus]", "Unavailable");
       text("[data-status-analyzers]", "Unavailable");
@@ -329,6 +370,7 @@
       const response = await root.fetch("/data/site-status.json", {
         headers: { accept: "application/json" },
         cache: "no-store",
+        signal: root.AbortSignal?.timeout?.(10_000),
       });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -348,6 +390,26 @@
       text("[data-status-tests-note]", status.repositoryTestsNote);
       text("[data-status-corpus-fingerprint]", status.corpusFingerprint);
       text("[data-status-services]", status.services);
+      sourceStamp(
+        "[data-status-metadata-source]",
+        "dated",
+        `build metadata verified ${status.verifiedAt}`,
+      );
+      sourceStamp(
+        "[data-status-marketplace-source]",
+        "dated",
+        `listing verified ${status.listingVerifiedAt}`,
+      );
+      sourceStamp(
+        "[data-status-corpus-source]",
+        "dated",
+        `build fingerprint verified ${status.verifiedAt}`,
+      );
+      sourceStamp(
+        "[data-payment-source]",
+        "dated",
+        `address-level evidence metadata verified ${status.verifiedAt}`,
+      );
 
       // Service IDs are reassigned on every `agent update`, so overlay the live
       // IDs from the build-generated catalog instead of the static snapshot.
@@ -355,6 +417,7 @@
         const catalogResponse = await root.fetch("/data/warden-services.json", {
           headers: { accept: "application/json" },
           cache: "no-store",
+          signal: root.AbortSignal?.timeout?.(10_000),
         });
         if (catalogResponse.ok) {
           const catalog = await catalogResponse.json();
@@ -368,8 +431,11 @@
             text("[data-status-services]", liveIds);
           }
         }
-      } catch {
-        // Keep the committed-snapshot service IDs on any fetch failure.
+      } catch (error) {
+        text(
+          "[data-status-services]",
+          `${status.services} (dated snapshot; catalog unavailable: ${error.message})`,
+        );
       }
 
       const payment = status.paymentActivity;
@@ -386,6 +452,26 @@
         paymentLink.href = url;
       }
     } catch (error) {
+      sourceStamp(
+        "[data-status-metadata-source]",
+        "degraded",
+        "build metadata unavailable",
+      );
+      sourceStamp(
+        "[data-status-marketplace-source]",
+        "degraded",
+        "marketplace snapshot unavailable",
+      );
+      sourceStamp(
+        "[data-status-corpus-source]",
+        "degraded",
+        "corpus fingerprint unavailable",
+      );
+      sourceStamp(
+        "[data-payment-source]",
+        "degraded",
+        "payment evidence metadata unavailable",
+      );
       text("[data-status-metadata-date]", "Metadata unavailable");
       text("[data-status-listing]", "Metadata unavailable");
       text("[data-status-listing-date]", "Metadata unavailable");
@@ -404,6 +490,7 @@
       const response = await root.fetch("/data/evaluation.json", {
         headers: { accept: "application/json" },
         cache: "no-store",
+        signal: root.AbortSignal?.timeout?.(10_000),
       });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -415,7 +502,17 @@
       text("[data-evaluation-fp-rate]", evaluation.falsePositiveRate);
       text("[data-evaluation-measured-at]", evaluation.measuredAt);
       text("[data-evaluation-mode]", evaluation.mode);
+      sourceStamp(
+        "[data-evaluation-source]",
+        "dated",
+        `benchmark measured ${evaluation.measuredAt}`,
+      );
     } catch (error) {
+      sourceStamp(
+        "[data-evaluation-source]",
+        "degraded",
+        `evaluation unavailable: ${error.message}`,
+      );
       for (const selector of [
         "[data-evaluation-recall]",
         "[data-evaluation-attacks]",
@@ -434,6 +531,7 @@
       const response = await root.fetch("/data/service-monitor.json", {
         headers: { accept: "application/json" },
         cache: "no-store",
+        signal: root.AbortSignal?.timeout?.(10_000),
       });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -443,7 +541,19 @@
       text("[data-monitor-window]", monitor.window);
       text("[data-monitor-availability]", monitor.availability);
       text("[data-monitor-latest]", monitor.latest);
-    } catch {
+      sourceStamp(
+        "[data-monitor-source]",
+        monitor.state === "Not measured" ? "unknown" : "dated",
+        monitor.state === "Not measured"
+          ? "no readiness samples or snapshot timestamp are published"
+          : `latest readiness evidence ${monitor.latest}`,
+      );
+    } catch (error) {
+      sourceStamp(
+        "[data-monitor-source]",
+        "degraded",
+        `readiness evidence unavailable: ${error.message}`,
+      );
       text("[data-monitor-state]", "Evidence unavailable");
       text("[data-monitor-window]", "Evidence unavailable");
       text("[data-monitor-availability]", "Not measured");

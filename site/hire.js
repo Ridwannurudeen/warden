@@ -94,6 +94,9 @@
         "Payment terms do not match the selected service asset or amount on X Layer",
       );
     }
+    if (!/^0x[a-fA-F0-9]{40}$/.test(String(acceptance.payTo || ""))) {
+      throw new Error("Payment terms contain an invalid payment recipient");
+    }
     return acceptance;
   }
 
@@ -339,7 +342,7 @@
       return commands;
     }
 
-    commands[1] = `onchainos agent task-402-pay ${quote(job)} --provider-agent-id ${provider} --accepts ${quote(JSON.stringify(accepts))} --endpoint ${quote(service.endpoint)} --token-symbol ${tokenSymbol} --token-amount ${amount} --body ${quote(JSON.stringify(service.requestBody))}`;
+    commands[1] = `onchainos agent task-402-pay ${quote(job)} --provider-agent-id ${provider} --accepts ${quote(JSON.stringify([acceptance]))} --endpoint ${quote(service.endpoint)} --token-symbol ${tokenSymbol} --token-amount ${amount} --body ${quote(JSON.stringify(service.requestBody))}`;
     if (verdictConfirmed) {
       commands[2] = `onchainos agent complete ${quote(job)}`;
       if (reviewer) {
@@ -392,9 +395,14 @@
   const retryCatalogButton = root.document.querySelector(
     "[data-retry-catalog]",
   );
+  const catalogStamp = root.document.querySelector("[data-hire-catalog-stamp]");
   const acceptsStatus = root.document.querySelector("[data-accepts-status]");
   const acceptsOutput = root.document.querySelector("[data-accepts-output]");
+  const challengeStamp = root.document.querySelector(
+    "[data-hire-challenge-stamp]",
+  );
   const refreshButton = root.document.querySelector("[data-refresh-accepts]");
+  const copyStatus = root.document.querySelector("[data-copy-status]");
   let catalog = null;
   let challenge = null;
   let challengeController = null;
@@ -412,6 +420,24 @@
     const element = root.document.querySelector(selector);
     if (element) {
       element.textContent = value;
+    }
+  }
+
+  function setSourceStamp(element, state) {
+    if (!element) {
+      return;
+    }
+    const normalized = String(state).toUpperCase();
+    element.dataset.sourceStamp = normalized;
+    element.dataset.sourceState = normalized;
+    const label = element.querySelector("[data-source-stamp-label]");
+    if (label) {
+      label.textContent = normalized;
+    }
+    element.removeAttribute("aria-label");
+    root.WardenUI?.applySourceStamp(element, normalized);
+    if (!element.hasAttribute("aria-label")) {
+      element.setAttribute("aria-label", `Source state: ${normalized}.`);
     }
   }
 
@@ -466,7 +492,31 @@
   }
 
   function serviceFacts(service, acceptance) {
+    setText(
+      "[data-summary-job]",
+      jobInput.value.trim()
+        ? "Provided; validated before payment unlocks"
+        : "Required after step 1",
+    );
+    setText(
+      "[data-summary-reviewer]",
+      reviewerInput.value.trim()
+        ? "Provided; validated before feedback unlocks"
+        : "Optional after the verdict",
+    );
     if (!service) {
+      setText("[data-service-name]", "Catalog not available");
+      setText("[data-service-id]", "Not established");
+      setText("[data-service-price]", "Not established");
+      setText("[data-service-token]", "Not established");
+      setText("[data-service-network]", "Not established");
+      setText("[data-service-endpoint]", "Not established");
+      setText(
+        "[data-service-recipient]",
+        "Not established until live terms match",
+      );
+      setText("[data-service-accepts]", "Live terms not requested");
+      setText("[data-summary-payment]", "No browser payment attempted");
       return;
     }
     const tokenSymbol = acceptance?.extra?.name || "USDT";
@@ -479,14 +529,26 @@
     );
     setText(
       "[data-service-network]",
-      acceptance?.network || "eip155:196 (awaiting live match)",
+      acceptance?.network || "eip155:196 (catalog expectation)",
     );
     setText("[data-service-endpoint]", service.endpoint);
+    setText(
+      "[data-service-recipient]",
+      acceptance?.payTo || "Not established until live terms match",
+    );
     setText(
       "[data-service-accepts]",
       acceptance
         ? `${challenge.accepts.length} returned · exact term matched`
-        : "Waiting for a verified 402 challenge",
+        : "Live terms not yet matched",
+    );
+    setText(
+      "[data-summary-payment]",
+      acceptance
+        ? spendConfirmed.checked
+          ? "Spend acknowledged; execution remains in the CLI"
+          : "Terms matched; spend not acknowledged"
+        : "No browser payment attempted",
     );
     setText("[data-spend-amount]", `${service.feeAmount} ${tokenSymbol}`);
   }
@@ -567,6 +629,10 @@
       score: scoreInput.value,
     });
     showValidation(validation);
+    const liveAcceptance = challenge
+      ? acceptanceFor(service, challenge.accepts)
+      : null;
+    serviceFacts(service, liveAcceptance);
     const availability = commandAvailability({
       catalogReady: Boolean(catalog),
       paymentTermsReady: Boolean(challenge),
@@ -605,8 +671,6 @@
         verdictConfirmed: verdictConfirmed.checked,
       });
       setCommands(commands, availability, messages);
-      const acceptance = acceptanceFor(service, challenge.accepts);
-      serviceFacts(service, acceptance);
     } catch (error) {
       setCommands(
         [null, null, null, null],
@@ -633,8 +697,10 @@
         selectedService()?.serviceId,
       );
     challenge = null;
-    acceptsStatus.textContent = "Fetching current payment terms...";
-    acceptsOutput.textContent = "[]";
+    setSourceStamp(challengeStamp, "UNKNOWN");
+    acceptsStatus.textContent =
+      "Requesting fresh terms from the selected Warden endpoint.";
+    acceptsOutput.textContent = "No verified live terms yet.";
     refreshButton.disabled = true;
     serviceFacts(service, null);
     renderCommands();
@@ -658,6 +724,7 @@
       }
       challenge = nextChallenge;
       acceptsOutput.textContent = JSON.stringify(challenge.accepts, null, 2);
+      setSourceStamp(challengeStamp, "LIVE");
       acceptsStatus.textContent =
         "Current terms loaded and matched to the selected listing.";
       renderCommands();
@@ -665,6 +732,7 @@
       if (!isCurrent()) {
         return;
       }
+      setSourceStamp(challengeStamp, "DEGRADED");
       acceptsStatus.textContent = `Could not load verified payment terms: ${error.message}`;
       renderCommands();
     } finally {
@@ -695,7 +763,9 @@
     retryCatalogButton.disabled = true;
     serviceSelect.disabled = true;
     serviceSelect.replaceChildren();
-    catalogStatus.textContent = "Loading the normalized service catalog...";
+    setSourceStamp(catalogStamp, "UNKNOWN");
+    catalogStatus.textContent = "Requesting the normalized service catalog.";
+    serviceFacts(null, null);
     try {
       const response = await root.fetch("/data/warden-services.json", {
         headers: { accept: "application/json" },
@@ -716,9 +786,11 @@
         serviceSelect.append(option);
       }
       serviceSelect.disabled = false;
+      setSourceStamp(catalogStamp, "DATED");
       catalogStatus.textContent = `Catalog snapshot ${catalog.snapshotFetchedAt}. Display values below come from this normalized source.`;
       selectService();
     } catch (error) {
+      setSourceStamp(catalogStamp, "DEGRADED");
       catalogStatus.textContent = `${error.message}.`;
       retryCatalogButton.hidden = false;
       retryCatalogButton.disabled = false;
@@ -769,11 +841,16 @@
         await root.navigator.clipboard.writeText(button.dataset.command);
         const original = button.textContent;
         button.textContent = "Copied";
+        if (copyStatus) {
+          copyStatus.textContent = `Step ${button.dataset.copyStep} command copied. Review it before execution.`;
+        }
         root.setTimeout(() => {
           button.textContent = original;
         }, 1200);
       } catch (error) {
-        acceptsStatus.textContent = `Copy failed: ${error.message}`;
+        if (copyStatus) {
+          copyStatus.textContent = `Copy failed: ${error.message}`;
+        }
       }
     });
   }

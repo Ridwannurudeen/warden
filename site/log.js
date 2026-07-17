@@ -212,6 +212,7 @@
         {
           headers: { accept: "application/json" },
           cache: "no-store",
+          signal: root.AbortSignal?.timeout?.(10_000),
         },
       );
       if (!response.ok) {
@@ -623,6 +624,7 @@
     const response = await fetchImpl("/data/apa-log-anchor.json", {
       headers: { accept: "application/json" },
       cache: "no-store",
+      signal: root.AbortSignal?.timeout?.(10_000),
     });
     if (response.status === 404) {
       return null;
@@ -675,13 +677,55 @@
   }
 
   const entriesElement = document.querySelector("[data-apa-log-entries]");
-  const retryButton = document.querySelector("[data-apa-log-retry]");
+  const retryButtons = document.querySelectorAll("[data-apa-log-retry]");
+  const copyRawButton = document.querySelector("[data-apa-log-copy-raw]");
+  const tamperButton = document.querySelector("[data-apa-log-tamper]");
+  let verifiedMaterial = null;
 
   function text(selector, value) {
     const element = document.querySelector(selector);
     if (element) {
       element.textContent = value;
     }
+  }
+
+  function sourceStamp(state, message) {
+    const element = document.querySelector("[data-apa-log-source]");
+    if (!element) {
+      return;
+    }
+    element.dataset.sourceStamp = state;
+    element.className = `source-stamp source-stamp--${state}`;
+    root.WardenUI?.applySourceStamp(element, state);
+    element.textContent = `${state.toUpperCase()} · ${message}`;
+    element.setAttribute(
+      "aria-label",
+      `Source state: ${state.toUpperCase()}. ${message}`,
+    );
+  }
+
+  function setRetryDisabled(disabled) {
+    for (const button of retryButtons) {
+      button.disabled = disabled;
+    }
+  }
+
+  function resetLocalTools() {
+    verifiedMaterial = null;
+    if (copyRawButton) {
+      copyRawButton.disabled = true;
+    }
+    if (tamperButton) {
+      tamperButton.disabled = true;
+    }
+    text(
+      "[data-apa-log-raw]",
+      "Normalized JSON is unavailable until the log is fetched.",
+    );
+    text(
+      "[data-apa-log-tool-status]",
+      "Fetch a valid non-empty log before running local tools.",
+    );
   }
 
   function createFact(label, value, numeric = false) {
@@ -740,13 +784,19 @@
 
   async function loadLog() {
     container.dataset.state = "loading";
-    retryButton.disabled = true;
-    text("[data-apa-log-status]", "Fetching the current JSON log…");
-    text("[data-apa-log-chain]", "Checking");
+    setRetryDisabled(true);
+    resetLocalTools();
+    sourceStamp("unknown", "ledger verification in progress");
+    text(
+      "[data-apa-log-status]",
+      "Fetching public log pages, issuer keys, and the signed checkpoint. No chain result is available yet.",
+    );
+    text("[data-apa-log-chain]", "Unknown while verification runs");
     try {
       const requestOptions = {
         headers: { accept: "application/json" },
         cache: "no-store",
+        signal: root.AbortSignal?.timeout?.(10_000),
       };
       const [entries, checkpointResponse, issuerResponse, publication] =
         await Promise.all([
@@ -771,12 +821,22 @@
       const observedAt = new Date().toISOString();
 
       renderEntries(entries);
+      text(
+        "[data-apa-log-raw]",
+        JSON.stringify(
+          { entries, total: entries.length, next_cursor: null },
+          null,
+          2,
+        ),
+      );
       text("[data-apa-log-total]", entries.length.toLocaleString());
       text("[data-apa-log-observed]", observedAt);
       if (!result.ok) {
         container.dataset.state = "tampered";
+        sourceStamp("live", `ledger rejected ${observedAt}`);
         text("[data-apa-log-chain]", "Chain break detected");
         text("[data-apa-log-head]", "Not accepted");
+        text("[data-apa-log-checkpoint]", "Not accepted");
         text("[data-apa-log-anchor]", "Not evaluated");
         text(
           "[data-apa-log-status]",
@@ -795,8 +855,13 @@
         !["missing", "unpublished"].includes(anchorResult.status)
       ) {
         container.dataset.state = "tampered";
+        sourceStamp("live", `published prefix rejected ${observedAt}`);
         text("[data-apa-log-chain]", "Published pin rejected");
         text("[data-apa-log-head]", "Not accepted");
+        text(
+          "[data-apa-log-checkpoint]",
+          `Signed ${formatTimestamp(result.checkpoint.issued_at)}`,
+        );
         text("[data-apa-log-anchor]", "Rejected");
         text(
           "[data-apa-log-status]",
@@ -814,6 +879,11 @@
           ? `Verified through #${anchorResult.pinnedSeq.toLocaleString()}`
           : "Not independently published",
       );
+      text(
+        "[data-apa-log-checkpoint]",
+        `Signed ${formatTimestamp(result.checkpoint.issued_at)}`,
+      );
+      sourceStamp("live", `ledger checked ${observedAt}`);
 
       if (entries.length === 0) {
         container.dataset.state = "empty";
@@ -827,6 +897,17 @@
       }
 
       container.dataset.state = "verified";
+      verifiedMaterial = { checkpoint, entries, issuerDocument };
+      if (copyRawButton) {
+        copyRawButton.disabled = false;
+      }
+      if (tamperButton) {
+        tamperButton.disabled = false;
+      }
+      text(
+        "[data-apa-log-tool-status]",
+        "The verified normalized ledger is ready to copy or challenge locally.",
+      );
       text("[data-apa-log-chain]", "Continuity verified");
       text("[data-apa-log-head]", result.headHash);
       text(
@@ -835,10 +916,15 @@
       );
     } catch (error) {
       container.dataset.state = "error";
+      sourceStamp(
+        "degraded",
+        `ledger unavailable ${new Date().toISOString()}`,
+      );
       entriesElement.replaceChildren();
       text("[data-apa-log-total]", "Unavailable");
       text("[data-apa-log-chain]", "Not verified");
       text("[data-apa-log-head]", "Unavailable");
+      text("[data-apa-log-checkpoint]", "Unavailable");
       text("[data-apa-log-anchor]", "Unavailable");
       text("[data-apa-log-observed]", new Date().toISOString());
       text(
@@ -846,10 +932,61 @@
         `${error.message}. No continuity result is implied.`,
       );
     } finally {
-      retryButton.disabled = false;
+      setRetryDisabled(false);
     }
   }
 
-  retryButton.addEventListener("click", loadLog);
+  for (const button of retryButtons) {
+    button.addEventListener("click", loadLog);
+  }
+  copyRawButton?.addEventListener("click", async () => {
+    if (!verifiedMaterial) {
+      return;
+    }
+    try {
+      await root.navigator.clipboard.writeText(
+        JSON.stringify(
+          {
+            entries: verifiedMaterial.entries,
+            total: verifiedMaterial.entries.length,
+            next_cursor: null,
+          },
+          null,
+          2,
+        ),
+      );
+      text("[data-apa-log-tool-status]", "Normalized ledger JSON copied.");
+    } catch (error) {
+      text(
+        "[data-apa-log-tool-status]",
+        `Copy failed: ${error.message}`,
+      );
+    }
+  });
+  tamperButton?.addEventListener("click", async () => {
+    if (!verifiedMaterial || verifiedMaterial.entries.length === 0) {
+      return;
+    }
+    const changed = verifiedMaterial.entries.map((entry) => ({ ...entry }));
+    changed[0].record_hash = `${changed[0].record_hash[0] === "0" ? "1" : "0"}${changed[0].record_hash.slice(1)}`;
+    try {
+      const result = await verifySignedLog(
+        changed,
+        verifiedMaterial.checkpoint,
+        verifiedMaterial.issuerDocument,
+      );
+      text(
+        "[data-apa-log-tool-status]",
+        result.ok
+          ? "Unexpected result: the changed local copy was accepted."
+          : `Local tamper rejected: ${result.reason}`,
+      );
+    } catch (error) {
+      text(
+        "[data-apa-log-tool-status]",
+        `Local tamper rejected: ${error.message}`,
+      );
+    }
+  });
   loadLog();
 })(typeof globalThis === "undefined" ? this : globalThis);

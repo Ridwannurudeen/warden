@@ -300,8 +300,8 @@ curl --fail-with-body -sS ${shellEndpoint} \\
   -H "content-type: application/json" \\
   -H "PAYMENT-SIGNATURE: $PAYMENT_SIGNATURE" \\
   --data ${shellSingleQuote(requestJson)}`,
-      python: `import os\n\nimport httpx\n\npayment_signature = os.environ.get("PAYMENT_SIGNATURE")\nif not payment_signature:\n    raise RuntimeError("PAYMENT_SIGNATURE is required in the server or agent runtime")\n\n# This request spends ${price} USDT for Warden service #${serviceId}.\nresponse = httpx.post(\n    ${endpointLiteral},\n    headers={"PAYMENT-SIGNATURE": payment_signature},\n    json=${requestPretty},\n    timeout=30,\n)\nif response.status_code == 402:\n    raise RuntimeError("Payment was not accepted; refresh and validate the x402 challenge")\nresponse.raise_for_status()\nresult = response.json()\n\n${pythonResult}`,
-      typescript: `${typescriptContract}\n\n// Server or agent runtime only. Never bundle this value into browser code.\nconst paymentSignature = process.env.PAYMENT_SIGNATURE;\nif (!paymentSignature) throw new Error("PAYMENT_SIGNATURE is required");\n\n// This request spends ${price} USDT for Warden service #${serviceId}.\nconst response = await fetch(${endpointLiteral}, {\n  method: "POST",\n  headers: {\n    "content-type": "application/json",\n    "PAYMENT-SIGNATURE": paymentSignature,\n  },\n  body: JSON.stringify(${requestPretty}),\n});\nif (response.status === 402) {\n  throw new Error("Payment was not accepted; refresh and validate the x402 challenge");\n}\nif (!response.ok) throw new Error(\`Warden returned HTTP \${response.status}\`);\n\n${typescriptResult}`,
+      python: `import os\n\nimport httpx\n\npayment_signature = os.environ.get("PAYMENT_SIGNATURE")\nif not payment_signature:\n    raise RuntimeError("PAYMENT_SIGNATURE is required in the server or agent runtime")\n\n# This request spends ${price} USDT for Warden service #${serviceId}.\n# Do not automatically retry a paid replay; establish settlement state first.\nresponse = httpx.post(\n    ${endpointLiteral},\n    headers={"PAYMENT-SIGNATURE": payment_signature},\n    json=${requestPretty},\n    timeout=30,\n)\nif response.status_code == 402:\n    raise RuntimeError("Payment was not accepted; refresh and validate the x402 challenge")\nresponse.raise_for_status()\nresult = response.json()\n\n${pythonResult}`,
+      typescript: `${typescriptContract}\n\n// Server or agent runtime only. Never bundle this value into browser code.\nconst paymentSignature = process.env.PAYMENT_SIGNATURE;\nif (!paymentSignature) throw new Error("PAYMENT_SIGNATURE is required");\n\n// This request spends ${price} USDT for Warden service #${serviceId}.\n// Do not automatically retry a paid replay; establish settlement state first.\nconst response = await fetch(${endpointLiteral}, {\n  method: "POST",\n  headers: {\n    "content-type": "application/json",\n    "PAYMENT-SIGNATURE": paymentSignature,\n  },\n  body: JSON.stringify(${requestPretty}),\n  signal: AbortSignal.timeout(30_000),\n});\nif (response.status === 402) {\n  throw new Error("Payment was not accepted; refresh and validate the x402 challenge");\n}\nif (!response.ok) throw new Error(\`Warden returned HTTP \${response.status}\`);\n\n${typescriptResult}`,
       mcp: `{
   "mcpServers": {
     "warden": {
@@ -382,7 +382,9 @@ Local MCP does not spend ${price} USDT or call marketplace service #${serviceId}
   const catalogStatus = document.querySelector(
     "[data-integrate-catalog-status]",
   );
+  const catalogStamp = document.querySelector("[data-integrate-catalog-stamp]");
   const retryButton = document.querySelector("[data-integrate-retry]");
+  const copyStatus = document.querySelector("[data-copy-status]");
   const copyButtons = Array.from(
     document.querySelectorAll("[data-surface-panel] [data-copy-target]"),
   );
@@ -417,6 +419,24 @@ Local MCP does not spend ${price} USDT or call marketplace service #${serviceId}
     const element = document.querySelector(selector);
     if (element) {
       element.textContent = value;
+    }
+  }
+
+  function setSourceStamp(element, state) {
+    if (!element) {
+      return;
+    }
+    const normalized = String(state).toUpperCase();
+    element.dataset.sourceStamp = normalized;
+    element.dataset.sourceState = normalized;
+    const label = element.querySelector("[data-source-stamp-label]");
+    if (label) {
+      label.textContent = normalized;
+    }
+    element.removeAttribute("aria-label");
+    root.WardenUI?.applySourceStamp(element, normalized);
+    if (!element.hasAttribute("aria-label")) {
+      element.setAttribute("aria-label", `Source state: ${normalized}.`);
     }
   }
 
@@ -455,7 +475,8 @@ Local MCP does not spend ${price} USDT or call marketplace service #${serviceId}
     retryButton.disabled = true;
     serviceSelect.disabled = true;
     serviceSelect.replaceChildren();
-    catalogStatus.textContent = "Loading the normalized service catalog...";
+    setSourceStamp(catalogStamp, "UNKNOWN");
+    catalogStatus.textContent = "Requesting the normalized service catalog.";
     try {
       const response = await root.fetch("/data/warden-services.json", {
         headers: { accept: "application/json" },
@@ -476,11 +497,13 @@ Local MCP does not spend ${price} USDT or call marketplace service #${serviceId}
         serviceSelect.append(option);
       }
       serviceSelect.disabled = false;
+      setSourceStamp(catalogStamp, "DATED");
       catalogStatus.textContent = `Catalog snapshot ${catalog.snapshotFetchedAt}. Service display values and examples use this source.`;
       renderService();
     } catch (error) {
       catalog = null;
       setIntegrationCopiesEnabled(copyButtons, false);
+      setSourceStamp(catalogStamp, "DEGRADED");
       catalogStatus.textContent = `${error.message}.`;
       retryButton.hidden = false;
       retryButton.disabled = false;
@@ -492,6 +515,24 @@ Local MCP does not spend ${price} USDT or call marketplace service #${serviceId}
     root.WardenUI?.focusStatusTarget(catalogStatus);
     loadCatalog();
   });
+  for (const button of copyButtons) {
+    button.addEventListener("click", async () => {
+      const target = document.getElementById(button.dataset.copyTarget);
+      if (!target || button.disabled) {
+        return;
+      }
+      try {
+        await root.navigator.clipboard.writeText(target.textContent);
+        if (copyStatus) {
+          copyStatus.textContent = `${button.textContent.trim()} copied. Review it before use.`;
+        }
+      } catch (error) {
+        if (copyStatus) {
+          copyStatus.textContent = `Copy failed: ${error.message}`;
+        }
+      }
+    });
+  }
   if (tabs.length > 0) {
     selectTab(tabs[0]);
   }

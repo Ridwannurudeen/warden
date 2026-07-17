@@ -13,17 +13,35 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from warden.site_docs import render_docs  # noqa: E402
+from warden.sitemap import write_crawler_files  # noqa: E402
+
+DEFAULT_DOCS_OUTPUT = ROOT / "site" / "docs"
+DEFAULT_SPEC_OUTPUT = ROOT / "site" / "spec" / "APA-SPEC.md"
+DEFAULT_SITE_ROOT = ROOT / "site"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build Warden's generated static pages.")
-    parser.add_argument("--docs-output", type=Path, default=ROOT / "site" / "docs")
+    parser.add_argument("--docs-output", type=Path, default=DEFAULT_DOCS_OUTPUT)
     parser.add_argument(
         "--spec-output",
         type=Path,
-        default=ROOT / "site" / "spec" / "APA-SPEC.md",
+        default=DEFAULT_SPEC_OUTPUT,
+    )
+    parser.add_argument(
+        "--site-root",
+        type=Path,
+        help="Complete public site tree whose assets and crawler files should be regenerated.",
     )
     return parser.parse_args()
+
+
+def _crawler_site_root(args: argparse.Namespace) -> Path | None:
+    if args.site_root is not None:
+        return args.site_root
+    if args.docs_output == DEFAULT_DOCS_OUTPUT and args.spec_output == DEFAULT_SPEC_OUTPUT:
+        return DEFAULT_SITE_ROOT
+    return None
 
 
 def version_static_assets(site: Path) -> int:
@@ -53,9 +71,13 @@ def main() -> None:
     render_docs(ROOT, args.docs_output)
     args.spec_output.parent.mkdir(parents=True, exist_ok=True)
     args.spec_output.write_bytes((ROOT / "spec" / "APA-SPEC.md").read_bytes())
-    versioned = version_static_assets(ROOT / "site")
     print("Built 11 reason-code pages, the documentation index, and the public APA spec.")
-    print(f"Versioned styles.css/app.js references on {versioned} page(s).")
+    site_root = _crawler_site_root(args)
+    if site_root is not None:
+        versioned = version_static_assets(site_root)
+        routes = write_crawler_files(site_root)
+        print(f"Versioned styles.css/app.js references on {versioned} page(s).")
+        print(f"Generated crawler files for {len(routes)} canonical public routes.")
 
 
 if __name__ == "__main__":

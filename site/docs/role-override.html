@@ -16,30 +16,36 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="https://warden.gudman.xyz/assets/warden-social-card.png">
     <link rel="icon" href="/assets/warden-avatar.png">
-    <link rel="stylesheet" href="/styles.css?v=1267bdfa">
+    <link rel="stylesheet" href="/styles.css?v=96b93423">
   </head>
-  <body>
+  <body class="page-archetype--docs">
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
       <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
-      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><details class="nav-group"><summary>Product</summary><div class="nav-menu"><a href="/theater">Attack Theater</a><a href="/playground">Playground</a><a href="/agents">Marketplace index</a><a href="/gauntlet">Gauntlet</a><a href="/showcase">Walkthrough</a></div></details><details class="nav-group has-current"><summary>Developers</summary><div class="nav-menu"><a href="/docs" aria-current="page">Documentation</a><a href="/integrate">Integrate</a><a href="/trust">Trust Layer</a><a href="/status">API status</a></div></details><details class="nav-group"><summary>Evidence</summary><div class="nav-menu"><a href="/verify">Verify APA</a><a href="/apa/log">Transparency log</a><a href="/badges">Audit badges</a><a href="/agents#methodology">Public-text methodology</a><a href="/gauntlet#policy">Adversarial challenge</a></div></details><div class="nav-mobile-actions"><a class="button secondary" href="/hire">Hire on OKX.AI</a><a class="button primary" href="/playground">Run a live scan</a></div></nav>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><details class="nav-group"><summary>Product</summary><div class="nav-menu"><a href="/">Overview</a><a href="/playground">Live Playground</a><a href="/theater">Attack Theater</a><a href="/hire">Use Warden</a></div></details><details class="nav-group has-current"><summary>Developers</summary><div class="nav-menu"><a href="/integrate#sdk-first">5-Minute Quickstart</a><a href="/integrate">Integrations</a><a href="/docs" aria-current="page">Documentation</a></div></details><details class="nav-group"><summary>Evidence</summary><div class="nav-menu"><a href="/verify">Verify an Attestation</a><a href="/apa/log">Transparency Log</a><a href="/badges">Endpoint Audit Records</a><a href="/agents">Marketplace Evidence Index</a><a href="/status">Service Status</a></div></details><details class="nav-group"><summary>Research</summary><div class="nav-menu"><a href="/gauntlet">Gauntlet</a><a href="/agents#methodology">Methodology</a><a href="/showcase">Product Tour</a></div></details><div class="nav-mobile-actions"><a class="button secondary" href="/integrate">Integrate</a><a class="button primary" href="/playground">Run live scan</a></div></nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status" aria-label="Open API status"><span class="live-dot" data-health-dot aria-hidden="true"></span><span data-health-label>Checking API</span></a>
-        <a class="header-hire" href="/hire">Hire</a>
-        <a class="header-scan" href="/playground">Run scan</a>
+        <a class="status-pill" href="/status" aria-label="Service status: unknown" data-health-state="unknown"><span class="live-dot is-unknown" data-health-dot aria-hidden="true"></span><span data-health-label>Status unknown</span></a>
+        <a class="header-hire" href="/integrate">Integrate</a>
+        <a class="header-scan" href="/playground">Run live scan</a>
         <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button>
       </div>
     </header>
     <main id="main" class="page-shell site-main">
 <section class="page-hero page-hero--compact">
+  <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><a href="/docs">Documentation</a><span aria-hidden="true">/</span><span>Role override</span></nav>
   <p class="eyebrow">Reason code</p>
   <h1>ROLE_OVERRIDE</h1>
   <p class="hero-text">Untrusted content tries to coerce an agent outside its authorized commerce role.</p>
+  <p class="docs-metadata"><span>Documentation version <code>0.1.0</code></span><span>Last updated <time datetime="2026-07-17">2026-07-17</time></span></p>
 </section>
 <div class="doc-layout">
   <aside class="doc-nav" aria-label="Reason codes"><a href="/docs">All reason codes</a><a href="/docs/prompt-injection">PROMPT_INJECTION</a><a href="/docs/role-override" aria-current="page">ROLE_OVERRIDE</a><a href="/docs/web3-injection">WEB3_INJECTION</a><a href="/docs/hidden-unicode">HIDDEN_UNICODE</a><a href="/docs/encoding-trick">ENCODING_TRICK</a><a href="/docs/statistical-anomaly">STATISTICAL_ANOMALY</a><a href="/docs/corpus-match">CORPUS_MATCH</a><a href="/docs/drain-address">DRAIN_ADDRESS</a><a href="/docs/tool-hijack">TOOL_HIJACK</a><a href="/docs/secret-exfil">SECRET_EXFIL</a><a href="/docs/malicious-link">MALICIOUS_LINK</a></aside>
   <article class="prose">
+    <nav class="table-of-contents" aria-label="On this page">
+      <strong>On this page</strong>
+      <a href="#corpus-example">Corpus example</a><a href="#observed-contract">Observed contract</a><a href="#detector-behavior">Detector behavior</a><a href="#commerce-impact">Commerce impact</a><a href="#detector-boundary">Detector boundary</a><a href="#integration-guidance">Integration guidance</a>
+    </nav>
     <section id="corpus-example">
       <p class="eyebrow">Corpus case role-001</p>
       <h2>Real regression input <a class="heading-anchor" href="#corpus-example" aria-label="Link to corpus example">#</a></h2>
@@ -50,6 +56,7 @@
     <section id="observed-contract">
       <h2>Observed decision contract <a class="heading-anchor" href="#observed-contract" aria-label="Link to observed decision contract">#</a></h2>
       <div class="result-grid">
+      <div><span>Machine-readable value</span><strong><code>ROLE_OVERRIDE</code></strong></div>
       <div><span>Fast-path result</span><strong>SANITIZE</strong></div>
       <div><span>Thorough result</span><strong>SANITIZE</strong></div>
       <div><span>Documented risk</span><strong>MEDIUM</strong></div>
@@ -58,16 +65,17 @@
     </section>
     <section id="detector-behavior"><h2>What Warden detects <a class="heading-anchor" href="#detector-behavior" aria-label="Link to detector behavior">#</a></h2><p>Warden flags identity and authority reassignment phrases as untrusted control text.</p></section>
     <section id="commerce-impact"><h2>Why it matters in agent commerce <a class="heading-anchor" href="#commerce-impact" aria-label="Link to commerce impact">#</a></h2><p>Untrusted content tries to coerce an agent outside its authorized commerce role.</p></section>
-    <section id="detector-boundary"><h2>Detector boundary <a class="heading-anchor" href="#detector-boundary" aria-label="Link to detector boundary">#</a></h2><aside class="callout"><strong>Boundary:</strong> Downstream policy still decides what a sanitized response may do.</aside></section>
-    <div class="hero-actions"><a class="button primary" href="/playground">Test the fast path</a><a class="button secondary" href="/integrate">Integrate Warden</a></div>
+    <section id="detector-boundary"><h2>Detector boundary <a class="heading-anchor" href="#detector-boundary" aria-label="Link to detector boundary">#</a></h2><h3>False-positive considerations</h3><aside class="callout"><strong>Boundary:</strong> Downstream policy still decides what a sanitized response may do.</aside></section>
+    <section id="integration-guidance"><h2>Related integration guidance <a class="heading-anchor" href="#integration-guidance" aria-label="Link to integration guidance">#</a></h2><p>Preserve the caller&#x27;s role and review the sanitized payload.</p><p>Preserve the machine-readable reason value in decision logs, but do not treat it as a probability or a universal statement about the payload.</p></section>
+    <div class="hero-actions"><a class="button primary" href="/playground">Test the fast path</a><a class="button secondary" href="/integrate">Integrate in 5 minutes</a></div>
     <nav class="doc-pagination" aria-label="Reason-code pagination"><a class="button secondary" rel="prev" href="/docs/prompt-injection"><span>Previous</span><strong>PROMPT_INJECTION</strong></a><a class="button secondary" rel="next" href="/docs/web3-injection"><span>Next</span><strong>WEB3_INJECTION</strong></a></nav>
   </article>
 </div>
 </main>
     <footer class="site-footer page-shell">
-      <div><strong>Warden</strong><span>The immune system of the agent economy.</span><span>Independent service listed on OKX.AI.</span></div>
-      <nav aria-label="Footer"><a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a><a href="/showcase">Walkthrough</a><a href="/docs">Docs</a><a href="/badges">Evidence</a><a href="/status">Status</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></nav>
+      <div><strong>Warden</strong><span>Verifiable pre-action security for AI agents.</span><span>Gate the action. Keep the proof.</span></div>
+      <nav aria-label="Footer"><div class="site-footer__col"><span class="site-footer__label">Product</span><a href="/">Overview</a><a href="/playground">Live Playground</a><a href="/theater">Attack Theater</a><a href="/hire">Use Warden</a></div><div class="site-footer__col"><span class="site-footer__label">Developers</span><a href="/integrate#sdk-first">5-Minute Quickstart</a><a href="/integrate">Integrations</a><a href="/docs">Documentation</a></div><div class="site-footer__col"><span class="site-footer__label">Evidence</span><a href="/verify">Verify an Attestation</a><a href="/apa/log">Transparency Log</a><a href="/badges">Endpoint Audit Records</a><a href="/agents">Marketplace Evidence Index</a><a href="/status">Service Status</a></div><div class="site-footer__col"><span class="site-footer__label">Research</span><a href="/gauntlet">Gauntlet</a><a href="/agents#methodology">Methodology</a><a href="/showcase">Product Tour</a></div><div class="site-footer__col"><span class="site-footer__label">Policy</span><a href="/trust">Trust &amp; Security</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></div></nav>
     </footer>
-    <script src="/app.js?v=65a484d3" defer></script>
+    <script src="/app.js?v=5c7f3a4c" defer></script>
   </body>
 </html>

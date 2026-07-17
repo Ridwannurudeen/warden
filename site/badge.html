@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Verify one signed Warden endpoint-audit badge by audit ID."
+      content="Inspect one Warden endpoint audit record, its point-in-time outcome, and its current stored-record integrity result."
     />
     <meta name="color-scheme" content="dark light" />
-    <title>Verify Audit Badge | Warden</title>
+    <title>Endpoint Audit Record | Warden</title>
     <link rel="canonical" href="https://warden.gudman.xyz/badge" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Warden" />
-    <meta property="og:title" content="Verify Audit Badge | Warden" />
+    <meta property="og:title" content="Endpoint Audit Record | Warden" />
     <meta
       property="og:description"
-      content="Verify one signed Warden endpoint-audit badge by audit ID."
+      content="Inspect one Warden endpoint audit record, its point-in-time outcome, and its current stored-record integrity result."
     />
     <meta property="og:url" content="https://warden.gudman.xyz/badge" />
     <meta
@@ -29,7 +29,7 @@
     />
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
+    <link rel="stylesheet" href="/styles.css?v=96b93423" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -55,38 +55,58 @@
         <details class="nav-group">
           <summary>Product</summary>
           <div class="nav-menu">
-            <a href="/playground">Playground</a>
+            <a href="/">Overview</a>
+            <a href="/playground">Live Playground</a>
             <a href="/theater">Attack Theater</a>
-            <a href="/agents">Marketplace index</a>
+            <a href="/hire">Use Warden</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Developers</summary>
           <div class="nav-menu">
+            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+            <a href="/integrate">Integrations</a>
             <a href="/docs">Documentation</a>
-            <a href="/integrate">Integrate</a>
+          </div>
+        </details>
+        <details class="nav-group has-current">
+          <summary>Evidence</summary>
+          <div class="nav-menu">
+            <a href="/verify">Verify an Attestation</a>
+            <a href="/apa/log">Transparency Log</a>
+            <a href="/badges" aria-current="page">Endpoint Audit Records</a>
+            <a href="/agents">Marketplace Evidence Index</a>
+            <a href="/status">Service Status</a>
           </div>
         </details>
         <details class="nav-group">
-          <summary>Evidence</summary>
+          <summary>Research</summary>
           <div class="nav-menu">
-            <a href="/verify">Verify APA</a>
-            <a href="/apa/log">Transparency log</a>
-            <a href="/trust">Trust Layer</a>
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/agents#methodology">Methodology</a>
+            <a href="/showcase">Product Tour</a>
           </div>
         </details>
         <div class="nav-mobile-actions">
-          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
-          <a class="button primary" href="/playground">Run a live scan</a>
+          <a class="button secondary" href="/integrate">Integrate</a>
+          <a class="button primary" href="/playground">Run live scan</a>
         </div>
       </nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status" aria-label="Open API status"
-          ><span class="live-dot" data-health-dot aria-hidden="true"></span
-          ><span data-health-label>Checking API</span></a
+        <a
+          class="status-pill"
+          href="/status"
+          aria-label="Service status: unknown"
+          data-health-state="unknown"
+          ><span
+            class="live-dot is-unknown"
+            data-health-dot
+            aria-hidden="true"
+          ></span
+          ><span data-health-label>Status unknown</span></a
         >
-        <a class="header-hire" href="/hire">Hire</a>
-        <a class="header-scan" href="/playground">Run scan</a>
+        <a class="header-hire" href="/integrate">Integrate</a>
+        <a class="header-scan" href="/playground">Run live scan</a>
         <button
           class="theme-toggle"
           type="button"
@@ -99,29 +119,44 @@
     </header>
 
     <main id="main" class="page-shell site-main">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Home</a><span aria-hidden="true">/</span
+        ><a href="/badges">Endpoint Audit Records</a
+        ><span aria-hidden="true">/</span
+        ><span aria-current="page">Record detail</span>
+      </nav>
       <section class="page-hero page-hero--compact">
-        <p class="eyebrow">Badge integrity check</p>
-        <h1>Verify one issued audit record.</h1>
+        <p class="eyebrow">Evidence / Record detail</p>
+        <h1>Separate the audit result from its integrity.</h1>
         <p class="hero-text">
-          The route resolves one 16-character audit ID and asks
-          <code>GET /badge/{audit_id}</code> for the stored public record and
-          its current server-side signature result.
+          This route resolves one 16-character audit ID. The issue timestamp
+          bounds what the audit observed; the live lookup separately reports
+          whether the stored payload still matches its server-side signature.
         </p>
         <div class="hero-actions">
-          <a class="button secondary" href="/badges">Back to registry</a>
+          <a class="button secondary" href="/badges">All endpoint audit records</a>
         </div>
       </section>
 
       <section
         class="console-card badge-detail"
         data-badge-detail
-        data-state="loading"
+        data-state="unknown"
       >
         <div class="section-heading">
-          <p class="eyebrow">Verification result</p>
-          <h2 data-badge-heading>Checking badge</h2>
+          <p class="eyebrow">Stored-record check</p>
+          <h2 data-badge-heading>Verification not run</h2>
+          <p>
+            <span
+              class="source-stamp source-stamp--unknown"
+              data-badge-detail-source
+              data-source-stamp
+              data-source-state="unknown"
+              >UNKNOWN · record not requested</span
+            >
+          </p>
           <p data-badge-status aria-live="polite">
-            Loading the signed record...
+            No record or integrity conclusion is available yet.
           </p>
           <button
             class="button secondary"
@@ -140,16 +175,22 @@
             <span
               class="status-label status-label--pending"
               data-badge-verification
-              >Pending</span
+              >Unknown until checked</span
             >
             <dl class="data-list">
               <div>
                 <dt>Audit ID</dt>
-                <dd class="num" data-badge-audit-id>--</dd>
+                <dd class="num" data-badge-audit-id>
+                  Not available until requested
+                </dd>
               </div>
               <div>
                 <dt>Signature</dt>
-                <dd><code data-badge-signature>--</code></dd>
+                <dd>
+                  <code data-badge-signature
+                    >Not available until requested</code
+                  >
+                </dd>
               </div>
             </dl>
           </section>
@@ -160,15 +201,19 @@
             <dl class="data-list">
               <div>
                 <dt>Grade</dt>
-                <dd data-badge-grade>--</dd>
+                <dd data-badge-grade>Not available until requested</dd>
               </div>
               <div>
                 <dt>Score</dt>
-                <dd class="num" data-badge-score>--</dd>
+                <dd class="num" data-badge-score>
+                  Not available until requested
+                </dd>
               </div>
               <div>
                 <dt>Battery cases blocked or flagged</dt>
-                <dd class="num" data-badge-blocked>--</dd>
+                <dd class="num" data-badge-blocked>
+                  Not available until requested
+                </dd>
               </div>
             </dl>
           </section>
@@ -179,7 +224,7 @@
             <dl class="data-list">
               <div>
                 <dt>Target host</dt>
-                <dd data-badge-target>--</dd>
+                <dd data-badge-target>Not available until requested</dd>
               </div>
             </dl>
           </section>
@@ -190,11 +235,23 @@
             <dl class="data-list">
               <div>
                 <dt>Issued</dt>
-                <dd class="num" data-badge-issued>--</dd>
+                <dd class="num" data-badge-issued>
+                  Not available until requested
+                </dd>
               </div>
             </dl>
           </section>
         </div>
+
+        <details class="snippet-card">
+          <summary>Inspect the signed record JSON</summary>
+          <p>
+            This is the stored public payload. The API's integrity conclusion is
+            presented separately above and is not inserted into the signed
+            record.
+          </p>
+          <pre><code data-badge-raw-json>Record JSON is unavailable until the lookup succeeds.</code></pre>
+        </details>
 
         <div class="record-actions" aria-label="Badge record actions">
           <button
@@ -215,11 +272,12 @@
           </button>
           <p data-badge-action-status aria-live="polite"></p>
         </div>
-        <p class="caveat">
+        <p class="caveat evidence-boundary">
+          <strong>This is point-in-time evidence, not certification.</strong>
           Sharing copies only the canonical verification URL. Signature validity
-          proves record integrity for this stored payload; the audit result is
-          point-in-time evidence from a fixed battery, not a guarantee of target
-          safety, ownership, or future behavior.
+          establishes stored-record integrity for this payload. It does not
+          establish target ownership, current safety, continuous monitoring,
+          expiry or revocation status, or future behavior.
         </p>
       </section>
     </main>
@@ -227,20 +285,47 @@
     <footer class="site-footer page-shell">
       <div>
         <strong>Warden</strong
-        ><span>The immune system of the agent economy.</span
-        ><span>Independent service listed on OKX.AI.</span>
+        ><span>Verifiable pre-action security for AI agents.</span
+        ><span>Gate the action. Keep the proof.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a
-        ><a href="/playground">Run a scan</a><a href="/gauntlet">Gauntlet</a
-        ><a href="/showcase">Walkthrough</a
-        ><a href="/docs">Docs</a><a href="/badges">Audit badges</a
-        ><a href="/status">API status</a><a href="/privacy">Privacy</a
-        ><a href="/terms">Terms</a
-        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Product</span>
+          <a href="/">Overview</a>
+          <a href="/playground">Live Playground</a>
+          <a href="/theater">Attack Theater</a>
+          <a href="/hire">Use Warden</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Developers</span>
+          <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+          <a href="/integrate">Integrations</a>
+          <a href="/docs">Documentation</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Evidence</span>
+          <a href="/verify">Verify an Attestation</a>
+          <a href="/apa/log">Transparency Log</a>
+          <a href="/badges">Endpoint Audit Records</a>
+          <a href="/agents">Marketplace Evidence Index</a>
+          <a href="/status">Service Status</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Research</span>
+          <a href="/gauntlet">Gauntlet</a>
+          <a href="/agents#methodology">Methodology</a>
+          <a href="/showcase">Product Tour</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Policy</span>
+          <a href="/trust">Trust &amp; Security</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        </div>
       </nav>
     </footer>
-    <script src="/app.js?v=65a484d3" defer></script>
+    <script src="/app.js?v=5c7f3a4c" defer></script>
     <script src="/badge.js" defer></script>
   </body>
 </html>

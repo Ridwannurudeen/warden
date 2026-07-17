@@ -5,17 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Try to get an adversarial payload past Warden's real deterministic firewall."
+      content="Submit an authorized adversarial payload to Warden's deterministic fast path for private human review."
     />
     <meta name="color-scheme" content="dark light" />
-    <title>The Gauntlet | Try to Bypass Warden</title>
+    <title>Gauntlet | Authorized Adversarial Research | Warden</title>
     <link rel="canonical" href="https://warden.gudman.xyz/gauntlet" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Warden" />
-    <meta property="og:title" content="The Gauntlet | Try to Bypass Warden" />
+    <meta
+      property="og:title"
+      content="Gauntlet | Authorized Adversarial Research | Warden"
+    />
     <meta
       property="og:description"
-      content="Try to get an adversarial payload past Warden's real deterministic firewall."
+      content="Declared attacks, private review, and signed public evidence for human-confirmed bypasses."
     />
     <meta property="og:url" content="https://warden.gudman.xyz/gauntlet" />
     <meta
@@ -38,7 +41,7 @@
       sizes="180x180"
       href="/assets/apple-touch-icon.png"
     />
-    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
+    <link rel="stylesheet" href="/styles.css?v=96b93423" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -64,38 +67,50 @@
         <details class="nav-group">
           <summary>Product</summary>
           <div class="nav-menu">
-            <a href="/playground">Playground</a>
+            <a href="/">Overview</a>
+            <a href="/playground">Live Playground</a>
             <a href="/theater">Attack Theater</a>
-            <a href="/agents">Marketplace index</a>
+            <a href="/hire">Use Warden</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Developers</summary>
           <div class="nav-menu">
+            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+            <a href="/integrate">Integrations</a>
             <a href="/docs">Documentation</a>
-            <a href="/integrate">Integrate</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Evidence</summary>
           <div class="nav-menu">
-            <a href="/verify">Verify APA</a>
-            <a href="/apa/log">Transparency log</a>
-            <a href="/trust">Trust Layer</a>
+            <a href="/verify">Verify an Attestation</a>
+            <a href="/apa/log">Transparency Log</a>
+            <a href="/badges">Endpoint Audit Records</a>
+            <a href="/agents">Marketplace Evidence Index</a>
+            <a href="/status">Service Status</a>
+          </div>
+        </details>
+        <details class="nav-group has-current">
+          <summary>Research</summary>
+          <div class="nav-menu">
+            <a href="/gauntlet" aria-current="page">Gauntlet</a>
+            <a href="/agents#methodology">Methodology</a>
+            <a href="/showcase">Product Tour</a>
           </div>
         </details>
         <div class="nav-mobile-actions">
-          <a class="button secondary" href="/hire">Hire on OKX.AI</a>
-          <a class="button primary" href="/playground">Run a live scan</a>
+          <a class="button secondary" href="/integrate">Integrate</a>
+          <a class="button primary" href="/playground">Run live scan</a>
         </div>
       </nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status" aria-label="Open API status"
-          ><span class="live-dot" data-health-dot aria-hidden="true"></span
-          ><span data-health-label>Checking API</span></a
+        <a class="status-pill" href="/status" aria-label="Service status: unknown" data-health-state="unknown"
+          ><span class="live-dot is-unknown" data-health-dot aria-hidden="true"></span
+          ><span data-health-label>Status unknown</span></a
         >
-        <a class="header-hire" href="/hire">Hire</a>
-        <a class="header-scan" href="/playground">Run scan</a>
+        <a class="header-hire" href="/integrate">Integrate</a>
+        <a class="header-scan" href="/playground">Run live scan</a>
         <button
           class="theme-toggle"
           type="button"
@@ -109,16 +124,23 @@
 
     <main id="main" class="page-shell site-main">
       <section class="page-hero page-hero--compact">
-        <p class="eyebrow">Public defeat ledger</p>
+        <p class="eyebrow">Authorized adversarial research</p>
         <h1>Warden signs its own defeats.</h1>
         <p class="hero-text">
-          Every attack that beat us, cryptographically proven, already in our
-          benchmark.
+          Only human-confirmed, reproducible bypasses become signed WARDEN
+          BREAKER certificates and held-out regression cases.
         </p>
         <p class="section-copy">
           Submit an authorized adversarial payload to Warden's live
           deterministic fast path. An ALLOW is only a private candidate until a
           human reproduces and confirms the miss.
+        </p>
+        <p
+          class="source-stamp source-stamp--illustrative"
+          data-source-state="illustrative"
+        >
+          <strong>ILLUSTRATIVE</strong> The form and policy are visible without
+          submitting any content.
         </p>
       </section>
 
@@ -126,8 +148,13 @@
         <div class="section-heading">
           <p class="eyebrow">Live counters</p>
           <h2 id="stats-title">Gauntlet evidence, not example traffic.</h2>
-          <p data-gauntlet-stats-status aria-live="polite">
-            Loading live Gauntlet counters...
+          <p
+            class="source-stamp source-stamp--unknown"
+            data-gauntlet-stats-status
+            data-source-state="unknown"
+            aria-live="polite"
+          >
+            <strong>UNKNOWN</strong> Live counters have not resolved.
           </p>
         </div>
         <section
@@ -138,19 +165,23 @@
         >
           <div>
             <span>Attempts</span
-            ><strong class="num" data-stat="attempts">--</strong>
+            ><strong class="num" data-stat="attempts">Not resolved</strong>
           </div>
           <div>
             <span>Pending claims</span
-            ><strong class="num" data-stat="pending_claims">--</strong>
+            ><strong class="num" data-stat="pending_claims"
+              >Not resolved</strong
+            >
           </div>
           <div>
             <span>Confirmed bypasses</span
-            ><strong class="num" data-stat="confirmed_bypasses">--</strong>
+            ><strong class="num" data-stat="confirmed_bypasses"
+              >Not resolved</strong
+            >
           </div>
           <div>
             <span>Current corpus</span
-            ><strong class="num" data-stat="corpus_size">--</strong>
+            ><strong class="num" data-stat="corpus_size">Not resolved</strong>
           </div>
         </section>
         <p class="empty-state gauntlet-zero" data-gauntlet-zero hidden>
@@ -186,8 +217,13 @@
             Finder handles are self-asserted credits, not authenticated
             identities.
           </p>
-          <p data-breaker-status aria-live="polite">
-            Loading public BREAKER certificates...
+          <p
+            class="source-stamp source-stamp--unknown"
+            data-breaker-status
+            data-source-state="unknown"
+            aria-live="polite"
+          >
+            <strong>UNKNOWN</strong> Certificate board has not resolved.
           </p>
         </div>
         <p class="empty-state" data-breaker-empty hidden>
@@ -278,6 +314,52 @@
             <p>Only a human-confirmed, reproducible miss becomes a bypass.</p>
           </li>
         </ol>
+      </section>
+
+      <section class="feature-panel" aria-labelledby="review-states-title">
+        <div class="section-heading">
+          <p class="eyebrow">Review-state contract</p>
+          <h2 id="review-states-title">
+            An ALLOW candidate is not a confirmed bypass.
+          </h2>
+        </div>
+        <dl class="data-list">
+          <div>
+            <dt>Pending review</dt>
+            <dd>
+              An ALLOW candidate is retained privately for an authorized human
+              reviewer to reproduce.
+            </dd>
+          </div>
+          <div>
+            <dt>Confirmed</dt>
+            <dd>
+              A reproducible miss receives a signed certificate and enters the
+              held-out evaluation set.
+            </dd>
+          </div>
+          <div>
+            <dt>Rejected</dt>
+            <dd>
+              A mislabeled, benign, non-reproducible, or out-of-scope candidate
+              does not become public proof.
+            </dd>
+          </div>
+          <div>
+            <dt>Duplicate</dt>
+            <dd>
+              The receipt references an existing candidate without retaining a
+              second raw payload.
+            </dd>
+          </div>
+          <div>
+            <dt>Detected</dt>
+            <dd>
+              BLOCK or SANITIZE means the declared path was detected and is not
+              queued as a bypass candidate.
+            </dd>
+          </div>
+        </dl>
       </section>
 
       <aside
@@ -476,6 +558,14 @@
           <p class="scan-status" data-gauntlet-status aria-live="polite">
             Ready for an authorized challenge.
           </p>
+          <p
+            class="source-stamp source-stamp--unknown"
+            data-gauntlet-result-source
+            data-source-state="unknown"
+            aria-live="polite"
+          >
+            <strong>UNKNOWN</strong> No challenge response has been accepted.
+          </p>
           <div class="scan-error" data-gauntlet-error role="alert" hidden>
             <p data-gauntlet-error-message></p>
             <button class="button secondary" type="button" data-gauntlet-retry>
@@ -503,25 +593,29 @@
               Warden result
             </h2>
           </div>
-          <span class="status-label" data-gauntlet-state>Waiting</span>
+          <span class="status-label" data-gauntlet-state>No result</span>
         </div>
         <p class="recommended-action" data-gauntlet-message></p>
         <dl class="data-list receipt-data">
           <div>
             <dt>Decision</dt>
-            <dd data-gauntlet-verdict>--</dd>
+            <dd data-gauntlet-verdict>Not returned</dd>
           </div>
           <div>
             <dt>Risk severity</dt>
-            <dd data-gauntlet-risk>--</dd>
+            <dd data-gauntlet-risk>Not returned</dd>
           </div>
           <div>
             <dt>Reason codes</dt>
-            <dd data-gauntlet-reasons>--</dd>
+            <dd data-gauntlet-reasons>Not returned</dd>
           </div>
           <div>
             <dt>Claim ID</dt>
             <dd><code data-gauntlet-claim-id>Not applicable</code></dd>
+          </div>
+          <div>
+            <dt>Response received</dt>
+            <dd data-gauntlet-checked-at>Not run</dd>
           </div>
         </dl>
         <pre><code id="gauntlet-receipt-json" data-gauntlet-receipt-json>{}</code></pre>
@@ -554,21 +648,47 @@
     </main>
 
     <footer class="site-footer page-shell">
-      <div>
+      <div class="site-footer__brand">
         <strong>Warden</strong
-        ><span>The immune system of the agent economy.</span
-        ><span>Independent service listed on OKX.AI.</span>
+        ><span>Verifiable pre-action security for AI agents.</span
+        ><span>Gate the action. Keep the proof.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
-        ><a href="/gauntlet" aria-current="page">Gauntlet</a
-        ><a href="/showcase">Walkthrough</a><a href="/docs">Docs</a
-        ><a href="/badges">Audit badges</a><a href="/status">API status</a
-        ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
-        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Product</span>
+          <a href="/">Overview</a><a href="/playground">Live Playground</a
+          ><a href="/theater">Attack Theater</a
+          ><a href="/hire">Use Warden</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Developers</span>
+          <a href="/integrate#sdk-first">5-Minute Quickstart</a
+          ><a href="/integrate">Integrations</a
+          ><a href="/docs">Documentation</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Evidence</span>
+          <a href="/verify">Verify an Attestation</a
+          ><a href="/apa/log">Transparency Log</a
+          ><a href="/badges">Endpoint Audit Records</a
+          ><a href="/agents">Marketplace Evidence Index</a
+          ><a href="/status">Service Status</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Research</span>
+          <a href="/gauntlet">Gauntlet</a
+          ><a href="/agents#methodology">Methodology</a
+          ><a href="/showcase">Product Tour</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Policy</span>
+          <a href="/trust">Trust &amp; Security</a
+          ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
+          ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        </div>
       </nav>
     </footer>
-    <script src="/app.js?v=65a484d3" defer></script>
+    <script src="/app.js?v=5c7f3a4c" defer></script>
     <script src="/scan-client.js" defer></script>
     <script src="/gauntlet.js" defer></script>
   </body>

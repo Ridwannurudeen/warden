@@ -87,10 +87,42 @@
       detectionCount: data.detections.length,
       latency: `${Number(data.latency_ms).toFixed(2)} ms`,
       reasons,
-      recommendation: data.recommendation,
+      recommendation:
+        data.verdict === "ALLOW"
+          ? "No implemented fast-path detector fired. This is not a guarantee that the content is safe."
+          : data.recommendation,
       riskLevel: data.risk_level,
       riskNote,
       verdict: data.verdict,
+    };
+  }
+
+  function deriveTextDifference(before, after) {
+    let start = 0;
+    while (
+      start < before.length &&
+      start < after.length &&
+      before[start] === after[start]
+    ) {
+      start += 1;
+    }
+
+    let beforeEnd = before.length;
+    let afterEnd = after.length;
+    while (
+      beforeEnd > start &&
+      afterEnd > start &&
+      before[beforeEnd - 1] === after[afterEnd - 1]
+    ) {
+      beforeEnd -= 1;
+      afterEnd -= 1;
+    }
+
+    return {
+      prefix: before.slice(0, start),
+      removed: before.slice(start, beforeEnd),
+      added: after.slice(start, afterEnd),
+      suffix: before.slice(beforeEnd),
     };
   }
 
@@ -98,6 +130,7 @@
     buildDemoRequest,
     defaultExampleId,
     deriveScanPresentation,
+    deriveTextDifference,
     isCurrentPlaygroundRequest,
     recipientFocusIndexAfterRemoval,
   };
@@ -118,6 +151,9 @@
   const workspace = document.querySelector("[data-demo-workspace]");
   const exampleSelect = document.querySelector("[data-demo-example]");
   const payloadInput = document.querySelector("[data-demo-payload]");
+  const characterCount = document.querySelector(
+    "[data-demo-character-count]",
+  );
   const addressInput = document.querySelector("[data-demo-addresses]");
   const addressChips = document.querySelector("[data-demo-address-chips]");
   const addressError = document.querySelector("[data-demo-address-error]");
@@ -125,6 +161,7 @@
   const addAddressButton = document.querySelector("[data-add-demo-address]");
   const clearButton = document.querySelector("[data-clear-demo]");
   const status = document.querySelector("[data-demo-status]");
+  const sourceStamp = document.querySelector("[data-demo-source-stamp]");
   const emptyState = document.querySelector("[data-demo-empty]");
   const result = document.querySelector("[data-demo-result]");
   const errorPanel = document.querySelector("[data-demo-error]");
@@ -140,6 +177,19 @@
   function setStatus(message, state = "ready") {
     status.textContent = message;
     status.dataset.state = state;
+  }
+
+  function setSourceState(state, message) {
+    sourceStamp.dataset.sourceState = state;
+    sourceStamp.className = `source-stamp source-stamp--${state}`;
+    sourceStamp.replaceChildren();
+    const label = document.createElement("strong");
+    label.textContent = state.toUpperCase();
+    sourceStamp.append(label, ` ${message}`);
+  }
+
+  function updateCharacterCount() {
+    characterCount.textContent = `${payloadInput.value.length.toLocaleString()} / 4,000 characters`;
   }
 
   function setAddressError(message = "") {
@@ -249,11 +299,16 @@
       return;
     }
     payloadInput.value = example.payload;
+    updateCharacterCount();
     setExpectedAddresses(
       example.id === DRAIN_EXAMPLE_ID ? [DRAIN_EXPECTED_ADDRESS] : [],
     );
     setPayloadError();
     setStatus(`Loaded committed corpus example: ${example.label}.`);
+    setSourceState(
+      "illustrative",
+      "Input loaded. No verdict exists until you run the scan.",
+    );
   }
 
   function renderReasons(reasons) {
@@ -304,6 +359,17 @@
     container.replaceChildren(...nodes);
   }
 
+  function renderTextDifference(target, prefix, changed, suffix, kind) {
+    target.replaceChildren(prefix);
+    if (changed) {
+      const marker = document.createElement(kind === "removed" ? "del" : "ins");
+      marker.dataset.diff = kind;
+      marker.textContent = changed;
+      target.append(marker);
+    }
+    target.append(suffix);
+  }
+
   function renderResult(data, originalPayload) {
     const presentation = deriveScanPresentation(data, originalPayload);
     const verdictPanel = document.querySelector("[data-demo-verdict-panel]");
@@ -328,15 +394,35 @@
     );
     document.querySelector("[data-demo-latency]").textContent =
       presentation.latency;
+    const receivedAt = new Date().toISOString();
+    document.querySelector("[data-demo-checked-at]").textContent = receivedAt;
+    setSourceState(
+      "live",
+      `Validated response received from this Warden instance at ${receivedAt}.`,
+    );
     renderReasons(presentation.reasons);
     renderDetections(data.detections);
 
     const diff = document.querySelector("[data-demo-diff]");
     diff.hidden = !presentation.changed;
-    document.querySelector("[data-demo-before]").textContent =
-      presentation.before;
-    document.querySelector("[data-demo-after]").textContent =
-      presentation.after || "(empty sanitized payload)";
+    const textDifference = deriveTextDifference(
+      presentation.before,
+      presentation.after,
+    );
+    renderTextDifference(
+      document.querySelector("[data-demo-before]"),
+      textDifference.prefix,
+      textDifference.removed,
+      textDifference.suffix,
+      "removed",
+    );
+    renderTextDifference(
+      document.querySelector("[data-demo-after]"),
+      textDifference.prefix,
+      textDifference.added || "(removed)",
+      textDifference.suffix,
+      "added",
+    );
     document.querySelector("[data-demo-json]").textContent = JSON.stringify(
       data,
       null,
@@ -366,6 +452,10 @@
       emptyState.hidden = false;
       errorPanel.hidden = true;
       setStatus("Input changed. Run a new scan for the current payload.");
+      setSourceState(
+        "unknown",
+        "Input changed. The previous verdict no longer applies.",
+      );
     }
   }
 
@@ -377,6 +467,10 @@
     emptyState.hidden = false;
     errorPanel.hidden = true;
     setStatus("Scanning with Warden's deterministic fast path...", "loading");
+    setSourceState(
+      "unknown",
+      "Request in progress. No verdict has been accepted yet.",
+    );
     try {
       const data = assertScanResponse(
         await postJson("/api/demo/scan", request),
@@ -396,6 +490,10 @@
       errorMessage.textContent = formatScanError(error);
       errorPanel.hidden = false;
       setStatus("No valid verdict was accepted.", "error");
+      setSourceState(
+        "degraded",
+        "The request did not produce a valid verdict. Do not act on it.",
+      );
     } finally {
       if (isCurrentPlaygroundRequest(requestId, scanRequestId)) {
         setBusy(false);
@@ -436,6 +534,10 @@
         "The examples endpoint is unavailable. Loaded the committed drain-address regression example.",
         "error",
       );
+      setSourceState(
+        "illustrative",
+        "Committed regression input loaded locally; no live verdict exists.",
+      );
     });
 
   exampleSelect.addEventListener("change", () => {
@@ -475,6 +577,7 @@
   payloadInput.addEventListener("input", () => {
     supersedeScan();
     setPayloadError();
+    updateCharacterCount();
   });
 
   clearButton.addEventListener("click", () => {
@@ -489,6 +592,8 @@
     errorPanel.hidden = true;
     lastSubmission = null;
     setStatus("Ready for a new payload.");
+    setSourceState("unknown", "No scan has run for this payload.");
+    updateCharacterCount();
     payloadInput.focus();
   });
 
@@ -523,4 +628,5 @@
   });
 
   renderAddressChips();
+  updateCharacterCount();
 })(typeof globalThis === "undefined" ? this : globalThis);

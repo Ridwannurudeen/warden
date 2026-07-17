@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Watch Warden gate prompt injection, a drain-address swap, and secret exfiltration before a no-side-effect demo agent handler."
+      content="Run a controlled sequence showing Warden gate prompt injection, recipient manipulation, and secret exfiltration before a no-side-effect demo agent handler."
     />
     <meta name="color-scheme" content="dark light" />
     <title>Attack Theater | Warden</title>
@@ -15,7 +15,7 @@
     <meta property="og:title" content="Warden Attack Theater" />
     <meta
       property="og:description"
-      content="Three attacks. Three live verdicts. One visible runtime defense boundary."
+      content="Three controlled attacks, explicit live activation, and a visible pre-action security boundary."
     />
     <meta property="og:url" content="https://warden.gudman.xyz/theater" />
     <meta
@@ -29,7 +29,7 @@
     />
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=1267bdfa" />
+    <link rel="stylesheet" href="/styles.css?v=96b93423" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -55,37 +55,49 @@
         <details class="nav-group has-current">
           <summary>Product</summary>
           <div class="nav-menu">
-            <a href="/playground">Playground</a>
+            <a href="/">Overview</a>
+            <a href="/playground">Live Playground</a>
             <a href="/theater" aria-current="page">Attack Theater</a>
-            <a href="/agents">Marketplace index</a>
+            <a href="/hire">Use Warden</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Developers</summary>
           <div class="nav-menu">
+            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
+            <a href="/integrate">Integrations</a>
             <a href="/docs">Documentation</a>
-            <a href="/integrate">Integrate</a>
           </div>
         </details>
         <details class="nav-group">
           <summary>Evidence</summary>
           <div class="nav-menu">
-            <a href="/verify">Verify APA</a>
-            <a href="/apa/log">Transparency log</a>
-            <a href="/trust">Trust Layer</a>
+            <a href="/verify">Verify an Attestation</a>
+            <a href="/apa/log">Transparency Log</a>
+            <a href="/badges">Endpoint Audit Records</a>
+            <a href="/agents">Marketplace Evidence Index</a>
+            <a href="/status">Service Status</a>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary>Research</summary>
+          <div class="nav-menu">
+            <a href="/gauntlet">Gauntlet</a>
+            <a href="/agents#methodology">Methodology</a>
+            <a href="/showcase">Product Tour</a>
           </div>
         </details>
         <div class="nav-mobile-actions">
-          <a class="button secondary" href="/hire">Hire on OKX.AI</a
-          ><a class="button primary" href="/playground">Run a live scan</a>
+          <a class="button secondary" href="/integrate">Integrate</a
+          ><a class="button primary" href="/playground">Run live scan</a>
         </div>
       </nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status" aria-label="Open API status"
-          ><span class="live-dot" data-health-dot aria-hidden="true"></span
-          ><span data-health-label>Checking API</span></a
-        ><a class="header-hire" href="/hire">Hire</a
-        ><a class="header-scan" href="/playground">Run scan</a
+        <a class="status-pill" href="/status" aria-label="Service status: unknown" data-health-state="unknown"
+          ><span class="live-dot is-unknown" data-health-dot aria-hidden="true"></span
+          ><span data-health-label>Status unknown</span></a
+        ><a class="header-hire" href="/integrate">Integrate</a
+        ><a class="header-scan" href="/playground">Run live scan</a
         ><button
           class="theme-toggle"
           type="button"
@@ -100,13 +112,13 @@
     <main id="main" class="page-shell site-main theater-main" data-theater>
       <section class="theater-intro">
         <div>
-          <p class="eyebrow">Attack Theater · live immune response · one pass</p>
-          <h1>Watch Warden neutralize three live attacks.</h1>
+          <p class="eyebrow">Attack Theater · controlled incident sequence</p>
+          <h1>Run three attacks through one visible boundary.</h1>
           <p class="hero-text">
             Prompt injection, a recipient swap, and secret exfiltration enter a
-            Warden-owned demo agent. Every displayed verdict and downstream
-            receipt comes from <code>POST /api/demo/theater</code> during this
-            session.
+            Warden-owned demo agent only after you start the sequence. Every
+            displayed verdict and downstream receipt comes from
+            <code>POST /api/demo/theater</code> during this session.
           </p>
           <p>
             This fast demo uses deterministic checks for known patterns;
@@ -125,13 +137,20 @@
             request is blocked from its own explicit transfer intent, without a
             supplied recipient allowlist.
           </p>
+          <p
+            class="source-stamp source-stamp--illustrative"
+            data-source-state="illustrative"
+          >
+            <strong>ILLUSTRATIVE</strong> The staged input is visible before any
+            live request is made.
+          </p>
         </div>
       </section>
 
       <section class="theater-console" aria-labelledby="theater-console-title">
         <div class="theater-console__bar">
           <div>
-            <p class="eyebrow">Immune response in progress</p>
+            <p class="eyebrow">Explicitly activated live sequence</p>
             <h2 id="theater-console-title">
               Three attacks. One runtime boundary.
             </h2>
@@ -143,7 +162,7 @@
             </div>
             <div>
               <dt>Latest compute</dt>
-              <dd data-theater-latency>—</dd>
+              <dd data-theater-latency>Not run</dd>
             </div>
           </dl>
         </div>
@@ -164,13 +183,18 @@
             aria-label="Warden verdict and downstream delivery"
           >
             <span>WARDEN</span>
-            <strong data-theater-stage-outcome>AWAITING LIVE VERDICT</strong>
-            <small data-theater-stage-delivery>DEMO ASP AWAITING GATE</small>
+            <strong data-theater-stage-outcome>NOT RUN</strong>
+            <small data-theater-stage-delivery
+              >NO DOWNSTREAM INVOCATION</small
+            >
+            <small data-theater-stage-evidence
+              >ILLUSTRATIVE SCENE · NO RECEIPT</small
+            >
           </div>
         </div>
 
         <div class="theater-progress" aria-label="Attack pass progress">
-          <span>Live pass</span>
+          <span>Controlled pass</span>
           <strong data-theater-progress>0 / 3</strong>
         </div>
         <p
@@ -180,28 +204,44 @@
           role="status"
           aria-live="polite"
         >
-          Autoplay is armed for one three-attack pass.
+          No request has been sent. Start the sequence or run the first attack
+          manually.
+        </p>
+        <p
+          class="source-stamp source-stamp--illustrative"
+          data-theater-source-stamp
+          data-source-state="illustrative"
+          aria-live="polite"
+        >
+          <strong>ILLUSTRATIVE</strong> Staged input only; no verdict or delivery
+          receipt exists yet.
         </p>
 
         <div class="theater-controls" aria-label="Attack Theater controls">
-          <button class="button secondary" type="button" data-theater-toggle>
-            Pause autoplay</button
-          ><button class="button primary" type="button" data-theater-next>
-            Run next attack</button
+          <button class="button primary" type="button" data-theater-start>
+            Start live sequence</button
+          ><button class="button secondary" type="button" data-theater-toggle>
+            Pause sequence</button
+          ><button class="button secondary" type="button" data-theater-next>
+            Next attack</button
           ><button class="button secondary" type="button" data-theater-replay>
-            Replay pass
+            Replay sequence</button
+          ><button class="button secondary" type="button" data-theater-reset>
+            Reset
           </button>
         </div>
       </section>
 
       <section class="theater-feed-panel" aria-labelledby="theater-feed-title">
         <div>
-          <p class="eyebrow">Live neutralization feed</p>
+          <p class="eyebrow">Accessible incident record</p>
           <h2 id="theater-feed-title">Only validated API responses count.</h2>
           <p>
             The counter advances only when the verdict, reason code, and demo
             ASP receipt all agree. Request failures, surprising outcomes, and
-            malformed receipts remain stopped for inspection.
+            malformed receipts remain stopped for inspection. This ordered list
+            is also the complete static equivalent when reduced motion is
+            requested.
           </p>
         </div>
         <ol
@@ -225,28 +265,54 @@
           </p>
         </div>
         <div class="hero-actions">
-          <a class="button primary" href="/integrate">Integrate APA</a
-          ><a class="button secondary" href="/docs">Read the contracts</a>
+          <a class="button primary" href="/integrate">Integrate in 5 minutes</a
+          ><a class="button secondary" href="/docs">Read the decision contract</a>
         </div>
       </section>
     </main>
 
     <footer class="site-footer page-shell">
-      <div>
+      <div class="site-footer__brand">
         <strong>Warden</strong
-        ><span>The immune system of the agent economy.</span
-        ><span>Independent service listed on OKX.AI.</span>
+        ><span>Verifiable pre-action security for AI agents.</span
+        ><span>Gate the action. Keep the proof.</span>
       </div>
       <nav aria-label="Footer">
-        <a href="/theater">Attack Theater</a><a href="/playground">Run a scan</a
-        ><a href="/gauntlet">Gauntlet</a
-        ><a href="/showcase">Walkthrough</a><a href="/docs">Docs</a
-        ><a href="/badges">Audit badges</a><a href="/status">API status</a
-        ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
-        ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Product</span>
+          <a href="/">Overview</a><a href="/playground">Live Playground</a
+          ><a href="/theater">Attack Theater</a
+          ><a href="/hire">Use Warden</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Developers</span>
+          <a href="/integrate#sdk-first">5-Minute Quickstart</a
+          ><a href="/integrate">Integrations</a
+          ><a href="/docs">Documentation</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Evidence</span>
+          <a href="/verify">Verify an Attestation</a
+          ><a href="/apa/log">Transparency Log</a
+          ><a href="/badges">Endpoint Audit Records</a
+          ><a href="/agents">Marketplace Evidence Index</a
+          ><a href="/status">Service Status</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Research</span>
+          <a href="/gauntlet">Gauntlet</a
+          ><a href="/agents#methodology">Methodology</a
+          ><a href="/showcase">Product Tour</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Policy</span>
+          <a href="/trust">Trust &amp; Security</a
+          ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
+          ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+        </div>
       </nav>
     </footer>
-    <script src="/app.js?v=65a484d3" defer></script>
+    <script src="/app.js?v=5c7f3a4c" defer></script>
     <script src="/scan-client.js" defer></script>
     <script src="/theater.js" defer></script>
   </body>

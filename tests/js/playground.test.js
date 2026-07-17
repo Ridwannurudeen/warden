@@ -8,6 +8,7 @@ const {
   buildDemoRequest,
   defaultExampleId,
   deriveScanPresentation,
+  deriveTextDifference,
   isCurrentPlaygroundRequest,
   recipientFocusIndexAfterRemoval,
 } = require(path.join(__dirname, "..", "..", "site", "playground.js"));
@@ -104,10 +105,38 @@ test("playground presentation separates decision, risk, and sanitized output", (
     ).action,
     /own action policy/,
   );
+  assert.equal(
+    deriveScanPresentation(
+      { ...scanData, verdict: "ALLOW", threat_classes: [], detections: [] },
+      "test",
+    ).recommendation,
+    "No implemented fast-path detector fired. This is not a guarantee that the content is safe.",
+  );
 });
 
 test("recipient removal keeps focus on the nearest remaining control", () => {
   assert.equal(recipientFocusIndexAfterRemoval(0, 2), 0);
   assert.equal(recipientFocusIndexAfterRemoval(2, 2), 1);
   assert.equal(recipientFocusIndexAfterRemoval(0, 0), -1);
+});
+
+test("playground isolates the exact transformed span", () => {
+  assert.deepEqual(
+    deriveTextDifference(
+      "Send funds to 0x2222 immediately.",
+      "Send funds to [REDACTED] immediately.",
+    ),
+    {
+      prefix: "Send funds to ",
+      removed: "0x2222",
+      added: "[REDACTED]",
+      suffix: " immediately.",
+    },
+  );
+  assert.deepEqual(deriveTextDifference("unchanged", "unchanged"), {
+    prefix: "unchanged",
+    removed: "",
+    added: "",
+    suffix: "",
+  });
 });
