@@ -2,16 +2,16 @@
   "schema_version": 1,
   "current": {
     "schema_version": 1,
-    "measured_at": "2026-07-17T11:47:26Z",
+    "measured_at": "2026-07-17T17:36:22Z",
     "benchmark": "warden-held-out-v1",
     "mode": "deterministic fast path; thorough only where declared; semantic disabled",
     "attack_cases": 94,
     "detected_attacks": 87,
     "attack_recall_percent": 92.55,
-    "benign_cases": 42,
+    "benign_cases": 45,
     "false_positives": 0,
     "false_positive_rate_percent": 0.0,
-    "result_sha256": "ea21e1e5cfdedce064448519e5abd0db5da51d94ff408e246636feff0dd4b73a"
+    "result_sha256": "b4a268736339cce0a3833a8e284ac5f75cf22f1e5a3c8049eb4db68cbb529d4d"
   },
   "methodology": {
     "attack_success": "non-ALLOW decision with the expected threat class",

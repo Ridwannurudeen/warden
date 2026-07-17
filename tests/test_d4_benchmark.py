@@ -48,7 +48,7 @@ async def test_published_benchmark_exactly_matches_a_fresh_run():
     assert 0 <= measured["false_positive_rate_percent"] <= 100
     readme = (ROOT / "benchmark" / "README.md").read_text(encoding="utf-8")
     assert "92.55% (87/94)" in readme
-    assert "0.00% (0/42)" in readme
+    assert "0.00% (0/45)" in readme
 
 
 @pytest.mark.asyncio

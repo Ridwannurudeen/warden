@@ -13,7 +13,7 @@ injections and drains, homoglyph-swapped keywords, and zero-width obfuscation, a
 Decoder Wall normalization pre-pass before detection:
 
 - Attack recall: **92.55% (87/94)**
-- False-positive rate: **0.00% (0/42)**
+- False-positive rate: **0.00% (0/45)**
 
 An attack counts as detected only when Warden returns `SANITIZE` or `BLOCK` and includes the case's
 expected threat class. A benign case counts as a false positive when Warden returns anything other
