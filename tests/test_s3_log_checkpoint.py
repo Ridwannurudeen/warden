@@ -1,6 +1,7 @@
 """Regression coverage for signed APA transparency-log checkpoints."""
 
 import hashlib
+import json
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -144,3 +145,28 @@ def test_corrupted_local_anchor_returns_failed_verification():
     with TestClient(app) as client:
         response = client.get("/apa/log/checkpoint")
     assert response.status_code == 503
+
+
+def test_checkpoint_migration_rejects_semantically_invalid_mixed_log_entry():
+    malformed = {
+        "seq": 1,
+        "ts": 1_789_000_000,
+        "event": "breaker-confirmed",
+        "record_type": "not-a-breaker",
+        "certificate_id": "0" * 32,
+        "benchmark_case_id": "gauntlet-" + "0" * 16,
+        "record_hash": "a" * 64,
+        "prev_hash": protection_store.GENESIS_PREV_HASH,
+    }
+    with protection_store._connect() as connection:
+        connection.execute(
+            "INSERT INTO log (seq, entry_json) VALUES (?, ?)",
+            (1, json.dumps(malformed, sort_keys=True, separators=(",", ":"))),
+        )
+
+    with pytest.raises(protection_store.ProtectionStateConflict):
+        protection_store.migrate_log_checkpoint()
+
+    with protection_store._connect() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM log_checkpoint").fetchone()[0] == 0
+        assert connection.execute("SELECT COUNT(*) FROM log_anchor").fetchone()[0] == 0

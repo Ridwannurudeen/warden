@@ -76,6 +76,7 @@ class GauntletRequest(BaseModel):
     payload: str
     context: DemoScanContext = Field(default_factory=DemoScanContext)
     finder: str | None = Field(default=None, max_length=128)
+    public_credit_consent: bool = Field(default=False, strict=True)
 
     @field_validator("intent")
     @classmethod
@@ -148,6 +149,33 @@ class GauntletStats(BaseModel):
     pending_claims: int
     confirmed_bypasses: int
     corpus_size: int
+
+
+class BreakerCertificate(BaseModel):
+    spec_version: Literal["warden-breaker/1"]
+    predicate_type: Literal[
+        "https://warden.gudman.xyz/spec/gauntlet-breaker/v1"
+    ]
+    certificate_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    issuer: Literal["warden"]
+    award: Literal["WARDEN BREAKER"]
+    benchmark_case_id: str = Field(pattern=r"^gauntlet-[0-9a-f]{16}$")
+    threat_class: ReasonCode
+    payload_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    payload_scope: Literal["human-reviewed-redacted-reproducer"]
+    finder: str | None
+    confirmed_at: int = Field(ge=0)
+    log_seq: int = Field(ge=1)
+    issuer_sig: str
+
+
+class BreakerLeaderboardResponse(BaseModel):
+    breakers: list[BreakerCertificate]
+    total: int
+
+
+class BreakerDetailResponse(BaseModel):
+    certificate: BreakerCertificate
 
 
 class AuditRequest(BaseModel):

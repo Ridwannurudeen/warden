@@ -18,7 +18,12 @@ from warden import __version__, protection, protection_store
 from warden.auditor import AgentAuditor
 from warden.core.verdict import ReasonCode
 from warden.engine import WardenEngine
-from warden.gauntlet_store import get_stats, record_attempt
+from warden.gauntlet_store import (
+    get_confirmed_breaker_ids,
+    get_stats,
+    is_confirmed_breaker,
+    record_attempt,
+)
 from warden.ratelimit import (
     check_rate_limit,
     is_verified_payer,
@@ -33,6 +38,9 @@ from warden.models import (
     BadgeRecord,
     BadgeRegistryEntry,
     BadgeRegistryResponse,
+    BreakerCertificate,
+    BreakerDetailResponse,
+    BreakerLeaderboardResponse,
     DemoAspReceipt,
     DemoExample,
     DemoScanRequest,
@@ -591,6 +599,51 @@ async def gauntlet(req: GauntletRequest) -> GauntletResponse:
 @app.get("/api/demo/gauntlet/stats", response_model=GauntletStats)
 async def gauntlet_stats() -> GauntletStats:
     return GauntletStats.model_validate(get_stats(_corpus_size()))
+
+
+@app.get(
+    "/api/demo/gauntlet/breakers",
+    response_model=BreakerLeaderboardResponse,
+)
+async def gauntlet_breakers() -> BreakerLeaderboardResponse:
+    certificate_ids = get_confirmed_breaker_ids()
+    try:
+        records = protection_store.get_breaker_certificates_with_evidence(
+            certificate_ids
+        )
+    except (
+        protection_store.LogCheckpointMissing,
+        protection_store.ProtectionStateConflict,
+    ) as exc:
+        raise HTTPException(status_code=503, detail="Breaker evidence is unavailable") from exc
+    certificates = [BreakerCertificate.model_validate(record) for record in records]
+    return BreakerLeaderboardResponse(
+        breakers=certificates,
+        total=len(certificates),
+    )
+
+
+@app.get(
+    "/api/demo/gauntlet/breakers/{certificate_id}",
+    response_model=BreakerDetailResponse,
+)
+async def gauntlet_breaker(certificate_id: str) -> BreakerDetailResponse:
+    if not is_confirmed_breaker(certificate_id):
+        raise HTTPException(status_code=404, detail="Breaker certificate not found")
+    try:
+        certificate = protection_store.get_breaker_certificate_with_evidence(
+            certificate_id
+        )
+    except (
+        protection_store.LogCheckpointMissing,
+        protection_store.ProtectionStateConflict,
+    ) as exc:
+        raise HTTPException(status_code=503, detail="Breaker evidence is unavailable") from exc
+    if certificate is None:
+        raise HTTPException(status_code=404, detail="Breaker certificate not found")
+    return BreakerDetailResponse(
+        certificate=BreakerCertificate.model_validate(certificate)
+    )
 
 
 @app.get("/api/demo/examples", response_model=list[DemoExample])

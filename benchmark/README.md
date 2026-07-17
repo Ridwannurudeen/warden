@@ -40,13 +40,32 @@ python scripts/benchmark_recall.py --record --json
 Human-reviewed Gauntlet candidates enter evaluation only through an operator action:
 
 ```powershell
-python scripts/review_gauntlet.py CLAIM_ID PROMPT_INJECTION --confirm-human-review
+$env:WARDEN_PROTECTION_DB = "C:\path\to\protection.db"
+python scripts/review_gauntlet.py CLAIM_ID PROMPT_INJECTION `
+  --confirm-human-review `
+  --redacted-payload-file .\reviewed-reproducer.txt `
+  --credit-handle researcher.example
 ```
 
-The reviewer assigns one existing reason code after inspecting the retained candidate. Promotion is
-idempotent, appends the case only to `held_out_attacks.jsonl`, and refuses payloads already present in the
-training corpus. After promotion, rerun the benchmark, intentionally update the published result, and record
-the dated measurement. There is no public confirmation API and no automatic training-corpus mutation.
+`WARDEN_ISSUER_KEY` must also be present in the operator environment; the command refuses the development-key
+fallback. Use `--anonymous` instead of `--credit-handle` when the submitted finder did not consent to public
+credit. A supplied handle is self-asserted: the workflow proves Warden recorded the credit after review, not
+that the submitter controls an external account.
+
+The reviewer assigns one existing reason code after inspecting the retained candidate, writes a publishable
+redacted reproducer, and explicitly confirms the review. The workflow rechecks that exact reproducer against
+the current fast scanner and proceeds only while the verdict remains `ALLOW`. It refuses finder credit unless
+the same submitted handle carries stored public-credit consent, refuses overlaps with the training corpus or
+held-out benign cases, and appends only the redacted reproducer to `held_out_attacks.jsonl`.
+
+The same APA Ed25519 issuer key signs a `WARDEN BREAKER` certificate over the reproducer's SHA-256 digest,
+assigned threat class, finder credit or anonymity, confirmation time, benchmark case ID, and transparency-log
+position. The certificate and its typed `breaker-confirmed` entry commit atomically with a signed log
+checkpoint. Publication remains gated on the claim's final confirmed state, and retries recover without
+duplicating the benchmark case, certificate, or log entry.
+
+After promotion, rerun the benchmark, intentionally update the published result, and record the dated
+measurement. There is no public confirmation API, no automatic confirmation, and no training-corpus mutation.
 
 The optional paid semantic runtime has a separate guarded evaluation mode:
 

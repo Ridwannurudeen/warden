@@ -30,6 +30,26 @@ LOG_CHECKPOINT_FIELDS = {
     "issued_at",
     "issuer_sig",
 }
+APA_LOG_ENTRY_FIELDS = {
+    "seq",
+    "ts",
+    "event",
+    "attestation_id",
+    "endpoint_host",
+    "status",
+    "record_hash",
+    "prev_hash",
+}
+BREAKER_LOG_ENTRY_FIELDS = {
+    "seq",
+    "ts",
+    "event",
+    "record_type",
+    "certificate_id",
+    "benchmark_case_id",
+    "record_hash",
+    "prev_hash",
+}
 
 _LOCK = Lock()
 
@@ -66,6 +86,13 @@ CREATE TABLE IF NOT EXISTS log_checkpoint (
 CREATE TABLE IF NOT EXISTS log_anchor (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     checkpoint_hash TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS breaker_certificates (
+    certificate_id TEXT PRIMARY KEY,
+    claim_id TEXT NOT NULL UNIQUE,
+    confirmed_at INTEGER NOT NULL,
+    log_seq INTEGER NOT NULL UNIQUE,
+    record_json TEXT NOT NULL
 );
 """
 
@@ -265,12 +292,53 @@ def list_reprobe_targets() -> list[dict[str, object]]:
     ]
 
 
+def _is_lower_hex(value: object, length: int) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == length
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _is_valid_log_entry(entry: object) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    fields = set(entry)
+    if "record_type" in entry:
+        if (
+            fields != BREAKER_LOG_ENTRY_FIELDS
+            or entry.get("record_type") != "breaker-certificate"
+            or entry.get("event") != "breaker-confirmed"
+            or not _is_lower_hex(entry.get("certificate_id"), 32)
+        ):
+            return False
+        benchmark_case_id = entry.get("benchmark_case_id")
+        if (
+            not isinstance(benchmark_case_id, str)
+            or not benchmark_case_id.startswith("gauntlet-")
+            or not _is_lower_hex(benchmark_case_id.removeprefix("gauntlet-"), 16)
+        ):
+            return False
+    elif fields != APA_LOG_ENTRY_FIELDS or any(
+        not isinstance(entry.get(field), str) or not entry[field]
+        for field in ("event", "attestation_id", "endpoint_host", "status")
+    ):
+        return False
+    return (
+        type(entry.get("seq")) is int
+        and 1 <= entry["seq"] <= MAX_SAFE_UNIX_SECONDS
+        and type(entry.get("ts")) is int
+        and 0 <= entry["ts"] <= MAX_SAFE_UNIX_SECONDS
+        and _is_lower_hex(entry.get("record_hash"), 64)
+        and _is_lower_hex(entry.get("prev_hash"), 64)
+    )
+
+
 def _verified_log_head(entries: list[dict[str, object]]) -> str | None:
     previous_hash = GENESIS_PREV_HASH
     for expected_seq, entry in enumerate(entries, start=1):
         if (
-            not isinstance(entry, dict)
-            or type(entry.get("seq")) is not int
+            not _is_valid_log_entry(entry)
             or entry["seq"] != expected_seq
         ):
             return None
@@ -411,11 +479,9 @@ def _read_anchored_checkpoint(
     return checkpoint
 
 
-def _append_log(
+def _next_log_position(
     connection: sqlite3.Connection,
-    event: str,
-    record: dict[str, object],
-) -> dict[str, object]:
+) -> tuple[int, str]:
     rows, entries, head_hash = _read_log_head(connection)
     anchor_exists = (
         connection.execute("SELECT 1 FROM log_anchor WHERE singleton = 1").fetchone()
@@ -435,9 +501,34 @@ def _append_log(
             )
     else:
         _read_anchored_checkpoint(connection, len(entries), head_hash)
+    return len(entries) + 1, head_hash
 
-    next_seq = len(entries) + 1
-    prev_hash = head_hash
+
+def _write_log_entry(
+    connection: sqlite3.Connection,
+    entry: dict[str, object],
+) -> dict[str, object]:
+    sequence = int(entry["seq"])
+    serialized = _canonical_json(entry)
+    connection.execute(
+        "INSERT INTO log (seq, entry_json) VALUES (?, ?)",
+        (sequence, serialized),
+    )
+    _write_log_checkpoint(
+        connection,
+        sequence,
+        hashlib.sha256(serialized.encode("utf-8")).hexdigest(),
+        int(entry["ts"]),
+    )
+    return entry
+
+
+def _append_log(
+    connection: sqlite3.Connection,
+    event: str,
+    record: dict[str, object],
+) -> dict[str, object]:
+    next_seq, prev_hash = _next_log_position(connection)
     entry = {
         "seq": next_seq,
         "ts": int(time.time()),
@@ -448,17 +539,7 @@ def _append_log(
         "record_hash": hashlib.sha256(_canonical_json(record).encode("utf-8")).hexdigest(),
         "prev_hash": prev_hash,
     }
-    connection.execute(
-        "INSERT INTO log (seq, entry_json) VALUES (?, ?)",
-        (next_seq, _canonical_json(entry)),
-    )
-    _write_log_checkpoint(
-        connection,
-        next_seq,
-        hashlib.sha256(_canonical_json(entry).encode("utf-8")).hexdigest(),
-        int(entry["ts"]),
-    )
-    return entry
+    return _write_log_entry(connection, entry)
 
 
 def commit_attestation_events(
@@ -486,6 +567,158 @@ def commit_attestation_events(
             _store_attestation(connection, record)
             entries.append(_append_log(connection, event, record))
     return entries
+
+
+def _breaker_log_entry_matches(
+    entry: dict[str, object],
+    record: dict[str, object],
+    log_seq: int,
+) -> bool:
+    return entry == {
+        "seq": log_seq,
+        "ts": record.get("confirmed_at"),
+        "event": "breaker-confirmed",
+        "record_type": "breaker-certificate",
+        "certificate_id": record.get("certificate_id"),
+        "benchmark_case_id": record.get("benchmark_case_id"),
+        "record_hash": hashlib.sha256(
+            _canonical_json(record).encode("utf-8")
+        ).hexdigest(),
+        "prev_hash": entry.get("prev_hash"),
+    }
+
+
+def commit_breaker_certificate(
+    *,
+    claim_id: str,
+    record_factory: Callable[[int], dict[str, object]],
+    record_validator: Callable[[dict[str, object]], bool],
+) -> dict[str, object]:
+    """Sign, store, and hash-chain one confirmed BREAKER in one transaction."""
+    with _LOCK, _connect() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        existing_row = connection.execute(
+            "SELECT record_json, log_seq FROM breaker_certificates WHERE claim_id = ?",
+            (claim_id,),
+        ).fetchone()
+        if existing_row is not None:
+            try:
+                existing = json.loads(existing_row[0])
+            except (json.JSONDecodeError, TypeError) as exc:
+                raise ProtectionStateConflict(
+                    "stored breaker certificate contains invalid JSON"
+                ) from exc
+            if not isinstance(existing, dict) or not record_validator(existing):
+                raise ProtectionStateConflict("stored breaker certificate failed verification")
+            _, entries, head_hash = _read_log_head(connection)
+            _read_anchored_checkpoint(connection, len(entries), head_hash)
+            log_seq = existing_row[1]
+            if type(log_seq) is not int or not 1 <= log_seq <= len(entries):
+                raise ProtectionStateConflict(
+                    "stored breaker certificate has no matching log entry"
+                )
+            entry = entries[log_seq - 1]
+            if not _breaker_log_entry_matches(entry, existing, log_seq):
+                raise ProtectionStateConflict(
+                    "stored breaker certificate has no matching log entry"
+                )
+            return existing
+
+        next_seq, prev_hash = _next_log_position(connection)
+        record = record_factory(next_seq)
+        if not isinstance(record, dict) or not record_validator(record):
+            raise ValueError("breaker certificate failed issuer verification")
+        if record.get("log_seq") != next_seq:
+            raise ValueError("breaker certificate log_seq does not match reserved position")
+        entry = {
+            "seq": next_seq,
+            "ts": record["confirmed_at"],
+            "event": "breaker-confirmed",
+            "record_type": "breaker-certificate",
+            "certificate_id": record["certificate_id"],
+            "benchmark_case_id": record["benchmark_case_id"],
+            "record_hash": hashlib.sha256(
+                _canonical_json(record).encode("utf-8")
+            ).hexdigest(),
+            "prev_hash": prev_hash,
+        }
+        connection.execute(
+            "INSERT INTO breaker_certificates "
+            "(certificate_id, claim_id, confirmed_at, log_seq, record_json) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                str(record["certificate_id"]),
+                claim_id,
+                int(record["confirmed_at"]),
+                next_seq,
+                _canonical_json(record),
+            ),
+        )
+        _write_log_entry(connection, entry)
+    return record
+
+
+def get_breaker_certificate(certificate_id: str) -> dict[str, object] | None:
+    with _LOCK, _connect() as connection:
+        row = connection.execute(
+            "SELECT record_json FROM breaker_certificates WHERE certificate_id = ?",
+            (certificate_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    return json.loads(row[0])
+
+
+def get_breaker_certificates_with_evidence(
+    certificate_ids: list[str],
+) -> list[dict[str, object]]:
+    """Return signed certificates only while their anchored log evidence is intact."""
+    if not certificate_ids:
+        return []
+    with _LOCK, _connect() as connection:
+        from warden import protection
+
+        _, entries, head_hash = _read_log_head(connection)
+        _read_anchored_checkpoint(connection, len(entries), head_hash)
+        records = []
+        for certificate_id in certificate_ids:
+            row = connection.execute(
+                "SELECT record_json, log_seq FROM breaker_certificates "
+                "WHERE certificate_id = ?",
+                (certificate_id,),
+            ).fetchone()
+            if row is None:
+                continue
+            try:
+                record = json.loads(row[0])
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if not isinstance(record, dict) or not protection.verify_breaker_certificate(
+                record
+            ):
+                continue
+            log_seq = row[1]
+            if type(log_seq) is not int or not 1 <= log_seq <= len(entries):
+                raise ProtectionStateConflict(
+                    "breaker certificate has no matching transparency-log entry"
+                )
+            entry = entries[log_seq - 1]
+            if (
+                record.get("log_seq") != log_seq
+                or not _breaker_log_entry_matches(entry, record, log_seq)
+            ):
+                raise ProtectionStateConflict(
+                    "breaker certificate has no matching transparency-log entry"
+                )
+            records.append(record)
+        return records
+
+
+def get_breaker_certificate_with_evidence(
+    certificate_id: str,
+) -> dict[str, object] | None:
+    records = get_breaker_certificates_with_evidence([certificate_id])
+    return records[0] if records else None
 
 
 def commit_registration(

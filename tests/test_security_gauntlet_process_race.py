@@ -4,7 +4,10 @@ import json
 import threading
 from pathlib import Path
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
 from warden import gauntlet_store
+from warden.badges import b64u_encode
 from warden.core.verdict import ReasonCode
 from warden.models import GauntletRequest, ScanResponse
 
@@ -29,13 +32,16 @@ def _response(verdict):
     )
 
 
-def test_review_and_submission_are_cross_process_serialized(tmp_path):
+def test_review_and_submission_are_cross_process_serialized(tmp_path, monkeypatch):
     reviewer = _load_store_copy("gauntlet_reviewer_copy")
     writer = _load_store_copy("gauntlet_writer_copy")
     store_path = tmp_path / "attempts.jsonl"
     benchmark_path = tmp_path / "held_out.jsonl"
     reviewer._STORE_PATH = store_path
     writer._STORE_PATH = store_path
+    seed = Ed25519PrivateKey.generate().private_bytes_raw()
+    monkeypatch.setenv("WARDEN_ISSUER_KEY", b64u_encode(seed, "ed25519-seed"))
+    monkeypatch.setenv("WARDEN_PROTECTION_DB", str(tmp_path / "protection.db"))
 
     _, claim_id = reviewer.record_attempt(
         GauntletRequest(
@@ -64,6 +70,9 @@ def test_review_and_submission_are_cross_process_serialized(tmp_path):
             reviewer.confirm_bypass(
                 claim_id,
                 ReasonCode.PROMPT_INJECTION,
+                reviewed_payload="An unusual authorization note with alpha delta wording.",
+                finder=None,
+                reviewer_approved=True,
                 benchmark_path=benchmark_path,
                 confirmed_at="2026-07-16T16:31:00Z",
             )

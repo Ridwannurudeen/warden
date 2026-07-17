@@ -19,6 +19,7 @@ import httpx
 
 from warden.apa_url import PublicUrlUnavailable, validate_public_http_url
 from warden.badges import b64u_decode, b64u_encode, ed25519_sign_record, ed25519_verify_record
+from warden.core.verdict import ReasonCode
 from warden import protection_store
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -37,6 +38,25 @@ ATTESTATION_SCOPE = "Endpoint-signed count; local counter state is not independe
 MAX_SAFE_UNIX_SECONDS = 9_007_199_254_740_991
 DEFAULT_ISSUER_KID = "warden-issuer-1"
 LOG_CHECKPOINT_VERSION = "apa-log/0.1"
+BREAKER_SPEC_VERSION = "warden-breaker/1"
+BREAKER_PREDICATE_TYPE = "https://warden.gudman.xyz/spec/gauntlet-breaker/v1"
+BREAKER_AWARD = "WARDEN BREAKER"
+BREAKER_PAYLOAD_SCOPE = "human-reviewed-redacted-reproducer"
+BREAKER_CERTIFICATE_FIELDS = {
+    "spec_version",
+    "predicate_type",
+    "certificate_id",
+    "issuer",
+    "award",
+    "benchmark_case_id",
+    "threat_class",
+    "payload_sha256",
+    "payload_scope",
+    "finder",
+    "confirmed_at",
+    "log_seq",
+    "issuer_sig",
+}
 
 # Global cap on concurrent outbound probes, independent of per-IP rate limits
 # (APA-SPEC §10 SSRF/DoS). Single-worker deployment, so a process-wide
@@ -250,6 +270,109 @@ def verify_log_checkpoint(checkpoint: dict[str, object]) -> bool:
     return any(
         issued_at <= int(key["not_after"])
         and ed25519_verify_record(checkpoint, str(key["pub"]), "issuer_sig")
+        for key in keys
+    )
+
+
+def issue_breaker_certificate(
+    *,
+    certificate_id: str,
+    benchmark_case_id: str,
+    threat_class: ReasonCode,
+    payload_sha256: str,
+    finder: str | None,
+    confirmed_at: int,
+    log_seq: int,
+) -> dict[str, object]:
+    """Issue one historical WARDEN BREAKER certificate with the APA issuer key."""
+    record = {
+        "spec_version": BREAKER_SPEC_VERSION,
+        "predicate_type": BREAKER_PREDICATE_TYPE,
+        "certificate_id": certificate_id,
+        "issuer": ISSUER_NAME,
+        "award": BREAKER_AWARD,
+        "benchmark_case_id": benchmark_case_id,
+        "threat_class": threat_class.value,
+        "payload_sha256": payload_sha256,
+        "payload_scope": BREAKER_PAYLOAD_SCOPE,
+        "finder": finder,
+        "confirmed_at": confirmed_at,
+        "log_seq": log_seq,
+    }
+    signed = ed25519_sign_record(record, issuer_private_key(), "issuer_sig")
+    if not verify_breaker_certificate(signed):
+        raise ValueError("breaker certificate fields are invalid")
+    return signed
+
+
+def verify_breaker_certificate(record: dict[str, object]) -> bool:
+    """Verify the strict certificate schema and the applicable issuer signature."""
+    if (
+        not isinstance(record, dict)
+        or set(record) != BREAKER_CERTIFICATE_FIELDS
+        or not _signed_json_values_are_safe(record)
+    ):
+        return False
+    certificate_id = record.get("certificate_id")
+    benchmark_case_id = record.get("benchmark_case_id")
+    payload_sha256 = record.get("payload_sha256")
+    finder = record.get("finder")
+    confirmed_at = record.get("confirmed_at")
+    log_seq = record.get("log_seq")
+    if (
+        record.get("spec_version") != BREAKER_SPEC_VERSION
+        or record.get("predicate_type") != BREAKER_PREDICATE_TYPE
+        or record.get("issuer") != ISSUER_NAME
+        or record.get("award") != BREAKER_AWARD
+        or record.get("payload_scope") != BREAKER_PAYLOAD_SCOPE
+    ):
+        return False
+    if (
+        not isinstance(certificate_id, str)
+        or len(certificate_id) != 32
+        or any(character not in "0123456789abcdef" for character in certificate_id)
+    ):
+        return False
+    if (
+        not isinstance(benchmark_case_id, str)
+        or len(benchmark_case_id) != 25
+        or not benchmark_case_id.startswith("gauntlet-")
+        or any(
+            character not in "0123456789abcdef"
+            for character in benchmark_case_id.removeprefix("gauntlet-")
+        )
+    ):
+        return False
+    if record.get("threat_class") not in {reason.value for reason in ReasonCode}:
+        return False
+    if (
+        not isinstance(payload_sha256, str)
+        or len(payload_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in payload_sha256)
+    ):
+        return False
+    if finder is not None and (
+        not isinstance(finder, str)
+        or not finder
+        or finder.strip() != finder
+        or len(finder) > 128
+        or any(ord(character) < 32 or ord(character) == 127 for character in finder)
+    ):
+        return False
+    if (
+        type(confirmed_at) is not int
+        or not 0 <= confirmed_at <= MAX_SAFE_UNIX_SECONDS
+        or type(log_seq) is not int
+        or not 1 <= log_seq <= MAX_SAFE_UNIX_SECONDS
+    ):
+        return False
+    try:
+        keys = issuer_keys()
+    except ValueError:
+        return False
+    return any(
+        confirmed_at <= int(key["not_after"])
+        and ed25519_verify_record(record, str(key["pub"]), "issuer_sig")
         for key in keys
     )
 
