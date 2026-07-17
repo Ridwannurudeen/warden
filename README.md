@@ -263,7 +263,7 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
 - Local deterministic analysis is intentionally conservative and cannot claim semantic coverage beyond
   the implemented scanner categories, analyzers, and corpus.
 - The optional paid semantic path has a separately recorded held-out result of 71.43% recall (20/28) with
-  0.00% false positives (0/16), compared with the committed deterministic baseline of 64.29% (18/28). Repository
+  0.00% false positives (0/16), compared with the committed deterministic baseline of 67.86% (19/28). Repository
   configuration still leaves the runtime disabled. Its fail-open behavior preserves the deterministic verdict
   when inference is unavailable, and reproducing the recorded result requires an explicitly configured model.
 - The endpoint auditor assumes the target accepts `POST` JSON with a `payload` field. It rejects internal
