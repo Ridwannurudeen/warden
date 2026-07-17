@@ -173,11 +173,8 @@ def test_committed_warden_marketplace_numbers_are_explicitly_snapshot_dated():
     agent_html = (ROOT / "site" / "agents" / "3808.html").read_text(encoding="utf-8")
     index_html = (ROOT / "site" / "agents" / "index.html").read_text(encoding="utf-8")
 
-    assert "<span>Sold at snapshot</span><strong class=\"num\">14</strong>" in agent_html
-    assert (
-        "<span>Buyer review at snapshot</span><strong class=\"num\">4 / 5</strong>"
-        in agent_html
-    )
+    assert '<span>Sold at snapshot</span><strong class="num">14</strong>' in agent_html
+    assert '<span>Buyer review at snapshot</span><strong class="num">4 / 5</strong>' in agent_html
     assert "<span>Sold at 2026-07-16 snapshot</span>" in index_html
     assert "<span>Buyer review at 2026-07-16 snapshot</span>" in index_html
     assert (
@@ -818,11 +815,59 @@ def test_badge_association_requires_an_explicit_reviewed_link(monkeypatch):
     assert associate_badges(indexed, [badge], {str(badge["audit_id"]): "3808"}) == {"3808": [badge]}
 
 
+def test_v2_badge_association_requires_exact_path_and_port(monkeypatch):
+    monkeypatch.setenv("WARDEN_BADGE_SECRET", "marketplace-v2-association-test-key")
+    service = MarketplaceService.model_validate(
+        {"serviceId": "1", "endpoint": "https://api.example.org/scan"}
+    )
+    indexed = [
+        IndexedAgent(
+            agent=_agent(agentId="3808", services=[service]),
+            verdict="ALLOW",
+            risk_level="NONE",
+            threat_classes=[],
+            fields_scanned=1,
+            rationale="No injection patterns were detected.",
+        )
+    ]
+
+    def _v2_badge(*, path: str, port: int | None) -> dict[str, object]:
+        return issue_badge(
+            target_host="api.example.org",
+            score=100,
+            grade="A",
+            blocked=20,
+            total=20,
+            issued_at="2026-07-16",
+            target={
+                "scheme": "https",
+                "host": "api.example.org",
+                "port": port,
+                "path": path,
+                "query": "",
+            },
+            battery={"id": "warden-core-http", "version": "2026-07", "hash": "x"},
+        )
+
+    exact = _v2_badge(path="/scan", port=None)
+    other_path = _v2_badge(path="/admin", port=None)
+    other_port = _v2_badge(path="/scan", port=8443)
+
+    links = {
+        str(exact["audit_id"]): "3808",
+        str(other_path["audit_id"]): "3808",
+        str(other_port["audit_id"]): "3808",
+    }
+    # Only the badge bound to the exact scheme/host/port/path of the listed
+    # service associates; a different path or port does not vouch for it.
+    assert associate_badges(indexed, [exact, other_path, other_port], links) == {"3808": [exact]}
+    # The three bindings are distinct signed identities.
+    assert len({exact["audit_id"], other_path["audit_id"], other_port["audit_id"]}) == 3
+
+
 def test_badge_association_ignores_malformed_service_url(monkeypatch):
     monkeypatch.setenv("WARDEN_BADGE_SECRET", "marketplace-association-test-key")
-    service = MarketplaceService.model_validate(
-        {"serviceId": "1", "endpoint": "https://["}
-    )
+    service = MarketplaceService.model_validate({"serviceId": "1", "endpoint": "https://["})
     indexed = [
         IndexedAgent(
             agent=_agent(services=[service]),
@@ -842,10 +887,7 @@ def test_badge_association_ignores_malformed_service_url(monkeypatch):
         issued_at="2026-07-13",
     )
 
-    assert (
-        associate_badges(indexed, [badge], {str(badge["audit_id"]): "3808"})
-        == {}
-    )
+    assert associate_badges(indexed, [badge], {str(badge["audit_id"]): "3808"}) == {}
 
 
 def test_badge_link_manifest_rejects_conflicting_agent_ownership(tmp_path):
@@ -988,12 +1030,15 @@ def test_apa_association_requires_valid_signature_reviewed_link_and_matching_ser
         attestation_id="fedcba9876543210fedcba9876543210",
         endpoint_host="[",
     )
-    assert associate_attestations(
-        indexed,
-        [malformed_host],
-        {str(malformed_host["attestation_id"]): "3808"},
-        issuer_pub,
-    ) == {}
+    assert (
+        associate_attestations(
+            indexed,
+            [malformed_host],
+            {str(malformed_host["attestation_id"]): "3808"},
+            issuer_pub,
+        )
+        == {}
+    )
 
     overlong = _signed_attestation(
         issuer_key,

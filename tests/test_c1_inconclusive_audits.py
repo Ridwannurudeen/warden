@@ -166,7 +166,11 @@ async def test_fully_inconclusive_audit_issues_no_grade_or_signed_badge(monkeypa
 @pytest.mark.asyncio
 async def test_normal_conclusive_target_keeps_the_original_scoring(monkeypatch):
     auditor = AgentAuditor()
-    outcomes = iter([AuditOutcome.BLOCKED, AuditOutcome.NOT_BLOCKED])
+    # Two fixed-battery outcomes followed by benign-control outcomes that pass
+    # liveness (a functioning target processes benign input without blocking it).
+    outcomes = iter(
+        [AuditOutcome.BLOCKED, AuditOutcome.NOT_BLOCKED, *([AuditOutcome.NOT_BLOCKED] * 3)]
+    )
 
     async def validate(target_url):
         return "https://93.184.216.34/scan", "example.org", urlparse(target_url)
@@ -205,7 +209,12 @@ async def test_normal_conclusive_target_keeps_the_original_scoring(monkeypatch):
 async def test_partial_audit_returns_results_without_a_signed_badge(monkeypatch):
     auditor = AgentAuditor()
     outcomes = iter(
-        [AuditOutcome.BLOCKED, AuditOutcome.INCONCLUSIVE, AuditOutcome.NOT_BLOCKED]
+        [
+            AuditOutcome.BLOCKED,
+            AuditOutcome.INCONCLUSIVE,
+            AuditOutcome.NOT_BLOCKED,
+            *([AuditOutcome.NOT_BLOCKED] * 3),
+        ]
     )
 
     async def validate(target_url):

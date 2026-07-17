@@ -78,6 +78,29 @@ def ed25519_verify_record(record: dict[str, object], pub: str, sig_field: str) -
     return True
 
 
+def canonical_target(
+    scheme: str,
+    host: str,
+    port: int | None,
+    path: str,
+    query: str,
+) -> str:
+    """Return a normalized `scheme://host[:port]/path[?query]` identity string.
+
+    Default ports are dropped and an empty path becomes `/` so that the same
+    endpoint always canonicalizes identically for signing and association.
+    """
+    scheme = scheme.lower()
+    host = host.rstrip(".").casefold()
+    default_port = 443 if scheme == "https" else 80
+    authority = host if port in (None, default_port) else f"{host}:{port}"
+    normalized_path = path or "/"
+    if not normalized_path.startswith("/"):
+        normalized_path = f"/{normalized_path}"
+    suffix = f"?{query}" if query else ""
+    return f"{scheme}://{authority}{normalized_path}{suffix}"
+
+
 def issue_badge(
     target_host: str,
     score: float,
@@ -87,6 +110,8 @@ def issue_badge(
     issued_at: str,
     consent_verified: bool = True,
     *,
+    target: dict[str, object] | None = None,
+    battery: dict[str, object] | None = None,
     secret: str | None = None,
 ) -> dict[str, object]:
     """
@@ -95,8 +120,14 @@ def issue_badge(
     The audit id is stable for the same complete unsigned audit result.
     `consent_verified` is part of the signed payload so an unconsented audit
     can never be re-labeled as consented after issuance.
+
+    When `target` and `battery` are provided, the badge is a versioned v2
+    record that binds the exact audited endpoint (scheme/host/port/path/query),
+    the battery identity/version, and prompt provenance (a battery hash plus the
+    benign-liveness result) into the signed payload and the audit id. Legacy
+    callers that omit them continue to receive byte-identical v1 records.
     """
-    result = {
+    result: dict[str, object] = {
         "target_host": target_host,
         "grade": grade,
         "score": score,
@@ -105,6 +136,10 @@ def issue_badge(
         "issued_at": issued_at,
         "consent_verified": consent_verified,
     }
+    if target is not None and battery is not None:
+        result["badge_version"] = 2
+        result["target"] = target
+        result["battery"] = battery
     audit_id = hashlib.sha256(_canonical_json(result).encode("utf-8")).hexdigest()[:16]
     payload = {"audit_id": audit_id, **result}
     canonical_payload = dict(payload)

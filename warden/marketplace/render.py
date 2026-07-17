@@ -8,7 +8,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
-from warden.badges import b64u_decode, b64u_encode, ed25519_verify_record, verify_badge
+from warden.badges import (
+    b64u_decode,
+    b64u_encode,
+    canonical_target,
+    ed25519_verify_record,
+    verify_badge,
+)
 from warden.marketplace.fetch import SnapshotMetadata
 from warden.marketplace.index import IndexedAgent
 from warden.site_render import page_shell
@@ -151,6 +157,51 @@ def _listed_service_hosts(
     return service_hosts_by_agent
 
 
+def _listed_service_targets(indexed_agents: list[IndexedAgent]) -> dict[str, set[str]]:
+    """Per-agent set of exact canonical service endpoints (scheme/host/port/path)."""
+    targets_by_agent: dict[str, set[str]] = {}
+    for indexed in indexed_agents:
+        for service in indexed.agent.services:
+            try:
+                endpoint = urlparse(service.endpoint)
+                hostname = endpoint.hostname
+                username = endpoint.username
+                password = endpoint.password
+                port = endpoint.port
+            except ValueError:
+                continue
+            if endpoint.scheme not in {"http", "https"} or not hostname or username or password:
+                continue
+            canonical = canonical_target(
+                endpoint.scheme, hostname, port, endpoint.path, endpoint.query
+            )
+            targets_by_agent.setdefault(indexed.agent.agent_id, set()).add(canonical)
+    return targets_by_agent
+
+
+def _badge_canonical_target(badge: dict[str, object]) -> str | None:
+    """Return the exact canonical endpoint a v2 badge is bound to, else None (v1)."""
+    target = badge.get("target")
+    if not isinstance(target, dict):
+        return None
+    scheme = target.get("scheme")
+    host = target.get("host")
+    if not isinstance(scheme, str) or not isinstance(host, str) or not host:
+        return None
+    port = target.get("port")
+    if port is not None and not isinstance(port, int):
+        return None
+    path = target.get("path")
+    query = target.get("query")
+    return canonical_target(
+        scheme,
+        host,
+        port,
+        path if isinstance(path, str) else "/",
+        query if isinstance(query, str) else "",
+    )
+
+
 def _normalize_apa_endpoint_host(value: object) -> str | None:
     if (
         not isinstance(value, str)
@@ -280,6 +331,7 @@ def associate_badges(
     badge_links: dict[str, str],
 ) -> dict[str, list[dict[str, object]]]:
     service_hosts_by_agent = _listed_service_hosts(indexed_agents, include_non_default_port=False)
+    service_targets_by_agent = _listed_service_targets(indexed_agents)
 
     associated: dict[str, list[dict[str, object]]] = {}
     for badge in badge_records:
@@ -287,11 +339,21 @@ def associate_badges(
             continue
         audit_id = str(badge.get("audit_id", ""))
         agent_id = badge_links.get(audit_id)
-        if agent_id not in service_hosts_by_agent:
+        if agent_id is None:
             continue
-        target_host = str(badge.get("target_host", "")).rstrip(".").casefold()
-        if target_host not in service_hosts_by_agent[agent_id]:
-            continue
+        badge_target = _badge_canonical_target(badge)
+        if badge_target is not None:
+            # v2 records bind the exact audited endpoint; association requires an
+            # exact scheme/host/port/path match to one of the agent's services.
+            if badge_target not in service_targets_by_agent.get(agent_id, set()):
+                continue
+        else:
+            # Legacy v1 records carry only a host; they remain host-scoped receipts.
+            if agent_id not in service_hosts_by_agent:
+                continue
+            target_host = str(badge.get("target_host", "")).rstrip(".").casefold()
+            if target_host not in service_hosts_by_agent[agent_id]:
+                continue
         associated.setdefault(agent_id, []).append(badge)
     return associated
 
@@ -393,9 +455,7 @@ def _render_agent_page(
     verdict = indexed.verdict or "NOT_SCANNED"
     _, public_text_label = _public_text_status(indexed)
     sold_label = (
-        "Sold at snapshot"
-        if agent.agent_id == WARDEN_MARKETPLACE_AGENT_ID
-        else "Sold count"
+        "Sold at snapshot" if agent.agent_id == WARDEN_MARKETPLACE_AGENT_ID else "Sold count"
     )
     buyer_review_label = (
         "Buyer review at snapshot"
@@ -514,9 +574,7 @@ def _render_index_page(
             else "Buyer review average"
         )
         buyer_review_data_label = (
-            buyer_review_label
-            if agent.agent_id == WARDEN_MARKETPLACE_AGENT_ID
-            else "Buyer reviews"
+            buyer_review_label if agent.agent_id == WARDEN_MARKETPLACE_AGENT_ID else "Buyer reviews"
         )
         row_label = (
             f"Agent: {agent.name or 'Unnamed agent'}; Agent ID: {agent.agent_id}; "
