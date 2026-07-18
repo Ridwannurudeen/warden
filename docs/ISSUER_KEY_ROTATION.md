@@ -38,26 +38,28 @@ the one-hour attestation grace window have passed.
 Do not continue unless the backup database is a regular file, non-empty, and opens read-only with SQLite.
 Because all writers are stopped, this backup is also the rollback boundary.
 
-## 3. Build the isolated database candidate
+## 3. Prove the rotation with an ephemeral candidate
 
-Create `/opt/warden/data/.issuer-rotation/candidate.db` as `warden:warden` with mode `0600`. Use SQLite's
-backup API to copy the quiesced production database into that path, then close both connections. Do not point
-the application or a timer at the candidate. Set these shell variables for the guarded command:
+Create the candidate directory as `warden:warden` with mode `0700`, but do not create `candidate.db`. The
+rotation script refuses an existing candidate, copies the quiesced source with SQLite's read-only backup API,
+and uses a private staging name on the same filesystem. In `--dry-run` mode it performs the complete re-probe
+and signature gate, then removes the ephemeral candidate. It never points the application or a timer at that
+copy.
 
 ```bash
 app=/opt/warden
+source_db=/opt/warden/data/protection.db
 candidate_db=/opt/warden/data/.issuer-rotation/candidate.db
 candidate_app_env=/opt/warden/.env.rotation
 candidate_history=/opt/warden/issuer-history.json.rotation
+install -d -o warden -g warden -m 0700 /opt/warden/data/.issuer-rotation
+test ! -e "$candidate_db"
+test ! -L "$candidate_db"
 ```
 
-The candidate must be on the same filesystem as `/opt/warden/data/protection.db` so final promotion can use
-an atomic rename. Refuse candidate database symlinks and stop if stale SQLite journal files are present.
-
-## 4. Re-probe and prove complete re-signing
-
-Run the reprobe process as the unprivileged `warden` user with the new application environment, the candidate
-history, and only the candidate database selected:
+The candidate directory must be on the same filesystem as `protection.db` so both candidate publication and
+final operator promotion are atomic. Stop if the source has a stale SQLite journal, WAL, or shared-memory
+sidecar. Run the full dry-run as the unprivileged `warden` user:
 
 ```bash
 runuser -u warden -- env -i \
@@ -65,6 +67,35 @@ runuser -u warden -- env -i \
   PATH="$app/.venv/bin:/usr/local/bin:/usr/bin:/bin" \
   APP="$app" \
   APP_ENV="$candidate_app_env" \
+  SOURCE_DB="$source_db" \
+  CANDIDATE_HISTORY="$candidate_history" \
+  bash -c 'set -euo pipefail
+    set -a
+    . "$APP_ENV"
+    set +a
+    export WARDEN_ISSUER_HISTORY="$CANDIDATE_HISTORY"
+    cd "$APP"
+    exec .venv/bin/python scripts/rotate_issuer_key.py \
+      --source-db "$SOURCE_DB" \
+      --dry-run'
+```
+
+Successful output contains only mode and attestation counts. Confirm no database or SQLite sidecar was left
+in `.issuer-rotation`. A non-zero exit means the key material, history, source database, endpoint probes, or
+complete-current-issuer gate failed; investigate before continuing.
+
+## 4. Build the verified database candidate
+
+Run the same orchestrator without `--dry-run`. It repeats every proof against a fresh staging copy and exposes
+`candidate.db` only after the complete-current-issuer gate passes:
+
+```bash
+runuser -u warden -- env -i \
+  HOME=/opt/warden \
+  PATH="$app/.venv/bin:/usr/local/bin:/usr/bin:/bin" \
+  APP="$app" \
+  APP_ENV="$candidate_app_env" \
+  SOURCE_DB="$source_db" \
   CANDIDATE_DB="$candidate_db" \
   CANDIDATE_HISTORY="$candidate_history" \
   bash -c 'set -euo pipefail
@@ -72,17 +103,19 @@ runuser -u warden -- env -i \
     . "$APP_ENV"
     set +a
     export WARDEN_ISSUER_HISTORY="$CANDIDATE_HISTORY"
-    export WARDEN_PROTECTION_DB="$CANDIDATE_DB"
     cd "$APP"
-    exec .venv/bin/python scripts/reprobe_protections.py \
-      --require-complete-current-issuer'
+    exec .venv/bin/python scripts/rotate_issuer_key.py \
+      --source-db "$SOURCE_DB" \
+      --candidate-db "$CANDIDATE_DB"'
 ```
 
-This is the only rotation mode. It snapshots eligible persisted attestations before probing, requires zero
-skipped updates, reloads every snapshot ID, and verifies each signature directly against the current issuer
-public key. An unreachable endpoint is recorded honestly as `stale`; a bad proof is `invalid`; either record
-is still signed by the new current key. A concurrent state change, corrupt record, missing history key, or
-failed write exits non-zero. Do not promote after a non-zero exit.
+The orchestrator requires all initially eligible records to verify through the public retired-key history
+before it invokes `reprobe_protections.py --require-complete-current-issuer` internally. It then reloads every
+snapshot ID, verifies each signature directly against the new current issuer, verifies the signed log head,
+and proves byte-for-byte that both source database and history file stayed unchanged. An unreachable endpoint
+is recorded honestly as `stale`; a bad proof is `invalid`; either candidate record is still signed by the new
+current key. A corrupt record, missing retired key, concurrent source change, skipped update, or failed write
+exits non-zero and leaves no publishable candidate. Do not promote after a non-zero exit.
 
 ## 5. Promote only after the gate passes
 

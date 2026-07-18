@@ -168,14 +168,18 @@ def test_rotation_flag_and_runbook_require_candidate_database_before_promotion()
 
     runbook = (ROOT / "docs" / "ISSUER_KEY_ROTATION.md").read_text(encoding="utf-8")
     backup = runbook.index("## 2. Quiesce and back up")
-    candidate = runbook.index("## 3. Build the isolated database candidate")
+    dry_run = runbook.index("## 3. Prove the rotation with an ephemeral candidate")
+    candidate = runbook.index("## 4. Build the verified database candidate")
     gate = runbook.index("--require-complete-current-issuer")
     promotion = runbook.index("## 5. Promote only after the gate passes")
     rollback = runbook.index("## Rollback")
 
-    assert backup < candidate < gate < promotion < rollback
+    assert backup < dry_run < candidate < gate < promotion < rollback
+    assert "scripts/rotate_issuer_key.py" in runbook
+    assert '--source-db "$SOURCE_DB"' in runbook
+    assert "--dry-run" in runbook
     assert 'CANDIDATE_DB="$candidate_db"' in runbook
-    assert 'export WARDEN_PROTECTION_DB="$CANDIDATE_DB"' in runbook
+    assert '--candidate-db "$CANDIDATE_DB"' in runbook
     assert "Do not print, log, or pass the issuer seed" in runbook
     assert "docs/ISSUER_KEY_ROTATION.md" in (ROOT / "deploy" / "DEPLOY.md").read_text(
         encoding="utf-8"
