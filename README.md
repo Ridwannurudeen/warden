@@ -75,8 +75,9 @@ remains the current no-payment scan surface. The recording contract is
 
 ### Install from source
 
-The same-named package currently on PyPI is unrelated. Install the Python service and SDK from this
-repository:
+The unrelated `warden-guard` package on PyPI is not this project. Warden's publish-ready SDK uses
+the available distribution name `warden-agent-guard`, but is not claimed published until the
+user completes that release. Install the Python service and SDK from this repository:
 
 ```bash
 git clone https://github.com/Ridwannurudeen/warden.git
@@ -86,7 +87,8 @@ python -m pip install -e . -e sdk/python
 
 ### Build the TypeScript client from source
 
-The `@warden/guard` package under `sdk/ts` is not claimed as published to npm. Build and test the locked
+The owned-scope `@gudman/warden-guard` package under `sdk/ts` is not claimed as published to npm.
+Build and test the locked
 source checkout directly. The zero-dependency built runtime declares Node 18+, while the locked Vite/Vitest
 development toolchain requires Node 20.19+ for `npm test` and `npm run build`:
 

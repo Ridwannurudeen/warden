@@ -2,7 +2,7 @@
 
 Optional integration. Requires LangChain:
 
-    pip install warden-guard[langchain]
+    pip install warden-agent-guard[langchain]
 
 Drop the guard between an untrusted source and the model so poisoned input never
 reaches the LLM:
@@ -26,7 +26,8 @@ try:
     from langchain_core.runnables import Runnable, RunnableConfig
 except ImportError as exc:  # pragma: no cover - exercised only without LangChain
     raise ImportError(
-        "warden_guard.langchain_guard requires LangChain; install warden-guard[langchain]"
+        "warden_guard.langchain_guard requires LangChain; "
+        "install warden-agent-guard[langchain]"
     ) from exc
 
 from warden_guard.client import WardenClient

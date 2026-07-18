@@ -4,13 +4,22 @@ from __future__ import annotations
 
 import asyncio
 import json
+import secrets
+import time
 from collections.abc import Awaitable, Callable
 from urllib.parse import urlsplit
 
 import httpx
 
 from warden_guard.aio import AsyncWardenClient
-from warden_guard.client import FREE_PATH, WardenBlocked, WardenClient, WardenError
+from warden_guard.apa import sign_document
+from warden_guard.client import (
+    FREE_PATH,
+    ScanResult,
+    WardenBlocked,
+    WardenClient,
+)
+from warden_guard.keys import load_or_create_key, public_key_str
 
 _HOP_BY_HOP_HEADERS = {
     b"connection",
@@ -22,6 +31,13 @@ _HOP_BY_HOP_HEADERS = {
     b"transfer-encoding",
     b"upgrade",
 }
+
+
+def _write_signed_verdict(record: dict[str, object]) -> None:
+    print(
+        json.dumps(record, ensure_ascii=False, separators=(",", ":"), sort_keys=True),
+        flush=True,
+    )
 
 
 def _host_identity(value: str, scheme: str) -> tuple[str, int] | None:
@@ -63,10 +79,11 @@ class WardenReverseProxy:
         upstream: str,
         *,
         client: WardenClient | AsyncWardenClient | None = None,
-        max_body_bytes: int = 1_000_000,
+        max_body_bytes: int = 100_000,
         max_response_bytes: int = 10_000_000,
         upstream_timeout: float = 8.0,
         transport: httpx.AsyncBaseTransport | None = None,
+        verdict_log: Callable[[dict[str, object]], None] = _write_signed_verdict,
     ) -> None:
         parsed = urlsplit(upstream)
         try:
@@ -112,6 +129,9 @@ class WardenReverseProxy:
         self.max_response_bytes = max_response_bytes
         self.upstream_timeout = upstream_timeout
         self.transport = transport
+        self.verdict_log = verdict_log
+        self.signing_key = load_or_create_key()
+        self.guard_pub = public_key_str(self.signing_key)
 
     async def __call__(
         self,
@@ -152,17 +172,18 @@ class WardenReverseProxy:
 
         body_bytes = bytes(body)
         if body_bytes:
+            request_id = secrets.token_hex(16)
             try:
                 payload = body_bytes.decode("utf-8")
             except UnicodeDecodeError:
                 await self._json_response(send, 415, "request body must be UTF-8")
                 return
             try:
-                guarded = await self._guard(payload)
+                guarded = await self._guard(payload, request_id=request_id)
             except WardenBlocked:
-                await self._json_response(send, 400, "payload blocked by Warden")
+                await self._json_response(send, 403, "payload blocked by Warden")
                 return
-            except WardenError:
+            except Exception:
                 await self._json_response(send, 503, "Warden scanner unavailable")
                 return
             body_bytes = guarded.encode("utf-8")
@@ -235,10 +256,34 @@ class WardenReverseProxy:
         except httpx.HTTPError:
             await self._json_response(send, 502, "upstream unavailable")
 
-    async def _guard(self, payload: str) -> str:
+    async def _guard(self, payload: str, *, request_id: str) -> str:
         if isinstance(self.client, AsyncWardenClient):
-            return await self.client.guard(payload)
-        return await asyncio.to_thread(self.client.guard, payload)
+            result = await self.client.scan(payload)
+        else:
+            result = await asyncio.to_thread(self.client.scan, payload)
+        self._log_verdict(result, request_id=request_id)
+        if result.blocked:
+            raise WardenBlocked(result)
+        if result.sanitized and result.sanitized_payload is not None:
+            return result.sanitized_payload
+        return payload
+
+    def _log_verdict(self, result: ScanResult, *, request_id: str) -> None:
+        record = sign_document(
+            {
+                "event": "warden.gateway.verdict",
+                "request_id": request_id,
+                "ts": int(time.time()),
+                "verdict": result.verdict,
+                "risk_level": result.risk_level,
+                "threat_classes": list(result.threat_classes),
+                "latency_ms": result.latency_ms,
+                "guard_pub": self.guard_pub,
+            },
+            self.signing_key,
+            sig_field="sig",
+        )
+        self.verdict_log(record)
 
     @staticmethod
     async def _json_response(

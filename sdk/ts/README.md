@@ -1,4 +1,4 @@
-# @warden/guard
+# @gudman/warden-guard
 
 Fetch-based Warden payload scanning for TypeScript and JavaScript, with an Express-style middleware that has no Express runtime dependency.
 
@@ -7,6 +7,9 @@ The default free endpoint is rate-limited, best-effort telemetry. `failOpen` the
 `latencyMs` is reported by the hosted scanner. End-to-end call latency also includes network round-trip time.
 
 ## Build from source
+
+The package is publish-ready under the npm account-owned `@gudman` scope but is not
+claimed published until the user completes that release.
 
 The emitted zero-dependency runtime supports Node 18+. Building and testing this checkout requires Node
 20.19+ because the locked Vite/Vitest development toolchain has a higher engine floor.
@@ -27,7 +30,7 @@ npm install /path/to/warden/sdk/ts
 ## Client
 
 ```ts
-import { WardenClient, WardenBlocked } from "@warden/guard";
+import { WardenClient, WardenBlocked } from "@gudman/warden-guard";
 
 const warden = new WardenClient();
 const result = await warden.scan(userPayload, {
@@ -58,7 +61,7 @@ This package does not construct or settle x402 payments. Use a separate payment-
 
 ```ts
 import express from "express";
-import { WardenClient, wardenGuard } from "@warden/guard";
+import { WardenClient, wardenGuard } from "@gudman/warden-guard";
 
 const app = express();
 app.use(express.json());

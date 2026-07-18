@@ -1,4 +1,4 @@
-"""Test setup for the warden-guard SDK.
+"""Test setup for the warden-agent-guard SDK.
 
 Makes `warden_guard` (sdk/python) and the repo root (`warden`, `spec/`)
 importable, and isolates the guard key + scan-counter state into tmp dirs so

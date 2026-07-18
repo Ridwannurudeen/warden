@@ -2,7 +2,7 @@
 
 Optional integration. Requires LlamaIndex:
 
-    pip install warden-guard[llamaindex]
+    pip install warden-agent-guard[llamaindex]
 
 Add the postprocessor to a query engine so poisoned retrieved context is dropped
 or sanitized before synthesis:
@@ -27,7 +27,8 @@ try:
     from llama_index.core.schema import MetadataMode, NodeWithScore, QueryBundle
 except ImportError as exc:  # pragma: no cover - exercised only without LlamaIndex
     raise ImportError(
-        "warden_guard.llamaindex_guard requires LlamaIndex; install warden-guard[llamaindex]"
+        "warden_guard.llamaindex_guard requires LlamaIndex; "
+        "install warden-agent-guard[llamaindex]"
     ) from exc
 
 from warden_guard.client import WardenBlocked, WardenClient

@@ -1,16 +1,33 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "warden-guard"
+name = "warden-agent-guard"
 version = "0.1.0"
 description = "Drop-in payload firewall SDK for agent services, with APA v0.1 protection proofs."
+readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.27",
     "cryptography>=42",
 ]
+keywords = ["ai-agents", "firewall", "prompt-injection", "security"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+
+[project.urls]
+Homepage = "https://warden.gudman.xyz"
+Documentation = "https://warden.gudman.xyz/docs"
+Repository = "https://github.com/Ridwannurudeen/warden"
+Issues = "https://github.com/Ridwannurudeen/warden/issues"
 
 [project.optional-dependencies]
 server = [
@@ -26,13 +43,16 @@ llamaindex = [
     "llama-index-core>=0.11",
 ]
 dev = [
+    "build>=1.2",
     "pytest>=8",
     "pytest-asyncio>=0.23",
     "ruff>=0.5",
+    "twine>=5",
 ]
 
 [project.scripts]
 warden-guard = "warden_guard.cli:main"
+warden-gateway = "warden_guard.gateway:main"
 
 [tool.setuptools.packages.find]
 include = ["warden_guard*"]

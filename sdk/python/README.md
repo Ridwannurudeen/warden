@@ -1,13 +1,13 @@
-# warden-guard
+# warden-agent-guard
 
 **One line protects any agent service from poisoned payloads — and lets it *prove* it.**
 
-`warden-guard` is the drop-in Python SDK for [Warden](https://warden.gudman.xyz), the
+`warden-agent-guard` is the drop-in Python SDK for [Warden](https://warden.gudman.xyz), the
 deterministic payload firewall for the agent economy, plus a reference implementation of the
 open [APA v0.1](../../spec/APA-SPEC.md) protection-proof standard.
 
-This SDK is not published under an owned PyPI package name. Install it from a
-checked-out Warden source tree:
+The release target is the currently available PyPI name `warden-agent-guard`. Until the user
+publishes it, install from a checked-out Warden source tree:
 
 ```bash
 python -m pip install -e /path/to/warden/sdk/python
@@ -73,7 +73,7 @@ unless the application uses `guard()` directly and forwards its returned safe te
 
 ## Standalone reverse proxy
 
-The proxy command places the same guard in front of an existing HTTP service. It
+Warden Gateway places the same guard in front of an existing HTTP service. It
 preserves method, path, query, and end-to-end headers; strips hop-by-hop headers;
 rewrites only a sanitized UTF-8 body; and never calls the upstream on BLOCK, scanner
 failure, an oversized body, or a detected loop. Local scanning is the fail-closed
@@ -82,13 +82,17 @@ default and requires the repository's root package plus the proxy extra:
 ```bash
 python -m pip install -e /path/to/warden
 python -m pip install -e '/path/to/warden/sdk/python[proxy]'
-warden-guard proxy --upstream http://127.0.0.1:9000 --listen 127.0.0.1 --port 8787
+warden-gateway --upstream http://127.0.0.1:9000 --mode local
 ```
 
-Passing `--warden-url` explicitly selects that origin's protected `/scan` route with
-`fail_open=False`; the SDK does not settle x402 payment challenges. The free hosted
-demo is rejected as a reverse-proxy scanner because it truncates long payloads and
-is not an enforcement-grade substitute for the default local scanner.
+`--mode hosted` selects the configured origin's protected `/scan` route with
+`fail_open=False`; the SDK does not settle x402 payment challenges, so the public paid
+route requires a separate payment-aware transport. The free hosted demo is never
+available to the gateway because it truncates long payloads. BLOCK returns HTTP 403.
+Every completed scan writes a guard-key-signed JSON verdict receipt containing only a
+random request ID, timestamp, verdict, risk, threat classes, scanner latency, public key,
+and signature. Payloads, transformed bodies, detections, and raw scanner responses are
+never written to that log.
 
 ## Decorator
 

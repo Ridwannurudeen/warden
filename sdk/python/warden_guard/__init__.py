@@ -1,4 +1,4 @@
-"""warden-guard — one-line payload firewall for agent services (APA v0.1)."""
+"""warden-agent-guard — one-line payload firewall for agent services (APA v0.1)."""
 
 from importlib.metadata import version as _distribution_version
 
@@ -10,7 +10,7 @@ from warden_guard.pipeline import AsyncTextGuard, GuardedText, TextGuard
 from warden_guard.proof import ProtectionProofApp, protection_proof
 from warden_guard.proxy import WardenReverseProxy
 
-__version__ = _distribution_version("warden-guard")
+__version__ = _distribution_version("warden-agent-guard")
 
 __all__ = [
     "AsyncTextGuard",
