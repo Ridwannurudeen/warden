@@ -2,9 +2,10 @@
 
 This pack turns the normative APA wire formats into independently runnable checks. It contains strict JSON
 Schemas for the Protection Proof, issuer document, guard-live and audited attestations, mixed transparency-log
-entries, signed checkpoints, and WARDEN BREAKER certificates. Frozen vectors cover a valid record, expiry,
-revocation, one-byte-equivalent field tampering, endpoint proof verification, issuer discovery, chain
-continuity, checkpoint binding, and BREAKER evidence.
+entries, signed checkpoints, portable endpoint-audit evidence, and WARDEN BREAKER certificates. Frozen vectors
+cover a valid record, expiry, revocation, one-byte-equivalent field tampering, endpoint proof verification,
+issuer discovery, issuer-key history, chain continuity, checkpoint binding, endpoint-audit manifest binding,
+and BREAKER evidence.
 
 Install the two verifier dependencies and run:
 

@@ -51,6 +51,8 @@ class _FakeAsyncClient:
 
 
 def _stubbed_audit_requests(monkeypatch, response: _ConsentResponse):
+    monkeypatch.setenv("WARDEN_ENVIRONMENT", "development")
+
     async def _validate_public_http_url(self, target_url: str):
         return (
             "http://127.0.0.1:8000",

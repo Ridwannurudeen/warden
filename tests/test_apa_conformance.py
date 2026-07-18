@@ -24,6 +24,7 @@ def _load_json(path: Path) -> dict[str, object]:
 def test_every_published_schema_is_valid_draft_2020_12() -> None:
     expected = {
         "apa-attestation-v0.1.schema.json",
+        "apa-endpoint-audit-v0.1.schema.json",
         "apa-issuer-v0.1.schema.json",
         "apa-log-checkpoint-v0.1.schema.json",
         "apa-log-entry-v0.1.schema.json",
@@ -51,8 +52,10 @@ def test_conformance_vectors_match_their_declared_schemas() -> None:
         "tampered-attestation",
         "protection-proof",
         "issuer-document",
+        "endpoint-audit-attestation",
         "apa-log-entry",
         "breaker-log-entry",
+        "endpoint-audit-log-entry",
         "log-checkpoint",
         "breaker-certificate",
     }
@@ -77,7 +80,7 @@ def test_reference_conformance_runner_accepts_the_frozen_vectors() -> None:
     )
 
     assert completed.returncode == 0, completed.stdout + completed.stderr
-    assert "10 vectors passed" in completed.stdout
+    assert "12 vectors passed" in completed.stdout
 
 
 def test_conformance_pack_is_documented_and_continuously_verified() -> None:

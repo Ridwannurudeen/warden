@@ -89,6 +89,47 @@
         "prev_hash"
       ],
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "ts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "event": { "enum": ["audit-issued", "audit-revoked"] },
+        "record_type": { "const": "endpoint-audit-attestation" },
+        "audit_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$"
+        },
+        "endpoint_host": { "type": "string", "minLength": 1 },
+        "record_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "prev_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "seq",
+        "ts",
+        "event",
+        "record_type",
+        "audit_id",
+        "endpoint_host",
+        "record_hash",
+        "prev_hash"
+      ],
+      "additionalProperties": false
     }
   ]
 }

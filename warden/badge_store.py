@@ -59,18 +59,31 @@ def _read_records(path: Path) -> list[dict[str, object]]:
 
 
 def record_badge(badge: dict[str, object]) -> None:
+    versioned = badge.get("badge_version") == 2
+    if versioned:
+        from warden.badges import verify_badge
+
+        if not verify_badge(badge):
+            raise ValueError("versioned audit badge failed integrity verification")
     record = json.dumps(badge, ensure_ascii=False, sort_keys=True)
+    already_stored = False
     with _exclusive_store_lock():
         for existing in _read_records(_STORE_PATH):
             if existing.get("audit_id") != badge.get("audit_id"):
                 continue
             if existing == badge:
-                return
+                already_stored = True
+                break
             raise ValueError("badge audit_id conflicts with an existing record")
-        with _STORE_PATH.open("a", encoding="utf-8") as handle:
-            handle.write(record + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
+        if not already_stored:
+            with _STORE_PATH.open("a", encoding="utf-8") as handle:
+                handle.write(record + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+    if versioned:
+        from warden import audit_attestations
+
+        audit_attestations.publish_from_badge(badge)
 
 
 def get_badge(audit_id: str) -> dict[str, object] | None:

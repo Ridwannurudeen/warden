@@ -289,12 +289,48 @@ tagged union, verify every entry from genesis, verify the signed checkpoint, and
 the certificate's signed `log_seq` to match both IDs and `record_hash`. The Warden browser verifier fails
 closed above 10,000 entries to bound client-side request, memory, and DOM work.
 
+### 7.4 Portable endpoint-audit evidence extension
+
+The Warden reference implementation uses a separate immutable record for one consented, conclusive endpoint
+audit. This avoids confusing a rolling guard-liveness Attestation with point-in-time audit evidence. The record
+has `spec_version = "apa-audit/0.1"` and
+`predicate_type = "https://warden.gudman.xyz/spec/endpoint-audit/v1"` and binds:
+
+- the exact canonical endpoint URL in `subject` and its `endpoint_host`;
+- the immutable battery ID, version, and SHA-256 manifest digest;
+- attack counts (`blocked`, `total`, `conclusive`, `inconclusive`) and benign-control counts;
+- the derived grade, verified consent, verified liveness, observation date, issue time, and expiry;
+- the normative limitation that this is point-in-time evidence, not certification, continuous monitoring, or
+  proof of future safety; and
+- the issuance log sequence and issuer signature.
+
+An Issuer MUST issue this record only when every attack probe is conclusive, every benign control passes,
+consent and endpoint liveness are verified, and the complete battery comes from one published immutable
+manifest. Any inconclusive probe prevents issuance. The Warden profile expires the claim exactly 2,592,000
+seconds (30 days) after `issued_at`; an otherwise valid expired record has effective status `stale`.
+
+Issuer-key selection uses the signed `issued_at` and the same `not_after` history rules as §6. The signed record
+is immutable. Revocation is an external effective state committed to the shared transparency log, so a
+Verifier checks both the record and its log evidence. Issuance and revocation entries have exactly
+`{ seq, ts, event, record_type, audit_id, endpoint_host, record_hash, prev_hash }`, where `event` is
+`audit-issued` or `audit-revoked`, `record_type = "endpoint-audit-attestation"`, and `record_hash` binds the
+complete signed record.
+
+The strict wire schema is
+[`schemas/apa-endpoint-audit-v0.1.schema.json`](schemas/apa-endpoint-audit-v0.1.schema.json). A valid signature
+proves only that the named issuer signed the bounded audit facts and committed them to its log. It does not
+make the endpoint safe, certify it, or establish that every future request will follow the observed behavior.
+
 ## 8. The `audited` tier (optional, ties to endpoint audits)
 
 An Issuer MAY additionally issue an `audited` Attestation after running a published attack battery against the
 endpoint (with the endpoint's consent — the proof of consent MUST be included in the signed record as
 `consent_verified: true`, and an unconsented audit MUST NOT be issued as `audited`). The `audited` record adds
 `grade`, `blocked`, `total`, `battery_version` and is otherwise identical. It is **point-in-time**; UIs MUST say so.
+
+This compact tier remains part of the APA v0.1 compatibility contract. New Warden integrations SHOULD use the
+more explicit portable endpoint-audit record in §7.4 when they need manifest binding, an exact subject,
+revocation evidence, or independently inspectable limitations.
 
 ## 9. Extensibility & interop
 

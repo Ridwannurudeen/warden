@@ -8,6 +8,11 @@
         "kid": "conformance-issuer-v1",
         "pub": "ed25519:RnbE4q_xPmh0ylVUg2TnMYkcYCO1vh4AceuyZJDE6ow",
         "not_after": 9007199254740991
+      },
+      {
+        "kid": "conformance-retired-audit-v1",
+        "pub": "ed25519:A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg",
+        "not_after": 1784000100
       }
     ]
   },
@@ -126,8 +131,45 @@
             "kid": "conformance-issuer-v1",
             "pub": "ed25519:RnbE4q_xPmh0ylVUg2TnMYkcYCO1vh4AceuyZJDE6ow",
             "not_after": 9007199254740991
+          },
+          {
+            "kid": "conformance-retired-audit-v1",
+            "pub": "ed25519:A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg",
+            "not_after": 1784000100
           }
         ]
+      }
+    },
+    {
+      "id": "endpoint-audit-attestation",
+      "schema": "apa-endpoint-audit-v0.1.schema.json",
+      "schema_valid": true,
+      "verification": "valid-audit",
+      "value": {
+        "spec_version": "apa-audit/0.1",
+        "predicate_type": "https://warden.gudman.xyz/spec/endpoint-audit/v1",
+        "audit_id": "fedcba9876543210",
+        "issuer": "warden",
+        "subject": "https://agent.example/scan?mode=strict",
+        "endpoint_host": "agent.example",
+        "battery_id": "warden-core-http",
+        "battery_version": "2026-07",
+        "battery_sha256": "7e18f89d7249fe97e007f37dc91839492cfb7a40af4d7b660309645c0fe33f3f",
+        "blocked": 19,
+        "total": 20,
+        "conclusive": 20,
+        "inconclusive": 0,
+        "benign_total": 3,
+        "benign_passed": 3,
+        "grade": "A",
+        "consent_verified": true,
+        "liveness_passed": true,
+        "observed_on": "2026-07-18",
+        "issued_at": 1784000070,
+        "expires_at": 1786592070,
+        "limitations": "Point-in-time endpoint audit; not certification, continuous monitoring, or proof of future safety.",
+        "log_seq": 3,
+        "issuer_sig": "sig:Ngn-CbHF5-B60HC1w9UoQ93ZLegW8B2PFRHqRiXasvg2oJ7INA1joNKbjjW2PgbjZkn6s-5kon8THv7qMvNPBQ"
       }
     },
     {
@@ -163,6 +205,22 @@
       }
     },
     {
+      "id": "endpoint-audit-log-entry",
+      "schema": "apa-log-entry-v0.1.schema.json",
+      "schema_valid": true,
+      "verification": "valid-log-entry",
+      "value": {
+        "seq": 3,
+        "ts": 1784000070,
+        "event": "audit-issued",
+        "record_type": "endpoint-audit-attestation",
+        "audit_id": "fedcba9876543210",
+        "endpoint_host": "agent.example",
+        "record_hash": "3443a7f9644f7b8cb1ae69852b0b0cd8b43c1e1817f3c84b71d82a5fae00fc1b",
+        "prev_hash": "fb705957613b7318bfdcb4212cd416c369d24ac4417f95919ccafe6f2923f2f5"
+      }
+    },
+    {
       "id": "log-checkpoint",
       "schema": "apa-log-checkpoint-v0.1.schema.json",
       "schema_valid": true,
@@ -170,10 +228,10 @@
       "value": {
         "spec_version": "apa-log/0.1",
         "issuer": "warden",
-        "seq": 2,
-        "head_hash": "fb705957613b7318bfdcb4212cd416c369d24ac4417f95919ccafe6f2923f2f5",
-        "issued_at": 1784000060,
-        "issuer_sig": "sig:KGaAJF93sGPAB_6FkAxzYZKGCqzljSpbc5x5VAUm-Lj21Dtu0kZCIUomHjL66V_mlYKh6Lq9DzAoa8mXFUVCAQ"
+        "seq": 3,
+        "head_hash": "cece88ed1bc4522d63da34b48a702aaf490a1890cccc52f7ef4caf8b5a5505c3",
+        "issued_at": 1784000080,
+        "issuer_sig": "sig:dl8bHs_YySYte5Gu_7sVhdki4hfFdaGZe61R41eVIr3lHIXbPU8-EpSrTgfpJRYEft0A--tMu3iKoxCPlptmCQ"
       }
     },
     {
