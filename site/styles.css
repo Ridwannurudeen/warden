@@ -2529,8 +2529,31 @@ ins[data-diff="added"] {
 }
 
 .table-of-contents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 18px;
+  align-items: baseline;
   padding-block: 14px;
   border-block: 1px solid var(--line);
+}
+
+.table-of-contents strong {
+  flex-basis: 100%;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.table-of-contents a {
+  color: var(--accent-bright);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.table-of-contents a:hover {
+  text-decoration: underline;
 }
 
 .docs-reference-table,
