@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
+DEPENDENCY_POLICY = ROOT / "docs" / "DEPENDENCY_UPDATE_POLICY.md"
 PINNED_ACTIONS = {
     "actions/checkout": "df4cb1c069e1874edd31b4311f1884172cec0e10",
     "actions/setup-python": "ece7cb06caefa5fff74198d8649806c4678c61a1",
@@ -75,3 +76,31 @@ def test_secret_scan_is_read_only_has_full_history_and_fails_on_detected_credent
     assert "security-events: write" not in workflow
     assert "trufflesecurity/trufflehog@" not in workflow
     assert workflow.count("persist-credentials: false") == 2
+
+
+def test_dependency_updates_require_reviewed_lock_refresh_and_full_gates() -> None:
+    policy = DEPENDENCY_POLICY.read_text(encoding="utf-8")
+    normalized = " ".join(policy.split())
+
+    assert (
+        "uv pip compile pyproject.toml sdk/python/pyproject.toml "
+        "--extra dev --extra langchain --extra llamaindex --generate-hashes "
+        "--python-platform x86_64-unknown-linux-gnu --python-version 3.11 "
+        "-o requirements.lock"
+    ) in policy
+    for command in (
+        "python -m pip_audit --require-hashes -r requirements.lock --disable-pip",
+        "python -m pytest -q",
+        "python -m build --no-isolation",
+        "python -m twine check dist/*",
+        "npm ci",
+        "npm audit --audit-level=high",
+        "npm test",
+        "npm run build",
+        "npm pack --dry-run",
+    ):
+        assert f"`{command}`" in policy
+    assert "reviewed pull request" in normalized
+    assert "must not be auto-merged" in normalized
+    assert "release notes" in normalized
+    assert "rollback" in normalized
