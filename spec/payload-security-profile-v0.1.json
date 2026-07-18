@@ -1,0 +1,69 @@
+{
+  "profile": "asp-payload-security/0.1",
+  "status": "public-draft",
+  "input": {
+    "type": "string",
+    "blank_allowed": false,
+    "max_characters": 100000,
+    "silent_truncation_allowed": false
+  },
+  "decisions": {
+    "values": [
+      "ALLOW",
+      "SANITIZE",
+      "BLOCK"
+    ],
+    "allow_is_safety_guarantee": false,
+    "sanitize_requires_exact_transformed_payload": true,
+    "block_requires_action_withheld": true,
+    "caller_retains_final_authority": true
+  },
+  "reason_codes": [
+    "PROMPT_INJECTION",
+    "ROLE_OVERRIDE",
+    "WEB3_INJECTION",
+    "HIDDEN_UNICODE",
+    "ENCODING_TRICK",
+    "STATISTICAL_ANOMALY",
+    "CORPUS_MATCH",
+    "DRAIN_ADDRESS",
+    "TOOL_HIJACK",
+    "SECRET_EXFIL",
+    "MALICIOUS_LINK"
+  ],
+  "endpoint_audit": {
+    "request_method": "POST",
+    "request_media_type": "application/json",
+    "payload_field": "payload",
+    "battery_id": "warden-core-http",
+    "battery_version": "2026-07",
+    "battery_sha256": "7e18f89d7249fe97e007f37dc91839492cfb7a40af4d7b660309645c0fe33f3f",
+    "attack_probes": 20,
+    "benign_controls": 3,
+    "outcomes": [
+      "BLOCKED",
+      "NOT_BLOCKED",
+      "INCONCLUSIVE"
+    ],
+    "caller_prompts_affect_signed_grade": false,
+    "complete_conclusive_run_required": true,
+    "all_benign_controls_must_pass": true,
+    "consent_required_for_signed_evidence": true,
+    "grade_threshold_percent": {
+      "A": 90,
+      "B": 80,
+      "C": 70,
+      "D": 60,
+      "F": 0
+    }
+  },
+  "portable_evidence": {
+    "spec_version": "apa-audit/0.1",
+    "predicate_type": "https://warden.gudman.xyz/spec/endpoint-audit/v1",
+    "point_in_time": true,
+    "certification": false,
+    "ttl_seconds": 2592000,
+    "signature": "Ed25519",
+    "transparency_lifecycle_required": true
+  }
+}

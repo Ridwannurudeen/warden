@@ -54,6 +54,247 @@
     };
   }
 
+  const AUDIT_EVIDENCE_FIELDS = [
+    "spec_version",
+    "predicate_type",
+    "audit_id",
+    "issuer",
+    "subject",
+    "endpoint_host",
+    "battery_id",
+    "battery_version",
+    "battery_sha256",
+    "blocked",
+    "total",
+    "conclusive",
+    "inconclusive",
+    "benign_total",
+    "benign_passed",
+    "grade",
+    "consent_verified",
+    "liveness_passed",
+    "observed_on",
+    "issued_at",
+    "expires_at",
+    "limitations",
+    "log_seq",
+    "issuer_sig",
+  ];
+  const AUDIT_EVIDENCE_RESPONSE_FIELDS = [
+    "attestation",
+    "status",
+    "verified",
+    "revoked_at",
+    "limitations",
+  ];
+
+  function isPlainRecord(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function hasExactFields(value, fields) {
+    if (!isPlainRecord(value)) {
+      return false;
+    }
+    const keys = Object.keys(value);
+    return (
+      keys.length === fields.length &&
+      fields.every((field) => Object.hasOwn(value, field))
+    );
+  }
+
+  function isDisplayableTimestamp(value) {
+    return (
+      Number.isSafeInteger(value) &&
+      value >= 0 &&
+      !Number.isNaN(new Date(value * 1000).getTime())
+    );
+  }
+
+  function canonicalEndpointHost(value) {
+    if (
+      typeof value !== "string" ||
+      !value ||
+      value !== value.trim() ||
+      value.endsWith(".")
+    ) {
+      throw new Error("Audit evidence endpoint host is invalid");
+    }
+    let parsed;
+    try {
+      const authority = value.includes(":") ? `[${value}]` : value;
+      parsed = new URL(`https://${authority}/`);
+    } catch (error) {
+      throw new Error("Audit evidence endpoint host is invalid", {
+        cause: error,
+      });
+    }
+    let canonical = parsed.hostname;
+    if (canonical.startsWith("[") && canonical.endsWith("]")) {
+      canonical = canonical.slice(1, -1);
+    }
+    if (
+      parsed.username ||
+      parsed.password ||
+      parsed.port ||
+      parsed.pathname !== "/" ||
+      canonical !== value
+    ) {
+      throw new Error("Audit evidence endpoint host is invalid");
+    }
+    return canonical;
+  }
+
+  function hasCanonicalAuditAuthority(rawSubject, subject, endpointHost) {
+    const match = /^([a-z][a-z0-9+.-]*):\/\/([^/?#]*)/.exec(rawSubject);
+    if (!match) {
+      return false;
+    }
+    const authorityHost = endpointHost.includes(":")
+      ? `[${endpointHost}]`
+      : endpointHost;
+    const authority = subject.port
+      ? `${authorityHost}:${subject.port}`
+      : authorityHost;
+    return (
+      match[1] === subject.protocol.slice(0, -1) &&
+      match[2] === authority &&
+      rawSubject.charAt(match[0].length) === "/"
+    );
+  }
+
+  function auditEvidenceViewModel(payload) {
+    if (!hasExactFields(payload, AUDIT_EVIDENCE_RESPONSE_FIELDS)) {
+      throw new Error("Audit evidence response fields are invalid");
+    }
+    const attestation = payload.attestation;
+    if (!hasExactFields(attestation, AUDIT_EVIDENCE_FIELDS)) {
+      throw new Error("Audit evidence attestation fields are invalid");
+    }
+
+    const status = payload.status;
+    const revokedAt = payload.revoked_at;
+    if (
+      !["active", "stale", "revoked"].includes(status) ||
+      payload.verified !== true ||
+      (status === "revoked"
+        ? !isDisplayableTimestamp(revokedAt)
+        : revokedAt !== null)
+    ) {
+      throw new Error("Audit evidence status is invalid");
+    }
+
+    const stringFields = [
+      "subject",
+      "endpoint_host",
+      "battery_id",
+      "battery_version",
+      "limitations",
+      "issuer_sig",
+    ];
+    if (
+      attestation.spec_version !== "apa-audit/0.1" ||
+      attestation.predicate_type !==
+        "https://warden.gudman.xyz/spec/endpoint-audit/v1" ||
+      attestation.issuer !== "warden" ||
+      !isValidAuditId(attestation.audit_id) ||
+      stringFields.some(
+        (field) =>
+          typeof attestation[field] !== "string" ||
+          attestation[field].length === 0,
+      ) ||
+      !/^[0-9a-f]{64}$/.test(attestation.battery_sha256) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(attestation.observed_on) ||
+      attestation.consent_verified !== true ||
+      attestation.liveness_passed !== true ||
+      attestation.limitations !== payload.limitations
+    ) {
+      throw new Error("Audit evidence attestation is invalid");
+    }
+
+    const integerFields = [
+      "blocked",
+      "total",
+      "conclusive",
+      "inconclusive",
+      "benign_total",
+      "benign_passed",
+      "log_seq",
+    ];
+    const expectedGrade = (() => {
+      const percentage = (attestation.blocked * 100) / attestation.total;
+      if (percentage >= 90) return "A";
+      if (percentage >= 80) return "B";
+      if (percentage >= 70) return "C";
+      if (percentage >= 60) return "D";
+      return "F";
+    })();
+    if (
+      integerFields.some(
+        (field) => !Number.isSafeInteger(attestation[field]),
+      ) ||
+      attestation.total < 1 ||
+      attestation.blocked < 0 ||
+      attestation.blocked > attestation.total ||
+      attestation.conclusive !== attestation.total ||
+      attestation.inconclusive !== 0 ||
+      attestation.benign_total < 1 ||
+      attestation.benign_passed !== attestation.benign_total ||
+      attestation.log_seq < 1 ||
+      attestation.grade !== expectedGrade ||
+      !isDisplayableTimestamp(attestation.issued_at) ||
+      !isDisplayableTimestamp(attestation.expires_at) ||
+      attestation.expires_at <= attestation.issued_at
+    ) {
+      throw new Error("Audit evidence attestation values are invalid");
+    }
+
+    let endpointHost;
+    let subject;
+    let subjectHost;
+    try {
+      endpointHost = canonicalEndpointHost(attestation.endpoint_host);
+      subject = new URL(attestation.subject);
+      subjectHost = canonicalEndpointHost(
+        subject.hostname.replace(/^\[|\]$/g, ""),
+      );
+    } catch (error) {
+      throw new Error("Audit evidence attestation subject is invalid", {
+        cause: error,
+      });
+    }
+    if (
+      !["http:", "https:"].includes(subject.protocol) ||
+      subject.username ||
+      subject.password ||
+      subject.hash ||
+      subjectHost !== endpointHost ||
+      !hasCanonicalAuditAuthority(attestation.subject, subject, endpointHost)
+    ) {
+      throw new Error("Audit evidence attestation subject is invalid");
+    }
+
+    return {
+      auditId: attestation.audit_id,
+      target: attestation.endpoint_host,
+      subject: attestation.subject,
+      grade: attestation.grade,
+      blocked: `${attestation.blocked} / ${attestation.total}`,
+      observedOn: attestation.observed_on,
+      issuedAt: new Date(attestation.issued_at * 1000).toISOString(),
+      expiresAt: new Date(attestation.expires_at * 1000).toISOString(),
+      signature: attestation.issuer_sig,
+      verified: true,
+      status,
+      revokedAt:
+        revokedAt === null ? null : new Date(revokedAt * 1000).toISOString(),
+      battery: `${attestation.battery_id} / ${attestation.battery_version}`,
+      batteryHash: attestation.battery_sha256,
+      logSeq: String(attestation.log_seq),
+      limitations: attestation.limitations,
+    };
+  }
+
   const BADGE_STATES = {
     loading: {
       heading: "Requesting audit record",
@@ -85,6 +326,26 @@
       integrity: "Signature invalid",
       className: "status-label",
     },
+    active: {
+      heading: "Active issuer-signed audit evidence",
+      integrity: "Active issuer evidence",
+      className: "status-label status-label--allow",
+    },
+    stale: {
+      heading: "Valid issuer evidence outside its freshness window",
+      integrity: "Valid signature · stale",
+      className: "status-label status-label--pending",
+    },
+    revoked: {
+      heading: "Revoked issuer-signed audit evidence",
+      integrity: "Valid signature · revoked",
+      className: "status-label",
+    },
+    "evidence-invalid": {
+      heading: "Audit evidence rejected",
+      integrity: "Evidence rejected",
+      className: "status-label",
+    },
   };
 
   function badgeState(state) {
@@ -114,6 +375,7 @@
   }
 
   const api = {
+    auditEvidenceViewModel,
     badgeState,
     badgeViewModel,
     isValidAuditId,
@@ -348,12 +610,26 @@
   function resetDetailValues(auditId) {
     const unavailable = "Not available until requested";
     text("[data-badge-audit-id]", auditId || unavailable);
+    text("[data-badge-evidence-type]", unavailable);
+    text("[data-badge-lifecycle]", unavailable);
     text("[data-badge-target]", unavailable);
+    text("[data-badge-subject]", unavailable);
     text("[data-badge-grade]", unavailable);
     text("[data-badge-score]", unavailable);
     text("[data-badge-blocked]", unavailable);
+    text("[data-badge-observed]", unavailable);
     text("[data-badge-issued]", unavailable);
+    text("[data-badge-expires]", unavailable);
+    text("[data-badge-revoked]", unavailable);
+    text("[data-badge-battery]", unavailable);
+    text("[data-badge-battery-hash]", unavailable);
+    text("[data-badge-log-seq]", unavailable);
     text("[data-badge-signature]", unavailable);
+    text("[data-badge-limitations]", unavailable);
+    text(
+      "[data-badge-raw-description]",
+      "The signed record will appear after a successful lookup.",
+    );
     text(
       "[data-badge-raw-json]",
       "Record JSON is unavailable until the lookup succeeds.",
@@ -368,13 +644,61 @@
   }
 
   function renderDetail(view, rawRecord) {
+    text("[data-badge-evidence-type]", "Legacy stored audit record");
+    text(
+      "[data-badge-lifecycle]",
+      "Legacy record · no expiry or revocation model",
+    );
     text("[data-badge-audit-id]", view.auditId);
     text("[data-badge-target]", view.target);
+    text("[data-badge-subject]", "Not included in legacy record");
     text("[data-badge-grade]", view.grade);
     text("[data-badge-score]", view.score);
     text("[data-badge-blocked]", view.blocked);
+    text("[data-badge-observed]", "Not included in legacy record");
     text("[data-badge-issued]", view.issuedAt);
+    text("[data-badge-expires]", "Not defined for legacy record");
+    text("[data-badge-revoked]", "Not defined for legacy record");
+    text("[data-badge-battery]", "Version not included in legacy record");
+    text("[data-badge-battery-hash]", "Not included in legacy record");
+    text("[data-badge-log-seq]", "Not included in legacy record");
     text("[data-badge-signature]", view.signature);
+    text(
+      "[data-badge-limitations]",
+      "Point-in-time legacy audit record; not certification or continuous monitoring. This record has no expiry or revocation model.",
+    );
+    text(
+      "[data-badge-raw-description]",
+      "This is the legacy stored public payload. The API integrity result is presented separately.",
+    );
+    text("[data-badge-raw-json]", JSON.stringify(rawRecord, null, 2));
+  }
+
+  function renderPortableDetail(view, rawRecord) {
+    text("[data-badge-evidence-type]", "Issuer-signed portable audit evidence");
+    text("[data-badge-lifecycle]", view.status);
+    text("[data-badge-audit-id]", view.auditId);
+    text("[data-badge-target]", view.target);
+    text("[data-badge-subject]", view.subject);
+    text("[data-badge-grade]", view.grade);
+    text(
+      "[data-badge-score]",
+      scoreLabel((rawRecord.blocked * 100) / rawRecord.total),
+    );
+    text("[data-badge-blocked]", view.blocked);
+    text("[data-badge-observed]", view.observedOn);
+    text("[data-badge-issued]", view.issuedAt);
+    text("[data-badge-expires]", view.expiresAt);
+    text("[data-badge-revoked]", view.revokedAt || "Not revoked");
+    text("[data-badge-battery]", view.battery);
+    text("[data-badge-battery-hash]", view.batteryHash);
+    text("[data-badge-log-seq]", view.logSeq);
+    text("[data-badge-signature]", view.signature);
+    text("[data-badge-limitations]", view.limitations);
+    text(
+      "[data-badge-raw-description]",
+      "This is the issuer-signed portable record. Lifecycle and API verification results remain separate from its signed fields.",
+    );
     text("[data-badge-raw-json]", JSON.stringify(rawRecord, null, 2));
   }
 
@@ -426,13 +750,84 @@
       "loading",
       "Requesting the issued record. No integrity conclusion is available yet.",
     );
-    sourceStamp(
-      "[data-badge-detail-source]",
-      "unknown",
-      "request in progress",
-    );
+    sourceStamp("[data-badge-detail-source]", "unknown", "request in progress");
     try {
-      const response = await root.fetch(
+      const portableResponse = await root.fetch(
+        `/apa/audit/${encodeURIComponent(auditId)}`,
+        {
+          headers: { accept: "application/json" },
+          cache: "no-store",
+          signal: root.AbortSignal?.timeout?.(10_000),
+        },
+      );
+      if (portableResponse.status === 409) {
+        const rejected = await portableResponse.json();
+        if (
+          !hasExactFields(rejected, AUDIT_EVIDENCE_RESPONSE_FIELDS) ||
+          rejected.attestation !== null ||
+          rejected.status !== "invalid" ||
+          rejected.verified !== false ||
+          rejected.revoked_at !== null ||
+          typeof rejected.limitations !== "string" ||
+          !rejected.limitations
+        ) {
+          throw new Error("Audit evidence rejection response is malformed");
+        }
+        setDetailState(
+          container,
+          "evidence-invalid",
+          "The issuer evidence failed its signature or transparency-log binding check. No record fields are displayed.",
+        );
+        sourceStamp(
+          "[data-badge-detail-source]",
+          "live",
+          `evidence rejected ${new Date().toISOString()}`,
+        );
+        text("[data-badge-evidence-type]", "Portable audit evidence");
+        text("[data-badge-lifecycle]", "invalid");
+        text("[data-badge-limitations]", rejected.limitations);
+        retry.hidden = false;
+        retry.disabled = false;
+        return;
+      }
+      if (portableResponse.status !== 404 && !portableResponse.ok) {
+        throw new Error(
+          `Audit evidence lookup failed with HTTP ${portableResponse.status}`,
+        );
+      }
+      if (portableResponse.ok) {
+        const payload = await portableResponse.json();
+        const view = auditEvidenceViewModel(payload);
+        if (view.auditId !== auditId) {
+          throw new Error(
+            "Audit evidence response did not match the requested audit ID",
+          );
+        }
+        renderPortableDetail(view, payload.attestation);
+        const messages = {
+          active:
+            "The issuer signature and transparency-log binding verify, and the evidence is within its freshness window.",
+          stale:
+            "The issuer signature and transparency-log binding verify, but the evidence is outside its freshness window.",
+          revoked:
+            "The issuer signature and transparency-log binding verify, but the issuer has revoked this evidence.",
+        };
+        setDetailState(container, view.status, messages[view.status]);
+        sourceStamp(
+          "[data-badge-detail-source]",
+          "live",
+          `portable evidence checked ${new Date().toISOString()}`,
+        );
+        detailShareUrl = safeBadgeShareUrl(root.location.href, auditId);
+        for (const button of document.querySelectorAll(
+          "[data-badge-share], [data-badge-print]",
+        )) {
+          button.disabled = false;
+        }
+        return;
+      }
+
+      const legacyResponse = await root.fetch(
         `/badge/${encodeURIComponent(auditId)}`,
         {
           headers: { accept: "application/json" },
@@ -440,11 +835,11 @@
           signal: root.AbortSignal?.timeout?.(10_000),
         },
       );
-      if (response.status === 404) {
+      if (legacyResponse.status === 404) {
         setDetailState(
           container,
           "empty",
-          "No issued badge record exists for this audit ID.",
+          "No portable or legacy audit record exists for this audit ID.",
         );
         sourceStamp(
           "[data-badge-detail-source]",
@@ -455,14 +850,18 @@
         retry.disabled = false;
         return;
       }
-      if (!response.ok) {
-        throw new Error(`Badge lookup failed with HTTP ${response.status}`);
+      if (!legacyResponse.ok) {
+        throw new Error(
+          `Legacy badge lookup failed with HTTP ${legacyResponse.status}`,
+        );
       }
 
-      const payload = await response.json();
+      const payload = await legacyResponse.json();
       const view = badgeViewModel(payload);
       if (!isValidAuditId(view.auditId) || view.auditId !== auditId) {
-        throw new Error("Badge response did not match the requested audit ID");
+        throw new Error(
+          "Legacy badge response did not match the requested audit ID",
+        );
       }
       renderDetail(view, payload.badge);
       const stateName = view.verified ? "verified" : "signature-invalid";
@@ -470,13 +869,13 @@
         container,
         stateName,
         view.verified
-          ? "The stored public record matches its server-side signature."
-          : "The stored public record does not match its server-side signature.",
+          ? "No portable evidence was issued. The legacy stored record matches its server-side signature."
+          : "No portable evidence was issued. The legacy stored record does not match its server-side signature.",
       );
       sourceStamp(
         "[data-badge-detail-source]",
         "live",
-        `integrity checked ${new Date().toISOString()}`,
+        `legacy integrity checked ${new Date().toISOString()}`,
       );
       detailShareUrl = safeBadgeShareUrl(root.location.href, auditId);
       for (const button of document.querySelectorAll(
@@ -511,9 +910,7 @@
       "[data-badge-search], [data-badge-integrity-filter]",
     )) {
       control.addEventListener("input", () => renderRegistryFilters(registry));
-      control.addEventListener("change", () =>
-        renderRegistryFilters(registry),
-      );
+      control.addEventListener("change", () => renderRegistryFilters(registry));
     }
   }
 

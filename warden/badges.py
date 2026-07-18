@@ -5,9 +5,11 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import ipaddress
 import json
 import os
 
+import idna
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
@@ -78,6 +80,29 @@ def ed25519_verify_record(record: dict[str, object], pub: str, sig_field: str) -
     return True
 
 
+def canonical_host(host: str) -> str:
+    """Return a browser-compatible ASCII DNS name or compressed IP address."""
+    if not isinstance(host, str) or not host:
+        raise ValueError("target host must be a non-empty string")
+    value = host.rstrip(".")
+    if not value:
+        raise ValueError("target host must be a non-empty string")
+    try:
+        address = ipaddress.ip_address(value)
+    except ValueError:
+        try:
+            return idna.encode(
+                value,
+                uts46=True,
+                std3_rules=True,
+            ).decode("ascii")
+        except idna.IDNAError as exc:
+            raise ValueError("target host is not a valid DNS name or IP address") from exc
+    if isinstance(address, ipaddress.IPv6Address) and address.scope_id is not None:
+        raise ValueError("target host must not contain an IPv6 scope identifier")
+    return address.compressed
+
+
 def canonical_target(
     scheme: str,
     host: str,
@@ -91,9 +116,10 @@ def canonical_target(
     endpoint always canonicalizes identically for signing and association.
     """
     scheme = scheme.lower()
-    host = host.rstrip(".").casefold()
+    host = canonical_host(host)
     default_port = 443 if scheme == "https" else 80
-    authority = host if port in (None, default_port) else f"{host}:{port}"
+    authority_host = f"[{host}]" if ":" in host else host
+    authority = authority_host if port in (None, default_port) else f"{authority_host}:{port}"
     normalized_path = path or "/"
     if not normalized_path.startswith("/"):
         normalized_path = f"/{normalized_path}"

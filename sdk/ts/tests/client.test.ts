@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  type FeedbackSubmission,
   WardenBlocked,
   WardenClient,
   WardenError,
@@ -307,4 +308,160 @@ describe("WardenClient", () => {
       message: expect.stringContaining("checks"),
     });
   });
+
+  const feedbackSubmission: FeedbackSubmission = {
+    outcome: "missed_attack",
+    observedVerdict: "ALLOW",
+    threatClass: "PROMPT_INJECTION",
+    redactedReproducer: "Human-reviewed reproducer with secrets removed.",
+    consentToRetain: true,
+    redactionConfirmed: true,
+  };
+
+  const feedbackResponse = {
+    feedback_id: "0123456789abcdef0123456789abcdef",
+    status: "pending",
+    retained_until: "2026-10-16T12:00:00Z",
+  };
+
+  it("submits feedback only through the explicit dedicated contract", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(feedbackResponse, 202));
+
+    const result = await new WardenClient({
+      baseUrl: "https://warden.test/",
+    }).submitFeedback(feedbackSubmission);
+
+    expect(result).toEqual({
+      feedbackId: "0123456789abcdef0123456789abcdef",
+      status: "pending",
+      retainedUntil: "2026-10-16T12:00:00Z",
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [input, init] = fetchMock.mock.calls[0]!;
+    expect(input).toBe("https://warden.test/api/feedback");
+    expect(init).toMatchObject({
+      method: "POST",
+      headers: { "content-type": "application/json" },
+    });
+    expect(JSON.parse(String(init?.body))).toEqual({
+      outcome: "missed_attack",
+      observed_verdict: "ALLOW",
+      threat_class: "PROMPT_INJECTION",
+      redacted_reproducer: "Human-reviewed reproducer with secrets removed.",
+      consent_to_retain: true,
+      redaction_confirmed: true,
+    });
+  });
+
+  it.each([
+    { consentToRetain: false },
+    { consentToRetain: 1 },
+    { redactionConfirmed: false },
+    { redactionConfirmed: 1 },
+  ])(
+    "requires literal consent before feedback reaches the network",
+    async (change) => {
+      const invalid = {
+        ...feedbackSubmission,
+        ...change,
+      } as unknown as FeedbackSubmission;
+
+      await expect(
+        new WardenClient().submitFeedback(invalid),
+      ).rejects.toMatchObject({
+        name: "WardenError",
+        message: expect.stringContaining("explicit boolean true"),
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("never applies scan fail-open behavior to feedback submission", async () => {
+    fetchMock.mockRejectedValue(new TypeError("feedback unavailable"));
+
+    await expect(
+      new WardenClient({ failOpen: true }).submitFeedback(feedbackSubmission),
+    ).rejects.toMatchObject({
+      name: "WardenError",
+      message: expect.stringContaining("feedback submission failed"),
+    });
+  });
+
+  it.each([
+    { ...feedbackResponse, feedback_id: "not-an-id" },
+    { ...feedbackResponse, unexpected: "field" },
+    { ...feedbackResponse, retained_until: "not-a-timestamp" },
+    { ...feedbackResponse, retained_until: "2026-02-31T12:00:00Z" },
+  ])("rejects malformed feedback receipts", async (body) => {
+    fetchMock.mockResolvedValue(jsonResponse(body, 202));
+
+    await expect(
+      new WardenClient({ failOpen: true }).submitFeedback(feedbackSubmission),
+    ).rejects.toBeInstanceOf(WardenError);
+  });
+
+  it.each([
+    { outcome: "unknown" },
+    { observedVerdict: "MAYBE" },
+    { threatClass: "UNKNOWN" },
+    { redactedReproducer: "x".repeat(4001) },
+    { redactedReproducer: "\ud800" },
+  ])(
+    "rejects feedback outside the backend contract before fetch",
+    async (change) => {
+      const invalid = {
+        ...feedbackSubmission,
+        ...change,
+      } as unknown as FeedbackSubmission;
+
+      await expect(
+        new WardenClient().submitFeedback(invalid),
+      ).rejects.toBeInstanceOf(WardenError);
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { outcome: "missed_attack", observedVerdict: "SANITIZE" },
+    { outcome: "missed_attack", observedVerdict: "BLOCK" },
+    { outcome: "false_positive", observedVerdict: "ALLOW" },
+    { outcome: "correct_detection", observedVerdict: "ALLOW" },
+  ])(
+    "rejects contradictory $outcome/$observedVerdict feedback before fetch",
+    async (change) => {
+      const invalid = {
+        ...feedbackSubmission,
+        ...change,
+      } as unknown as FeedbackSubmission;
+
+      await expect(
+        new WardenClient().submitFeedback(invalid),
+      ).rejects.toMatchObject({
+        name: "WardenError",
+        message: expect.stringContaining("requires"),
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { outcome: "missed_attack", observedVerdict: "ALLOW" },
+    { outcome: "false_positive", observedVerdict: "BLOCK" },
+    { outcome: "correct_detection", observedVerdict: "SANITIZE" },
+  ] as const)(
+    "accepts valid $outcome/$observedVerdict feedback with 4000 Unicode scalars",
+    async ({ outcome, observedVerdict }) => {
+      fetchMock.mockResolvedValue(jsonResponse(feedbackResponse, 202));
+      const submission = {
+        ...feedbackSubmission,
+        outcome,
+        observedVerdict,
+        redactedReproducer: "😀".repeat(4000),
+      } satisfies FeedbackSubmission;
+
+      await expect(
+        new WardenClient().submitFeedback(submission),
+      ).resolves.toMatchObject({ status: "pending" });
+    },
+  );
 });

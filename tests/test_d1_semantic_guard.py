@@ -2,6 +2,7 @@
 
 import asyncio
 import gzip
+import json
 
 import httpx
 import pytest
@@ -16,6 +17,7 @@ from warden.scanner.semantic import (
     HttpSemanticAnalyzer,
     MAX_SEMANTIC_RESPONSE_BYTES,
     SemanticClassification,
+    SemanticThreatCategory,
     build_semantic_analyzer_from_env,
 )
 
@@ -135,7 +137,12 @@ def test_engine_loads_semantic_analyzer_from_paid_runtime_environment(monkeypatc
 @pytest.mark.asyncio
 async def test_fast_depth_never_calls_semantic_analyzer():
     analyzer = RecordingSemanticAnalyzer(
-        SemanticClassification(flagged=True, confidence=0.95, reason="Injection intent.")
+        SemanticClassification(
+            flagged=True,
+            confidence=0.95,
+            reason="Injection intent.",
+            category=SemanticThreatCategory.PROMPT_INJECTION,
+        )
     )
     scanner = InjectionScanner(ai_analyzer=analyzer)
 
@@ -148,7 +155,12 @@ async def test_fast_depth_never_calls_semantic_analyzer():
 @pytest.mark.asyncio
 async def test_deterministic_detection_short_circuits_semantic_analyzer():
     analyzer = RecordingSemanticAnalyzer(
-        SemanticClassification(flagged=True, confidence=0.95, reason="Injection intent.")
+        SemanticClassification(
+            flagged=True,
+            confidence=0.95,
+            reason="Injection intent.",
+            category=SemanticThreatCategory.PROMPT_INJECTION,
+        )
     )
     scanner = InjectionScanner(ai_analyzer=analyzer)
 
@@ -162,7 +174,12 @@ async def test_deterministic_detection_short_circuits_semantic_analyzer():
 @pytest.mark.asyncio
 async def test_deterministic_exfiltration_analyzer_short_circuits_semantic_analyzer():
     analyzer = RecordingSemanticAnalyzer(
-        SemanticClassification(flagged=True, confidence=0.95, reason="Injection intent.")
+        SemanticClassification(
+            flagged=True,
+            confidence=0.95,
+            reason="Injection intent.",
+            category=SemanticThreatCategory.PROMPT_INJECTION,
+        )
     )
     engine = WardenEngine(semantic_analyzer=analyzer)
 
@@ -178,7 +195,12 @@ async def test_deterministic_exfiltration_analyzer_short_circuits_semantic_analy
 @pytest.mark.asyncio
 async def test_paid_thorough_semantic_layer_blocks_novel_injection():
     analyzer = RecordingSemanticAnalyzer(
-        SemanticClassification(flagged=True, confidence=0.95, reason="Instruction displacement.")
+        SemanticClassification(
+            flagged=True,
+            confidence=0.95,
+            reason="Instruction displacement.",
+            category=SemanticThreatCategory.PROMPT_INJECTION,
+        )
     )
     engine = WardenEngine(semantic_analyzer=analyzer)
 
@@ -196,7 +218,7 @@ async def test_paid_thorough_semantic_layer_blocks_novel_injection():
             "class": "PROMPT_INJECTION",
             "match": "",
             "confidence": 0.95,
-            "source": "layer_4",
+            "source": "layer_5",
         }
     ]
 
@@ -204,7 +226,12 @@ async def test_paid_thorough_semantic_layer_blocks_novel_injection():
 @pytest.mark.asyncio
 async def test_local_thorough_scan_does_not_enable_paid_semantic_layer():
     analyzer = RecordingSemanticAnalyzer(
-        SemanticClassification(flagged=True, confidence=0.95, reason="Injection intent.")
+        SemanticClassification(
+            flagged=True,
+            confidence=0.95,
+            reason="Injection intent.",
+            category=SemanticThreatCategory.PROMPT_INJECTION,
+        )
     )
     engine = WardenEngine(semantic_analyzer=analyzer)
 
@@ -217,13 +244,16 @@ async def test_local_thorough_scan_does_not_enable_paid_semantic_layer():
 @pytest.mark.asyncio
 async def test_paid_http_scan_handler_enables_semantic_layer(monkeypatch):
     analyzer = RecordingSemanticAnalyzer(
-        SemanticClassification(flagged=True, confidence=0.95, reason="Injection intent.")
+        SemanticClassification(
+            flagged=True,
+            confidence=0.95,
+            reason="Injection intent.",
+            category=SemanticThreatCategory.PROMPT_INJECTION,
+        )
     )
     monkeypatch.setattr(api_module, "engine", WardenEngine(semantic_analyzer=analyzer))
 
-    response = await api_module.scan(
-        ScanRequest(payload=NOVEL_INJECTION, depth="thorough")
-    )
+    response = await api_module.scan(ScanRequest(payload=NOVEL_INJECTION, depth="thorough"))
 
     assert analyzer.calls == [NOVEL_INJECTION]
     assert response.verdict == "BLOCK"
@@ -231,7 +261,12 @@ async def test_paid_http_scan_handler_enables_semantic_layer(monkeypatch):
 
 def test_free_demo_cannot_enable_semantic_layer_with_thorough_field(monkeypatch):
     analyzer = RecordingSemanticAnalyzer(
-        SemanticClassification(flagged=True, confidence=0.95, reason="Injection intent.")
+        SemanticClassification(
+            flagged=True,
+            confidence=0.95,
+            reason="Injection intent.",
+            category=SemanticThreatCategory.PROMPT_INJECTION,
+        )
     )
     monkeypatch.setattr(api_module, "engine", WardenEngine(semantic_analyzer=analyzer))
     monkeypatch.setenv("WARDEN_DEMO_RATE_LIMIT_PER_MIN", "0")
@@ -249,7 +284,12 @@ def test_free_demo_cannot_enable_semantic_layer_with_thorough_field(monkeypatch)
 @pytest.mark.asyncio
 async def test_mcp_thorough_scan_cannot_enable_paid_semantic_layer(monkeypatch):
     analyzer = RecordingSemanticAnalyzer(
-        SemanticClassification(flagged=True, confidence=0.95, reason="Injection intent.")
+        SemanticClassification(
+            flagged=True,
+            confidence=0.95,
+            reason="Injection intent.",
+            category=SemanticThreatCategory.PROMPT_INJECTION,
+        )
     )
     monkeypatch.setattr(mcp_module, "engine", WardenEngine(semantic_analyzer=analyzer))
 
@@ -274,7 +314,12 @@ async def test_semantic_failure_fails_open_to_deterministic_result():
 @pytest.mark.asyncio
 async def test_low_confidence_semantic_flag_is_not_enforced():
     analyzer = RecordingSemanticAnalyzer(
-        SemanticClassification(flagged=True, confidence=0.49, reason="Weak signal.")
+        SemanticClassification(
+            flagged=True,
+            confidence=0.49,
+            reason="Weak signal.",
+            category=SemanticThreatCategory.PROMPT_INJECTION,
+        )
     )
     scanner = InjectionScanner(ai_analyzer=analyzer)
 
@@ -303,7 +348,8 @@ async def test_http_semantic_adapter_uses_provider_neutral_contract():
                         "message": {
                             "content": (
                                 '{"flagged":true,"confidence":0.91,'
-                                '"reason":"Instruction override."}'
+                                '"reason":"Instruction override.",'
+                                '"category":"PROMPT_INJECTION"}'
                             )
                         }
                     }
@@ -324,6 +370,7 @@ async def test_http_semantic_adapter_uses_provider_neutral_contract():
         flagged=True,
         confidence=0.91,
         reason="Instruction override.",
+        category=SemanticThreatCategory.PROMPT_INJECTION,
     )
 
 
@@ -337,7 +384,10 @@ async def test_http_semantic_adapter_enforces_hard_timeout():
                 "choices": [
                     {
                         "message": {
-                            "content": '{"flagged":false,"confidence":0.1,"reason":"Clean."}'
+                            "content": (
+                                '{"flagged":false,"confidence":0.1,'
+                                '"reason":"Clean.","category":null}'
+                            )
                         }
                     }
                 ]
@@ -367,7 +417,8 @@ async def test_invalid_provider_response_fails_open():
                         "message": {
                             "content": (
                                 '{"flagged":"yes","confidence":0.99,'
-                                '"reason":"Invalid flag type."}'
+                                '"reason":"Invalid flag type.",'
+                                '"category":"PROMPT_INJECTION"}'
                             )
                         }
                     }
@@ -384,6 +435,64 @@ async def test_invalid_provider_response_fails_open():
     scanner = InjectionScanner(ai_analyzer=analyzer)
 
     result = await scanner.scan(NOVEL_INJECTION, depth="thorough")
+
+    assert result["clean"] is True
+    assert result["layers_triggered"] == []
+
+
+@pytest.mark.parametrize("duplicate_layer", ["response", "choice", "message", "model"])
+@pytest.mark.asyncio
+async def test_semantic_adapter_rejects_duplicate_keys_at_every_object_layer(duplicate_layer):
+    model_content = json.dumps(
+        {
+            "flagged": True,
+            "confidence": 0.99,
+            "reason": "Instruction override.",
+            "category": "PROMPT_INJECTION",
+        },
+        separators=(",", ":"),
+    )
+    encoded_content = json.dumps(model_content)
+    responses = {
+        "response": (f'{{"choices":[],"choices":[{{"message":{{"content":{encoded_content}}}}}]}}'),
+        "choice": (f'{{"choices":[{{"message":null,"message":{{"content":{encoded_content}}}}}]}}'),
+        "message": (
+            f'{{"choices":[{{"message":{{"content":null,"content":{encoded_content}}}}}]}}'
+        ),
+        "model": json.dumps(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": (
+                                '{"flagged":false,"flagged":true,"confidence":0.99,'
+                                '"reason":"Duplicate key.","category":"PROMPT_INJECTION"}'
+                            )
+                        }
+                    }
+                ]
+            },
+            separators=(",", ":"),
+        ),
+    }
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=responses[duplicate_layer].encode())
+
+    analyzer = HttpSemanticAnalyzer(
+        endpoint="https://semantic.example/v1/chat/completions",
+        model="security-classifier-v1",
+        api_key="test-semantic-key",
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(ValueError, match="duplicate"):
+        await analyzer.classify(NOVEL_INJECTION)
+
+    result = await InjectionScanner(ai_analyzer=analyzer).scan(
+        NOVEL_INJECTION,
+        depth="thorough",
+    )
 
     assert result["clean"] is True
     assert result["layers_triggered"] == []

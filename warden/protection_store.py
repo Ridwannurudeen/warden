@@ -1,8 +1,8 @@
 """SQLite store for APA protection state: TOFU bindings, nonces, attestations, log.
 
-The deployed API runs one uvicorn worker; SQLite transactions also serialize
-the separate periodic re-probe process. The transparency log is hash-chained
-(`prev_hash` = SHA-256 of the previous entry's canonical bytes) per APA-SPEC §7.2.
+SQLite transactions serialize the API workers and the separate periodic re-probe
+process. The transparency log is hash-chained (`prev_hash` = SHA-256 of the
+previous entry's canonical bytes) per APA-SPEC §7.2.
 """
 
 from __future__ import annotations
@@ -116,7 +116,13 @@ CREATE TABLE IF NOT EXISTS audit_revocations (
     log_seq INTEGER NOT NULL UNIQUE,
     FOREIGN KEY (audit_id) REFERENCES audit_attestations(audit_id)
 );
+CREATE TABLE IF NOT EXISTS probe_leases (
+    lease_id TEXT PRIMARY KEY,
+    expires_at REAL NOT NULL
+);
 """
+
+PROBE_ADMISSION_DB_TIMEOUT_SECONDS = 0.5
 
 
 class ProtectionStateConflict(ValueError):
@@ -131,6 +137,10 @@ class LogCheckpointMissing(RuntimeError):
     """The transparency log has no complete locally anchored signed head."""
 
 
+class ProbeAdmissionStorageUnavailable(RuntimeError):
+    """The shared outbound-probe admission store cannot be used safely."""
+
+
 def _db_path() -> Path:
     configured = os.getenv("WARDEN_PROTECTION_DB")
     if configured:
@@ -139,10 +149,10 @@ def _db_path() -> Path:
 
 
 @contextmanager
-def _connect() -> Iterator[sqlite3.Connection]:
+def _connect(*, timeout_seconds: float = 5.0) -> Iterator[sqlite3.Connection]:
     path = _db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(path)
+    connection = sqlite3.connect(path, timeout=timeout_seconds)
     try:
         connection.executescript(_SCHEMA)
         attestation_columns = {
@@ -174,6 +184,53 @@ def _connect() -> Iterator[sqlite3.Connection]:
         raise
     finally:
         connection.close()
+
+
+def acquire_probe_lease(
+    lease_id: str,
+    *,
+    now: float,
+    ttl_seconds: float,
+    max_leases: int,
+) -> bool:
+    """Atomically acquire one anonymous, expiring outbound-probe slot."""
+    if not lease_id or ttl_seconds <= 0 or max_leases < 1:
+        raise ValueError("probe lease arguments are invalid")
+    try:
+        with _LOCK, _connect(timeout_seconds=PROBE_ADMISSION_DB_TIMEOUT_SECONDS) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                "DELETE FROM probe_leases WHERE expires_at <= ?",
+                (now,),
+            )
+            active = int(connection.execute("SELECT COUNT(*) FROM probe_leases").fetchone()[0])
+            if active >= max_leases:
+                return False
+            connection.execute(
+                "INSERT INTO probe_leases (lease_id, expires_at) VALUES (?, ?)",
+                (lease_id, now + ttl_seconds),
+            )
+    except (OSError, sqlite3.Error) as exc:
+        raise ProbeAdmissionStorageUnavailable(
+            "shared probe admission storage is unavailable"
+        ) from exc
+    return True
+
+
+def release_probe_lease(lease_id: str) -> None:
+    """Release one shared outbound-probe slot; crash leftovers expire on acquire."""
+    if not lease_id:
+        raise ValueError("probe lease_id is required")
+    try:
+        with _LOCK, _connect(timeout_seconds=PROBE_ADMISSION_DB_TIMEOUT_SECONDS) as connection:
+            connection.execute(
+                "DELETE FROM probe_leases WHERE lease_id = ?",
+                (lease_id,),
+            )
+    except (OSError, sqlite3.Error) as exc:
+        raise ProbeAdmissionStorageUnavailable(
+            "shared probe admission storage is unavailable"
+        ) from exc
 
 
 def get_binding(endpoint_host: str) -> dict[str, object] | None:
@@ -569,7 +626,9 @@ def _append_log(
         "attestation_id": record.get("attestation_id"),
         "endpoint_host": record.get("endpoint_host"),
         "status": record.get("status"),
-        "record_hash": hashlib.sha256(_canonical_json(record).encode("utf-8")).hexdigest(),
+        "record_hash": hashlib.sha256(
+            _canonical_json(record).encode("utf-8")
+        ).hexdigest(),
         "prev_hash": prev_hash,
     }
     return _write_log_entry(connection, entry)
@@ -614,9 +673,7 @@ def _breaker_log_entry_matches(
         "record_type": "breaker-certificate",
         "certificate_id": record.get("certificate_id"),
         "benchmark_case_id": record.get("benchmark_case_id"),
-        "record_hash": hashlib.sha256(
-            _canonical_json(record).encode("utf-8")
-        ).hexdigest(),
+        "record_hash": hashlib.sha256(_canonical_json(record).encode("utf-8")).hexdigest(),
         "prev_hash": entry.get("prev_hash"),
     }
 

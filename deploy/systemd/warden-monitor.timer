@@ -1,0 +1,12 @@
+[Unit]
+Description=Record Warden application and unsigned x402 challenge readiness every five minutes
+
+[Timer]
+OnCalendar=*-*-* *:00/5:00 UTC
+RandomizedDelaySec=30s
+AccuracySec=30s
+Persistent=true
+Unit=warden-monitor.service
+
+[Install]
+WantedBy=timers.target

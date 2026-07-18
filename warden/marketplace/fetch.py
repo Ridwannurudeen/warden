@@ -10,7 +10,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -142,6 +142,10 @@ class SearchPageData(BaseModel):
     total: int | None = Field(default=None, ge=0)
 
 
+class MarketplaceProviderAdapter(Protocol):
+    def search_page(self, *, query: str, page: int, page_size: int) -> SearchPageData: ...
+
+
 class SearchEnvelope(BaseModel):
     ok: bool
     data: SearchPageData
@@ -227,6 +231,25 @@ def _run_cli(command: list[str]) -> str:
     return completed.stdout
 
 
+class OnchainOSCLIAdapter:
+    def __init__(self, command_runner: CommandRunner | None = None) -> None:
+        self._command_runner = command_runner if command_runner is not None else _run_cli
+
+    def search_page(self, *, query: str, page: int, page_size: int) -> SearchPageData:
+        command = [
+            "onchainos",
+            "agent",
+            "search",
+            "--query",
+            query,
+            "--page",
+            str(page),
+            "--page-size",
+            str(page_size),
+        ]
+        return parse_search_output(self._command_runner(command))
+
+
 def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -238,10 +261,15 @@ def fetch_snapshot(
     page_size: int = 100,
     captured_at: str | None = None,
     command_runner: CommandRunner | None = None,
+    adapter: MarketplaceProviderAdapter | None = None,
 ) -> MarketplaceSnapshot:
     if not 1 <= page_size <= 100:
         raise ValueError("page_size must be between 1 and 100")
-    runner = command_runner or _run_cli
+    if adapter is not None and command_runner is not None:
+        raise ValueError("adapter and command_runner cannot both be provided")
+    provider = (
+        adapter if adapter is not None else OnchainOSCLIAdapter(command_runner=command_runner)
+    )
     agents_by_id: dict[str, MarketplaceAgent] = {}
     reported_totals: list[int] = []
     page_number = 1
@@ -249,18 +277,7 @@ def fetch_snapshot(
     while True:
         if page_number > MAX_MARKETPLACE_PAGES:
             raise RuntimeError("marketplace search exceeded page limit")
-        command = [
-            "onchainos",
-            "agent",
-            "search",
-            "--query",
-            query,
-            "--page",
-            str(page_number),
-            "--page-size",
-            str(page_size),
-        ]
-        page = parse_search_output(runner(command))
+        page = provider.search_page(query=query, page=page_number, page_size=page_size)
         if page.page != page_number or page.page_size != page_size or len(page.agents) > page_size:
             raise RuntimeError("marketplace page returned inconsistent pagination metadata")
         if page.total is not None:

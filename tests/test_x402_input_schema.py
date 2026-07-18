@@ -35,8 +35,19 @@ assert api._scan_route.extensions == api._SCAN_EXTENSIONS
 assert api._audit_route.extensions == api._AUDIT_EXTENSIONS
 assert api._scan_route.extensions["bazaar"]["info"]["input"]["inputSchema"]["required"] == ["payload"]
 assert api._audit_route.extensions["bazaar"]["info"]["input"]["inputSchema"]["required"] == ["target_url"]
-assert [option.price for option in api._scan_route.accepts] == ["$0.5"]
-assert [option.price for option in api._audit_route.accepts] == ["$0.5"]
+expected_price = {
+    "amount": "500000",
+    "asset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+    "extra": {"name": "USD₮0", "version": "1"},
+}
+assert [option.price.model_dump() for option in api._scan_route.accepts] == [expected_price]
+assert [option.price.model_dump() for option in api._audit_route.accepts] == [expected_price]
+assert api._payment_rail.protocol == "x402-v2"
+assert api._payment_rail.facilitator == "okx"
+assert api._payment_rail.network == "eip155:196"
+assert api._payment_rail.display_price == "0.5 USDT"
+assert api._facilitator_http_client.follow_redirects is False
+assert api._facilitator_http_client.trust_env is False
 assert set(api._paid_routes) == {"POST /scan", "GET /scan", "POST /audit", "GET /audit"}
 assert api.app.user_middleware[0].kwargs["dispatch"] is api.payment_required_schema_middleware
 assert next(
@@ -56,7 +67,13 @@ with TestClient(api.app) as client:
         assert challenge["outputSchema"]["input"]["inputSchema"]["required"] == [required_field]
         assert challenge["accepts"][0]["outputSchema"]["input"]["inputSchema"]["required"] == [required_field]
         assert challenge["accepts"][0]["amount"] == "500000"
+        assert challenge["accepts"][0]["asset"] == "0x779ded0c9e1022225f8e0630b35a9b54be713736"
+        assert challenge["accepts"][0]["network"] == "eip155:196"
+        assert challenge["accepts"][0]["scheme"] == "exact"
+        assert challenge["accepts"][0]["payTo"] == "0x0000000000000000000000000000000000000001"
+        assert challenge["accepts"][0]["extra"] == {"name": "USD₮0", "version": "1"}
         assert decode_payment_required_header(header).accepts
+assert api._facilitator_http_client.is_closed is True
 """
     env = {
         key: value

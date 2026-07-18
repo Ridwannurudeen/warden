@@ -1,0 +1,28 @@
+[Unit]
+Description=Publish Warden signed transparency-log checkpoints
+After=warden.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=30s
+WorkingDirectory=/opt/warden
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=HOME=/opt/warden/anchor
+Environment=PATH=/opt/warden/.venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=WARDEN_PROTECTION_DB=/opt/warden/data/protection.db
+ExecStart=/usr/bin/flock --exclusive --nonblock /opt/warden/anchor/.publish.lock /opt/warden/.venv/bin/python /opt/warden/scripts/publish_log_checkpoint.py --output /opt/warden/anchor/apa-log-anchor.json --history-output /opt/warden/anchor/apa-log-anchor-history.json
+User=warden
+Group=warden
+UMask=0022
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectProc=invisible
+PrivateTmp=true
+PrivateDevices=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX
+InaccessiblePaths=/opt/warden/.env /opt/warden/index.env /opt/warden/badges /opt/warden/gauntlet /opt/warden/monitor
+ReadOnlyPaths=/opt/warden/data/protection.db
+ReadWritePaths=/opt/warden/anchor

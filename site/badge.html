@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Inspect one Warden endpoint audit record, its point-in-time outcome, and its current stored-record integrity result."
+      content="Inspect one Warden endpoint audit record, its issuer signature, lifecycle, transparency-log binding, and point-in-time limits."
     />
     <meta name="color-scheme" content="dark light" />
     <title>Endpoint Audit Record | Warden</title>
@@ -15,7 +15,7 @@
     <meta property="og:title" content="Endpoint Audit Record | Warden" />
     <meta
       property="og:description"
-      content="Inspect one Warden endpoint audit record, its point-in-time outcome, and its current stored-record integrity result."
+      content="Inspect one Warden endpoint audit record, its issuer signature, lifecycle, transparency-log binding, and point-in-time limits."
     />
     <meta property="og:url" content="https://warden.gudman.xyz/badge" />
     <meta
@@ -27,8 +27,17 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/assets/favicon-32.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/assets/apple-touch-icon.png"
+    />
     <link rel="stylesheet" href="/styles.css?v=96b93423" />
   </head>
   <body>
@@ -129,12 +138,15 @@
         <p class="eyebrow">Evidence / Record detail</p>
         <h1>Separate the audit result from its integrity.</h1>
         <p class="hero-text">
-          This route resolves one 16-character audit ID. The issue timestamp
-          bounds what the audit observed; the live lookup separately reports
-          whether the stored payload still matches its server-side signature.
+          This route resolves one 16-character audit ID. New records expose
+          issuer-signed portable evidence with expiry, revocation, and
+          transparency-log binding. Older IDs remain available as clearly
+          labelled legacy records.
         </p>
         <div class="hero-actions">
-          <a class="button secondary" href="/badges">All endpoint audit records</a>
+          <a class="button secondary" href="/badges"
+            >All endpoint audit records</a
+          >
         </div>
       </section>
 
@@ -144,7 +156,7 @@
         data-state="unknown"
       >
         <div class="section-heading">
-          <p class="eyebrow">Stored-record check</p>
+          <p class="eyebrow">Issuer evidence check</p>
           <h2 data-badge-heading>Verification not run</h2>
           <p>
             <span
@@ -171,7 +183,7 @@
         <div class="badge-evidence-grid">
           <section class="badge-evidence" aria-labelledby="integrity-title">
             <p class="eyebrow">Integrity</p>
-            <h3 id="integrity-title">Stored record signature</h3>
+            <h3 id="integrity-title">Evidence and lifecycle</h3>
             <span
               class="status-label status-label--pending"
               data-badge-verification
@@ -179,13 +191,21 @@
             >
             <dl class="data-list">
               <div>
+                <dt>Evidence type</dt>
+                <dd data-badge-evidence-type>Not available until requested</dd>
+              </div>
+              <div>
+                <dt>Lifecycle</dt>
+                <dd data-badge-lifecycle>Not available until requested</dd>
+              </div>
+              <div>
                 <dt>Audit ID</dt>
                 <dd class="num" data-badge-audit-id>
                   Not available until requested
                 </dd>
               </div>
               <div>
-                <dt>Signature</dt>
+                <dt>Issuer or legacy signature</dt>
                 <dd>
                   <code data-badge-signature
                     >Not available until requested</code
@@ -215,6 +235,18 @@
                   Not available until requested
                 </dd>
               </div>
+              <div>
+                <dt>Battery ID and version</dt>
+                <dd data-badge-battery>Not available until requested</dd>
+              </div>
+              <div>
+                <dt>Battery SHA-256</dt>
+                <dd>
+                  <code data-badge-battery-hash
+                    >Not available until requested</code
+                  >
+                </dd>
+              </div>
             </dl>
           </section>
 
@@ -226,6 +258,16 @@
                 <dt>Target host</dt>
                 <dd data-badge-target>Not available until requested</dd>
               </div>
+              <div>
+                <dt>Exact subject</dt>
+                <dd data-badge-subject>Not available until requested</dd>
+              </div>
+              <div>
+                <dt>Transparency log sequence</dt>
+                <dd class="num" data-badge-log-seq>
+                  Not available until requested
+                </dd>
+              </div>
             </dl>
           </section>
 
@@ -234,21 +276,43 @@
             <h3 id="time-title">Point-in-time issuance</h3>
             <dl class="data-list">
               <div>
+                <dt>Observed on</dt>
+                <dd class="num" data-badge-observed>
+                  Not available until requested
+                </dd>
+              </div>
+              <div>
                 <dt>Issued</dt>
                 <dd class="num" data-badge-issued>
                   Not available until requested
                 </dd>
               </div>
+              <div>
+                <dt>Expires</dt>
+                <dd class="num" data-badge-expires>
+                  Not available until requested
+                </dd>
+              </div>
+              <div>
+                <dt>Revoked</dt>
+                <dd class="num" data-badge-revoked>
+                  Not available until requested
+                </dd>
+              </div>
             </dl>
+          </section>
+
+          <section class="badge-evidence" aria-labelledby="limits-title">
+            <p class="eyebrow">Boundary</p>
+            <h3 id="limits-title">What this record does not prove</h3>
+            <p data-badge-limitations>Not available until requested</p>
           </section>
         </div>
 
         <details class="snippet-card">
           <summary>Inspect the signed record JSON</summary>
-          <p>
-            This is the stored public payload. The API's integrity conclusion is
-            presented separately above and is not inserted into the signed
-            record.
+          <p data-badge-raw-description>
+            The signed record will appear after a successful lookup.
           </p>
           <pre><code data-badge-raw-json>Record JSON is unavailable until the lookup succeeds.</code></pre>
         </details>
@@ -274,10 +338,11 @@
         </div>
         <p class="caveat evidence-boundary">
           <strong>This is point-in-time evidence, not certification.</strong>
-          Sharing copies only the canonical verification URL. Signature validity
-          establishes stored-record integrity for this payload. It does not
-          establish target ownership, current safety, continuous monitoring,
-          expiry or revocation status, or future behavior.
+          Sharing copies only the canonical verification URL. Portable evidence
+          reports issuer-signature, transparency binding, expiry and revocation
+          status; legacy records report only their stored-record integrity. No
+          result establishes target ownership, current safety, continuous
+          monitoring, or future behavior.
         </p>
       </section>
     </main>

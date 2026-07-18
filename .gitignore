@@ -5,6 +5,8 @@
 # Runtime state — issued audit badges (regenerated at runtime)
 badges/
 gauntlet/
+/data/feedback/
+/data/shield/
 
 # Generated marketplace pages (rebuild with scripts/build_index.py)
 /site/agents/
@@ -15,6 +17,8 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+/dist/
+/sdk/python/dist/
 .pytest_cache/
 .ruff_cache/
 

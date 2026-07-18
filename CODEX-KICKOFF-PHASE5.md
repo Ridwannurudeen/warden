@@ -1,3 +1,7 @@
+> **SUPERSEDED — ARCHIVE ONLY.** Do not use this kickoff for current work. Its
+> linked pricing and signing-domain assumptions are obsolete; use `PAYMENT.md`
+> and the current repository contracts instead.
+
 You have full read/write access to this repository. Build Phase 5 end-to-end, autonomously, in one
 continuous run. Do not stop to check in after each item — only stop when the entire scope is done,
 or if you hit a genuine hard blocker that makes the brief's premise wrong (in which case: say so in

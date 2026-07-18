@@ -12,6 +12,7 @@ from warden import protection
 from warden.badges import b64u_decode, b64u_encode
 
 GENESIS_HISTORY_HASH = "0" * 64
+MAX_ANCHOR_HISTORY_ENTRIES = 10_000
 _HISTORY_FIELDS = {"schema_version", "status", "history_head_hash", "anchors"}
 _ANCHOR_FIELDS = {"anchor_seq", "previous_anchor_hash", "checkpoint"}
 _CHECKPOINT_FIELDS = {
@@ -71,23 +72,19 @@ def _validate_checkpoint_shape(checkpoint: object) -> dict[str, object]:
     return checkpoint
 
 
-def _checkpoint_matches_log(
-    checkpoint: dict[str, object],
-    entries: Sequence[dict[str, object]],
-) -> bool:
-    sequence = int(checkpoint["seq"])
-    if sequence > len(entries):
-        return False
+def _log_prefix_hashes(entries: Sequence[dict[str, object]]) -> tuple[str, ...]:
+    prefix_hashes = [GENESIS_HISTORY_HASH]
     previous_hash = GENESIS_HISTORY_HASH
-    for expected_sequence, entry in enumerate(entries[:sequence], start=1):
+    for expected_sequence, entry in enumerate(entries, start=1):
         if (
             not isinstance(entry, dict)
             or entry.get("seq") != expected_sequence
             or entry.get("prev_hash") != previous_hash
         ):
-            return False
+            raise AnchorHistoryError("supplied log chain is invalid")
         previous_hash = hashlib.sha256(_canonical_json(entry).encode("utf-8")).hexdigest()
-    return checkpoint.get("head_hash") == previous_hash
+        prefix_hashes.append(previous_hash)
+    return tuple(prefix_hashes)
 
 
 def empty_anchor_history() -> dict[str, object]:
@@ -113,9 +110,12 @@ def validate_anchor_history(
     anchors = document.get("anchors")
     if not isinstance(anchors, list):
         raise AnchorHistoryError("anchor history anchors must be an array")
+    if len(anchors) > MAX_ANCHOR_HISTORY_ENTRIES:
+        raise AnchorHistoryError("anchor history exceeds the retained-entry limit")
     if document.get("status") not in {"unpublished", "published"}:
         raise AnchorHistoryError("anchor history status is invalid")
 
+    prefix_hashes = _log_prefix_hashes(entries)
     previous_anchor_hash = GENESIS_HISTORY_HASH
     previous_checkpoint_seq = -1
     previous_issued_at = -1
@@ -136,7 +136,10 @@ def validate_anchor_history(
             raise AnchorHistoryError("anchor checkpoint timestamps must not decrease")
         if verify_signatures and not protection.verify_log_checkpoint(checkpoint):
             raise AnchorHistoryError("anchor checkpoint signature is invalid")
-        if not _checkpoint_matches_log(checkpoint, entries):
+        if (
+            checkpoint_seq >= len(prefix_hashes)
+            or checkpoint.get("head_hash") != prefix_hashes[checkpoint_seq]
+        ):
             raise AnchorHistoryError("anchor checkpoint does not match the supplied log prefix")
         previous_checkpoint_seq = checkpoint_seq
         previous_issued_at = issued_at

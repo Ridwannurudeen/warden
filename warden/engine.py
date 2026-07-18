@@ -11,20 +11,43 @@ from warden.analyzers import (
 from warden.core.analyzer import AnalysisContext
 from warden.core.registry import AnalyzerRegistry
 from warden.core.verdict import ReasonCode, Verdict, VerdictEngine
-from warden.scanner.normalize import TRANSFORM_DECODED, derive_candidates
+from warden.scanner.embedding import (
+    EmbeddingAnalyzer,
+    build_embedding_analyzer_from_env,
+)
+from warden.scanner.normalize import (
+    TRANSFORM_AMBIGUOUS_CONTAINER,
+    TRANSFORM_DECODED,
+    TRANSFORM_DECODER_LIMIT,
+    TRANSFORM_UNSAFE_CONTAINER,
+    derive_candidates,
+)
 from warden.scanner.scanner import InjectionScanner
 from warden.scanner.semantic import SemanticAnalyzer, build_semantic_analyzer_from_env
 
 
 class WardenEngine:
-    def __init__(self, semantic_analyzer: SemanticAnalyzer | None = None):
-        configured_analyzer = (
+    def __init__(
+        self,
+        semantic_analyzer: SemanticAnalyzer | None = None,
+        embedding_analyzer: EmbeddingAnalyzer | None = None,
+    ):
+        configured_semantic = (
             semantic_analyzer
             if semantic_analyzer is not None
             else build_semantic_analyzer_from_env()
         )
-        self.semantic_enabled = configured_analyzer is not None
-        self.scanner = InjectionScanner(ai_analyzer=configured_analyzer)
+        configured_embedding = (
+            embedding_analyzer
+            if embedding_analyzer is not None
+            else build_embedding_analyzer_from_env()
+        )
+        self.semantic_enabled = configured_semantic is not None
+        self.embedding_enabled = configured_embedding is not None
+        self.scanner = InjectionScanner(
+            ai_analyzer=configured_semantic,
+            embedding_analyzer=configured_embedding,
+        )
         self.registry = AnalyzerRegistry()
         self.registry.register(DrainAddressAnalyzer())
         self.registry.register(ToolHijackAnalyzer())
@@ -57,13 +80,13 @@ class WardenEngine:
             },
         )
         analyzer_results = await self.registry.run_all(analyzer_context)
-        semantic_allowed = allow_paid_semantic and not any(
+        model_tier_allowed = allow_paid_semantic and not any(
             result.error or result.flags or result.score > 0 for result in analyzer_results
         )
         scanner_result = await self.scanner.scan(
             payload,
             depth=depth,
-            allow_semantic=semantic_allowed,
+            allow_semantic=model_tier_allowed,
         )
         verdict = self.verdict_engine.decide(payload, scanner_result, analyzer_results)
         if verdict.verdict == "SANITIZE":
@@ -77,14 +100,10 @@ class WardenEngine:
                 },
             )
             sanitized_analyzer_results = await self.registry.run_all(sanitized_analyzer_context)
-            sanitized_semantic_allowed = semantic_allowed and not any(
-                result.error or result.flags or result.score > 0
-                for result in sanitized_analyzer_results
-            )
             sanitized_scanner_result = await self.scanner.scan(
                 verdict.sanitized_payload,
                 depth=depth,
-                allow_semantic=sanitized_semantic_allowed,
+                allow_semantic=False,
             )
             sanitized_verdict = self.verdict_engine.decide(
                 verdict.sanitized_payload,
@@ -127,6 +146,46 @@ class WardenEngine:
         threat, but it never suppresses or downgrades a raw-text verdict.
         """
         for candidate, transform in derive_candidates(payload):
+            if transform == TRANSFORM_AMBIGUOUS_CONTAINER:
+                verdict.verdict = "BLOCK"
+                verdict.risk_level = self._max_risk(verdict.risk_level, "HIGH")
+                verdict.recommendation = (
+                    "Block this payload. Its encoded JSON container has ambiguous "
+                    "case-colliding semantic keys."
+                )
+                verdict.checks["decoder_wall"] = (
+                    "fail - encoded container has ambiguous semantic keys"
+                )
+                if ReasonCode.ENCODING_TRICK not in verdict.threat_classes:
+                    verdict.threat_classes.append(ReasonCode.ENCODING_TRICK)
+                if ReasonCode.ENCODING_TRICK not in verdict.failed_checks:
+                    verdict.failed_checks.append(ReasonCode.ENCODING_TRICK)
+                return
+            if transform in {TRANSFORM_UNSAFE_CONTAINER, TRANSFORM_DECODER_LIMIT}:
+                verdict.verdict = "BLOCK"
+                verdict.risk_level = self._max_risk(verdict.risk_level, "HIGH")
+                if transform == TRANSFORM_UNSAFE_CONTAINER:
+                    verdict.recommendation = (
+                        "Block this payload. Its encoded JSON container is malformed, "
+                        "unsupported, or exceeds safe inspection bounds."
+                    )
+                    verdict.checks["decoder_wall"] = (
+                        "fail - encoded container could not be inspected safely"
+                    )
+                else:
+                    verdict.recommendation = (
+                        "Block this payload. Its normalization layers exceed safe "
+                        "inspection bounds."
+                    )
+                    verdict.checks["decoder_wall"] = (
+                        "fail - decoder candidate or recursion limit exceeded"
+                    )
+                if ReasonCode.ENCODING_TRICK not in verdict.threat_classes:
+                    verdict.threat_classes.append(ReasonCode.ENCODING_TRICK)
+                if ReasonCode.ENCODING_TRICK not in verdict.failed_checks:
+                    verdict.failed_checks.append(ReasonCode.ENCODING_TRICK)
+                return
+
             candidate_context = AnalysisContext(
                 address="",
                 extra={

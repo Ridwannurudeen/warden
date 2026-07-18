@@ -74,8 +74,19 @@ test("endpoint audit records remain bounded, searchable, and inspectable", () =>
   assert.match(registry, /data-badge-integrity-filter/);
   assert.match(registry, /This is point-in-time evidence, not certification/);
   assert.match(detail, /data-badge-raw-json/);
-  assert.match(detail, /expiry or revocation status/);
+  assert.match(detail, /data-badge-evidence-type/);
+  assert.match(detail, /data-badge-lifecycle/);
+  assert.match(detail, /data-badge-subject/);
+  assert.match(detail, /data-badge-expires/);
+  assert.match(detail, /data-badge-battery/);
+  assert.match(detail, /data-badge-battery-hash/);
+  assert.match(detail, /data-badge-log-seq/);
+  assert.match(detail, /data-badge-revoked/);
+  assert.match(detail, /data-badge-limitations/);
+  assert.match(detail, /expiry and revocation\s+status/);
   assert.match(script, /renderRegistryFilters/);
+  assert.match(script, /\/apa\/audit\//);
+  assert.match(script, /\/badge\//);
   assert.match(script, /JSON\.stringify\(rawRecord, null, 2\)/);
   assert.doesNotMatch(script, /innerHTML|insertAdjacentHTML|document\.write/);
 });
@@ -84,7 +95,13 @@ test("attestation verifier offers explicit real-record and local-file paths", ()
   const html = page("verify.html");
   const script = page("verify.js");
 
-  for (const label of ["Parse", "Resolve key", "Verify", "Freshness", "Read boundary"]) {
+  for (const label of [
+    "Parse",
+    "Resolve key",
+    "Verify",
+    "Freshness",
+    "Read boundary",
+  ]) {
     assert.match(html, new RegExp(`>${label}<`));
   }
   assert.match(html, /data-apa-load-latest/);
@@ -108,6 +125,7 @@ test("transparency ledger exposes local recomputation and a one-byte challenge",
   assert.match(html, /data-apa-log-raw/);
   assert.match(html, /data-apa-log-copy-raw/);
   assert.match(html, /data-apa-log-tamper/);
+  assert.match(html, /endpoint audit lifecycle/i);
   assert.match(script, /verifiedMaterial/);
   assert.match(script, /Local tamper rejected/);
   assert.match(script, /verifySignedLog\(\s*changed,/);
@@ -140,7 +158,10 @@ test("status and trust pages keep unlike evidence layers separate", () => {
     assert.match(trust, new RegExp(layer));
   }
   assert.equal((trust.match(/<dt>What it proves<\/dt>/g) || []).length, 4);
-  assert.equal((trust.match(/<dt>What it does not prove<\/dt>/g) || []).length, 4);
+  assert.equal(
+    (trust.match(/<dt>What it does not prove<\/dt>/g) || []).length,
+    4,
+  );
   assert.equal((trust.match(/<dt>Who verifies it<\/dt>/g) || []).length, 4);
   assert.equal((trust.match(/<dt>Where to inspect<\/dt>/g) || []).length, 4);
 });

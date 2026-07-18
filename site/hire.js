@@ -1,6 +1,10 @@
 (function (root) {
   "use strict";
 
+  const PAYMENT_EIP712_NAME = "USD₮0";
+  const PAYMENT_EIP712_VERSION = "1";
+  const PAYMENT_SYMBOL = "USDT";
+
   function decodeBase64(value) {
     if (typeof root.atob === "function") {
       const bytes = Uint8Array.from(root.atob(value), (character) =>
@@ -86,12 +90,17 @@
         candidate.network === "eip155:196" &&
         String(candidate.asset || "").toLowerCase() ===
           service.feeTokenAddress.toLowerCase() &&
-        candidate.extra?.name === "USDT" &&
+        candidate.extra &&
+        typeof candidate.extra === "object" &&
+        !Array.isArray(candidate.extra) &&
+        Object.keys(candidate.extra).length === 2 &&
+        candidate.extra.name === PAYMENT_EIP712_NAME &&
+        candidate.extra.version === PAYMENT_EIP712_VERSION &&
         String(candidate.amount) === expectedAmount,
     );
     if (!acceptance) {
       throw new Error(
-        "Payment terms do not match the selected service asset or amount on X Layer",
+        "Payment terms do not match the selected service asset, amount, or EIP-712 domain on X Layer",
       );
     }
     if (!/^0x[a-fA-F0-9]{40}$/.test(String(acceptance.payTo || ""))) {
@@ -311,12 +320,7 @@
     }
     validateRequestBody(service);
     const acceptance = acceptanceFor(service, accepts);
-    const tokenSymbol = boundedText(
-      acceptance.extra?.name,
-      "token symbol",
-      true,
-      16,
-    );
+    const tokenSymbol = PAYMENT_SYMBOL;
     const taskTitle = boundedText(service.taskTitle, "task title", true, 128);
     const taskDescription = boundedText(
       service.taskDescription,
@@ -519,7 +523,7 @@
       setText("[data-summary-payment]", "No browser payment attempted");
       return;
     }
-    const tokenSymbol = acceptance?.extra?.name || "USDT";
+    const tokenSymbol = PAYMENT_SYMBOL;
     setText("[data-service-name]", service.serviceName);
     setText("[data-service-id]", `#${service.serviceId}`);
     setText("[data-service-price]", `${service.feeAmount} ${tokenSymbol}`);

@@ -12,6 +12,8 @@ import json
 import os
 import secrets
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -33,6 +35,8 @@ PROOF_TTL_SECONDS = 3600
 PROOF_WINDOW_SECONDS = 86_400
 ATTESTATION_TTL_SECONDS = 3600
 PROBE_TIMEOUT_SECONDS = 3.0
+MAX_CONCURRENT_PROBES = 4
+PROBE_LEASE_TTL_SECONDS = 10.0
 MAX_PROOF_RESPONSE_BYTES = 64_000
 MIN_NONCE_BITS = 128
 ATTESTATION_SCOPE = "Endpoint-signed count; local counter state is not independently audited."
@@ -59,10 +63,8 @@ BREAKER_CERTIFICATE_FIELDS = {
     "issuer_sig",
 }
 
-# Global cap on concurrent outbound probes, independent of per-IP rate limits
-# (APA-SPEC §10 SSRF/DoS). Single-worker deployment, so a process-wide
-# semaphore is the whole story.
-_PROBE_SEMAPHORE = asyncio.Semaphore(4)
+# Per-process backstop around the shared production admission gate.
+_PROBE_SEMAPHORE = asyncio.Semaphore(MAX_CONCURRENT_PROBES)
 
 
 class ProtectionProbeUnavailable(ValueError):
@@ -71,6 +73,40 @@ class ProtectionProbeUnavailable(ValueError):
 
 class ProtectionProofInvalid(ValueError):
     """The endpoint returned a proof that fails APA validation."""
+
+
+@asynccontextmanager
+async def _probe_admission() -> AsyncIterator[None]:
+    async with _PROBE_SEMAPHORE:
+        if not os.getenv("WARDEN_PROTECTION_DB"):
+            yield
+            return
+
+        lease_id = secrets.token_hex(16)
+        try:
+            acquired = protection_store.acquire_probe_lease(
+                lease_id,
+                now=time.time(),
+                ttl_seconds=PROBE_LEASE_TTL_SECONDS,
+                max_leases=MAX_CONCURRENT_PROBES,
+            )
+        except protection_store.ProbeAdmissionStorageUnavailable as exc:
+            raise ProtectionProbeUnavailable(
+                "shared protection probe admission is unavailable"
+            ) from exc
+        if not acquired:
+            raise ProtectionProbeUnavailable(
+                "shared protection probe capacity is currently exhausted"
+            )
+        try:
+            yield
+        finally:
+            try:
+                protection_store.release_probe_lease(lease_id)
+            except protection_store.ProbeAdmissionStorageUnavailable as exc:
+                raise ProtectionProbeUnavailable(
+                    "shared protection probe admission release failed"
+                ) from exc
 
 
 def _canonical_endpoint_host(host: str, *, scheme: str, port: int | None) -> str:
@@ -396,7 +432,7 @@ async def _fetch_proof(endpoint: str) -> tuple[str, dict[str, object]]:
     """
     try:
         async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
-            async with _PROBE_SEMAPHORE:
+            async with _probe_admission():
                 try:
                     connect_url, host_header, parsed = await validate_public_http_url(endpoint)
                 except PublicUrlUnavailable as exc:

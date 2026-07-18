@@ -97,6 +97,7 @@ test("commands use the selected snapshot service and complete the reviewable tas
     assert.match(commands[0], /^onchainos agent create-task /);
     assert.match(commands[0], /--provider 3808 --visibility 1/);
     assert.match(commands[0], /--payment-mode x402/);
+    assert.match(commands[0], /--currency USDT/);
     assert.match(commands[0], new RegExp(`--service-id ${service.serviceId}`));
     assert.match(
       commands[1],
@@ -107,6 +108,9 @@ test("commands use the selected snapshot service and complete the reviewable tas
       new RegExp(`--endpoint '${service.endpoint.replaceAll(".", "\\.")}'`),
     );
     assert.match(commands[1], /--accepts '\[/);
+    assert.match(commands[1], /"name":"USD₮0","version":"1"/);
+    assert.match(commands[1], /--token-symbol USDT --token-amount 0\.5/);
+    assert.doesNotMatch(commands[1], /--token-symbol USD₮0/);
     assert.equal(commands[2], "onchainos agent complete 'job-123456'");
     assert.equal(
       commands[3],
@@ -187,6 +191,31 @@ test("challenge validation rejects a mismatched endpoint or asset", () => {
       ),
     /recipient/,
   );
+});
+
+test("challenge validation requires the exact EIP-712 domain metadata", () => {
+  for (const extra of [
+    undefined,
+    {},
+    { name: "USDT", version: "1" },
+    { name: "USD₮0", version: "2" },
+    { name: "USD₮0", version: "1", salt: "unexpected" },
+  ]) {
+    const challenge = structuredClone(fixture.scan);
+    if (extra === undefined) {
+      delete challenge.accepts[0].extra;
+    } else {
+      challenge.accepts[0].extra = extra;
+    }
+    assert.throws(
+      () =>
+        parsePaymentRequiredHeader(
+          Buffer.from(JSON.stringify(challenge), "utf8").toString("base64"),
+          services.scan,
+        ),
+      /payment terms/i,
+    );
+  }
 });
 
 test("payment response validation rejects non-402 and missing headers", () => {

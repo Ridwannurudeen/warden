@@ -3,10 +3,14 @@
 import base64
 import json
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
@@ -14,7 +18,14 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from warden.badge_store import get_badge, list_badges
 from warden.badges import verify_badge
-from warden import __version__, protection, protection_store
+from warden import (
+    __version__,
+    audit_attestations,
+    feedback_store,
+    protection,
+    protection_store,
+    threat_intel,
+)
 from warden.auditor import AgentAuditor
 from warden.core.verdict import ReasonCode, Verdict
 from warden.engine import WardenEngine
@@ -33,6 +44,7 @@ from warden.ratelimit import (
 from warden.models import (
     ApaRegisterRequest,
     ApaRevokeRequest,
+    AuditEvidenceResponse,
     AuditRequest,
     AuditResponse,
     BadgeRecord,
@@ -45,6 +57,8 @@ from warden.models import (
     DemoExample,
     DemoScanRequest,
     DemoTheaterResponse,
+    FeedbackRequest,
+    FeedbackResponse,
     GauntletRequest,
     GauntletResponse,
     GauntletStats,
@@ -54,8 +68,15 @@ from warden.models import (
     RuntimeStatsResponse,
     ScanRequest,
     ScanResponse,
+    ThreatIntelSummary,
 )
 from warden.observability import runtime_metrics
+from warden.payment import (
+    NoRedirectOKXFacilitatorClient,
+    build_payment_option,
+    load_payment_rail,
+    paywall_required,
+)
 
 MAX_REQUEST_BODY_BYTES = 1_000_000
 MAX_JSON_NESTING_DEPTH = 64
@@ -253,6 +274,20 @@ def _demo_rate_limit_per_minute() -> int:
         return 20
 
 
+def _feedback_rate_limit_per_minute() -> int:
+    try:
+        return int(os.getenv("WARDEN_FEEDBACK_RATE_LIMIT_PER_MIN", "5") or "5")
+    except ValueError:
+        return 5
+
+
+def _threat_intel_rate_limit_per_minute() -> int:
+    try:
+        return int(os.getenv("WARDEN_THREAT_INTEL_RATE_LIMIT_PER_MIN", "30") or "30")
+    except ValueError:
+        return 30
+
+
 def _apa_rate_limit_per_minute() -> int:
     try:
         return int(os.getenv("WARDEN_APA_RATE_LIMIT_PER_MIN", "10") or "10")
@@ -269,8 +304,44 @@ def _apa_log_rate_limit_per_minute() -> int:
 
 engine = WardenEngine()
 auditor = AgentAuditor()
+_facilitator_http_client: httpx.AsyncClient | None = None
 
-app = FastAPI(title="Warden", version=__version__)
+
+@asynccontextmanager
+async def _lifespan(application: FastAPI) -> AsyncIterator[None]:
+    del application
+    try:
+        yield
+    finally:
+        if _facilitator_http_client is not None and not _facilitator_http_client.is_closed:
+            await _facilitator_http_client.aclose()
+
+
+app = FastAPI(title="Warden", version=__version__, lifespan=_lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_error(
+    request: Request,
+    exc: RequestValidationError,
+) -> JSONResponse:
+    del request
+
+    def safe_text(value: object) -> str:
+        return str(value).encode("utf-8", errors="replace").decode("utf-8")
+
+    detail = [
+        {
+            "type": safe_text(error.get("type", "validation_error")),
+            "loc": [
+                item if type(item) is int else safe_text(item) for item in error.get("loc", ())
+            ],
+            "msg": safe_text(error.get("msg", "Request validation failed")),
+        }
+        for error in exc.errors()
+    ]
+    return JSONResponse(status_code=422, content={"detail": detail})
+
 
 _cors_setting = os.getenv(
     "WARDEN_CORS_ORIGINS",
@@ -290,9 +361,8 @@ app.add_middleware(
 # In production the deploy sets WARDEN_REQUIRE_PAYWALL=1 so a missing/typo'd
 # OKX_API_KEY fails loudly at startup instead of silently serving paid endpoints
 # for free. Local dev / test runs leave it unset → endpoints stay free, no mocks.
-if os.getenv("WARDEN_REQUIRE_PAYWALL", "").lower() in {"1", "true", "yes", "on"} and not os.getenv(
-    "OKX_API_KEY"
-):
+_paywall_required = paywall_required(os.environ)
+if _paywall_required and not os.getenv("OKX_API_KEY"):
     raise RuntimeError(
         "WARDEN_REQUIRE_PAYWALL is set but OKX_API_KEY is missing — "
         "refusing to serve paid endpoints for free."
@@ -315,56 +385,45 @@ if os.getenv("OKX_API_KEY"):
         )
     from x402.http import (
         OKXAuthConfig,
-        OKXFacilitatorClient,
         OKXFacilitatorConfig,
-        PaymentOption,
     )
     from x402.http.middleware.fastapi import PaymentMiddlewareASGI
     from x402.http.types import RouteConfig
     from x402.mechanisms.evm.exact.server import ExactEvmScheme
     from x402.server import x402ResourceServer
 
-    _pay_to = os.getenv("PAY_TO_ADDRESS", "")
+    _payment_rail = load_payment_rail(os.environ)
 
-    _facilitator = OKXFacilitatorClient(
+    _facilitator_http_client = httpx.AsyncClient(
+        timeout=30.0,
+        follow_redirects=False,
+        trust_env=False,
+    )
+    _facilitator = NoRedirectOKXFacilitatorClient(
         OKXFacilitatorConfig(
             auth=OKXAuthConfig(
                 api_key=os.getenv("OKX_API_KEY", ""),
                 secret_key=os.getenv("OKX_SECRET_KEY", ""),
                 passphrase=os.getenv("OKX_PASSPHRASE", ""),
             ),
-            base_url=os.getenv("OKX_BASE_URL", "https://web3.okx.com"),
+            base_url=_payment_rail.facilitator_url,
             sync_settle=True,
+            http_client=_facilitator_http_client,
         )
     )
+
     _server = x402ResourceServer(_facilitator)
-    _NETWORK = "eip155:196"  # X Layer mainnet
+    _NETWORK = _payment_rail.network
     _server.register(_NETWORK, ExactEvmScheme())
 
     _scan_route = RouteConfig(
-        accepts=[
-            PaymentOption(
-                scheme="exact",
-                price="$0.5",
-                network=_NETWORK,
-                pay_to=_pay_to,
-                max_timeout_seconds=300,
-            )
-        ],
+        accepts=[build_payment_option(_payment_rail)],
         description="Warden payload security scan",
         mime_type="application/json",
         extensions=_SCAN_EXTENSIONS,
     )
     _audit_route = RouteConfig(
-        accepts=[
-            PaymentOption(
-                scheme="exact",
-                price="$0.5",
-                network=_NETWORK,
-                pay_to=_pay_to,
-                max_timeout_seconds=300,
-            )
-        ],
+        accepts=[build_payment_option(_payment_rail)],
         description="Warden agent endpoint security audit",
         mime_type="application/json",
         extensions=_AUDIT_EXTENSIONS,
@@ -380,10 +439,9 @@ if os.getenv("OKX_API_KEY"):
         "POST /audit": _audit_route,
         "GET /audit": _audit_route,
     }
-    # Note: the OKX x402 middleware must reach the facilitator's /supported to
-    # build even an unpaid 402 challenge, so a facilitator outage takes the paid
-    # routes down regardless of how this is wired (confirmed against the package
-    # source — not fixable app-side). Monitor facilitator availability instead.
+    # The installed middleware may consult OKX while building a challenge.
+    # Scheduled probes verify only unsigned challenge generation; they do not
+    # claim third-party facilitator availability or successful settlement.
     app.add_middleware(PaymentMiddlewareASGI, routes=_paid_routes, server=_server)
 
 
@@ -408,6 +466,12 @@ async def rate_limit_middleware(request: Request, call_next):
     elif paid_payment_route:
         limit_per_minute = _rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute)
+    elif request.method == "POST" and path == "/api/feedback":
+        limit_per_minute = _feedback_rate_limit_per_minute()
+        rate_limited = check_rate_limit(request, limit_per_minute, scope="feedback")
+    elif request.method == "GET" and path == "/api/threat-intel/v1/summary":
+        limit_per_minute = _threat_intel_rate_limit_per_minute()
+        rate_limited = check_rate_limit(request, limit_per_minute, scope="threat-intel")
     elif path.startswith("/api/demo/"):
         limit_per_minute = _demo_rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute, scope="demo")
@@ -578,6 +642,22 @@ async def demo_scan(req: DemoScanRequest) -> ScanResponse:
     return ScanResponse.from_verdict(verdict)
 
 
+@app.post("/api/feedback", response_model=FeedbackResponse, status_code=202)
+async def submit_feedback(req: FeedbackRequest) -> FeedbackResponse:
+    result = feedback_store.record_feedback(
+        req,
+        scanner_version=__version__,
+        corpus_fingerprint=feedback_store.corpus_fingerprint(),
+    )
+    return FeedbackResponse.model_validate(result)
+
+
+@app.get("/api/threat-intel/v1/summary", response_model=ThreatIntelSummary)
+def threat_intel_summary() -> ThreatIntelSummary:
+    summary = threat_intel.build_summary(feedback_store.list_feedback())
+    return ThreatIntelSummary.model_validate(summary)
+
+
 def _demo_theater_asp_handler(payload: str) -> DemoAspReceipt:
     return DemoAspReceipt(invoked=True, received_payload=payload)
 
@@ -631,9 +711,7 @@ async def gauntlet_stats() -> GauntletStats:
 async def gauntlet_breakers() -> BreakerLeaderboardResponse:
     certificate_ids = get_confirmed_breaker_ids()
     try:
-        records = protection_store.get_breaker_certificates_with_evidence(
-            certificate_ids
-        )
+        records = protection_store.get_breaker_certificates_with_evidence(certificate_ids)
     except (
         protection_store.LogCheckpointMissing,
         protection_store.ProtectionStateConflict,
@@ -654,9 +732,7 @@ async def gauntlet_breaker(certificate_id: str) -> BreakerDetailResponse:
     if not is_confirmed_breaker(certificate_id):
         raise HTTPException(status_code=404, detail="Breaker certificate not found")
     try:
-        certificate = protection_store.get_breaker_certificate_with_evidence(
-            certificate_id
-        )
+        certificate = protection_store.get_breaker_certificate_with_evidence(certificate_id)
     except (
         protection_store.LogCheckpointMissing,
         protection_store.ProtectionStateConflict,
@@ -664,9 +740,7 @@ async def gauntlet_breaker(certificate_id: str) -> BreakerDetailResponse:
         raise HTTPException(status_code=503, detail="Breaker evidence is unavailable") from exc
     if certificate is None:
         raise HTTPException(status_code=404, detail="Breaker certificate not found")
-    return BreakerDetailResponse(
-        certificate=BreakerCertificate.model_validate(certificate)
-    )
+    return BreakerDetailResponse(certificate=BreakerCertificate.model_validate(certificate))
 
 
 @app.get("/api/demo/examples", response_model=list[DemoExample])
@@ -746,6 +820,47 @@ async def list_badges_endpoint() -> BadgeRegistryResponse:
         for badge in list_badges()
     ]
     return BadgeRegistryResponse(badges=badges, total=len(badges))
+
+
+@app.get(
+    "/apa/audit/{audit_id}",
+    response_model=AuditEvidenceResponse,
+    responses={409: {"model": AuditEvidenceResponse}},
+)
+async def apa_audit_attestation(audit_id: str) -> AuditEvidenceResponse | JSONResponse:
+    try:
+        evidence = protection_store.get_audit_attestation_with_evidence(
+            audit_id,
+            record_validator=audit_attestations.verify_audit_attestation,
+        )
+    except (
+        protection_store.LogCheckpointMissing,
+        protection_store.ProtectionStateConflict,
+    ):
+        return JSONResponse(
+            status_code=409,
+            content={
+                "attestation": None,
+                "status": "invalid",
+                "verified": False,
+                "revoked_at": None,
+                "limitations": audit_attestations.LIMITATIONS,
+            },
+        )
+    if evidence is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Endpoint audit attestation not found",
+        )
+    record = evidence["attestation"]
+    revoked = evidence["status"] == "revoked"
+    return AuditEvidenceResponse(
+        attestation=record,
+        status=audit_attestations.effective_status(record, revoked=revoked),
+        verified=audit_attestations.verify_audit_attestation(record),
+        revoked_at=evidence["revoked_at"],
+        limitations=audit_attestations.LIMITATIONS,
+    )
 
 
 @app.get("/.well-known/apa-issuer.json")
@@ -984,18 +1099,13 @@ async def readiness(response: Response) -> ReadinessResponse:
         "WARDEN_BADGE_SECRET",
     )
     paid_values = [bool(os.getenv(name, "").strip()) for name in paid_names]
-    paywall_required = os.getenv("WARDEN_REQUIRE_PAYWALL", "").lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    require_paywall = paywall_required(os.environ)
     if all(paid_values):
         checks["paid_routes"] = ReadinessCheck(
             status="ready",
             detail="Paid-route configuration is complete; facilitator reachability is not probed here.",
         )
-    elif paywall_required or any(paid_values):
+    elif require_paywall or any(paid_values):
         checks["paid_routes"] = ReadinessCheck(
             status="not_ready",
             detail="Required paid-route configuration is incomplete.",

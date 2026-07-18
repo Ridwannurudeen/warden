@@ -30,7 +30,8 @@ safe = warden.guard(untrusted_text)  # returns safe text, raises WardenBlocked o
 > truncates long payloads, so it is **best-effort telemetry, NOT enforcement**; it defaults
 > to `fail_open=True` (an outage returns ALLOW rather than taking your agent offline).
 > For enforcement use `WardenClient(local=True, fail_open=False)`. Selecting the
-> protected hosted route does not authorize an x402 payment.
+> protected hosted route does not authorize an x402 payment unless the caller
+> explicitly injects a payment handler.
 
 ## Enforcement-grade: local in-process mode
 
@@ -55,6 +56,35 @@ from warden_guard import AsyncWardenClient
 warden = AsyncWardenClient(local=True, fail_open=False)
 result = await warden.scan(untrusted_text)
 ```
+
+## Explicit feedback
+
+`scan()` and `guard()` never submit feedback. After a person has removed
+secrets and identifying details from a reproducer, feedback is a separate,
+opt-in call that requires literal retention consent and redaction
+confirmation:
+
+```python
+receipt = warden.submit_feedback(
+    outcome="missed_attack",
+    observed_verdict="ALLOW",
+    threat_class="PROMPT_INJECTION",
+    redacted_reproducer="Human-reviewed reproducer with secrets removed.",
+    consent_to_retain=True,
+    redaction_confirmed=True,
+)
+```
+
+The SDK enforces the same finite enums and relationship as the API:
+`missed_attack` requires an observed `ALLOW`; `false_positive` and
+`correct_detection` require `SANITIZE` or `BLOCK`. The redacted reproducer
+must contain valid Unicode scalar text and is limited to 4,000 characters.
+
+`AsyncWardenClient.submit_feedback()` exposes the same keyword-only contract.
+Feedback transport, HTTP, and response-validation failures always raise
+`WardenError`, even when scan telemetry is configured with
+`fail_open=True`. The receipt contains only the feedback ID, queue status,
+and retention deadline.
 
 ## FastAPI / any ASGI app
 
@@ -86,9 +116,9 @@ warden-gateway --upstream http://127.0.0.1:9000 --mode local
 ```
 
 `--mode hosted` selects the configured origin's protected `/scan` route with
-`fail_open=False`; the SDK does not settle x402 payment challenges, so the public paid
-route requires a separate payment-aware transport. The free hosted demo is never
-available to the gateway because it truncates long payloads. BLOCK returns HTTP 403.
+`fail_open=False`; the gateway does not configure a wallet or payment handler, so a
+402 fails closed. The free hosted demo is never available to the gateway because it
+truncates long payloads. BLOCK returns HTTP 403.
 Every completed scan writes a guard-key-signed JSON verdict receipt containing only a
 random request ID, timestamp, verdict, risk, threat classes, scanner latency, public key,
 and signature. Payloads, transformed bodies, detections, and raw scanner responses are
@@ -159,7 +189,52 @@ warden-guard verify attestation.json --issuer-pub ed25519:...  # offline attesta
 
 ## Protected hosted route
 
-`WardenClient(paid=True)` selects the x402-gated `/scan` endpoint. The SDK does not
-construct, sign, or settle x402 payments; HTTP 402 therefore raises `WardenError`
-even when `fail_open=True`. Use a separate payment-aware integration before relying
-on the protected hosted route.
+`WardenClient(paid=True)` selects the x402-gated `/scan` endpoint. With no
+`payment_handler`, HTTP 402 raises `WardenError` even when `fail_open=True`, preserving
+the previous non-paying behavior.
+
+To opt into one paid replay, inject a callback owned by the caller's wallet boundary.
+The callback receives an immutable `X402Challenge` only after Warden's exact x402 v2
+route, recipient, X Layer network, USDT asset, `500000` atomic amount, 300-second
+timeout, and `USD₮0`/`1` EIP-712 domain have been validated:
+
+```python
+import os
+
+from warden_guard import WardenClient, X402Challenge
+
+payment_signature = os.environ["PAYMENT_SIGNATURE"]
+
+
+def approved_payment(challenge: X402Challenge) -> str:
+    # The external wallet created this encoded PAYMENT-SIGNATURE for
+    # challenge.to_dict(); Warden Guard never receives the wallet key.
+    return payment_signature
+
+
+warden = WardenClient(
+    paid=True,
+    fail_open=False,
+    payment_handler=approved_payment,
+)
+result = warden.scan(untrusted_text, depth="thorough")
+```
+
+`AsyncWardenClient` accepts the same explicit option and supports either a direct
+string return or an awaitable callback. The SDK validates that the returned base64
+x402 v2 EIP-3009 payload is bound to the accepted requirement and resource. It also
+requires at least six seconds remaining for replay and rejects authorizations beyond
+the current 300-second challenge window, allowing only five seconds of clock skew. It
+then:
+
+- reuses the exact serialized endpoint and request body;
+- sends `PAYMENT-SIGNATURE` only on one replay;
+- disables redirects and environment-proxy routing for the signed flow;
+- rejects a second 402, challenge drift, malformed headers, callback failure, and
+  every replay HTTP or response-contract failure; and
+- requires a successful, correctly network-bound `PAYMENT-RESPONSE` receipt before
+  returning the validated scan result.
+
+Injected payment failures never use `fail_open`. The SDK does not generate a wallet,
+store a private key, create a signature, retry settlement, or make a live payment
+without this caller-supplied callback.

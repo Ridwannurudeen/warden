@@ -27,8 +27,17 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/assets/favicon-32.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/assets/apple-touch-icon.png"
+    />
     <link rel="stylesheet" href="/styles.css?v=96b93423" />
   </head>
   <body>
@@ -129,8 +138,9 @@
         <h1>Inspect the result. Keep its limits attached.</h1>
         <p class="hero-text">
           Each record captures one completed endpoint audit against a fixed
-          battery. Warden checks stored-record integrity when this registry is
-          requested; the result remains point-in-time evidence, not
+          battery. New audit details include issuer-signed portable evidence,
+          expiry, revocation, and transparency-log binding; legacy details keep
+          their narrower stored-record integrity boundary. Neither is
           certification or continuous monitoring.
         </p>
         <div class="hero-actions">
@@ -144,9 +154,11 @@
           <span>Evidence type</span><strong>Point-in-time audit</strong>
         </div>
         <div>
-          <span>Integrity</span><strong>Server-checked signature</strong>
+          <span>Integrity</span><strong>Signature checked on request</strong>
         </div>
-        <div><span>Freshness</span><strong>Issued timestamp shown</strong></div>
+        <div>
+          <span>Freshness</span><strong>Lifecycle shown when issued</strong>
+        </div>
         <div><span>Conclusion</span><strong>Not certification</strong></div>
       </section>
 
@@ -175,14 +187,15 @@
           <li>
             <span>03</span><strong>Integrity</strong>
             <p>
-              The API recomputes the stored record's signature for this request.
+              Portable records bind an issuer signature to the transparency log.
+              Legacy records retain a server-checked stored signature.
             </p>
           </li>
           <li>
             <span>04</span><strong>Time</strong>
             <p>
-              The issue time bounds the evidence; no expiry or revocation model
-              is claimed for these legacy records.
+              Portable records show issuance, expiry, and revocation. Legacy
+              records explicitly state that those lifecycle fields do not exist.
             </p>
           </li>
         </ol>

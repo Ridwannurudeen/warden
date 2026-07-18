@@ -1,8 +1,15 @@
 """Badge issuance, verification, and lookup tests."""
 
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
+from warden import badge_store
 from warden.api import app
 from warden.badge_store import get_badge, record_badge
 from warden.badges import issue_badge, verify_badge
@@ -79,8 +86,6 @@ def test_badge_store_round_trip(tmp_path, monkeypatch):
 
 
 def test_badge_store_append_is_atomic_and_durable(tmp_path, monkeypatch):
-    import json
-
     store_path = tmp_path / "issued.jsonl"
     monkeypatch.setattr("warden.badge_store._STORE_PATH", store_path)
 
@@ -104,7 +109,6 @@ def test_badge_store_append_is_atomic_and_durable(tmp_path, monkeypatch):
 
 
 def test_badge_store_concurrent_writes_do_not_interleave(tmp_path, monkeypatch):
-    import json
     import threading
 
     store_path = tmp_path / "issued.jsonl"
@@ -216,3 +220,112 @@ def test_badge_registry_verifies_each_record_and_only_returns_public_fields(tmp_
     assert payload["badges"][0]["verified"] is False
     assert "internal_only" not in payload["badges"][0]["badge"]
     assert payload["badges"][1] == {"badge": verified_badge, "verified": True}
+
+
+def test_badge_store_retains_only_the_newest_bounded_records(tmp_path, monkeypatch):
+    store_path = tmp_path / "issued.jsonl"
+    monkeypatch.setattr(badge_store, "_STORE_PATH", store_path)
+    monkeypatch.setattr(badge_store, "_MAX_RECORDS", 3)
+    badges = [
+        issue_badge(
+            target_host=f"api-{index}.example.org",
+            score=90.0,
+            grade="A",
+            blocked=20,
+            total=20,
+            issued_at=f"2026-07-{index + 1:02d}",
+        )
+        for index in range(5)
+    ]
+
+    for badge in badges:
+        record_badge(badge)
+
+    persisted = [
+        json.loads(line) for line in store_path.read_text(encoding="utf-8").splitlines() if line
+    ]
+    assert persisted == badges[-3:]
+    assert get_badge(str(badges[0]["audit_id"])) is None
+    assert get_badge(str(badges[-1]["audit_id"])) == badges[-1]
+
+
+def test_badge_store_failed_atomic_replace_preserves_previous_records(
+    tmp_path,
+    monkeypatch,
+):
+    store_path = tmp_path / "issued.jsonl"
+    monkeypatch.setattr(badge_store, "_STORE_PATH", store_path)
+    first = issue_badge(
+        target_host="first.example.org",
+        score=90.0,
+        grade="A",
+        blocked=20,
+        total=20,
+        issued_at="2026-07-18",
+    )
+    second = issue_badge(
+        target_host="second.example.org",
+        score=90.0,
+        grade="A",
+        blocked=20,
+        total=20,
+        issued_at="2026-07-19",
+    )
+    record_badge(first)
+    original = store_path.read_bytes()
+
+    def fail_replace(source, destination):
+        raise OSError("simulated replace failure")
+
+    monkeypatch.setattr(badge_store.os, "replace", fail_replace)
+    with pytest.raises(OSError, match="replace failure"):
+        record_badge(second)
+
+    assert store_path.read_bytes() == original
+    assert not list(tmp_path.glob(".issued.jsonl.*.tmp"))
+
+
+def test_badge_store_serializes_writers_across_processes(tmp_path):
+    store_path = tmp_path / "issued.jsonl"
+    worker = """
+import sys
+from pathlib import Path
+from warden import badge_store
+from warden.badges import issue_badge
+
+badge_store._STORE_PATH = Path(sys.argv[1])
+offset = int(sys.argv[2])
+for index in range(10):
+    badge_store.record_badge(
+        issue_badge(
+            target_host=f"api-{offset + index}.example.org",
+            score=90.0,
+            grade="A",
+            blocked=20,
+            total=20,
+            issued_at="2026-07-18",
+        )
+    )
+"""
+    environment = {**os.environ, "WARDEN_BADGE_SECRET": "badge-test-secret"}
+    processes = [
+        subprocess.Popen(
+            [sys.executable, "-c", worker, str(store_path), str(offset)],
+            cwd=Path(__file__).resolve().parents[1],
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for offset in range(0, 40, 10)
+    ]
+
+    for process in processes:
+        stdout, stderr = process.communicate(timeout=30)
+        assert process.returncode == 0, stdout + stderr
+
+    records = [
+        json.loads(line) for line in store_path.read_text(encoding="utf-8").splitlines() if line
+    ]
+    assert len(records) == 40
+    assert len({record["audit_id"] for record in records}) == 40

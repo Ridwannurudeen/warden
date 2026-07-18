@@ -1,6 +1,7 @@
 """Detect seed phrases, private keys, and secret exfiltration instructions."""
 
 import re
+from bisect import bisect_left, bisect_right
 from pathlib import Path
 
 from warden.core.analyzer import AnalysisContext, Analyzer, AnalyzerResult
@@ -50,7 +51,6 @@ EXFIL_INSTRUCTION_RES = [
         r"(?:wallet|context|seed phrase|seed|mnemonic|private key|api key|secret|system prompt)\b"
     ),
     re.compile(r"(?i)\breveal\s+(?:the\s+)?system\s+prompt\b"),
-    re.compile(r"(?i)\bPOST\b.{0,80}\bhttps?://"),
     # Broader verbs ("output/return/give/print/…") over credential/key tokens only,
     # including underscored/prefixed forms like OKX_API_KEY. Kept off wallet/context
     # to avoid false positives on benign "provide the wallet balance" phrasing.
@@ -64,6 +64,129 @@ EXFIL_INSTRUCTION_RES = [
         r"[_ -]?keys?)\b"
     ),
 ]
+SENSITIVE_OBJECT_RE = re.compile(
+    r"(?ix)"
+    r"(?:"
+    r"(?<![\w.-])\.env(?![\w.-])(?:\s+(?:files?|contents?))?"
+    r"|\b(?:"
+    r"authorization\s+headers?"
+    r"|bearer\s+tokens?"
+    r"|session\s+(?:cookies?|tokens?)"
+    r"|system\s+prompts?"
+    r"|developer\s+prompts?"
+    r"|mnemonics?"
+    r"|seed\s*phrases?"
+    r"|credentials?"
+    r"|passwords?"
+    r"|(?:api|access|auth|private|secret|signing)[_ -]?keys?"
+    r")\b"
+    r")"
+)
+OUTBOUND_SINK_RE = re.compile(
+    r"(?ix)"
+    r"(?:"
+    r"https?://[^\s<>'\"]+"
+    r"|\b(?:external\s+)?(?:endpoints?|webhooks?|collectors?|collection\s+servers?)\b"
+    r"|\bcallback\s+(?:urls?|payloads?)\b"
+    r"|\b(?:post|request)\s+bod(?:y|ies)\b"
+    r"|\b(?:query|url)\s+parameters?\b"
+    r"|\b(?:email|direct\s+message|dm|chat)\b"
+    r")"
+)
+OUTBOUND_FLOW_RE = re.compile(
+    r"(?i)\b(?:include|attach|place|put|embed|append|copy|route|forward|send|"
+    r"upload|post|transmit|write|add|contain|contains|containing|populate|set|"
+    r"carry|insert|serialize|encode|export|map|includes)\b"
+)
+OUTBOUND_NEGATION_PREFIX_RE = re.compile(
+    r"(?i)\b(?:do\s+not|don't|does\s+not|doesn't|never|must\s+not|should\s+not|"
+    r"cannot|can't|avoid)"
+    r"(?:\s+\w+){0,3}\s+$"
+)
+POST_NOUN_SUFFIX_RE = re.compile(r"(?i)^\s+(?:bod(?:y|ies)|requests?)\b")
+ABSENT_SENSITIVE_PREFIX_RE = re.compile(r"(?i)\b(?:no|zero|without)\s+(?:\w+\s+){0,2}$")
+NEGATED_TRANSFORM_TARGET_PREFIX_RE = re.compile(
+    r"(?i)(?:\b(?:redact(?:ed|ing|s)?|mask(?:ed|ing|s)?|"
+    r"sanitiz(?:e|ed|es|ing))\s+no"
+    r"|\bwithout\s+(?:redact(?:ed|ing|s)?|mask(?:ed|ing|s)?|"
+    r"sanitiz(?:e|ed|es|ing))\s+(?:the\s+)?)\s*$"
+)
+TRANSFORMED_SENSITIVE_PREFIX_RE = re.compile(
+    r"(?i)\b(?:redacted|masked|sanitized)\s+(?:\w+\s+){0,2}$"
+)
+NEGATED_TRANSFORMED_SENSITIVE_PREFIX_RE = re.compile(
+    r"(?i)\b(?:not|never|non)[ -]?(?:redacted|masked|sanitized)"
+    r"\s+(?:\w+\s+){0,2}$"
+)
+SAFE_SENSITIVE_SUFFIX_RE = re.compile(
+    r"(?ix)^\s+(?:"
+    r"(?:only\s+)?(?:in|as)\s+(?:a\s+)?(?:redacted|masked|sanitized)\s+"
+    r"(?:form|value|version)"
+    r"|(?:is|are|was|were)\s+(?:fully\s+)?(?:redacted|masked|sanitized)"
+    r")\b"
+)
+TRANSFORM_CONDITION_RE = re.compile(
+    r"(?ix)"
+    r"\b(?:only\s+)?after\s+(?:"
+    r"(?:fully\s+)?(?:redact(?:ed|ing)?|mask(?:ed|ing)?|sanitiz(?:e|ed|ing))\s+"
+    r"(?:the\s+)?(?:"
+    r"it|them|"
+    r"\.env(?:\s+(?:files?|contents?))?|"
+    r"authorization\s+headers?|bearer\s+tokens?|session\s+(?:cookies?|tokens?)|"
+    r"(?:system|developer)\s+prompts?|mnemonics?|seed\s*phrases?|credentials?|"
+    r"passwords?|(?:api|access|auth|private|secret|signing)[_ -]?keys?"
+    r")"
+    r"|(?:"
+    r"\.env(?:\s+(?:files?|contents?))?|"
+    r"authorization\s+headers?|bearer\s+tokens?|session\s+(?:cookies?|tokens?)|"
+    r"(?:system|developer)\s+prompts?|mnemonics?|seed\s*phrases?|credentials?|"
+    r"passwords?|(?:api|access|auth|private|secret|signing)[_ -]?keys?"
+    r")\s+(?:is|are|was|were)\s+(?:redacted|masked|sanitized)"
+    r")"
+)
+NEGATED_TRANSFORM_CONDITION_PREFIX_RE = re.compile(
+    r"(?i)\b(?:do\s+not|don't|never|not|without)(?:\s+\w+){0,4}\s+$"
+)
+POSITIVE_TRANSFORM_RE = re.compile(
+    r"(?i)\b(?:redact(?:ed|ing|s)?|mask(?:ed|ing|s)?|sanitiz(?:e|ed|es|ing))\b"
+)
+NEGATED_TRANSFORM_PREFIX_RE = re.compile(
+    r"(?i)\b(?:do\s+not|don't|never|not|without|fail(?:ed|s|ing)?\s+to|"
+    r"skip(?:ped|s|ping)?|avoid(?:ed|s|ing)?)\s+$"
+)
+LOCAL_TRANSFORM_SCOPE_RE = re.compile(
+    r"(?i)\b(?:in|from)\s+(?:the\s+)?(?:local\s+)?"
+    r"(?:logs?|telemetry|traces?|metrics?)\b"
+)
+LOCAL_RETENTION_PREFIX_RE = re.compile(
+    r"(?i)\b(?:store|keep|retain|save|persist|hold|write|serialize|cache)"
+    r"\s+(?:the\s+)?$"
+)
+LOCAL_RETENTION_SUFFIX_RE = re.compile(
+    r"(?ix)^\s+(?:"
+    r"(?:strictly\s+)?locally\b"
+    r"|(?:in|into|within)\s+(?:the\s+)?local\s+"
+    r"(?:encrypted\s+)?(?:storage|vault|file|cache|memory)\b"
+    r"|(?:remains?|stays?|is|are|must\s+remain)\s+(?:strictly\s+)?local\b"
+    r")"
+)
+SOURCE_SENSITIVE_VERB_RE = re.compile(
+    r"(?i)\b(?:read|retrieve|extract|fetch|load|access|obtain|collect|capture|get|take)\b"
+)
+DOCUMENTATION_CONTEXT_RE = re.compile(
+    r"(?i)\b(?:documentation|docs?|guide|manual|policy|report|example|schema|format)\b"
+)
+SINK_DOCUMENT_SUFFIX_RE = re.compile(
+    r"(?i)^\s+(?:documentation|docs?|guide|manual|schema|example|format|"
+    r"reliability\s+report)\b"
+)
+UNRELATED_CLAUSE_BOUNDARY_RE = re.compile(
+    r"(?i),\s*(?:while|whereas|although|but|and\s+(?:separately|meanwhile))\b"
+)
+SENSITIVE_REFERENCE_PRONOUN_RE = re.compile(r"(?i)\b(?:it|them|this|these|those)\b")
+SECRET_FLOW_BOUNDARY_RE = re.compile(r"(?:[.!?;](?=\s|$)|[\r\n]+)")
+MAX_PRONOUN_OBJECT_DISTANCE = 64
+MAX_FLOW_EXCERPT_SIZE = 640
 
 
 class ExfiltrationAnalyzer(Analyzer):
@@ -102,7 +225,7 @@ class ExfiltrationAnalyzer(Analyzer):
             detections.append(self._detection(seed_phrase, 0.95))
 
         if instruction:
-            detections.append(self._detection(instruction.group(), 0.80))
+            detections.append(self._detection(instruction, 0.80))
 
         score = max((detection["confidence"] for detection in detections), default=0.0) * 100
         return AnalyzerResult(
@@ -141,16 +264,240 @@ class ExfiltrationAnalyzer(Analyzer):
         return phrases
 
     @staticmethod
-    def _exfil_instruction(payload: str) -> re.Match[str] | None:
+    def _exfil_instruction(payload: str) -> str | None:
+        semantic_flow = ExfiltrationAnalyzer._sensitive_outbound_flow(payload)
+        if semantic_flow is not None:
+            return semantic_flow
+
         for pattern in EXFIL_INSTRUCTION_RES:
             for instruction in pattern.finditer(payload):
                 prefix = payload[max(0, instruction.start() - 24) : instruction.start()]
                 suffix = payload[instruction.end() : instruction.end() + 48]
-                if not NEGATED_INSTRUCTION_RE.search(
-                    prefix
-                ) and not SECRET_DOCUMENT_SUFFIX_RE.search(suffix):
-                    return instruction
+                if (
+                    not NEGATED_INSTRUCTION_RE.search(prefix)
+                    and not SECRET_DOCUMENT_SUFFIX_RE.search(suffix)
+                    and not ExfiltrationAnalyzer._has_safe_transform_condition(
+                        payload[instruction.start() : min(len(payload), instruction.end() + 256)]
+                    )
+                ):
+                    return instruction.group()
         return None
+
+    @staticmethod
+    def _has_safe_transform_condition(text: str) -> bool:
+        for condition in TRANSFORM_CONDITION_RE.finditer(text):
+            prefix = text[max(0, condition.start() - 64) : condition.start()]
+            if not NEGATED_TRANSFORM_CONDITION_PREFIX_RE.search(prefix):
+                return True
+        return False
+
+    @staticmethod
+    def _sensitive_outbound_flow(payload: str) -> str | None:
+        statement_start = 0
+        document_break_before = False
+        statement_ranges: list[tuple[int, int, bool]] = []
+        for boundary in SECRET_FLOW_BOUNDARY_RE.finditer(payload):
+            if (
+                boundary.start() > statement_start
+                and payload[statement_start : boundary.start()].strip()
+            ):
+                statement_ranges.append((statement_start, boundary.start(), document_break_before))
+                document_break_before = False
+            if len(re.findall(r"\r\n|[\r\n]", boundary.group())) >= 2:
+                document_break_before = True
+            statement_start = boundary.end()
+        if statement_start < len(payload) and payload[statement_start:].strip():
+            statement_ranges.append((statement_start, len(payload), document_break_before))
+
+        active_sensitive: re.Match[str] | None = None
+        for start, end, has_document_break in statement_ranges:
+            if has_document_break:
+                active_sensitive = None
+
+            sensitive_matches = list(SENSITIVE_OBJECT_RE.finditer(payload, start, end))
+            if not sensitive_matches and active_sensitive is None:
+                continue
+            sensitive_starts = [match.start() for match in sensitive_matches]
+
+            unsafe_sensitive: list[re.Match[str]] = []
+            for sensitive in sensitive_matches:
+                qualifier = payload[max(start, sensitive.start() - 64) : sensitive.start()]
+                suffix = payload[sensitive.end() : min(end, sensitive.end() + 96)]
+                if (
+                    (
+                        ABSENT_SENSITIVE_PREFIX_RE.search(qualifier)
+                        and not NEGATED_TRANSFORM_TARGET_PREFIX_RE.search(qualifier)
+                    )
+                    or (
+                        TRANSFORMED_SENSITIVE_PREFIX_RE.search(qualifier)
+                        and not NEGATED_TRANSFORMED_SENSITIVE_PREFIX_RE.search(qualifier)
+                    )
+                    or SAFE_SENSITIVE_SUFFIX_RE.search(suffix)
+                    or SECRET_DOCUMENT_SUFFIX_RE.search(suffix)
+                ):
+                    continue
+                unsafe_sensitive.append(sensitive)
+
+            unsafe_starts = [match.start() for match in unsafe_sensitive]
+            unsafe_start_set = set(unsafe_starts)
+            source_matches = list(SOURCE_SENSITIVE_VERB_RE.finditer(payload, start, end))
+            source_starts = [match.start() for match in source_matches]
+            documentation_starts = [
+                match.start() for match in DOCUMENTATION_CONTEXT_RE.finditer(payload, start, end)
+            ]
+            for sensitive in unsafe_sensitive:
+                source_index = bisect_right(source_starts, sensitive.start()) - 1
+                if source_index < 0:
+                    continue
+                source = source_matches[source_index]
+                source_prefix = payload[max(start, source.start() - 48) : source.start()]
+                documentation_index = bisect_left(documentation_starts, source.end())
+                has_documentation_context = (
+                    documentation_index < len(documentation_starts)
+                    and documentation_starts[documentation_index] < sensitive.start()
+                )
+                if (
+                    not OUTBOUND_NEGATION_PREFIX_RE.search(source_prefix)
+                    and not has_documentation_context
+                ):
+                    active_sensitive = sensitive
+
+            sinks = [
+                sink
+                for sink in OUTBOUND_SINK_RE.finditer(payload, start, end)
+                if not SINK_DOCUMENT_SUFFIX_RE.search(
+                    payload[sink.end() : min(end, sink.end() + 48)]
+                )
+            ]
+            if not sinks:
+                continue
+            sink_starts = [sink.start() for sink in sinks]
+
+            transform_matches = list(POSITIVE_TRANSFORM_RE.finditer(payload, start, end))
+            transform_starts = [match.start() for match in transform_matches]
+            local_scope_starts = [
+                match.start() for match in LOCAL_TRANSFORM_SCOPE_RE.finditer(payload, start, end)
+            ]
+            unrelated_clause_starts = [
+                match.start()
+                for match in UNRELATED_CLAUSE_BOUNDARY_RE.finditer(payload, start, end)
+            ]
+
+            for flow in OUTBOUND_FLOW_RE.finditer(payload, start, end):
+                if flow.group().casefold() == "post" and POST_NOUN_SUFFIX_RE.search(
+                    payload[flow.end() : min(end, flow.end() + 16)]
+                ):
+                    continue
+                prefix = payload[max(start, flow.start() - 64) : flow.start()]
+                if OUTBOUND_NEGATION_PREFIX_RE.search(prefix):
+                    continue
+
+                condition_window = payload[flow.start() : min(end, flow.end() + 256)]
+                if ExfiltrationAnalyzer._has_safe_transform_condition(condition_window):
+                    continue
+
+                relevant_sensitive: re.Match[str] | None = None
+                pronoun = SENSITIVE_REFERENCE_PRONOUN_RE.search(
+                    payload,
+                    flow.end(),
+                    min(end, flow.end() + MAX_PRONOUN_OBJECT_DISTANCE),
+                )
+                if pronoun is not None:
+                    sink_after_pronoun = bisect_left(sink_starts, pronoun.end())
+                    if sink_after_pronoun >= len(sinks):
+                        continue
+                    sink = sinks[sink_after_pronoun]
+
+                    sensitive_index = bisect_right(sensitive_starts, flow.start()) - 1
+                    if sensitive_index >= 0:
+                        candidate = sensitive_matches[sensitive_index]
+                        if candidate.start() not in unsafe_start_set:
+                            continue
+
+                        transform_index = bisect_right(transform_starts, candidate.start()) - 1
+                        if transform_index >= 0:
+                            transform = transform_matches[transform_index]
+                            transform_prefix = payload[
+                                max(start, transform.start() - 40) : transform.start()
+                            ]
+                            transform_target_size = candidate.start() - transform.end()
+                            local_scope_index = bisect_left(local_scope_starts, candidate.end())
+                            has_local_scope = (
+                                local_scope_index < len(local_scope_starts)
+                                and local_scope_starts[local_scope_index] < flow.start()
+                            )
+                            if (
+                                transform_target_size <= 64
+                                and re.fullmatch(
+                                    r"\s+(?:(?:the|all|any|these|those)\s+){0,2}",
+                                    payload[transform.end() : candidate.start()],
+                                    flags=re.IGNORECASE,
+                                )
+                                and not NEGATED_TRANSFORM_PREFIX_RE.search(transform_prefix)
+                                and not has_local_scope
+                            ):
+                                continue
+                        relevant_sensitive = candidate
+                    elif active_sensitive is not None:
+                        relevant_sensitive = active_sensitive
+                    else:
+                        continue
+                else:
+                    direct_index = bisect_left(unsafe_starts, flow.end())
+                    if direct_index >= len(unsafe_sensitive):
+                        continue
+                    relevant_sensitive = unsafe_sensitive[direct_index]
+                    if ExfiltrationAnalyzer._is_local_retention(
+                        payload, start, end, relevant_sensitive
+                    ):
+                        continue
+                    unrelated_clause_index = bisect_left(unrelated_clause_starts, flow.end())
+                    if (
+                        unrelated_clause_index < len(unrelated_clause_starts)
+                        and unrelated_clause_starts[unrelated_clause_index]
+                        < relevant_sensitive.start()
+                    ):
+                        continue
+
+                    sink_index = bisect_left(sink_starts, flow.end())
+                    if sink_index < len(sinks):
+                        sink = sinks[sink_index]
+                    else:
+                        sink = sinks[-1]
+
+                excerpt_start = max(
+                    start,
+                    min(flow.start(), sink.start(), relevant_sensitive.start()) - 64,
+                )
+                excerpt_end = min(
+                    end,
+                    max(flow.end(), sink.end(), relevant_sensitive.end()) + 96,
+                )
+                if excerpt_end - excerpt_start > MAX_FLOW_EXCERPT_SIZE:
+                    excerpt_start = max(start, min(flow.start(), sink.start()) - 64)
+                    excerpt_end = min(end, max(flow.end(), sink.end()) + 96)
+                return payload[excerpt_start:excerpt_end].strip()
+        return None
+
+    @staticmethod
+    def _is_local_retention(
+        payload: str,
+        statement_start: int,
+        statement_end: int,
+        sensitive: re.Match[str],
+    ) -> bool:
+        prefix = payload[max(statement_start, sensitive.start() - 64) : sensitive.start()]
+        suffix = payload[sensitive.end() : min(statement_end, sensitive.end() + 96)]
+        local_state = LOCAL_RETENTION_SUFFIX_RE.search(suffix)
+        if local_state is None:
+            return False
+        return bool(
+            local_state.group()
+            .lstrip()
+            .lower()
+            .startswith(("remain", "stay", "is ", "are ", "must remain"))
+            or LOCAL_RETENTION_PREFIX_RE.search(prefix)
+        )
 
     @staticmethod
     def _detection(match: str, confidence: float) -> dict[str, object]:

@@ -8,9 +8,11 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from threading import Lock
+from uuid import uuid4
 
 _STORE_PATH = Path(__file__).resolve().parents[1] / "badges" / "issued.jsonl"
 _LOCK = Lock()
+_MAX_RECORDS = 5_000
 
 
 @contextmanager
@@ -58,6 +60,30 @@ def _read_records(path: Path) -> list[dict[str, object]]:
     return records
 
 
+def _write_records(path: Path, records: list[dict[str, object]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    try:
+        with temporary.open("x", encoding="utf-8", newline="\n") as handle:
+            for record in records:
+                handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        if os.name != "nt":
+            directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _retained_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
+    return records[-_MAX_RECORDS:]
+
+
 def record_badge(badge: dict[str, object]) -> None:
     versioned = badge.get("badge_version") == 2
     if versioned:
@@ -65,10 +91,10 @@ def record_badge(badge: dict[str, object]) -> None:
 
         if not verify_badge(badge):
             raise ValueError("versioned audit badge failed integrity verification")
-    record = json.dumps(badge, ensure_ascii=False, sort_keys=True)
     already_stored = False
-    with _exclusive_store_lock():
-        for existing in _read_records(_STORE_PATH):
+    with _exclusive_store_lock(_STORE_PATH):
+        records = _read_records(_STORE_PATH)
+        for existing in records:
             if existing.get("audit_id") != badge.get("audit_id"):
                 continue
             if existing == badge:
@@ -76,10 +102,10 @@ def record_badge(badge: dict[str, object]) -> None:
                 break
             raise ValueError("badge audit_id conflicts with an existing record")
         if not already_stored:
-            with _STORE_PATH.open("a", encoding="utf-8") as handle:
-                handle.write(record + "\n")
-                handle.flush()
-                os.fsync(handle.fileno())
+            records.append(badge)
+        retained = _retained_records(records)
+        if not already_stored or retained != records:
+            _write_records(_STORE_PATH, retained)
     if versioned:
         from warden import audit_attestations
 
@@ -87,7 +113,7 @@ def record_badge(badge: dict[str, object]) -> None:
 
 
 def get_badge(audit_id: str) -> dict[str, object] | None:
-    with _exclusive_store_lock():
+    with _exclusive_store_lock(_STORE_PATH):
         records = _read_records(_STORE_PATH)
     for record in reversed(records):
         if str(record.get("audit_id")) == audit_id:

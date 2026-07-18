@@ -21,9 +21,10 @@ Tiers — read this before shipping:
   package installed. This is the enforcement-grade path; pair it with
   `fail_open=False`.
 - **Protected hosted route (`paid=True`):** selects the x402-gated `/scan`
-  endpoint. This client does not create or settle payment signatures, so a 402
-  response raises `WardenError` even when `fail_open=True`. Use a payment-aware
-  integration to authorize and settle hosted requests.
+  endpoint. Without a payment handler, a 402 raises `WardenError` even when
+  `fail_open=True`. An explicitly injected caller-owned payment handler may
+  authorize the validated canonical terms and return one `PAYMENT-SIGNATURE`;
+  the SDK never holds keys or signs autonomously.
 
 Latency honesty: verdict *compute* is sub-ms; the hosted paths add network RTT.
 
@@ -35,9 +36,17 @@ advance the signed APA count.
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
+import json
 import math
+import re
+import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Literal
+from datetime import datetime
+from typing import Literal, Protocol
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -46,7 +55,117 @@ from warden_guard.state import increment_scan_count
 DEFAULT_BASE_URL = "https://warden.gudman.xyz"
 FREE_PATH = "/api/demo/scan"
 PAID_PATH = "/scan"
+FEEDBACK_PATH = "/api/feedback"
 Depth = Literal["fast", "thorough"]
+FeedbackOutcome = Literal["missed_attack", "false_positive", "correct_detection"]
+FeedbackStatus = Literal["pending", "duplicate"]
+FeedbackThreatClass = Literal[
+    "PROMPT_INJECTION",
+    "ROLE_OVERRIDE",
+    "WEB3_INJECTION",
+    "HIDDEN_UNICODE",
+    "ENCODING_TRICK",
+    "STATISTICAL_ANOMALY",
+    "CORPUS_MATCH",
+    "DRAIN_ADDRESS",
+    "TOOL_HIJACK",
+    "SECRET_EXFIL",
+    "MALICIOUS_LINK",
+]
+FeedbackVerdict = Literal["ALLOW", "SANITIZE", "BLOCK"]
+MAX_FEEDBACK_REPRODUCER_LENGTH = 4_000
+MAX_X402_HEADER_LENGTH = 16_384
+X402_SCHEME = "exact"
+X402_NETWORK = "eip155:196"
+X402_ASSET = "0x779ded0c9e1022225f8e0630b35a9b54be713736"
+X402_AMOUNT = "500000"
+X402_PAY_TO = "0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51"
+X402_TIMEOUT_SECONDS = 300
+X402_MIN_REPLAY_WINDOW_SECONDS = 6
+X402_CLOCK_TOLERANCE_SECONDS = 5
+X402_EIP712_NAME = "USD₮0"
+X402_EIP712_VERSION = "1"
+_FEEDBACK_OUTCOMES = frozenset({"missed_attack", "false_positive", "correct_detection"})
+_FEEDBACK_VERDICTS = frozenset({"ALLOW", "SANITIZE", "BLOCK"})
+_FEEDBACK_THREAT_CLASSES = frozenset(
+    {
+        "PROMPT_INJECTION",
+        "ROLE_OVERRIDE",
+        "WEB3_INJECTION",
+        "HIDDEN_UNICODE",
+        "ENCODING_TRICK",
+        "STATISTICAL_ANOMALY",
+        "CORPUS_MATCH",
+        "DRAIN_ADDRESS",
+        "TOOL_HIJACK",
+        "SECRET_EXFIL",
+        "MALICIOUS_LINK",
+    }
+)
+_EVM_ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}")
+_HEX_VALUE = re.compile(r"0x(?:[0-9a-fA-F]{2})+")
+_NONCE = re.compile(r"0x[0-9a-fA-F]{64}")
+_MAX_UINT256 = 2**256 - 1
+
+
+def _current_unix_time() -> int:
+    return int(time.time())
+
+
+@dataclass(frozen=True)
+class X402PaymentRequirement:
+    """The one Warden payment requirement an injected wallet may authorize."""
+
+    scheme: str
+    network: str
+    asset: str
+    amount: str
+    pay_to: str
+    max_timeout_seconds: int
+    eip712_name: str
+    eip712_version: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "scheme": self.scheme,
+            "network": self.network,
+            "asset": self.asset,
+            "amount": self.amount,
+            "payTo": self.pay_to,
+            "maxTimeoutSeconds": self.max_timeout_seconds,
+            "extra": {
+                "name": self.eip712_name,
+                "version": self.eip712_version,
+            },
+        }
+
+
+@dataclass(frozen=True)
+class X402Challenge:
+    """A validated projection of Warden's canonical x402 v2 challenge."""
+
+    x402_version: Literal[2]
+    resource_url: str
+    requirement: X402PaymentRequirement
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "x402Version": self.x402_version,
+            "resource": {"url": self.resource_url},
+            "accepts": [self.requirement.to_dict()],
+        }
+
+
+class X402PaymentHandler(Protocol):
+    """Caller-owned synchronous wallet boundary."""
+
+    def __call__(self, challenge: X402Challenge, /) -> str: ...
+
+
+class AsyncX402PaymentHandler(Protocol):
+    """Caller-owned async wallet boundary."""
+
+    def __call__(self, challenge: X402Challenge, /) -> str | Awaitable[str]: ...
 
 
 @dataclass
@@ -129,6 +248,44 @@ class ScanResult:
         )
 
 
+@dataclass(frozen=True)
+class FeedbackResult:
+    """Receipt for one explicit, consented feedback submission."""
+
+    feedback_id: str
+    status: FeedbackStatus
+    retained_until: str
+
+    @classmethod
+    def from_response(cls, data: object) -> "FeedbackResult":
+        if not isinstance(data, dict) or set(data) != {
+            "feedback_id",
+            "status",
+            "retained_until",
+        }:
+            raise WardenError("Invalid Warden feedback response: fields")
+        feedback_id = data.get("feedback_id")
+        if not isinstance(feedback_id, str) or re.fullmatch(r"[0-9a-f]{32}", feedback_id) is None:
+            raise WardenError("Invalid Warden feedback response: feedback_id")
+        status = data.get("status")
+        if status not in {"pending", "duplicate"}:
+            raise WardenError("Invalid Warden feedback response: status")
+        retained_until = data.get("retained_until")
+        if not isinstance(retained_until, str) or not retained_until.endswith("Z"):
+            raise WardenError("Invalid Warden feedback response: retained_until")
+        try:
+            parsed_retention = datetime.fromisoformat(retained_until.removesuffix("Z") + "+00:00")
+        except ValueError as exc:
+            raise WardenError("Invalid Warden feedback response: retained_until") from exc
+        if parsed_retention.utcoffset() is None:
+            raise WardenError("Invalid Warden feedback response: retained_until")
+        return cls(
+            feedback_id=feedback_id,
+            status=status,
+            retained_until=retained_until,
+        )
+
+
 def _valid_detection(value: object) -> bool:
     if not isinstance(value, dict):
         return False
@@ -146,6 +303,340 @@ def _valid_detection(value: object) -> bool:
 
 class WardenError(RuntimeError):
     """Raised when a scan cannot be completed."""
+
+
+def _canonical_paid_url(base_url: str) -> str:
+    try:
+        parsed = urlsplit(base_url)
+        port = parsed.port
+    except ValueError as exc:
+        raise WardenError("x402 payment requires a canonical HTTPS base_url") from exc
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname is None
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise WardenError("x402 payment requires a canonical HTTPS base_url")
+    try:
+        parsed.hostname.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise WardenError("x402 payment requires an ASCII hostname") from exc
+    host = parsed.hostname.lower()
+    if ":" in host:
+        host = f"[{host}]"
+    authority = host if port in {None, 443} else f"{host}:{port}"
+    canonical_base = f"https://{authority}"
+    if base_url != canonical_base:
+        raise WardenError("x402 payment requires a canonical HTTPS base_url")
+    return canonical_base + PAID_PATH
+
+
+def _decode_x402_header(value: object, label: str) -> object:
+    if not isinstance(value, str) or not value or len(value) > MAX_X402_HEADER_LENGTH:
+        raise WardenError(f"Invalid {label} header")
+    try:
+        decoded = base64.b64decode(value.encode("ascii"), validate=True)
+        if base64.b64encode(decoded).decode("ascii") != value:
+            raise ValueError("noncanonical base64")
+        return json.loads(decoded.decode("utf-8"))
+    except (
+        binascii.Error,
+        UnicodeError,
+        json.JSONDecodeError,
+        RecursionError,
+        ValueError,
+    ) as exc:
+        raise WardenError(f"Invalid {label} header") from exc
+
+
+def _single_header(headers: httpx.Headers, name: str, label: str) -> str:
+    values = headers.get_list(name)
+    if len(values) != 1:
+        raise WardenError(f"Invalid {label} header")
+    return values[0]
+
+
+def _validate_optional_string(document: dict[str, object], field_name: str, label: str) -> None:
+    value = document.get(field_name)
+    if value is not None and not isinstance(value, str):
+        raise WardenError(f"Invalid {label} header")
+
+
+def _payment_requirement(
+    value: object,
+    *,
+    label: str = "x402 payment challenge",
+) -> X402PaymentRequirement:
+    if not isinstance(value, dict):
+        raise WardenError(f"Invalid {label}")
+    if set(value) - {
+        "scheme",
+        "network",
+        "asset",
+        "amount",
+        "payTo",
+        "maxTimeoutSeconds",
+        "extra",
+        "outputSchema",
+    }:
+        raise WardenError(f"Invalid {label}")
+    if value.get("outputSchema") is not None and not isinstance(value["outputSchema"], dict):
+        raise WardenError(f"Invalid {label}")
+    expected: dict[str, object] = {
+        "scheme": X402_SCHEME,
+        "network": X402_NETWORK,
+        "asset": X402_ASSET,
+        "amount": X402_AMOUNT,
+        "payTo": X402_PAY_TO,
+        "maxTimeoutSeconds": X402_TIMEOUT_SECONDS,
+        "extra": {
+            "name": X402_EIP712_NAME,
+            "version": X402_EIP712_VERSION,
+        },
+    }
+    if any(value.get(name) != expected_value for name, expected_value in expected.items()):
+        raise WardenError(f"Invalid {label}")
+    return X402PaymentRequirement(
+        scheme=X402_SCHEME,
+        network=X402_NETWORK,
+        asset=X402_ASSET,
+        amount=X402_AMOUNT,
+        pay_to=X402_PAY_TO,
+        max_timeout_seconds=X402_TIMEOUT_SECONDS,
+        eip712_name=X402_EIP712_NAME,
+        eip712_version=X402_EIP712_VERSION,
+    )
+
+
+def parse_x402_challenge(
+    headers: httpx.Headers,
+    *,
+    expected_resource_url: str,
+) -> X402Challenge:
+    """Parse only the exact Warden terms before crossing the wallet boundary."""
+    encoded = _single_header(
+        headers,
+        "PAYMENT-REQUIRED",
+        "x402 payment challenge",
+    )
+    document = _decode_x402_header(encoded, "x402 payment challenge")
+    if not isinstance(document, dict) or set(document) - {
+        "x402Version",
+        "error",
+        "resource",
+        "accepts",
+        "extensions",
+        "outputSchema",
+    }:
+        raise WardenError("Invalid x402 payment challenge")
+    if document.get("x402Version") != 2 or isinstance(document.get("x402Version"), bool):
+        raise WardenError("Invalid x402 payment challenge")
+    _validate_optional_string(document, "error", "x402 payment challenge")
+    extensions = document.get("extensions")
+    if extensions is not None and not isinstance(extensions, dict):
+        raise WardenError("Invalid x402 payment challenge")
+    output_schema = document.get("outputSchema")
+    if output_schema is not None and not isinstance(output_schema, dict):
+        raise WardenError("Invalid x402 payment challenge")
+    resource = document.get("resource")
+    if (
+        not isinstance(resource, dict)
+        or set(resource) - {"url", "description", "mimeType"}
+        or resource.get("url") != expected_resource_url
+    ):
+        raise WardenError("Invalid x402 payment challenge")
+    _validate_optional_string(resource, "description", "x402 payment challenge")
+    _validate_optional_string(resource, "mimeType", "x402 payment challenge")
+    accepts = document.get("accepts")
+    if not isinstance(accepts, list) or len(accepts) != 1:
+        raise WardenError("Invalid x402 payment challenge")
+    return X402Challenge(
+        x402_version=2,
+        resource_url=expected_resource_url,
+        requirement=_payment_requirement(accepts[0]),
+    )
+
+
+def validate_x402_payment_header(
+    value: object,
+    *,
+    challenge: X402Challenge,
+) -> str:
+    """Validate caller-produced header syntax and bind it to the challenge."""
+    document = _decode_x402_header(value, "x402 payment handler")
+    if not isinstance(document, dict) or set(document) - {
+        "x402Version",
+        "payload",
+        "accepted",
+        "resource",
+        "extensions",
+    }:
+        raise WardenError("Invalid x402 payment handler header")
+    if document.get("x402Version") != 2 or isinstance(document.get("x402Version"), bool):
+        raise WardenError("Invalid x402 payment handler header")
+    accepted = _payment_requirement(
+        document.get("accepted"),
+        label="x402 payment handler header",
+    )
+    if accepted != challenge.requirement:
+        raise WardenError("Invalid x402 payment handler header")
+    extensions = document.get("extensions")
+    if extensions is not None and not isinstance(extensions, dict):
+        raise WardenError("Invalid x402 payment handler header")
+    resource = document.get("resource")
+    if resource is not None:
+        if (
+            not isinstance(resource, dict)
+            or set(resource) - {"url", "description", "mimeType"}
+            or resource.get("url") != challenge.resource_url
+        ):
+            raise WardenError("Invalid x402 payment handler header")
+        _validate_optional_string(resource, "description", "x402 payment handler")
+        _validate_optional_string(resource, "mimeType", "x402 payment handler")
+
+    payload = document.get("payload")
+    if not isinstance(payload, dict) or set(payload) != {"authorization", "signature"}:
+        raise WardenError("Invalid x402 payment handler header")
+    authorization = payload.get("authorization")
+    if not isinstance(authorization, dict) or set(authorization) != {
+        "from",
+        "to",
+        "value",
+        "validAfter",
+        "validBefore",
+        "nonce",
+    }:
+        raise WardenError("Invalid x402 payment handler header")
+    payer = authorization.get("from")
+    signature = payload.get("signature")
+    valid_after = authorization.get("validAfter")
+    valid_before = authorization.get("validBefore")
+    validity_is_bounded = False
+    if (
+        isinstance(valid_after, str)
+        and valid_after.isdigit()
+        and len(valid_after) <= 78
+        and isinstance(valid_before, str)
+        and valid_before.isdigit()
+        and len(valid_before) <= 78
+    ):
+        valid_after_number = int(valid_after)
+        valid_before_number = int(valid_before)
+        now = _current_unix_time()
+        validity_is_bounded = (
+            valid_after_number <= _MAX_UINT256
+            and valid_before_number <= _MAX_UINT256
+            and valid_before_number > valid_after_number
+            and valid_after_number <= now
+            and valid_before_number >= now + X402_MIN_REPLAY_WINDOW_SECONDS
+            and valid_before_number
+            <= now + challenge.requirement.max_timeout_seconds + X402_CLOCK_TOLERANCE_SECONDS
+        )
+    if (
+        not isinstance(payer, str)
+        or _EVM_ADDRESS.fullmatch(payer) is None
+        or int(payer[2:], 16) == 0
+        or authorization.get("to") != challenge.requirement.pay_to
+        or authorization.get("value") != challenge.requirement.amount
+        or not validity_is_bounded
+        or not isinstance(authorization.get("nonce"), str)
+        or _NONCE.fullmatch(authorization["nonce"]) is None
+        or not isinstance(signature, str)
+        or _HEX_VALUE.fullmatch(signature) is None
+    ):
+        raise WardenError("Invalid x402 payment handler header")
+    return value
+
+
+def validate_x402_settlement_header(headers: httpx.Headers) -> None:
+    encoded = _single_header(headers, "PAYMENT-RESPONSE", "PAYMENT-RESPONSE")
+    document = _decode_x402_header(encoded, "PAYMENT-RESPONSE")
+    if not isinstance(document, dict) or set(document) - {
+        "success",
+        "errorReason",
+        "errorMessage",
+        "status",
+        "payer",
+        "transaction",
+        "network",
+    }:
+        raise WardenError("Invalid x402 settlement receipt")
+    for field_name in ("errorReason", "errorMessage", "status"):
+        _validate_optional_string(document, field_name, "x402 settlement receipt")
+    payer = document.get("payer")
+    if payer is not None and (not isinstance(payer, str) or _EVM_ADDRESS.fullmatch(payer) is None):
+        raise WardenError("Invalid x402 settlement receipt")
+    transaction = document.get("transaction")
+    if (
+        document.get("success") is not True
+        or not isinstance(transaction, str)
+        or not transaction.strip()
+        or len(transaction) > 512
+        or document.get("network") != X402_NETWORK
+    ):
+        raise WardenError("Invalid x402 settlement receipt")
+
+
+def invoke_payment_handler(
+    handler: Callable[[X402Challenge], str],
+    challenge: X402Challenge,
+) -> str:
+    try:
+        value = handler(challenge)
+    except Exception as exc:
+        raise WardenError("Warden x402 payment handler failed") from exc
+    return validate_x402_payment_header(value, challenge=challenge)
+
+
+def build_feedback_body(
+    *,
+    outcome: FeedbackOutcome,
+    observed_verdict: FeedbackVerdict,
+    threat_class: FeedbackThreatClass,
+    redacted_reproducer: str,
+    consent_to_retain: Literal[True],
+    redaction_confirmed: Literal[True],
+) -> dict[str, object]:
+    """Build the explicit opt-in body without accepting raw scan payload fields."""
+    if consent_to_retain is not True or redaction_confirmed is not True:
+        raise WardenError(
+            "Feedback requires explicit boolean true for retention consent and redaction confirmation"
+        )
+    if outcome not in _FEEDBACK_OUTCOMES:
+        raise WardenError("Feedback outcome is invalid")
+    if observed_verdict not in _FEEDBACK_VERDICTS:
+        raise WardenError("Feedback observed_verdict is invalid")
+    if threat_class not in _FEEDBACK_THREAT_CLASSES:
+        raise WardenError("Feedback threat_class is invalid")
+    if outcome == "missed_attack" and observed_verdict != "ALLOW":
+        raise WardenError("Feedback missed_attack requires an observed ALLOW verdict")
+    if outcome != "missed_attack" and observed_verdict == "ALLOW":
+        raise WardenError(f"Feedback {outcome} requires a non-ALLOW observed verdict")
+    if not isinstance(redacted_reproducer, str) or not redacted_reproducer.strip():
+        raise WardenError("Feedback redacted_reproducer must not be blank")
+    if len(redacted_reproducer) > MAX_FEEDBACK_REPRODUCER_LENGTH:
+        raise WardenError(
+            "Feedback redacted_reproducer must not exceed "
+            f"{MAX_FEEDBACK_REPRODUCER_LENGTH} characters"
+        )
+    try:
+        redacted_reproducer.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise WardenError(
+            "Feedback redacted_reproducer must contain valid unicode scalar text"
+        ) from exc
+    return {
+        "outcome": outcome,
+        "observed_verdict": observed_verdict,
+        "threat_class": threat_class,
+        "redacted_reproducer": redacted_reproducer,
+        "consent_to_retain": True,
+        "redaction_confirmed": True,
+    }
 
 
 def build_scan_body(
@@ -210,16 +701,21 @@ class WardenClient:
     Args:
         base_url: Warden host. Defaults to the public hosted service.
         paid: Select the protected x402 endpoint instead of the free demo path.
-            This client does not create or settle payment signatures.
+            The client never creates signatures. Supply `payment_handler` only
+            when a caller-owned wallet boundary may authorize the canonical
+            challenge and one exact replay.
+        payment_handler: Optional caller-owned signer callback. It receives only
+            validated canonical terms and must return an encoded
+            `PAYMENT-SIGNATURE` value. Requires `paid=True` and `local=False`.
         local: Run the verdict in-process via WardenEngine — no network,
             not rate-limited, sub-ms verdict compute. Enforcement-grade.
         timeout: Per-request timeout in seconds (hosted modes).
         fail_open: If True (the free-tier default), a transport or non-payment
             HTTP error returns an ALLOW result instead of raising, so an outage
             never takes your agent offline — best-effort telemetry, not
-            enforcement. HTTP 402 always raises because this client cannot
-            authorize payment. Set False (fail closed) for enforcement and pair
-            it with `local=True`.
+            enforcement. A 402 without a handler and every injected-payment
+            failure always raise. Set False (fail closed) for enforcement and
+            pair it with `local=True`.
     """
 
     def __init__(
@@ -230,12 +726,21 @@ class WardenClient:
         local: bool = False,
         timeout: float = 8.0,
         fail_open: bool = True,
+        payment_handler: X402PaymentHandler | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.path = PAID_PATH if paid else FREE_PATH
         self.local = local
         self.timeout = timeout
         self.fail_open = fail_open
+        if payment_handler is not None and not paid:
+            raise WardenError("x402 payment_handler requires paid=True")
+        if payment_handler is not None and local:
+            raise WardenError("x402 payment_handler requires local=False")
+        if payment_handler is not None and not callable(payment_handler):
+            raise WardenError("x402 payment_handler must be callable")
+        self.payment_handler = payment_handler
+        self._paid_url = _canonical_paid_url(self.base_url) if payment_handler is not None else None
         self._engine = LocalEngine() if local else None
 
     def scan(
@@ -255,9 +760,69 @@ class WardenClient:
             increment_scan_count()
             return result
         body = build_scan_body(payload, depth=depth, expected_addresses=expected_addresses)
+        request_url = self._paid_url or self.base_url + self.path
+        payment_enabled = self.payment_handler is not None
         try:
-            with httpx.Client(timeout=self.timeout) as client:
-                response = client.post(self.base_url + self.path, json=body)
+            client_options: dict[str, object] = {"timeout": self.timeout}
+            if payment_enabled:
+                client_options.update(follow_redirects=False, trust_env=False)
+            with httpx.Client(**client_options) as client:
+                if payment_enabled:
+                    request_body = json.dumps(
+                        body,
+                        separators=(",", ":"),
+                        ensure_ascii=False,
+                    ).encode("utf-8")
+                    response = client.post(
+                        request_url,
+                        content=request_body,
+                        headers={"content-type": "application/json"},
+                    )
+                else:
+                    request_body = None
+                    response = client.post(request_url, json=body)
+                if payment_enabled and response.is_redirect:
+                    raise WardenError("Warden x402 challenge returned a redirect")
+                if payment_enabled and response.status_code == 402:
+                    challenge = parse_x402_challenge(
+                        response.headers,
+                        expected_resource_url=request_url,
+                    )
+                    payment_header = invoke_payment_handler(
+                        self.payment_handler,
+                        challenge,
+                    )
+                    replay = client.post(
+                        request_url,
+                        content=request_body,
+                        headers={
+                            "content-type": "application/json",
+                            "PAYMENT-SIGNATURE": payment_header,
+                        },
+                    )
+                    if replay.status_code == 402:
+                        try:
+                            replay_challenge = parse_x402_challenge(
+                                replay.headers,
+                                expected_resource_url=request_url,
+                            )
+                        except WardenError as exc:
+                            raise WardenError(
+                                "Warden x402 challenge changed or became malformed on replay"
+                            ) from exc
+                        if replay_challenge != challenge:
+                            raise WardenError("Warden x402 challenge changed on replay")
+                        raise WardenError(
+                            "Warden permits only one paid replay; payment was not accepted"
+                        )
+                    if replay.is_redirect:
+                        raise WardenError("Warden x402 replay returned a redirect")
+                    if replay.status_code != 200:
+                        raise WardenError(
+                            f"Warden x402 replay failed with HTTP {replay.status_code}"
+                        )
+                    validate_x402_settlement_header(replay.headers)
+                    response = replay
                 response.raise_for_status()
                 try:
                     data = response.json()
@@ -267,6 +832,8 @@ class WardenClient:
                 increment_scan_count()
                 return result
         except httpx.HTTPError as exc:
+            if payment_enabled:
+                raise WardenError(f"Warden x402 request failed: {exc}") from exc
             if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 402:
                 raise WardenError(
                     "Warden scan requires x402 payment; paid=True selects the protected "
@@ -275,6 +842,37 @@ class WardenClient:
             if self.fail_open:
                 return ScanResult(verdict="ALLOW", risk_level="NONE", raw={"error": str(exc)})
             raise WardenError(f"Warden scan failed: {exc}") from exc
+
+    def submit_feedback(
+        self,
+        *,
+        outcome: FeedbackOutcome,
+        observed_verdict: FeedbackVerdict,
+        threat_class: FeedbackThreatClass,
+        redacted_reproducer: str,
+        consent_to_retain: Literal[True],
+        redaction_confirmed: Literal[True],
+    ) -> FeedbackResult:
+        """Submit one redacted reproducer after explicit user consent."""
+        body = build_feedback_body(
+            outcome=outcome,
+            observed_verdict=observed_verdict,
+            threat_class=threat_class,
+            redacted_reproducer=redacted_reproducer,
+            consent_to_retain=consent_to_retain,
+            redaction_confirmed=redaction_confirmed,
+        )
+        try:
+            with httpx.Client(timeout=self.timeout) as client:
+                response = client.post(self.base_url + FEEDBACK_PATH, json=body)
+                response.raise_for_status()
+                try:
+                    data = response.json()
+                except ValueError as exc:
+                    raise WardenError("Invalid Warden feedback response: expected JSON") from exc
+        except httpx.HTTPError as exc:
+            raise WardenError(f"Warden feedback submission failed: {exc}") from exc
+        return FeedbackResult.from_response(data)
 
     def guard(self, payload: str, **kwargs: object) -> str:
         """Scan and enforce: return the safe payload to act on, or raise on BLOCK.

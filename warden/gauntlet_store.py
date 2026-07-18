@@ -16,6 +16,10 @@ from uuid import uuid4
 
 from warden import protection, protection_store
 from warden.core.verdict import ReasonCode
+from warden.dataset_promotion import (
+    canonical_dataset_payload,
+    exclusive_dataset_lock,
+)
 from warden.engine import WardenEngine
 from warden.models import (
     ClaimStatus,
@@ -31,7 +35,9 @@ _LOCK = Lock()
 # Cap on-disk growth from the unauthenticated public demo route.
 _MAX_RECORDS = 5000
 _MAX_PENDING_RECORDS = 500
-_DEFAULT_BENCHMARK_PATH = Path(__file__).resolve().parents[1] / "benchmark" / "held_out_attacks.jsonl"
+_DEFAULT_BENCHMARK_PATH = (
+    Path(__file__).resolve().parents[1] / "benchmark" / "held_out_attacks.jsonl"
+)
 _DEFAULT_BENIGN_BENCHMARK_PATH = (
     Path(__file__).resolve().parents[1] / "benchmark" / "held_out_benign.jsonl"
 )
@@ -92,9 +98,7 @@ def _read_records_locked() -> list[dict[str, object]]:
 
 
 def _prune_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
-    pending = [
-        index for index, record in enumerate(records) if record.get("status") == "pending"
-    ]
+    pending = [index for index, record in enumerate(records) if record.get("status") == "pending"]
     retained = set(pending[-_MAX_PENDING_RECORDS:]) if _MAX_PENDING_RECORDS > 0 else set()
     retained.update(
         index for index, record in enumerate(records) if record.get("status") == "confirmed"
@@ -238,8 +242,7 @@ def is_confirmed_breaker(certificate_id: str) -> bool:
     with _exclusive_store_lock():
         records = _read_records_locked()
     return any(
-        record.get("status") == "confirmed"
-        and record.get("certificate_id") == certificate_id
+        record.get("status") == "confirmed" and record.get("certificate_id") == certificate_id
         for record in records
     )
 
@@ -256,8 +259,7 @@ def _parse_confirmed_at(value: str) -> tuple[str, int]:
         raise ValueError("confirmed_at must be a non-negative safe Unix timestamp")
     if (
         timestamp
-        > int(datetime.now(timezone.utc).timestamp())
-        + _MAX_CONFIRMATION_CLOCK_SKEW_SECONDS
+        > int(datetime.now(timezone.utc).timestamp()) + _MAX_CONFIRMATION_CLOCK_SKEW_SECONDS
     ):
         raise ValueError("confirmed_at must not be in the future")
     return value, timestamp
@@ -291,9 +293,7 @@ def _append_benchmark_case(path: Path, case: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     original = path.read_bytes() if path.exists() else b""
     separator = b"" if not original or original.endswith(b"\n") else b"\n"
-    serialized = (
-        json.dumps(case, ensure_ascii=False, sort_keys=True).encode("utf-8") + b"\n"
-    )
+    serialized = json.dumps(case, ensure_ascii=False, sort_keys=True).encode("utf-8") + b"\n"
     temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
     try:
         with temporary.open("xb") as handle:
@@ -305,6 +305,61 @@ def _append_benchmark_case(path: Path, case: dict[str, object]) -> None:
         os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def _reviewed_benchmark_case(
+    case: dict[str, object],
+    *,
+    benchmark_path: Path,
+    benign_benchmark_path: Path,
+    append_if_missing: bool,
+) -> dict[str, object] | None:
+    case_id = str(case["id"])
+    with exclusive_dataset_lock(benchmark_path):
+        if benchmark_path.exists() and benchmark_path.is_symlink():
+            raise ValueError("held-out benchmark path must not be a symlink")
+        benchmark_cases = _load_jsonl(benchmark_path)
+        existing = next(
+            (entry for entry in benchmark_cases if entry.get("id") == case_id),
+            None,
+        )
+        if existing is not None and existing != case:
+            raise ValueError("held-out benchmark case id conflicts with reviewed claim")
+
+        normalized = canonical_dataset_payload(case["payload"])
+        root = Path(__file__).resolve().parents[1]
+        training_payloads: set[str] = set()
+        for path in (
+            root / "corpus" / "attacks.jsonl",
+            root / "corpus" / "benign.jsonl",
+        ):
+            with path.open(encoding="utf-8") as handle:
+                training_payloads.update(
+                    canonical_dataset_payload(json.loads(line)["payload"])
+                    for line in handle
+                    if line.strip()
+                )
+        from warden.scanner.patterns import KNOWN_INJECTIONS
+
+        training_payloads.update(canonical_dataset_payload(payload) for payload in KNOWN_INJECTIONS)
+        if normalized in training_payloads:
+            raise ValueError("reviewed claim overlaps the training corpus")
+        if any(
+            canonical_dataset_payload(entry.get("payload", "")) == normalized
+            and entry.get("id") != case_id
+            for entry in benchmark_cases
+        ):
+            raise ValueError("reviewed claim duplicates an existing held-out payload")
+
+        benign_cases = _load_jsonl(benign_benchmark_path)
+        if any(
+            canonical_dataset_payload(entry.get("payload", "")) == normalized
+            for entry in benign_cases
+        ):
+            raise ValueError("reviewed claim overlaps the held-out benign benchmark")
+        if existing is None and append_if_missing:
+            _append_benchmark_case(benchmark_path, case)
+        return existing
 
 
 def _write_records(records: list[dict[str, object]]) -> None:
@@ -338,10 +393,8 @@ def _validated_pending_request(
         raise ValueError("pending Gauntlet claim is incomplete or invalid") from exc
     if (
         _claim_id(request) != claim_id
-        or claim.get("payload_hash")
-        != hashlib.sha256(request.payload.encode("utf-8")).hexdigest()
-        or claim.get("intent_hash")
-        != hashlib.sha256(request.intent.encode("utf-8")).hexdigest()
+        or claim.get("payload_hash") != hashlib.sha256(request.payload.encode("utf-8")).hexdigest()
+        or claim.get("intent_hash") != hashlib.sha256(request.intent.encode("utf-8")).hexdigest()
         or claim.get("credit_hash") != _credit_hash(request)
     ):
         raise ValueError("pending Gauntlet claim failed its stored digest checks")
@@ -398,9 +451,7 @@ def confirm_bypass(
         or any(ord(character) < 32 or ord(character) == 127 for character in finder)
     ):
         raise ValueError("finder must be a printable handle of at most 128 characters")
-    requested_at, requested_at_unix = _parse_confirmed_at(
-        confirmed_at or _timestamp()
-    )
+    requested_at, requested_at_unix = _parse_confirmed_at(confirmed_at or _timestamp())
 
     with _exclusive_store_lock():
         records = _read_records_locked()
@@ -417,12 +468,9 @@ def confirm_bypass(
             raise ValueError("no pending Gauntlet claim matches claim_id")
         submitted_request = _validated_pending_request(claim, claim_id)
         if finder is not None and (
-            not submitted_request.public_credit_consent
-            or submitted_request.finder != finder
+            not submitted_request.public_credit_consent or submitted_request.finder != finder
         ):
-            raise ValueError(
-                "public finder consent must match the submitted finder handle"
-            )
+            raise ValueError("public finder consent must match the submitted finder handle")
 
         case_id = f"gauntlet-{claim_id[:16]}"
         case: dict[str, object] = {
@@ -438,56 +486,21 @@ def confirm_bypass(
         )
         reviewed_scan_context = reviewed_request.context.model_dump(mode="json")
         if reviewed_scan_context.get("expected_addresses"):
-            case["context"] = {
-                "expected_addresses": reviewed_scan_context["expected_addresses"]
-            }
-
-        if benchmark_path.exists() and benchmark_path.is_symlink():
-            raise ValueError("held-out benchmark path must not be a symlink")
-        benchmark_cases = _load_jsonl(benchmark_path)
-        existing = next(
-            (entry for entry in benchmark_cases if entry.get("id") == case_id),
-            None,
-        )
-        if existing is not None and existing != case:
-            raise ValueError("held-out benchmark case id conflicts with reviewed claim")
-
-        normalized = " ".join(str(case["payload"]).casefold().split())
-        root = Path(__file__).resolve().parents[1]
-        with (root / "corpus" / "attacks.jsonl").open(encoding="utf-8") as handle:
-            training_payloads = {
-                " ".join(str(json.loads(line)["payload"]).casefold().split())
-                for line in handle
-                if line.strip()
-            }
-        from warden.scanner.patterns import KNOWN_INJECTIONS
-
-        training_payloads.update(
-            " ".join(payload.casefold().split()) for payload in KNOWN_INJECTIONS
-        )
-        if normalized in training_payloads:
-            raise ValueError("reviewed claim overlaps the training corpus")
-        if any(
-            " ".join(str(entry.get("payload", "")).casefold().split()) == normalized
-            and entry.get("id") != case_id
-            for entry in benchmark_cases
-        ):
-            raise ValueError("reviewed claim duplicates an existing held-out payload")
-
-        benign_cases = _load_jsonl(benign_benchmark_path)
-        if any(
-            " ".join(str(entry.get("payload", "")).casefold().split()) == normalized
-            for entry in benign_cases
-        ):
-            raise ValueError("reviewed claim overlaps the held-out benign benchmark")
+            case["context"] = {"expected_addresses": reviewed_scan_context["expected_addresses"]}
 
         payload_sha256 = hashlib.sha256(reviewed_payload.encode("utf-8")).hexdigest()
-        certificate_id = hashlib.sha256(
-            f"warden-breaker:{claim_id}".encode("utf-8")
-        ).hexdigest()[:32]
+        certificate_id = hashlib.sha256(f"warden-breaker:{claim_id}".encode("utf-8")).hexdigest()[
+            :32
+        ]
         certificate = protection_store.get_breaker_certificate(certificate_id)
 
         if claim.get("status") == "confirmed":
+            existing = _reviewed_benchmark_case(
+                case,
+                benchmark_path=benchmark_path,
+                benign_benchmark_path=benign_benchmark_path,
+                append_if_missing=False,
+            )
             if (
                 existing is None
                 or claim.get("benchmark_case_id") != case_id
@@ -505,6 +518,12 @@ def confirm_bypass(
                 raise ValueError("confirmed Gauntlet claim is missing its signed evidence")
             return {"held_out_case": case, "certificate": certificate}
 
+        _reviewed_benchmark_case(
+            case,
+            benchmark_path=benchmark_path,
+            benign_benchmark_path=benign_benchmark_path,
+            append_if_missing=False,
+        )
         if certificate is None:
             verdict = asyncio.run(
                 WardenEngine().scan(
@@ -519,8 +538,12 @@ def confirm_bypass(
                     "and is no longer a confirmable bypass"
                 )
 
-        if existing is None:
-            _append_benchmark_case(benchmark_path, case)
+        _reviewed_benchmark_case(
+            case,
+            benchmark_path=benchmark_path,
+            benign_benchmark_path=benign_benchmark_path,
+            append_if_missing=True,
+        )
 
         certificate = protection_store.commit_breaker_certificate(
             claim_id=claim_id,

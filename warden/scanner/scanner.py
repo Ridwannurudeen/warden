@@ -4,9 +4,10 @@ Protects AI agents from malicious content embedded in token metadata,
 contract descriptions, and data feeds.
 
 The default layers are regex matching, statistical heuristics, and thorough-mode
-TF-IDF similarity against the versioned attack corpus. A provider-neutral semantic
-classifier is available only when explicitly configured in a paid runtime; it runs
-after the deterministic thorough layers and failures preserve their result.
+TF-IDF similarity against the versioned attack corpus. Provider-neutral embedding
+similarity and semantic classification are available only when explicitly configured
+in a paid runtime; they run after the deterministic thorough layers and failures
+preserve their result.
 """
 
 import logging
@@ -16,8 +17,7 @@ import unicodedata
 from collections import Counter
 from typing import Dict, List, Optional, Tuple
 
-from warden.scanner.semantic import SemanticAnalyzer
-
+from warden.scanner.embedding import EmbeddingAnalyzer
 from warden.scanner.patterns import (
     INJECTION_PATTERNS,
     CATEGORY_CONFIDENCE,
@@ -33,11 +33,19 @@ from warden.scanner.patterns import (
     SIMILARITY_THRESHOLD,
     AMBIGUOUS_RANGE,
 )
+from warden.scanner.semantic import SemanticAnalyzer, SemanticThreatCategory
 
 logger = logging.getLogger(__name__)
 
 SEMANTIC_CONFIDENCE_THRESHOLD = 0.8
+EMBEDDING_SIMILARITY_THRESHOLD = 0.82
 MAX_REGEX_MATCHES_PER_CATEGORY = 100
+SEMANTIC_PATTERN_CATEGORIES = {
+    SemanticThreatCategory.PROMPT_INJECTION: "ai_prompt_injection",
+    SemanticThreatCategory.DRAIN_ADDRESS: "ai_drain_address",
+    SemanticThreatCategory.SECRET_EXFIL: "ai_secret_exfil",
+    SemanticThreatCategory.TOOL_HIJACK: "ai_tool_hijack",
+}
 WHOLE_PAYLOAD_REDACTION_CATEGORIES = frozenset(
     {
         "direct_instruction",
@@ -50,16 +58,19 @@ WHOLE_PAYLOAD_REDACTION_CATEGORIES = frozenset(
 
 
 class InjectionScanner:
-    """Regex, heuristic, and optional TF-IDF prompt-injection detection."""
+    """Deterministic prompt-injection detection with optional paid model tiers."""
 
-    def __init__(self, ai_analyzer: SemanticAnalyzer | None = None):
+    def __init__(
+        self,
+        ai_analyzer: SemanticAnalyzer | None = None,
+        embedding_analyzer: EmbeddingAnalyzer | None = None,
+    ):
         self._ai = ai_analyzer
+        self._embedding = embedding_analyzer
         # Pre-compile regex patterns for performance
         self._compiled_patterns: Dict[str, List[Tuple[re.Pattern, str]]] = {}
         for category, patterns in INJECTION_PATTERNS.items():
-            self._compiled_patterns[category] = [
-                (re.compile(p), p) for p in patterns
-            ]
+            self._compiled_patterns[category] = [(re.compile(p), p) for p in patterns]
         # Pre-compute TF-IDF vectors for known injections (Layer 3)
         self._idf: Dict[str, float] = {}
         self._corpus_vectors: List[Dict[str, float]] = []
@@ -79,10 +90,7 @@ class InjectionScanner:
                 df[token] += 1
 
         # Compute IDF: log(N / df) with smoothing
-        self._idf = {
-            token: math.log((n_docs + 1) / (count + 1)) + 1
-            for token, count in df.items()
-        }
+        self._idf = {token: math.log((n_docs + 1) / (count + 1)) + 1 for token, count in df.items()}
 
         # Compute TF-IDF vector per document
         self._corpus_vectors = []
@@ -90,15 +98,14 @@ class InjectionScanner:
             tf = Counter(tokens)
             total = len(tokens) if tokens else 1
             vec = {
-                token: (count / total) * self._idf.get(token, 1.0)
-                for token, count in tf.items()
+                token: (count / total) * self._idf.get(token, 1.0) for token, count in tf.items()
             }
             self._corpus_vectors.append(vec)
 
     @staticmethod
     def _tokenize(text: str) -> List[str]:
         """Lowercase word tokenization for TF-IDF."""
-        return re.findall(r'[a-z0-9]+', text.lower())
+        return re.findall(r"[a-z0-9]+", text.lower())
 
     async def scan(
         self,
@@ -111,9 +118,9 @@ class InjectionScanner:
         Args:
             content: Text to scan (token metadata, contract description, etc.)
             depth: "fast" for regex and heuristics, "thorough" to add TF-IDF and
-                the optional configured semantic classifier.
+                the optional configured embedding and semantic classifiers.
             allow_semantic: Whether the caller's deterministic gates permit the
-                optional classifier.
+                optional paid model tiers.
 
         Returns:
             dict with keys:
@@ -146,14 +153,16 @@ class InjectionScanner:
         # ── Layer 2: Statistical heuristics ────────────────────────
         layer2_result = self._run_heuristic_layer(content)
         if layer2_result["flagged"]:
-            detections.append({
-                "type": "heuristic",
-                "pattern_category": "statistical_analysis",
-                "match_text": None,
-                "confidence": layer2_result["score"],
-                "layer": 2,
-                "detail": layer2_result["detail"],
-            })
+            detections.append(
+                {
+                    "type": "heuristic",
+                    "pattern_category": "statistical_analysis",
+                    "match_text": None,
+                    "confidence": layer2_result["score"],
+                    "layer": 2,
+                    "detail": layer2_result["detail"],
+                }
+            )
             layers_triggered.append(2)
 
         if depth == "thorough":
@@ -164,30 +173,49 @@ class InjectionScanner:
             if (AMBIGUOUS_RANGE[0] <= heuristic_score <= AMBIGUOUS_RANGE[1]) or not layer1_hits:
                 layer3_result = self._run_similarity_layer(content)
                 if layer3_result["flagged"]:
-                    detections.append({
-                        "type": "similarity",
-                        "pattern_category": "corpus_match",
-                        "match_text": layer3_result["closest_match"],
-                        "confidence": layer3_result["similarity"],
-                        "layer": 3,
-                        "detail": f"Cosine similarity {layer3_result['similarity']:.2f} with known injection",
-                    })
+                    detections.append(
+                        {
+                            "type": "similarity",
+                            "pattern_category": "corpus_match",
+                            "match_text": layer3_result["closest_match"],
+                            "confidence": layer3_result["similarity"],
+                            "layer": 3,
+                            "detail": f"Cosine similarity {layer3_result['similarity']:.2f} with known injection",
+                        }
+                    )
                     layers_triggered.append(3)
 
-            # ── Layer 4: semantic classification ───────────────────
-            # Deterministic detections are authoritative and avoid the paid call.
-            if allow_semantic and self._ai and not detections:
-                layer4_result = await self._run_semantic_layer(content)
+            # ── Layer 4: embedding similarity ──────────────────────
+            # Deterministic detections are authoritative and avoid the paid calls.
+            if allow_semantic and self._embedding and not detections:
+                layer4_result = await self._run_embedding_layer(content)
                 if layer4_result["flagged"]:
-                    detections.append({
-                        "type": "semantic_classification",
-                        "pattern_category": "ai_analysis",
-                        "match_text": None,
-                        "confidence": layer4_result["confidence"],
-                        "layer": 4,
-                        "detail": layer4_result["reason"],
-                    })
+                    detections.append(
+                        {
+                            "type": "embedding_similarity",
+                            "pattern_category": "embedding_match",
+                            "match_text": None,
+                            "confidence": layer4_result["confidence"],
+                            "layer": 4,
+                            "detail": layer4_result["detail"],
+                        }
+                    )
                     layers_triggered.append(4)
+
+            if allow_semantic and self._ai and not detections:
+                layer5_result = await self._run_semantic_layer(content)
+                if layer5_result["flagged"]:
+                    detections.append(
+                        {
+                            "type": "semantic_classification",
+                            "pattern_category": layer5_result["pattern_category"],
+                            "match_text": None,
+                            "confidence": layer5_result["confidence"],
+                            "layer": 5,
+                            "detail": layer5_result["reason"],
+                        }
+                    )
+                    layers_triggered.append(5)
 
         # ── Aggregate results ──────────────────────────────────────
         clean = len(detections) == 0
@@ -218,13 +246,15 @@ class InjectionScanner:
                     if match_text in seen_matches:
                         continue
                     seen_matches.add(match_text)
-                    hits.append({
-                        "type": "regex",
-                        "pattern_category": category,
-                        "match_text": match_text,
-                        "confidence": confidence,
-                        "layer": 1,
-                    })
+                    hits.append(
+                        {
+                            "type": "regex",
+                            "pattern_category": category,
+                            "match_text": match_text,
+                            "confidence": confidence,
+                            "layer": 1,
+                        }
+                    )
                     if len(seen_matches) >= MAX_REGEX_MATCHES_PER_CATEGORY:
                         break
                 if len(seen_matches) >= MAX_REGEX_MATCHES_PER_CATEGORY:
@@ -240,21 +270,33 @@ class InjectionScanner:
 
         # 2a. Unicode entropy analysis
         entropy = self._unicode_entropy(content)
-        entropy_score = min(1.0, max(0.0, (entropy - 2.0) / (ENTROPY_THRESHOLD - 2.0))) if ENTROPY_THRESHOLD > 2.0 else 0.0
+        entropy_score = (
+            min(1.0, max(0.0, (entropy - 2.0) / (ENTROPY_THRESHOLD - 2.0)))
+            if ENTROPY_THRESHOLD > 2.0
+            else 0.0
+        )
         scores["entropy"] = entropy_score
         if entropy > ENTROPY_THRESHOLD:
             details.append(f"High Unicode entropy: {entropy:.2f}")
 
         # 2b. Invisible character ratio
         invisible_ratio = self._invisible_char_ratio(content)
-        invisible_score = min(1.0, invisible_ratio / INVISIBLE_RATIO_THRESHOLD) if INVISIBLE_RATIO_THRESHOLD > 0 else 0.0
+        invisible_score = (
+            min(1.0, invisible_ratio / INVISIBLE_RATIO_THRESHOLD)
+            if INVISIBLE_RATIO_THRESHOLD > 0
+            else 0.0
+        )
         scores["invisible_ratio"] = invisible_score
         if invisible_ratio > INVISIBLE_RATIO_THRESHOLD:
             details.append(f"Invisible char ratio: {invisible_ratio:.4f}")
 
         # 2c. Instruction density
         density = self._instruction_density(content)
-        density_score = min(1.0, density / INSTRUCTION_DENSITY_THRESHOLD) if INSTRUCTION_DENSITY_THRESHOLD > 0 else 0.0
+        density_score = (
+            min(1.0, density / INSTRUCTION_DENSITY_THRESHOLD)
+            if INSTRUCTION_DENSITY_THRESHOLD > 0
+            else 0.0
+        )
         scores["instruction_density"] = density_score
         if density > INSTRUCTION_DENSITY_THRESHOLD:
             details.append(f"High instruction density: {density:.2f}")
@@ -266,10 +308,7 @@ class InjectionScanner:
             details.append(f"Context switch detected: score={switch_score:.2f}")
 
         # Weighted average
-        combined = sum(
-            scores[k] * HEURISTIC_WEIGHTS[k]
-            for k in HEURISTIC_WEIGHTS
-        )
+        combined = sum(scores[k] * HEURISTIC_WEIGHTS[k] for k in HEURISTIC_WEIGHTS)
 
         return {
             "score": round(combined, 4),
@@ -309,7 +348,7 @@ class InjectionScanner:
     @staticmethod
     def _instruction_density(text: str) -> float:
         """Ratio of imperative verbs to total words."""
-        words = re.findall(r'[a-zA-Z]+', text.lower())
+        words = re.findall(r"[a-zA-Z]+", text.lower())
         if not words:
             return 0.0
         verb_count = sum(1 for w in words if w in IMPERATIVE_VERBS)
@@ -318,7 +357,7 @@ class InjectionScanner:
     @staticmethod
     def _context_switch_score(text: str) -> float:
         """Detect topic switches between first and second halves of text."""
-        words = re.findall(r'[a-zA-Z]+', text.lower())
+        words = re.findall(r"[a-zA-Z]+", text.lower())
         if len(words) < 6:
             return 0.0
 
@@ -353,8 +392,7 @@ class InjectionScanner:
         tf = Counter(tokens)
         total = len(tokens)
         query_vec = {
-            token: (count / total) * self._idf.get(token, 1.0)
-            for token, count in tf.items()
+            token: (count / total) * self._idf.get(token, 1.0) for token, count in tf.items()
         }
 
         # Find maximum cosine similarity
@@ -388,12 +426,63 @@ class InjectionScanner:
 
         return dot / (mag_a * mag_b)
 
-    # ── Layer 4: semantic classification ───────────────────────────────
+    # ── Layer 4: embedding similarity ──────────────────────────────────
+
+    async def _run_embedding_layer(self, content: str) -> Dict:
+        """Compare content with cached embeddings for the versioned corpus."""
+        try:
+            match = await self._embedding.match(content, tuple(KNOWN_INJECTIONS))
+            similarity = match.similarity
+            if (
+                isinstance(similarity, bool)
+                or not isinstance(similarity, (int, float))
+                or not math.isfinite(similarity)
+                or not -1 <= similarity <= 1
+            ):
+                raise ValueError("embedding similarity must be finite and between -1 and 1")
+            similarity = float(similarity)
+            return {
+                "flagged": similarity >= EMBEDDING_SIMILARITY_THRESHOLD,
+                "confidence": max(0.0, similarity),
+                "detail": (
+                    f"Embedding similarity {similarity:.2f} with the versioned injection corpus"
+                ),
+            }
+        except Exception as exc:
+            logger.warning(
+                "Optional embedding similarity unavailable: %s",
+                type(exc).__name__,
+            )
+            return {
+                "flagged": False,
+                "confidence": 0.0,
+                "detail": "Embedding layer unavailable",
+            }
+
+    # ── Layer 5: semantic classification ───────────────────────────────
 
     async def _run_semantic_layer(self, content: str) -> Dict:
         """Ask the configured optional analyzer for semantic classification."""
         try:
             classification = await self._ai.classify(content)
+            if not isinstance(classification.flagged, bool):
+                raise ValueError("semantic flagged value must be a boolean")
+            if (
+                isinstance(classification.confidence, bool)
+                or not isinstance(classification.confidence, (int, float))
+                or not math.isfinite(classification.confidence)
+                or not 0 <= classification.confidence <= 1
+            ):
+                raise ValueError("semantic confidence must be finite and between 0 and 1")
+            if not isinstance(classification.reason, str):
+                raise ValueError("semantic reason must be a string")
+            pattern_category = (
+                SEMANTIC_PATTERN_CATEGORIES.get(classification.category)
+                if classification.flagged
+                else None
+            )
+            if classification.flagged and pattern_category is None:
+                raise ValueError("flagged semantic classification requires a supported category")
             return {
                 "flagged": (
                     classification.flagged
@@ -401,13 +490,19 @@ class InjectionScanner:
                 ),
                 "confidence": classification.confidence,
                 "reason": classification.reason,
+                "pattern_category": pattern_category,
             }
         except Exception as exc:
             logger.warning(
                 "Optional semantic classification unavailable: %s",
                 type(exc).__name__,
             )
-            return {"flagged": False, "confidence": 0.0, "reason": "Semantic layer unavailable"}
+            return {
+                "flagged": False,
+                "confidence": 0.0,
+                "reason": "Semantic layer unavailable",
+                "pattern_category": None,
+            }
 
     # ── Result building ────────────────────────────────────────────────
 
@@ -468,8 +563,16 @@ class InjectionScanner:
             parts.append("Statistical anomalies suggest injection content.")
         if "corpus_match" in categories:
             parts.append("Content matches known injection payloads.")
-        if "ai_analysis" in categories:
-            parts.append("Semantic classifier flagged an injection.")
+        if "embedding_match" in categories:
+            parts.append("Embedding similarity matched the injection corpus.")
+        if "ai_prompt_injection" in categories:
+            parts.append("Semantic classifier flagged prompt-injection intent.")
+        if "ai_drain_address" in categories:
+            parts.append("Semantic classifier flagged payment-redirection intent.")
+        if "ai_secret_exfil" in categories:
+            parts.append("Semantic classifier flagged secret-exfiltration intent.")
+        if "ai_tool_hijack" in categories:
+            parts.append("Semantic classifier flagged tool-hijack intent.")
 
         advice = {
             "LOW": "Monitor but likely benign.",

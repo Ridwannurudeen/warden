@@ -137,11 +137,11 @@
         <p class="hero-text">
           Warden is a security service, so payload handling matters. This
           summary distinguishes transient scans from the append-only
-          Gauntlet-review store and public badge store implemented by the
-          application.
+          Gauntlet-review store, the separate opt-in feedback queue, and public
+          records implemented by the application.
         </p>
         <p class="snapshot-note">
-          Last updated <time datetime="2026-07-17">17 July 2026</time>.
+          Last updated <time datetime="2026-07-18">18 July 2026</time>.
         </p>
       </section>
 
@@ -149,6 +149,7 @@
         <nav class="doc-nav legal-nav" aria-label="Privacy sections">
           <a href="#browser-data">Browser data</a>
           <a href="#scans-audits">Scans and audits</a>
+          <a href="#feedback-retention">Opt-in feedback</a>
           <a href="#gauntlet-retention">Gauntlet retention</a>
           <a href="#public-records">Public records</a>
           <a href="#operational-metadata">Operational metadata</a>
@@ -181,6 +182,53 @@
               blocked and total counts, issue date, audit ID, and integrity
               signature. The detailed audit response is returned to the caller;
               the badge record is available through the public badge APIs.
+            </p>
+          </section>
+
+          <section id="feedback-retention">
+            <h2>Opt-in feedback and retention</h2>
+            <p>
+              A scan never creates a feedback record by itself. The separate
+              <code>POST /api/feedback</code> route accepts only a structured
+              outcome, observed verdict, implemented threat class, and a
+              reproducer that you have already redacted. Submission requires
+              literal <code>true</code> confirmations that Warden may retain
+              the record and that the reproducer is redacted. The route has no
+              field for the original scan payload, an endpoint, wallet,
+              submitter details, or arbitrary metadata. Warden cannot establish
+              that your redaction removed every sensitive value.
+            </p>
+            <p>
+              A pending record contains the redacted reproducer, its structured
+              labels, submission and expiry times, scanner version, corpus
+              fingerprint, and internal duplicate and content digests. It is
+              assigned a 90-day expiry. Expired records are excluded and the
+              queue file is compacted on its next read or write. A record may be
+              removed sooner when the private queue reaches its 5,000-record
+              cap. Scanner-equivalent Unicode and whitespace-normalized
+              duplicate submissions reference one retained record. Stored
+              identifiers and content digests are rechecked before review or
+              aggregation. HTTP infrastructure may still process the
+              operational metadata described below.
+            </p>
+            <p>
+              The public <code>/api/threat-intel/v1/summary</code> route exposes
+              aggregate counts only for outcome and threat-class groups with at
+              least five accepted records. Smaller groups are absent from the
+              cells, published total, and observation-window start, so the route
+              does not expose their exact size or timing. Submitted text, record
+              identifiers, digests, endpoints, wallets, and submitter details
+              are not published by that separately rate-limited route. These
+              self-reported counts do not measure threat prevalence.
+            </p>
+            <p>
+              Feedback does not update a detector automatically. An operator
+              may promote a consented redacted reproducer only after human
+              review, and only into one training or held-out dataset after
+              scanner-equivalent duplicate and cross-dataset checks under the
+              same promotion lock used by Gauntlet review. A promoted reproducer
+              may be published as part of that dataset and may remain there
+              beyond the pending queue's 90-day period.
             </p>
           </section>
 

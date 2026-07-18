@@ -1,5 +1,12 @@
 # Phase 5 — Pre-scope verification (2026-07-13)
 
+> **SUPERSEDED — HISTORICAL SNAPSHOT.** The challenge captured below is not the
+> current payment contract and its `USDT` EIP-712 conclusion was later found to
+> be incompatible with the token's on-chain domain. Do not use it to construct
+> or approve a payment. The current tested terms—`500000` atomic units and
+> `{"name":"USD₮0","version":"1"}`—are documented in `PAYMENT.md` and enforced
+> by `warden/payment.py`.
+
 Three questions had to be answered before scoping the website build. All three were run against
 live systems (OKX `onchainos` CLI v4.1.0, the live `warden.gudman.xyz` endpoint, and the installed
 `okxweb3-app-x402` package source). Nothing below is assumed.

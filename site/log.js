@@ -5,7 +5,9 @@
   const HEX_HASH = /^[0-9a-f]{64}$/;
   const BREAKER_CERTIFICATE_ID = /^[0-9a-f]{32}$/;
   const BREAKER_BENCHMARK_CASE_ID = /^gauntlet-[0-9a-f]{16}$/;
+  const AUDIT_ID = /^[0-9a-f]{16}$/;
   const MAX_LOG_ENTRIES = 10_000;
+  const MAX_ANCHOR_HISTORY_ENTRIES = 10_000;
   const APA_LOG_ENTRY_FIELDS = new Set([
     "seq",
     "ts",
@@ -23,6 +25,16 @@
     "record_type",
     "certificate_id",
     "benchmark_case_id",
+    "record_hash",
+    "prev_hash",
+  ]);
+  const AUDIT_LOG_ENTRY_FIELDS = new Set([
+    "seq",
+    "ts",
+    "event",
+    "record_type",
+    "audit_id",
+    "endpoint_host",
     "record_hash",
     "prev_hash",
   ]);
@@ -69,16 +81,12 @@
       );
     }
 
-    const isBreakerCertificate = Object.prototype.hasOwnProperty.call(
-      entry,
-      "record_type",
-    );
-    if (isBreakerCertificate) {
-      if (entry.record_type !== "breaker-certificate") {
-        throw new Error(
-          `Entry ${index + 1} record_type must be breaker-certificate`,
-        );
-      }
+    const recordType = entry.record_type;
+    let expectedFields = APA_LOG_ENTRY_FIELDS;
+    let entryType = "APA";
+    if (recordType === "breaker-certificate") {
+      expectedFields = BREAKER_LOG_ENTRY_FIELDS;
+      entryType = "breaker-certificate";
       if (entry.event !== "breaker-confirmed") {
         throw new Error(
           `Entry ${index + 1} event must be breaker-confirmed for a BREAKER certificate`,
@@ -100,6 +108,29 @@
           `Entry ${index + 1} benchmark_case_id must be gauntlet- followed by 16 lowercase hex characters`,
         );
       }
+    } else if (recordType === "endpoint-audit-attestation") {
+      expectedFields = AUDIT_LOG_ENTRY_FIELDS;
+      entryType = "endpoint-audit";
+      if (!["audit-issued", "audit-revoked"].includes(entry.event)) {
+        throw new Error(
+          `Entry ${index + 1} event must be audit-issued or audit-revoked for endpoint-audit evidence`,
+        );
+      }
+      if (
+        typeof entry.audit_id !== "string" ||
+        !AUDIT_ID.test(entry.audit_id)
+      ) {
+        throw new Error(
+          `Entry ${index + 1} audit_id must be 16 lowercase hex characters`,
+        );
+      }
+      if (typeof entry.endpoint_host !== "string" || !entry.endpoint_host) {
+        throw new Error(
+          `Entry ${index + 1} endpoint_host must be a non-empty string`,
+        );
+      }
+    } else if (Object.prototype.hasOwnProperty.call(entry, "record_type")) {
+      throw new Error(`Entry ${index + 1} record_type is unsupported`);
     } else {
       for (const field of [
         "event",
@@ -122,12 +153,7 @@
         );
       }
     }
-    rejectUnexpectedFields(
-      entry,
-      isBreakerCertificate ? BREAKER_LOG_ENTRY_FIELDS : APA_LOG_ENTRY_FIELDS,
-      index,
-      isBreakerCertificate ? "breaker-certificate" : "APA",
-    );
+    rejectUnexpectedFields(entry, expectedFields, index, entryType);
     return { ...entry };
   }
 
@@ -383,36 +409,52 @@
     ).join("");
   }
 
-  async function verifyLogChain(entries, cryptoImpl = root.crypto) {
+  async function verifyLogChainWithPrefixes(entries, cryptoImpl = root.crypto) {
     const normalized = normalizeLogPayload({ entries, total: entries.length });
     let previousHash = GENESIS_PREV_HASH;
+    const prefixHeads = [GENESIS_PREV_HASH];
 
     for (const [index, entry] of normalized.entries()) {
       if (entry.seq !== index + 1) {
         return {
-          ok: false,
-          index,
-          reason: `Entry ${index + 1} breaks the expected sequence.`,
+          result: {
+            ok: false,
+            index,
+            reason: `Entry ${index + 1} breaks the expected sequence.`,
+          },
+          prefixHeads,
         };
       }
       if (entry.prev_hash !== previousHash) {
         return {
-          ok: false,
-          index,
-          reason:
-            index === 0
-              ? "Entry 1 does not use the genesis previous hash."
-              : `Entry ${index + 1} previous entry hash does not match.`,
+          result: {
+            ok: false,
+            index,
+            reason:
+              index === 0
+                ? "Entry 1 does not use the genesis previous hash."
+                : `Entry ${index + 1} previous entry hash does not match.`,
+          },
+          prefixHeads,
         };
       }
       previousHash = await sha256Hex(canonicalJson(entry), cryptoImpl);
+      prefixHeads.push(previousHash);
     }
 
     return {
-      ok: true,
-      total: normalized.length,
-      headHash: previousHash,
+      result: {
+        ok: true,
+        total: normalized.length,
+        headHash: previousHash,
+      },
+      prefixHeads,
     };
+  }
+
+  async function verifyLogChain(entries, cryptoImpl = root.crypto) {
+    const verified = await verifyLogChainWithPrefixes(entries, cryptoImpl);
+    return verified.result;
   }
 
   async function verifyLogCheckpoint(
@@ -617,6 +659,205 @@
     };
   }
 
+  function normalizeAnchorHistory(document) {
+    if (
+      document === null ||
+      typeof document !== "object" ||
+      Array.isArray(document) ||
+      Object.keys(document).sort().join(",") !==
+        "anchors,history_head_hash,schema_version,status"
+    ) {
+      throw new Error("Anchor history must be an exact four-field object");
+    }
+    if (
+      document.schema_version !== 1 ||
+      !["unpublished", "published"].includes(document.status) ||
+      !HEX_HASH.test(document.history_head_hash) ||
+      !Array.isArray(document.anchors) ||
+      document.anchors.length > MAX_ANCHOR_HISTORY_ENTRIES
+    ) {
+      throw new Error("Anchor history metadata is invalid");
+    }
+    const anchors = document.anchors.map((anchor, index) => {
+      if (
+        anchor === null ||
+        typeof anchor !== "object" ||
+        Array.isArray(anchor) ||
+        Object.keys(anchor).sort().join(",") !==
+          "anchor_seq,checkpoint,previous_anchor_hash" ||
+        anchor.anchor_seq !== index + 1 ||
+        !HEX_HASH.test(anchor.previous_anchor_hash)
+      ) {
+        throw new Error(`Anchor history entry ${index + 1} is malformed`);
+      }
+      return {
+        anchor_seq: anchor.anchor_seq,
+        previous_anchor_hash: anchor.previous_anchor_hash,
+        checkpoint: normalizeLogCheckpoint(anchor.checkpoint),
+      };
+    });
+    const expectedStatus = anchors.length ? "published" : "unpublished";
+    if (document.status !== expectedStatus) {
+      throw new Error("Anchor history status does not match its entries");
+    }
+    if (!anchors.length && document.history_head_hash !== GENESIS_PREV_HASH) {
+      throw new Error("Empty anchor history must use the genesis head");
+    }
+    return {
+      schema_version: 1,
+      status: expectedStatus,
+      history_head_hash: document.history_head_hash,
+      anchors,
+    };
+  }
+
+  async function verifyAnchorHistory(
+    history,
+    entries,
+    issuerDocument,
+    cryptoImpl = root.crypto,
+    pinnedHead = null,
+  ) {
+    if (history === null || history === undefined) {
+      return {
+        ok: false,
+        status: "missing",
+        reason: "The public anchor history is not available.",
+      };
+    }
+    let normalized;
+    try {
+      normalized = normalizeAnchorHistory(history);
+    } catch (error) {
+      return {
+        ok: false,
+        status: "invalid",
+        reason: `Public anchor history is invalid: ${error.message}`,
+      };
+    }
+    if (normalized.status === "unpublished") {
+      return {
+        ok: false,
+        status: "unpublished",
+        reason: "No public checkpoint history has been published yet.",
+      };
+    }
+    if (pinnedHead !== null && !HEX_HASH.test(pinnedHead)) {
+      return {
+        ok: false,
+        status: "invalid",
+        reason: "The retained history head must be lowercase SHA-256 hex.",
+      };
+    }
+
+    let previousAnchorHash = GENESIS_PREV_HASH;
+    let previousCheckpointSeq = -1;
+    let previousIssuedAt = -1;
+    const observedHeads = [];
+    let logVerification;
+    try {
+      logVerification = await verifyLogChainWithPrefixes(entries, cryptoImpl);
+    } catch (error) {
+      return {
+        ok: false,
+        status: "rejected",
+        reason: `The current log is invalid: ${error.message}`,
+      };
+    }
+    if (!logVerification.result.ok) {
+      return {
+        ok: false,
+        status: "rejected",
+        reason: `The current log is invalid: ${logVerification.result.reason}`,
+      };
+    }
+    for (const anchor of normalized.anchors) {
+      if (anchor.previous_anchor_hash !== previousAnchorHash) {
+        return {
+          ok: false,
+          status: "rejected",
+          reason: `Public anchor history chain breaks at entry ${anchor.anchor_seq}.`,
+        };
+      }
+      if (
+        anchor.checkpoint.seq <= previousCheckpointSeq ||
+        anchor.checkpoint.issued_at < previousIssuedAt
+      ) {
+        return {
+          ok: false,
+          status: "rejected",
+          reason: "Public anchor checkpoints are not strictly append-only.",
+        };
+      }
+      let signatureValid;
+      try {
+        signatureValid = await verifyLogCheckpoint(
+          anchor.checkpoint,
+          issuerDocument,
+          cryptoImpl,
+        );
+      } catch (error) {
+        return {
+          ok: false,
+          status: "rejected",
+          reason: `Public anchor checkpoint is invalid: ${error.message}`,
+        };
+      }
+      if (!signatureValid) {
+        return {
+          ok: false,
+          status: "rejected",
+          reason: "Public anchor checkpoint signature is invalid.",
+        };
+      }
+      if (anchor.checkpoint.seq > entries.length) {
+        return {
+          ok: false,
+          status: "rejected",
+          reason:
+            "The current log is truncated before a public anchor checkpoint.",
+        };
+      }
+      if (
+        logVerification.prefixHeads[anchor.checkpoint.seq] !==
+        anchor.checkpoint.head_hash
+      ) {
+        return {
+          ok: false,
+          status: "rejected",
+          reason: "A public anchor checkpoint does not match its log prefix.",
+        };
+      }
+      previousCheckpointSeq = anchor.checkpoint.seq;
+      previousIssuedAt = anchor.checkpoint.issued_at;
+      previousAnchorHash = await sha256Hex(canonicalJson(anchor), cryptoImpl);
+      observedHeads.push(previousAnchorHash);
+    }
+    if (normalized.history_head_hash !== previousAnchorHash) {
+      return {
+        ok: false,
+        status: "rejected",
+        reason: "Public anchor history head does not match its entries.",
+      };
+    }
+    if (pinnedHead !== null && !observedHeads.includes(pinnedHead)) {
+      return {
+        ok: false,
+        status: "rejected",
+        reason: "The retained history head is absent from the public chain.",
+      };
+    }
+    return {
+      ok: true,
+      status: "verified",
+      anchorCount: normalized.anchors.length,
+      headHash: previousAnchorHash,
+      pinned: pinnedHead !== null,
+      latestCheckpoint:
+        normalized.anchors[normalized.anchors.length - 1].checkpoint,
+    };
+  }
+
   async function fetchAnchorPublication(fetchImpl) {
     if (typeof fetchImpl !== "function") {
       throw new Error("External checkpoint fetch is unavailable");
@@ -637,6 +878,26 @@
     return response.json();
   }
 
+  async function fetchAnchorHistory(fetchImpl) {
+    if (typeof fetchImpl !== "function") {
+      throw new Error("Public anchor history fetch is unavailable");
+    }
+    const response = await fetchImpl("/data/apa-log-anchor-history.json", {
+      headers: { accept: "application/json" },
+      cache: "no-store",
+      signal: root.AbortSignal?.timeout?.(10_000),
+    });
+    if (response.status === 404) {
+      return null;
+    }
+    if (!response.ok) {
+      throw new Error(
+        `Public anchor history request failed with HTTP ${response.status}`,
+      );
+    }
+    return response.json();
+  }
+
   function formatTimestamp(seconds) {
     const date = new Date(seconds * 1000);
     if (Number.isNaN(date.getTime())) {
@@ -649,15 +910,18 @@
     GENESIS_PREV_HASH,
     MAX_LOG_ENTRIES,
     canonicalJson,
+    fetchAnchorHistory,
     fetchAnchorPublication,
     fetchLogPages,
     normalizeAnchorPublication,
+    normalizeAnchorHistory,
     normalizeLogCheckpoint,
     normalizeLogPage,
     normalizeLogPayload,
     sha256Hex,
     verifyLogChain,
     verifyLogCheckpoint,
+    verifyAnchorHistory,
     verifyPublishedAnchor,
     verifySignedLog,
   };
@@ -758,6 +1022,15 @@
         createFact("Record hash", entry.record_hash, true),
         createFact("Previous hash", entry.prev_hash, true),
       );
+    } else if (entry.record_type === "endpoint-audit-attestation") {
+      summary.textContent = `Endpoint audit · ${entry.endpoint_host}`;
+      facts.append(
+        createFact("Observed", formatTimestamp(entry.ts), true),
+        createFact("Audit ID", entry.audit_id, true),
+        createFact("Lifecycle event", entry.event, false),
+        createFact("Record hash", entry.record_hash, true),
+        createFact("Previous hash", entry.prev_hash, true),
+      );
     } else {
       summary.textContent = `${entry.endpoint_host} · status ${entry.status}`;
       facts.append(
@@ -782,6 +1055,15 @@
     entriesElement.replaceChildren(...entries.map(createEntry));
   }
 
+  function retainedHistoryHead() {
+    const parameters = new URLSearchParams(root.location?.search || "");
+    const values = parameters.getAll("history_head");
+    if (values.length > 1) {
+      throw new Error("Provide at most one retained history_head value");
+    }
+    return values[0] || null;
+  }
+
   async function loadLog() {
     container.dataset.state = "loading";
     setRetryDisabled(true);
@@ -798,13 +1080,19 @@
         cache: "no-store",
         signal: root.AbortSignal?.timeout?.(10_000),
       };
-      const [entries, checkpointResponse, issuerResponse, publication] =
-        await Promise.all([
-          fetchLogPages(root.fetch?.bind(root)),
-          root.fetch("/apa/log/checkpoint", requestOptions),
-          root.fetch("/.well-known/apa-issuer.json", requestOptions),
-          fetchAnchorPublication(root.fetch?.bind(root)),
-        ]);
+      const [
+        entries,
+        checkpointResponse,
+        issuerResponse,
+        publication,
+        history,
+      ] = await Promise.all([
+        fetchLogPages(root.fetch?.bind(root)),
+        root.fetch("/apa/log/checkpoint", requestOptions),
+        root.fetch("/.well-known/apa-issuer.json", requestOptions),
+        fetchAnchorPublication(root.fetch?.bind(root)),
+        fetchAnchorHistory(root.fetch?.bind(root)),
+      ]);
       for (const [label, fetched] of [
         ["Checkpoint", checkpointResponse],
         ["Issuer document", issuerResponse],
@@ -838,6 +1126,10 @@
         text("[data-apa-log-head]", "Not accepted");
         text("[data-apa-log-checkpoint]", "Not accepted");
         text("[data-apa-log-anchor]", "Not evaluated");
+        text("[data-apa-log-history]", "Not evaluated");
+        text("[data-apa-log-history-count]", "Not evaluated");
+        text("[data-apa-log-history-head]", "Not evaluated");
+        text("[data-apa-log-history-pin]", "Not evaluated");
         text(
           "[data-apa-log-status]",
           `${result.reason} No continuity result is accepted.`,
@@ -850,34 +1142,90 @@
         publication,
         issuerDocument,
       );
-      if (
-        !anchorResult.ok &&
-        !["missing", "unpublished"].includes(anchorResult.status)
+      const historyPin = retainedHistoryHead();
+      const historyResult = await verifyAnchorHistory(
+        history,
+        entries,
+        issuerDocument,
+        root.crypto,
+        historyPin,
+      );
+      const absentStatuses = ["missing", "unpublished"];
+      let externalFailure = null;
+      if (!anchorResult.ok && !absentStatuses.includes(anchorResult.status)) {
+        externalFailure = anchorResult.reason;
+      } else if (
+        !historyResult.ok &&
+        !absentStatuses.includes(historyResult.status)
       ) {
+        externalFailure = historyResult.reason;
+      } else if (historyPin && !historyResult.ok) {
+        externalFailure =
+          "A retained history head was supplied, but no verifiable public history is available.";
+      } else if (anchorResult.ok !== historyResult.ok) {
+        externalFailure =
+          "The current public checkpoint and its history do not agree on publication state.";
+      } else if (
+        anchorResult.ok &&
+        canonicalJson(anchorResult.checkpoint) !==
+          canonicalJson(historyResult.latestCheckpoint)
+      ) {
+        externalFailure =
+          "The current public checkpoint does not match the latest history entry.";
+      }
+      if (externalFailure) {
         container.dataset.state = "tampered";
-        sourceStamp("live", `published prefix rejected ${observedAt}`);
-        text("[data-apa-log-chain]", "Published pin rejected");
+        sourceStamp("live", `public checkpoint history rejected ${observedAt}`);
+        text("[data-apa-log-chain]", "Public history rejected");
         text("[data-apa-log-head]", "Not accepted");
         text(
           "[data-apa-log-checkpoint]",
           `Signed ${formatTimestamp(result.checkpoint.issued_at)}`,
         );
         text("[data-apa-log-anchor]", "Rejected");
+        text("[data-apa-log-history]", "Rejected");
+        text("[data-apa-log-history-count]", "Not accepted");
+        text("[data-apa-log-history-head]", "Not accepted");
+        text("[data-apa-log-history-pin]", "Not accepted");
         text(
           "[data-apa-log-status]",
-          `${anchorResult.reason} No continuity result is accepted.`,
+          `${externalFailure} No continuity result is accepted.`,
         );
         return;
       }
 
-      const anchorSummary = anchorResult.ok
+      const currentAnchorSummary = anchorResult.ok
         ? `Signed prefix through entry ${anchorResult.pinnedSeq.toLocaleString()} verified.`
         : anchorResult.reason;
+      const historySummary = historyResult.ok
+        ? `${historyResult.anchorCount.toLocaleString()} public history checkpoints verified${historyResult.pinned ? " against the retained head." : "; no independent head was supplied."}`
+        : historyResult.reason;
+      const anchorSummary = `${currentAnchorSummary} ${historySummary}`;
       text(
         "[data-apa-log-anchor]",
         anchorResult.ok
           ? `Verified through #${anchorResult.pinnedSeq.toLocaleString()}`
-          : "Not independently published",
+          : "No public checkpoint published",
+      );
+      text(
+        "[data-apa-log-history]",
+        historyResult.ok ? "History verified" : "No history published",
+      );
+      text(
+        "[data-apa-log-history-count]",
+        historyResult.ok
+          ? historyResult.anchorCount.toLocaleString()
+          : "No entries",
+      );
+      text(
+        "[data-apa-log-history-head]",
+        historyResult.ok ? historyResult.headHash : "Not published",
+      );
+      text(
+        "[data-apa-log-history-pin]",
+        historyResult.pinned
+          ? "Retained head verified"
+          : "No independent head supplied",
       );
       text(
         "[data-apa-log-checkpoint]",
@@ -916,16 +1264,17 @@
       );
     } catch (error) {
       container.dataset.state = "error";
-      sourceStamp(
-        "degraded",
-        `ledger unavailable ${new Date().toISOString()}`,
-      );
+      sourceStamp("degraded", `ledger unavailable ${new Date().toISOString()}`);
       entriesElement.replaceChildren();
       text("[data-apa-log-total]", "Unavailable");
       text("[data-apa-log-chain]", "Not verified");
       text("[data-apa-log-head]", "Unavailable");
       text("[data-apa-log-checkpoint]", "Unavailable");
       text("[data-apa-log-anchor]", "Unavailable");
+      text("[data-apa-log-history]", "Unavailable");
+      text("[data-apa-log-history-count]", "Unavailable");
+      text("[data-apa-log-history-head]", "Unavailable");
+      text("[data-apa-log-history-pin]", "Unavailable");
       text("[data-apa-log-observed]", new Date().toISOString());
       text(
         "[data-apa-log-status]",
@@ -957,10 +1306,7 @@
       );
       text("[data-apa-log-tool-status]", "Normalized ledger JSON copied.");
     } catch (error) {
-      text(
-        "[data-apa-log-tool-status]",
-        `Copy failed: ${error.message}`,
-      );
+      text("[data-apa-log-tool-status]", `Copy failed: ${error.message}`);
     }
   });
   tamperButton?.addEventListener("click", async () => {

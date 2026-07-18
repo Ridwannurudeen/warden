@@ -14,7 +14,7 @@ and hackathon submission require explicit user approval.
       `spec/APA-SPEC.md` byte-identically at `site/spec/APA-SPEC.md`.
 - [x] `python scripts/build_index.py` regenerates the committed marketplace snapshot without refresh.
 - [x] `python -m pytest -q tests/test_marketplace.py tests/test_refresh_safety_index.py tests/test_deploy_index.py`
-      verifies schema-v2 coverage, atomic promotion, and the six-hour source units.
+      verifies schema-v2 coverage, atomic promotion, and the 30-minute source units.
 - [x] The committed Safety Index reports exact `sampled`, `expected`, and `dropped` counts for discovery query
       `a`; equality means a complete response for that query, while a mismatch renders partial/degraded
       without attributing a cause.
@@ -83,7 +83,7 @@ and hackathon submission require explicit user approval.
 - [x] TypeScript integration copy says `sdk/ts` is source-built, not claimed published, defaults to best-effort
       hosted `failOpen: true`, and has no local TypeScript engine.
 - [x] Safety Index copy describes schema-v2 `sampled`/`expected`/`dropped` coverage and labels the atomic
-      six-hour timer source-ready but not deployed.
+      30-minute timer source-ready but not deployed.
 - [x] No fabricated orders, reviews, customers, uptime, badges, attempts, receipts, or endorsements.
 
 ## Manual checks still required
@@ -104,7 +104,7 @@ from source inspection or automated unit tests alone.
 - [ ] `systemctl start warden-index.service` completes one live query-`a` refresh before timer activation.
 - [ ] `systemd-analyze verify /etc/systemd/system/warden-index.service /etc/systemd/system/warden-index.timer`
       passes on the target VPS.
-- [ ] `systemd-analyze calendar '*-*-* 00/6:00:00 UTC'` confirms the intended six-hour schedule.
+- [ ] `systemd-analyze calendar '*-*-* *:00/30:00 UTC'` confirms the intended 30-minute schedule.
 - [ ] `systemctl list-timers warden-index.timer --all` shows the installed timer and its next run.
 - [ ] `journalctl -u warden-index.service -n 100 --no-pager` shows a successful atomic capture or an explicit
       failure without replacing `current`.

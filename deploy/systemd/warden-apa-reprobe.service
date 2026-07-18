@@ -10,6 +10,7 @@ WorkingDirectory=/opt/warden/current
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
 EnvironmentFile=/opt/warden/.env
+Environment=WARDEN_PROTECTION_DB=/opt/warden/data/protection.db
 ExecStart=/usr/bin/flock --exclusive --nonblock /opt/warden/data/.apa-reprobe.lock /opt/warden/current/.venv/bin/python scripts/reprobe_protections.py
 User=warden
 Group=warden

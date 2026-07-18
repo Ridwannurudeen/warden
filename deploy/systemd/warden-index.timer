@@ -1,9 +1,9 @@
 [Unit]
-Description=Refresh Warden live Safety Index every six hours
+Description=Refresh Warden marketplace evidence every 30 minutes
 
 [Timer]
-OnCalendar=*-*-* 00/6:00:00 UTC
-RandomizedDelaySec=15m
+OnCalendar=*-*-* *:00/30:00 UTC
+RandomizedDelaySec=2m
 Persistent=true
 Unit=warden-index.service
 

@@ -41,7 +41,7 @@ Use only `certbot certonly --webroot` for certificate issuance.
 - Runtime feature flags (set in `/opt/warden/.env`):
   - `WARDEN_RATE_LIMIT_PER_MIN=60` (set to `0` to disable)
   - `WARDEN_DEMO_RATE_LIMIT_PER_MIN=20` (shared limit for public demo and Gauntlet routes)
-  - `WARDEN_REQUIRE_CONSENT=true` (hard consent is the default; set to `false` to restore soft consent, which lets an audit proceed against a target that has not opted in)
+  - `WARDEN_REQUIRE_CONSENT=true` and `WARDEN_ENVIRONMENT=production` (hard consent is mandatory in production; the `false` override is honored only when the environment is explicitly `development`)
   - `WARDEN_BADGE_SECRET=<strong-random-hmac-secret>` (required in production; the public development default is forgeable)
   - `WARDEN_ISSUER_KEY=<base64url-ed25519-seed>` (required in production; never let a release generate the development fallback)
   - `WARDEN_ISSUER_KID=<unique-current-key-id>` and `WARDEN_ISSUER_HISTORY=/opt/warden/issuer-history.json` (the current signer plus public-only retired-key history)
@@ -816,7 +816,10 @@ Issued badges and APA attestations remain runtime state on the VPS. After the se
 
 The vhost enforces a self-only Content Security Policy. Site HTML, CSS, JavaScript, fonts, images, and browser API calls must not load from another origin. External links are navigation only.
 
-Also serve `/.well-known/warden-consent` from `/opt/warden-site/current` when running in hard-consent mode. It should return HTTP 200 with body `warden-audit-allowed` and can be left absent when `WARDEN_REQUIRE_CONSENT=false`.
+Any endpoint submitted for an audit must serve its own `/.well-known/warden-consent` response with HTTP 200
+and body `warden-audit-allowed`. Warden probes that path on the target's already SSRF-validated, IP-pinned
+origin before running the battery. Production never permits a missing consent response; the soft-consent
+override exists only for an explicitly configured local development environment.
 
 This keeps the FastAPI root JSON stub untouched while making the public root a multi-page static site.
 
@@ -828,8 +831,8 @@ no environment file and makes both Warden secret files inaccessible. `deploy/sys
 is a separate `warden`-owned oneshot that requires the fetch unit, consumes the completed snapshot, associates
 signed Warden evidence, and publishes only after all release validations pass. `ProtectSystem=strict` leaves
 only the fetcher's public snapshot/home writable to the fetch unit and only `/opt/warden-index` writable to
-the builder. `deploy/systemd/warden-index.timer` runs on a six-hour UTC
-calendar with a randomized delay and `Persistent=true`, so a missed calendar event is caught after the timer
+the builder. `deploy/systemd/warden-index.timer` runs every 30 minutes on a UTC calendar with up to two
+minutes of randomized delay and `Persistent=true`, so a missed calendar event is caught after the timer
 becomes active again.
 
 Only the builder uses `EnvironmentFile=/opt/warden/index.env`, which contains `WARDEN_BADGE_SECRET`, public

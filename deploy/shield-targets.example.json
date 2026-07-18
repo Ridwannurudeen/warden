@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "targets": [
+    {
+      "target_id": "example-agent-production",
+      "owner_id": "example-owner",
+      "owner_enrolled": true,
+      "enrollment_revision": 1,
+      "target_url": "https://agent.example.com/scan",
+      "interval_hours": 168,
+      "battery": {
+        "id": "warden-core-http",
+        "version": "2026-07",
+        "sha256": "7e18f89d7249fe97e007f37dc91839492cfb7a40af4d7b660309645c0fe33f3f"
+      }
+    }
+  ]
+}

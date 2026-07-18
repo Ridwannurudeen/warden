@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Inspect Warden's shared APA and WARDEN BREAKER evidence log and verify its SHA-256 chain continuity in your browser."
+      content="Inspect Warden's shared APA, endpoint-audit, and WARDEN BREAKER evidence log and verify its SHA-256 chain continuity in your browser."
     />
     <meta name="color-scheme" content="dark light" />
     <title>Evidence Transparency Log | Warden</title>
@@ -15,7 +15,7 @@
     <meta property="og:title" content="Evidence Transparency Log | Warden" />
     <meta
       property="og:description"
-      content="Inspect the shared APA and WARDEN BREAKER log and independently recompute its internal SHA-256 chain."
+      content="Inspect the shared APA, endpoint-audit, and WARDEN BREAKER log and independently recompute its internal SHA-256 chain."
     />
     <meta property="og:url" content="https://warden.gudman.xyz/apa/log" />
     <meta
@@ -143,16 +143,16 @@
         <p class="hero-text">
           This page re-fetches <code>GET /apa/log</code> as JSON and recomputes
           every SHA-256 <code>prev_hash</code> link locally. APA issuance and
-          status changes share one ordered chain with confirmed WARDEN BREAKER
-          certificates.
+          status changes share one ordered chain with endpoint audit lifecycle
+          events and confirmed WARDEN BREAKER certificates. It also verifies the
+          public checkpoint history and any retained history head supplied in
+          the URL.
         </p>
         <div class="hero-actions">
           <button class="button primary" type="button" data-apa-log-retry>
             Fetch and verify the log
           </button>
-          <a class="button secondary" href="/verify"
-            >Verify an attestation</a
-          >
+          <a class="button secondary" href="/verify">Verify an attestation</a>
         </div>
       </section>
 
@@ -163,13 +163,15 @@
         <div><span>Source</span><strong>Same-origin JSON pages</strong></div>
         <div><span>Chain</span><strong>SHA-256</strong></div>
         <div><span>Head</span><strong>Issuer-signed checkpoint</strong></div>
-        <div><span>External pin</span><strong>Explicit when published</strong></div>
+        <div><span>Public history</span><strong>Hash chained</strong></div>
       </section>
 
       <section class="feature-panel" aria-labelledby="chain-model-title">
         <div class="section-heading">
           <p class="eyebrow">How continuity is checked</p>
-          <h2 id="chain-model-title">Each entry commits to the one before it.</h2>
+          <h2 id="chain-model-title">
+            Each entry commits to the one before it.
+          </h2>
           <p>
             The browser starts from the fixed genesis value, hashes each
             canonical entry, follows every <code>prev_hash</code>, and compares
@@ -183,15 +185,21 @@
           </li>
           <li>
             <span>02</span><strong>Continuity</strong>
-            <p>Every next entry must point to the prior canonical entry hash.</p>
+            <p>
+              Every next entry must point to the prior canonical entry hash.
+            </p>
           </li>
           <li>
             <span>03</span><strong>Signed head</strong>
-            <p>The recomputed head and count must match the signed checkpoint.</p>
+            <p>
+              The recomputed head and count must match the signed checkpoint.
+            </p>
           </li>
           <li>
             <span>04</span><strong>Published prefix</strong>
-            <p>An external checkpoint, when present, pins an older prefix.</p>
+            <p>
+              Each public checkpoint pins a prefix and the history links them.
+            </p>
           </li>
         </ol>
       </section>
@@ -245,17 +253,62 @@
             <span>External prefix checkpoint</span
             ><strong data-apa-log-anchor>Unknown until checked</strong>
           </div>
+          <div>
+            <span>Public checkpoint history</span
+            ><strong data-apa-log-history>Unknown until checked</strong>
+          </div>
+          <div>
+            <span>History entries</span
+            ><strong class="num" data-apa-log-history-count
+              >Unknown until checked</strong
+            >
+          </div>
+          <div>
+            <span>Computed history head</span
+            ><strong class="num" data-apa-log-history-head
+              >Unknown until checked</strong
+            >
+          </div>
+          <div>
+            <span>Independent retained head</span
+            ><strong data-apa-log-history-pin>Unknown until checked</strong>
+          </div>
         </div>
+        <form class="status-check-controls" action="/apa/log" method="get">
+          <label>
+            <span>Retained history head (optional)</span>
+            <input
+              name="history_head"
+              inputmode="text"
+              autocomplete="off"
+              spellcheck="false"
+              minlength="64"
+              maxlength="64"
+              pattern="[0-9a-f]{64}"
+              aria-describedby="history-head-help"
+            />
+          </label>
+          <button class="button secondary" type="submit">
+            Verify with retained head
+          </button>
+        </form>
+        <p class="caveat" id="history-head-help">
+          Supply a previously retained lowercase SHA-256 history head to detect
+          coherent replacement or truncation of the same-origin history.
+        </p>
       </section>
 
       <section aria-labelledby="log-entries-title">
         <div class="section-heading">
           <p class="eyebrow">Shared append sequence</p>
-          <h2 id="log-entries-title">APA and BREAKER evidence entries</h2>
+          <h2 id="log-entries-title">
+            One chain for every signed evidence type
+          </h2>
           <p class="section-copy">
-            Each entry identifies either an APA attestation or a WARDEN BREAKER
-            certificate, then includes the hash of that signed record and the
-            canonical hash of the preceding log entry.
+            Each entry identifies an APA attestation, an endpoint audit
+            lifecycle event, or a WARDEN BREAKER certificate, then includes the
+            signed record hash and the canonical hash of the preceding log
+            entry.
           </p>
         </div>
         <ol class="command-flow" data-apa-log-entries>
@@ -314,16 +367,17 @@
       <aside class="callout evidence-boundary">
         <strong>What this verification does and does not establish.</strong>
         The live signed head detects changes relative to Warden's locally stored
-        latest state. An operator-published checkpoint can additionally pin an
-        older prefix outside that database; this page verifies the pin when one
-        is present and says explicitly when it is unpublished. The static site
-        copy is still not independently timestamped or witnessed. A
-        <span>coherent database rollback</span> remains outside this proof when
-        accompanied by the older static copy. It also does not prove log
-        completeness or independently verify each <code>record_hash</code>.
-        Anyone may preserve a published checkpoint as an independent witness.
-        This browser view fails closed above 10,000 log entries to bound memory,
-        DOM, and request work.
+        latest state. The public checkpoint history additionally makes
+        replacement and truncation visible relative to any head retained outside
+        Warden. This page verifies a retained head when supplied and says
+        explicitly when none was provided. For either public source, it says
+        explicitly when it is unpublished. The same-origin static history is not
+        independently timestamped or witnessed by itself. A
+        <span>coherent database rollback</span> accompanied by every same-origin
+        copy remains outside this proof without an independently retained head.
+        The result also does not prove log completeness or independently verify
+        each <code>record_hash</code>. This browser view fails closed above
+        10,000 log or history entries to bound memory, DOM, and request work.
       </aside>
     </main>
 

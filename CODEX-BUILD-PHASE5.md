@@ -1,5 +1,11 @@
 # Warden Phase 5 — Codex Build Brief (The Marketplace Security Index)
 
+> **SUPERSEDED — ARCHIVE ONLY.** This 2026-07-13 build brief is retained as
+> project history and must not be executed as a current instruction set. Its
+> payment prices and EIP-712 domain assumptions are obsolete. The current,
+> tested contract is documented in `PAYMENT.md` and enforced by
+> `warden/payment.py`.
+
 **Branch:** create `phase5-web-platform` off `master` (currently `beb2b34`, **74 tests green** —
 re-verified 2026-07-13, corrects an earlier 57 count from Phase-3 that's now stale — ruff clean).
 

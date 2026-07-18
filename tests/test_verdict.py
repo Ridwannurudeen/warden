@@ -83,3 +83,47 @@ def test_band_boundary_69_sanitizes():
 def test_band_boundary_70_blocks():
     verdict = VerdictEngine().decide("payload", scanner_result(), [score_result(70)])
     assert verdict.verdict == "BLOCK"
+
+
+def test_scanner_high_stays_sanitizable_under_the_policy_table():
+    verdict = VerdictEngine().decide(
+        "payload",
+        scanner_result(
+            "HIGH",
+            [
+                {
+                    "pattern_category": "direct_instruction",
+                    "match_text": "payload",
+                    "confidence": 0.95,
+                    "layer": 1,
+                }
+            ],
+        ),
+        [score_result(0)],
+    )
+
+    assert verdict.verdict == "SANITIZE"
+    assert verdict.risk_level == "HIGH"
+
+
+def test_analyzer_block_band_is_not_diluted_by_scanner_score():
+    verdict = VerdictEngine().decide(
+        "payload",
+        scanner_result("MEDIUM"),
+        [score_result(70)],
+    )
+
+    assert verdict.verdict == "BLOCK"
+    assert "composite_score" not in verdict.checks
+
+
+def test_unknown_scanner_risk_fails_closed():
+    verdict = VerdictEngine().decide(
+        "payload",
+        scanner_result("UNRECOGNIZED"),
+        [score_result(0)],
+    )
+
+    assert verdict.verdict == "BLOCK"
+    assert verdict.risk_level == "CRITICAL"
+    assert verdict.checks["scanner_risk"].startswith("fail")

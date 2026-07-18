@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_real_paid_routes_are_wired_to_local_verification_and_settlement() -> None:
-    script = r'''
+    script = r"""
 import socket
 
 from fastapi.testclient import TestClient
@@ -72,7 +72,10 @@ class CapturingHTTPResourceServer:
         return HTTPProcessResult(
             type="payment-verified",
             payment_payload={"route": route_key},
-            payment_requirements={"route": route_key, "price": option.price},
+            payment_requirements={
+                "route": route_key,
+                "price": option.price.model_dump(),
+            },
         )
 
     async def process_settlement(
@@ -84,7 +87,14 @@ class CapturingHTTPResourceServer:
     ):
         route_key = f"{context.method} {context.path}"
         assert payment_payload == {"route": route_key}
-        assert payment_requirements == {"route": route_key, "price": "$0.5"}
+        assert payment_requirements == {
+            "route": route_key,
+            "price": {
+                "amount": "500000",
+                "asset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+                "extra": {"name": "USD₮0", "version": "1"},
+            },
+        }
         self.settled.append(route_key)
         return ProcessSettleResult(
             success=True,
@@ -122,7 +132,14 @@ with TestClient(api.app) as client:
     for route_key in expected_routes:
         options = server.routes[route_key].accepts
         assert len(options) == 1
-        assert options[0].price == "$0.5"
+        assert options[0].scheme == "exact"
+        assert options[0].network == "eip155:196"
+        assert options[0].pay_to == "0x0000000000000000000000000000000000000001"
+        assert options[0].price.model_dump() == {
+            "amount": "500000",
+            "asset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+            "extra": {"name": "USD₮0", "version": "1"},
+        }
 
     requests = [
         ("GET", "/scan", {"params": {"payload": "normal settlement note"}}),
@@ -148,7 +165,8 @@ assert audit_calls == [
     ("https://agent.example/scan", []),
     ("https://agent.example/scan", []),
 ]
-'''
+assert api._facilitator_http_client.is_closed is True
+"""
     env = {
         key: value
         for key, value in os.environ.items()
@@ -159,7 +177,7 @@ assert audit_calls == [
             "OKX_API_KEY": "local-route-test-api-key",
             "OKX_SECRET_KEY": "local-route-test-secret-key",
             "OKX_PASSPHRASE": "local-route-test-passphrase",
-            "OKX_BASE_URL": "https://network.invalid",
+            "OKX_BASE_URL": "https://web3.okx.com",
             "PAY_TO_ADDRESS": "0x0000000000000000000000000000000000000001",
             "WARDEN_BADGE_SECRET": "local-route-test-badge-secret",
             "WARDEN_RATE_LIMIT_PER_MIN": "0",

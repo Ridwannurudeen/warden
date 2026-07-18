@@ -1,0 +1,30 @@
+[Unit]
+Description=Record Warden application and unsigned x402 challenge readiness
+After=network-online.target warden.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+TimeoutStartSec=30s
+WorkingDirectory=/opt/warden
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=HOME=/opt/warden/monitor
+Environment=PATH=/opt/warden/.venv/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-/opt/warden/monitor-alert.env
+ExecStartPre=/opt/warden/.venv/bin/python /opt/warden/scripts/notify_service_transition.py --monitor /opt/warden/monitor/service-monitor.json --state /opt/warden/monitor/notifier-state.json
+ExecStart=/usr/bin/flock --exclusive --nonblock /opt/warden/monitor/.monitor.lock /opt/warden/.venv/bin/python /opt/warden/scripts/monitor_readiness.py --url http://127.0.0.1:8031/health/ready --paid-url http://127.0.0.1:8031/scan --expected-resource-url https://warden.gudman.xyz/scan --output /opt/warden/monitor/service-monitor.json
+ExecStartPost=/opt/warden/.venv/bin/python /opt/warden/scripts/notify_service_transition.py --monitor /opt/warden/monitor/service-monitor.json --state /opt/warden/monitor/notifier-state.json
+User=warden
+Group=warden
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectProc=invisible
+PrivateTmp=true
+PrivateDevices=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+InaccessiblePaths=/opt/warden/.env /opt/warden/index.env /opt/warden/data /opt/warden/badges /opt/warden/gauntlet /opt/warden/anchor
+ReadWritePaths=/opt/warden/monitor

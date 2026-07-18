@@ -3,7 +3,7 @@
 import unicodedata
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from warden.core.verdict import ReasonCode, Verdict
 
@@ -18,6 +18,8 @@ VerdictLabel = Literal["ALLOW", "SANITIZE", "BLOCK"]
 RiskLabel = Literal["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
 Grade = Literal["A", "B", "C", "D", "F", "INCONCLUSIVE"]
 ClaimStatus = Literal["not_candidate", "pending", "duplicate"]
+FeedbackOutcome = Literal["missed_attack", "false_positive", "correct_detection"]
+FeedbackStatus = Literal["pending", "duplicate"]
 
 _FINDER_DEFAULT_IGNORABLE_RANGES = (
     (0x00AD, 0x00AD),
@@ -45,9 +47,7 @@ def normalize_finder_handle(value: str | None) -> str | None:
         return None
     normalized = unicodedata.normalize("NFKC", value)
     normalized = "".join(
-        character
-        for character in normalized
-        if unicodedata.category(character) != "Cf"
+        character for character in normalized if unicodedata.category(character) != "Cf"
     ).strip(" \t\r\n")
     return normalized or None
 
@@ -58,8 +58,7 @@ def finder_handle_is_visible(value: str) -> bool:
         or (
             character.isprintable()
             and not any(
-                start <= ord(character) <= end
-                for start, end in _FINDER_DEFAULT_IGNORABLE_RANGES
+                start <= ord(character) <= end for start, end in _FINDER_DEFAULT_IGNORABLE_RANGES
             )
         )
         for character in value
@@ -202,11 +201,76 @@ class GauntletStats(BaseModel):
     corpus_size: int
 
 
+class FeedbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: FeedbackOutcome
+    observed_verdict: VerdictLabel
+    threat_class: ReasonCode
+    redacted_reproducer: str = Field(max_length=MAX_DEMO_PAYLOAD_LENGTH)
+    consent_to_retain: Literal[True]
+    redaction_confirmed: Literal[True]
+
+    @field_validator("consent_to_retain", "redaction_confirmed", mode="before")
+    @classmethod
+    def require_explicit_true(cls, value: object) -> bool:
+        if value is not True:
+            raise ValueError("explicit boolean true is required")
+        return True
+
+    @field_validator("redacted_reproducer")
+    @classmethod
+    def validate_redacted_reproducer(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("redacted_reproducer must not be blank")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError as exc:
+            raise ValueError("redacted_reproducer must contain valid unicode scalar text") from exc
+        return value
+
+    @model_validator(mode="after")
+    def validate_outcome_verdict(self) -> "FeedbackRequest":
+        if self.outcome == "missed_attack" and self.observed_verdict != "ALLOW":
+            raise ValueError("missed_attack requires an observed ALLOW verdict")
+        if self.outcome != "missed_attack" and self.observed_verdict == "ALLOW":
+            raise ValueError(f"{self.outcome} requires a non-ALLOW observed verdict")
+        return self
+
+
+class FeedbackResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    feedback_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    status: FeedbackStatus
+    retained_until: str
+
+
+class ThreatIntelCell(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: FeedbackOutcome
+    threat_class: ReasonCode
+    count: int = Field(ge=5)
+
+
+class ThreatIntelSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1]
+    generated_at: str
+    window_start: str | None
+    window_end: str
+    k_anonymity: Literal[5]
+    included_records: int = Field(ge=0)
+    cells: list[ThreatIntelCell]
+    source: str
+    limitations: str
+
+
 class BreakerCertificate(BaseModel):
     spec_version: Literal["warden-breaker/1"]
-    predicate_type: Literal[
-        "https://warden.gudman.xyz/spec/gauntlet-breaker/v1"
-    ]
+    predicate_type: Literal["https://warden.gudman.xyz/spec/gauntlet-breaker/v1"]
     certificate_id: str = Field(pattern=r"^[0-9a-f]{32}$")
     issuer: Literal["warden"]
     award: Literal["WARDEN BREAKER"]
@@ -266,6 +330,45 @@ class BadgeRegistryEntry(BaseModel):
 class BadgeRegistryResponse(BaseModel):
     badges: list[BadgeRegistryEntry]
     total: int
+
+
+class AuditAttestationRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    spec_version: Literal["apa-audit/0.1"]
+    predicate_type: Literal["https://warden.gudman.xyz/spec/endpoint-audit/v1"]
+    audit_id: str = Field(pattern=r"^[0-9a-f]{16}$")
+    issuer: Literal["warden"]
+    subject: str
+    endpoint_host: str
+    battery_id: str
+    battery_version: str
+    battery_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    blocked: int = Field(ge=0)
+    total: int = Field(ge=1)
+    conclusive: int = Field(ge=1)
+    inconclusive: Literal[0]
+    benign_total: int = Field(ge=1)
+    benign_passed: int = Field(ge=1)
+    grade: Literal["A", "B", "C", "D", "F"]
+    consent_verified: Literal[True]
+    liveness_passed: Literal[True]
+    observed_on: str
+    issued_at: int = Field(ge=0)
+    expires_at: int = Field(ge=0)
+    limitations: str
+    log_seq: int = Field(ge=1)
+    issuer_sig: str
+
+
+class AuditEvidenceResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    attestation: AuditAttestationRecord | None
+    status: Literal["active", "stale", "revoked", "invalid"]
+    verified: bool
+    revoked_at: int | None
+    limitations: str
 
 
 class AuditResponse(BaseModel):

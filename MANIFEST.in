@@ -1,1 +1,2 @@
 include warden/analyzers/bip39_words.txt
+include warden/corpus_fingerprint.txt

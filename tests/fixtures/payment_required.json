@@ -16,7 +16,7 @@
         "payTo": "0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51",
         "maxTimeoutSeconds": 300,
         "extra": {
-          "name": "USDT",
+          "name": "USD₮0",
           "version": "1"
         }
       }
@@ -39,7 +39,7 @@
         "payTo": "0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51",
         "maxTimeoutSeconds": 300,
         "extra": {
-          "name": "USDT",
+          "name": "USD₮0",
           "version": "1"
         }
       }

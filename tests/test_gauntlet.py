@@ -354,7 +354,7 @@ assert 'payment-required' not in response.headers
             "OKX_API_KEY": "gauntlet-test-api-key",
             "OKX_SECRET_KEY": "gauntlet-test-secret-key",
             "OKX_PASSPHRASE": "gauntlet-test-passphrase",
-            "OKX_BASE_URL": "http://127.0.0.1:9",
+            "OKX_BASE_URL": "https://web3.okx.com",
             "PAY_TO_ADDRESS": "0x0000000000000000000000000000000000000001",
             "WARDEN_BADGE_SECRET": "test-badge-secret",
             "WARDEN_DEMO_RATE_LIMIT_PER_MIN": "0",

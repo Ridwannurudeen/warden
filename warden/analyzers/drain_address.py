@@ -12,6 +12,27 @@ TRANSFER_INTENT_RE = re.compile(
     r"|move|redirect|payout|route|wallet\s+is|receiving address)\b"
 )
 CONTEXTUAL_RECIPIENT_RE = re.compile(r"(?i)\b(?:recipients?|payments?)\b")
+STRUCTURED_DESTINATION_RE = re.compile(
+    r"""(?ix)
+    (?:^|[.\s{,\[])
+    ["']?
+    (?:
+        destination
+        | beneficiary
+        | payee
+        | recipients?
+        | payout[_-]?recipients?
+        | receiving[_-]?(?:address|wallet)
+        | to
+    )
+    ["']?
+    \s*[:=]\s*["']?
+    """
+)
+STRUCTURED_PAYMENT_CONTEXT_RE = re.compile(
+    r"(?i)\b(?:payment|settlement|payout|transfer|transaction|amount|"
+    r"eth|btc|bnb|sol|usdt|usdc|dai|tokens?|funds?|balance|assets?)\b"
+)
 FORWARD_TRANSFER_INTENT_RE = re.compile(
     r"(?i)\bforward\s+(?:(?:the|all|remaining|entire)\s+)?"
     r"(?:\d+(?:\.\d+)?\s+)?"
@@ -89,6 +110,10 @@ class DrainAddressAnalyzer(Analyzer):
             or FORWARD_TRANSFER_INTENT_RE.search(payload)
             or HIGH_RISK_DRAIN_INTENT_RE.search(payload)
             or (has_expected and CONTEXTUAL_RECIPIENT_RE.search(payload))
+            or (
+                STRUCTURED_DESTINATION_RE.search(payload)
+                and (has_expected or STRUCTURED_PAYMENT_CONTEXT_RE.search(payload))
+            )
         ):
             for match in MALFORMED_ADDR_RE.finditer(payload):
                 token = match.group()
@@ -119,6 +144,10 @@ class DrainAddressAnalyzer(Analyzer):
         window = payload[max(0, start - 80) : min(len(payload), end + 80)]
         if HIGH_RISK_DRAIN_INTENT_RE.search(window):
             return 0.95
+        if STRUCTURED_DESTINATION_RE.search(window) and (
+            has_expected or STRUCTURED_PAYMENT_CONTEXT_RE.search(window)
+        ):
+            return 0.95 if has_expected else 0.80
         if (
             not TRANSFER_INTENT_RE.search(window)
             and not FORWARD_TRANSFER_INTENT_RE.search(window)

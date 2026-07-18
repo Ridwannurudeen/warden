@@ -569,7 +569,7 @@ def test_readme_leads_with_the_trust_layer_and_exact_quickstart_contracts():
     assert "best-effort telemetry, not enforcement" in readme
     assert "20 requests per minute per" in readme
     assert "4,000 characters" in readme
-    assert "### APA and legacy audit badges" in readme
+    assert "### APA and endpoint audit evidence" in readme
     assert "HMAC-SHA256" in readme
     for route in ("/theater", "/trust", "/verify", "/apa/log"):
         assert route in readme

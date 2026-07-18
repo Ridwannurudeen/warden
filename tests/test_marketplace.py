@@ -17,6 +17,7 @@ from warden.engine import WardenEngine
 from warden.marketplace.fetch import (
     MarketplaceAgent,
     MarketplaceService,
+    SearchPageData,
     SnapshotMetadata,
     fetch_snapshot,
     load_snapshot,
@@ -35,6 +36,19 @@ FIXTURES = ROOT / "tests" / "fixtures"
 
 def _fixture(name: str) -> str:
     return (FIXTURES / name).read_text(encoding="utf-8")
+
+
+class _FakeMarketplaceAdapter:
+    def __init__(self, pages: list[SearchPageData | Exception]) -> None:
+        self._pages = iter(pages)
+        self.calls: list[tuple[str, int, int]] = []
+
+    def search_page(self, *, query: str, page: int, page_size: int) -> SearchPageData:
+        self.calls.append((query, page, page_size))
+        result = next(self._pages)
+        if isinstance(result, Exception):
+            raise result
+        return result
 
 
 def _agent(**overrides) -> MarketplaceAgent:
@@ -220,6 +234,77 @@ def test_fetch_paginates_until_empty_and_persists_snapshot(tmp_path):
     assert snapshot.metadata.dropped == 0
     assert loaded == snapshot
     assert loaded.agents[0].services[0].service_id == "31669"
+
+
+def test_fetch_accepts_normalized_pages_from_provider_adapter(tmp_path):
+    adapter = _FakeMarketplaceAdapter(
+        [
+            SearchPageData(
+                agents=[_agent(agentId="9"), _agent(agentId="7")],
+                page=1,
+                page_size=2,
+                total=4,
+            ),
+            SearchPageData(
+                agents=[_agent(agentId="8")],
+                page=2,
+                page_size=2,
+                total=3,
+            ),
+            SearchPageData(agents=[], page=3, page_size=2, total=3),
+        ]
+    )
+    snapshot_path = tmp_path / "agents-v1.jsonl"
+
+    snapshot = fetch_snapshot(
+        snapshot_path,
+        query="provider-neutral",
+        page_size=2,
+        captured_at="2026-07-13T15:30:00Z",
+        adapter=adapter,
+    )
+
+    assert adapter.calls == [
+        ("provider-neutral", 1, 2),
+        ("provider-neutral", 2, 2),
+        ("provider-neutral", 3, 2),
+    ]
+    assert [agent.agent_id for agent in snapshot.agents] == ["7", "8", "9"]
+    assert snapshot.metadata.model_dump() == {
+        "schema_version": 2,
+        "captured_at": "2026-07-13T15:30:00Z",
+        "query": "provider-neutral",
+        "page_size": 2,
+        "sampled": 3,
+        "expected": 4,
+        "dropped": 1,
+    }
+    assert load_snapshot(snapshot_path) == snapshot
+
+
+def test_fetch_preserves_existing_snapshot_when_provider_adapter_fails(tmp_path):
+    adapter = _FakeMarketplaceAdapter([RuntimeError("provider unavailable")])
+    snapshot_path = tmp_path / "agents-v1.jsonl"
+    snapshot_path.write_text("original\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="provider unavailable"):
+        fetch_snapshot(snapshot_path, adapter=adapter)
+
+    assert adapter.calls == [("a", 1, 100)]
+    assert snapshot_path.read_text(encoding="utf-8") == "original\n"
+
+
+def test_fetch_rejects_conflicting_adapter_and_command_runner(tmp_path):
+    adapter = _FakeMarketplaceAdapter([])
+
+    with pytest.raises(ValueError, match="adapter and command_runner"):
+        fetch_snapshot(
+            tmp_path / "agents-v1.jsonl",
+            adapter=adapter,
+            command_runner=lambda command: pytest.fail("command runner must not run"),
+        )
+
+    assert adapter.calls == []
 
 
 def test_fetch_uses_unique_agents_and_maximum_reported_total_for_coverage(tmp_path):

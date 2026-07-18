@@ -215,11 +215,11 @@
             99.5% application-readiness objective
           </h2>
           <p class="section-copy">
-            The proposed measurement is a successful
-            <code>GET /health/ready</code> every five minutes over a complete
-            rolling 30-day window. Until that full scheduled window is recorded,
-            availability remains “Not measured” and no achieved uptime is
-            claimed.
+            Every five minutes, the scheduled monitor checks application
+            readiness and requests an unsigned <code>/scan</code> payment
+            challenge. The 99.5% objective applies to Warden's application
+            readiness. Challenge generation is reported separately and does not
+            establish payment settlement or facilitator uptime.
           </p>
           <p>
             <span
@@ -243,27 +243,43 @@
             >
           </div>
           <div>
-            <span>Measured availability</span
-            ><strong class="num" data-monitor-availability
+            <span>Application availability</span
+            ><strong class="num" data-monitor-application-availability
               >Not measured until evidence qualifies</strong
             >
           </div>
           <div>
-            <span>Latest readiness probe</span
+            <span>Unsigned x402 challenge-generation readiness</span
+            ><strong class="num" data-monitor-challenge-readiness
+              >Evidence not loaded</strong
+            >
+          </div>
+          <div>
+            <span>Latest two-signal probe</span
             ><strong class="num" data-monitor-latest
+              >Evidence not loaded</strong
+            >
+          </div>
+          <div>
+            <span>Latest application probe</span
+            ><strong class="num" data-monitor-application-latest
+              >Evidence not loaded</strong
+            >
+          </div>
+          <div>
+            <span>Latest unsigned challenge probe</span
+            ><strong class="num" data-monitor-challenge-latest
               >Evidence not loaded</strong
             >
           </div>
         </div>
         <aside class="callout">
           This objective covers Warden application readiness only and is not a
-          contractual SLA.
-          <span
-            >Third-party payment-facilitator availability is outside this
-            measurement</span
-          >
-          and must be monitored separately before paid-route availability can be
-          claimed.
+          contractual SLA. The second signal proves only that Warden generated
+          the pinned unsigned x402 challenge. It does not contact a payer,
+          verify funds, settle a payment, or measure third-party facilitator
+          uptime. Missing, malformed, disabled, failed, or stale challenge
+          evidence is unavailable.
         </aside>
       </section>
 

@@ -35,7 +35,9 @@ python scripts/benchmark_recall.py --record --json
 ```
 
 `--record` appends an exact UTC result to `history.jsonl` and atomically refreshes the public
-`site/data/evaluation.json` consumed by `/status`. It does not conceal misses or mutate detector inputs.
+`site/data/evaluation.json` consumed by `/status`. Recording accepts only the resolved canonical held-out
+paths when both line-ending-normalized content hashes match the pinned 94-attack/45-benign snapshot. It does
+not conceal misses or mutate detector inputs.
 
 Human-reviewed Gauntlet candidates enter evaluation only through an operator action:
 
@@ -67,23 +69,36 @@ duplicating the benchmark case, certificate, or log entry.
 After promotion, rerun the benchmark, intentionally update the published result, and record the dated
 measurement. There is no public confirmation API, no automatic confirmation, and no training-corpus mutation.
 
-The optional paid semantic runtime has a separate guarded evaluation mode:
+Optional paid model tiers have separate guarded evaluation modes:
 
 ```powershell
-python scripts/benchmark_recall.py --semantic --json
+python scripts/benchmark_recall.py --mode embedding-only --json
+python scripts/benchmark_recall.py --mode semantic-only --json
+python scripts/benchmark_recall.py --mode combined --json
 ```
 
-That command requires the complete semantic environment documented in the repository README, forces every
-case through paid `thorough` orchestration, and reports an enablement gate. The feature must stay disabled
-unless model-backed recall exceeds this 92.55% baseline while the held-out benign set remains at zero false
-positives.
+Each mode requires exactly the named provider configuration documented in the repository README, forces
+every case through paid `thorough` orchestration, and reports both the configured execution order and the
+tier responsible for each counted detection or false positive. `embedding-only` rejects an enabled semantic
+tier, `semantic-only` rejects an enabled embedding tier, and `combined` requires both. This prevents a
+combined run from being labeled as an isolated model result.
+
+The fixed `0.82` embedding-similarity and `0.80` semantic-confidence thresholds are both explicitly
+`uncalibrated`; no independent labeled calibration data exists for either threshold. Claiming a calibrated
+threshold requires a real provider/key and a separate independently labeled calibration set; the held-out
+evaluation cases must not be used for tuning. Temporary synthetic fixtures verify harness routing and
+accounting only, never model performance. Model-tier runs cannot use `--record` and therefore cannot update
+`history.jsonl` or the public evaluation file. Keep both network tiers disabled unless a real
+provider-backed held-out evaluation beats the 92.55% baseline with zero benign false positives and an
+independently reviewed public-evidence schema is added.
 
 A semantic-enabled run recorded on 2026-07-16 against the original 28-case set is published separately in
 `history.jsonl`: **71.43% recall (20/28)** with **0.00% false positives
 (0/16)**. That historical measurement predates both the Decoder Wall pre-pass and the expanded evasion set,
 so it is not comparable to the current 94-case deterministic baseline. The deterministic `results.json`
 remains the reproducible offline baseline. Repository configuration does not enable the paid semantic
-runtime, and reproducing that after-result requires an explicitly configured external model.
+runtime, and reproducing that after-result requires an explicitly configured external model. No
+real-provider threshold calibration or current model-tier performance result is published.
 
 `tests/test_d4_benchmark.py` reruns the evaluation and requires byte-equivalent JSON data after
 parsing, so detector changes must update the published result intentionally.

@@ -7,22 +7,53 @@ Warden keeps payment enforcement at the HTTP boundary. The scan engine, auditor,
 - Package: `okxweb3-app-x402[fastapi,evm]==0.1.0`.
 - Module path: the package provides the `x402` imports used by `warden/api.py`.
 - Activation: middleware is installed only when `OKX_API_KEY` is present in the environment.
-- Required production env when active: `OKX_API_KEY`, `OKX_SECRET_KEY`, `OKX_PASSPHRASE`, `PAY_TO_ADDRESS`, and optional `OKX_BASE_URL`.
+- Required production env: `WARDEN_REQUIRE_PAYWALL=1`, `OKX_API_KEY`,
+  `OKX_SECRET_KEY`, `OKX_PASSPHRASE`, and `PAY_TO_ADDRESS`.
+- Facilitator origin: the installed package's trusted default,
+  `https://web3.okx.com`. `OKX_BASE_URL` may be omitted or set to that exact
+  value; plaintext, paths, credentials, ports, and alternate facilitator
+  origins are rejected. Signed facilitator requests do not follow redirects.
+- Rail contract: x402 v2 `exact`, OKX facilitator, X Layer mainnet
+  (`eip155:196`), X Layer USDT
+  (`0x779ded0c9e1022225f8e0630b35a9b54be713736`, 6 decimals), and
+  `500000` atomic units (`0.5 USDT`). `warden/payment.py` passes the
+  atomic amount and asset explicitly; it does not rely on dollar-price or
+  default-token inference.
+- EIP-712 domain: the token's signed authorization metadata is pinned to
+  `{"name":"USD₮0","version":"1"}`. `USDT` remains the user-facing market
+  symbol; it is not the token contract's EIP-712 domain name. The installed
+  x402 package's `USDT` default is therefore overridden explicitly.
+- Unsupported `WARDEN_PAYMENT_*` overrides fail at startup instead of silently
+  switching scheme, facilitator, network, asset, amount, symbol, or decimals.
+  Coinbase, Base, Solana, AP2, metered, and `upto` rails are not implemented.
+- `WARDEN_REQUIRE_PAYWALL` accepts only documented boolean values. Production
+  sets `WARDEN_REQUIRE_PAYWALL=1` in the systemd unit so missing payment
+  credentials or a misspelled boolean stops startup rather than exposing paid
+  routes for free.
 - Security configuration:
   - `WARDEN_RATE_LIMIT_PER_MIN` (default `60`; set to `0` to disable rate-limiting)
+  - `WARDEN_RATE_LIMIT_DB` (production: `/opt/warden/data/rate-limit.db`; shared
+    fixed-window counters and verified-payer grants fail closed if unavailable)
   - `WARDEN_DEMO_RATE_LIMIT_PER_MIN` (default `20`; independent limit for `/api/demo/*`)
   - `WARDEN_REQUIRE_CONSENT` (`true`/`false`)
   - `WARDEN_BADGE_SECRET` (required in production; the public development default is forgeable)
 - Local/tests: when `OKX_API_KEY` is absent, `/scan` and `/audit` are free and the test suite runs without payment mocks.
 
-## Production Terms
+## Corrected source terms
 
-Live unpaid probes verified on 2026-07-13 returned x402 v2 `exact` challenges:
+The tested source contract on this branch is:
 
 | Route | Price | Network | Token | Pay to |
 |---|---:|---|---|---|
 | `POST /scan` | `0.5 USDT` | `eip155:196` | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | `0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51` |
 | `POST /audit` | `0.5 USDT` | `eip155:196` | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | `0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51` |
+
+These corrections are not yet deployed. A read-only probe on 2026-07-18
+confirmed that the live `/scan` challenge still publishes the stale
+`{"name":"USDT","version":"1"}` domain even though its amount, asset, network,
+and recipient match the table. Do not use that live challenge as evidence of a
+payable authorization. Deploy and read-only reprobe the exact domain before
+claiming live payment or settlement correctness.
 
 `GET /health` and `/api/demo/*` stay free. The playground uses only those routes. The `/hire` page makes an unpaid `GET` request to `/scan` or `/audit` to read the current 402 terms, then guides an agent operator through the paid, reviewable task flow; browser code does not sign or submit the paid service call.
 
@@ -60,4 +91,10 @@ subprocess.run(
 
 ## Demo Boundary
 
-The live payment gate is verified. The browser playground uses the free, fast-only `/api/demo/scan` route, while production `/scan` and `/audit` remain paid. A fully settled paid demo is not complete until the user funds a buyer wallet with USDT and gas on X Layer and explicitly approves a paid replay. Use `demo/run_demo.py --mode local` for the no-funds recording path.
+The corrected source payment gate is covered by local contract tests; live
+verification remains pending deployment and reprobe. The browser playground
+uses the free, fast-only `/api/demo/scan` route, while production `/scan` and
+`/audit` remain paid. A fully settled paid demo is not complete until the user
+funds a buyer wallet with USDT and gas on X Layer and explicitly approves a
+paid replay. Use `demo/run_demo.py --mode local` for the no-funds recording
+path.

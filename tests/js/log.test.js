@@ -16,6 +16,7 @@ const {
 } = require(logPath);
 const BREAKER_ID = "0123456789abcdef0123456789abcdef";
 const BENCHMARK_CASE_ID = "gauntlet-0123456789abcdef";
+const AUDIT_ID = "0123456789abcdef";
 
 function entry(seq, prevHash, overrides = {}) {
   return {
@@ -40,6 +41,20 @@ function breakerEntry(seq, prevHash, overrides = {}) {
     certificate_id: BREAKER_ID,
     benchmark_case_id: BENCHMARK_CASE_ID,
     record_hash: "c".repeat(64),
+    prev_hash: prevHash,
+    ...overrides,
+  };
+}
+
+function auditEntry(seq, prevHash, overrides = {}) {
+  return {
+    seq,
+    ts: 1_789_000_000 + seq,
+    event: "audit-issued",
+    record_type: "endpoint-audit-attestation",
+    audit_id: AUDIT_ID,
+    endpoint_host: "audit.example.org",
+    record_hash: "e".repeat(64),
     prev_hash: prevHash,
     ...overrides,
   };
@@ -149,6 +164,33 @@ test("log payload normalization accepts typed BREAKER entries and rejects ambigu
   );
 });
 
+test("log payload normalization accepts endpoint-audit lifecycle entries and rejects ambiguous shapes", () => {
+  const issued = auditEntry(1, GENESIS_PREV_HASH);
+  const revoked = auditEntry(2, "f".repeat(64), {
+    event: "audit-revoked",
+  });
+  assert.deepEqual(
+    normalizeLogPayload({ entries: [issued, revoked], total: 2 }),
+    [issued, revoked],
+  );
+  for (const overrides of [
+    { event: "issued" },
+    { audit_id: "0123456789abcdeF" },
+    { endpoint_host: "" },
+    { attestation_id: "ambiguous-subject" },
+    { record_type: "endpoint-audit" },
+  ]) {
+    assert.throws(
+      () =>
+        normalizeLogPayload({
+          entries: [auditEntry(1, GENESIS_PREV_HASH, overrides)],
+          total: 1,
+        }),
+      /audit|record_type|endpoint_host|attestation_id/,
+    );
+  }
+});
+
 test("browser-compatible SHA-256 verifies continuity and detects tampering", async () => {
   const entries = await validChain();
   const verified = await verifyLogChain(entries, webcrypto);
@@ -188,6 +230,32 @@ test("mixed APA and BREAKER entries verify as one chain and reject breaker tampe
   assert.match(rejected.reason, /previous entry hash/);
 });
 
+test("APA, BREAKER, and endpoint-audit entries verify in one chain", async () => {
+  const first = entry(1, GENESIS_PREV_HASH);
+  const second = breakerEntry(
+    2,
+    await sha256Hex(canonicalJson(first), webcrypto),
+  );
+  const third = auditEntry(
+    3,
+    await sha256Hex(canonicalJson(second), webcrypto),
+  );
+  const fourth = auditEntry(
+    4,
+    await sha256Hex(canonicalJson(third), webcrypto),
+    {
+      event: "audit-revoked",
+    },
+  );
+
+  const verified = await verifyLogChain(
+    [first, second, third, fourth],
+    webcrypto,
+  );
+  assert.equal(verified.ok, true);
+  assert.equal(verified.total, 4);
+});
+
 test("sequence and genesis failures stay distinguishable from valid chains", async () => {
   const badGenesis = [entry(1, "f".repeat(64))];
   const genesisResult = await verifyLogChain(badGenesis, webcrypto);
@@ -203,6 +271,8 @@ test("sequence and genesis failures stay distinguishable from valid chains", asy
 test("human log renderer uses text nodes and never HTML injection", () => {
   const source = fs.readFileSync(logPath, "utf8");
   assert.match(source, /textContent/);
+  assert.match(source, /Endpoint audit/);
+  assert.match(source, /Audit ID/);
   assert.doesNotMatch(source, /innerHTML|insertAdjacentHTML|document\.write/);
 });
 

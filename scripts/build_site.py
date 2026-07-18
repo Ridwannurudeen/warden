@@ -18,6 +18,10 @@ from warden.sitemap import write_crawler_files  # noqa: E402
 DEFAULT_DOCS_OUTPUT = ROOT / "site" / "docs"
 DEFAULT_SPEC_OUTPUT = ROOT / "site" / "spec" / "APA-SPEC.md"
 DEFAULT_SITE_ROOT = ROOT / "site"
+PUBLIC_SPEC_FILES = (
+    "ASP-PAYLOAD-SECURITY-STANDARD.md",
+    "payload-security-profile-v0.1.json",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -71,7 +75,12 @@ def main() -> None:
     render_docs(ROOT, args.docs_output)
     args.spec_output.parent.mkdir(parents=True, exist_ok=True)
     args.spec_output.write_bytes((ROOT / "spec" / "APA-SPEC.md").read_bytes())
-    print("Built 11 reason-code pages, the documentation index, and the public APA spec.")
+    for name in PUBLIC_SPEC_FILES:
+        (args.spec_output.parent / name).write_bytes((ROOT / "spec" / name).read_bytes())
+    print(
+        "Built 11 reason-code pages, the documentation index, the public APA spec, "
+        "and the ASP payload-security standard."
+    )
     site_root = _crawler_site_root(args)
     if site_root is not None:
         versioned = version_static_assets(site_root)

@@ -55,7 +55,7 @@ discovery response is complete for that query, not that every marketplace listin
 mismatch is rendered as partial/degraded without assigning a cause.
 
 [`scripts/refresh_safety_index.py`](scripts/refresh_safety_index.py) stages and validates each capture before
-atomically switching the public `current` release. The accompanying systemd service and persistent six-hour
+atomically switching the public `current` release. The accompanying systemd service and persistent 30-minute
 timer are source-ready but are not deployed or claimed active.
 
 ## See it in action
@@ -170,7 +170,8 @@ WardenClient(local=True, fail_open=False)
 - **Runtime:** Python 3.11+, FastAPI 0.137.1, Pydantic 2.13.4, httpx 0.28.1, and FastMCP 3.4.2.
 - **Decision path:** deterministic scanner categories plus drain-address, tool-hijack, exfiltration, and
   malicious-link analyzers. The free, local, and fast paths are always deterministic. A separately
-  configured model can inspect otherwise-undetected paid `thorough` requests after those layers.
+  configured embedding tier and semantic classifier can inspect otherwise-undetected paid `thorough`
+  requests after those layers.
 - **Proof path:** an endpoint self-signs `/.well-known/agent-protection`; the issuer verifies freshness,
   nonce uniqueness, and Ed25519 ownership before TOFU-binding `endpoint_host` to the key.
 - **Transparency:** issuance and status changes append to a SHA-256 hash chain at `/apa/log`.
@@ -179,29 +180,61 @@ WardenClient(local=True, fail_open=False)
   hosted fetch client with Express-style middleware and no local engine.
 - **Frontend:** dependency-free HTML, CSS, and JavaScript with self-hosted fonts and a self-only CSP.
 
-### Optional paid semantic layer
+### Optional paid model tiers
 
 The semantic layer is disabled unless all of `WARDEN_SEMANTIC_ENABLED=true`,
 `WARDEN_SEMANTIC_ENDPOINT`, `WARDEN_SEMANTIC_MODEL`, `WARDEN_SEMANTIC_API_KEY`, and the paid-runtime
 `OKX_API_KEY` are present. The endpoint must be HTTPS and accept a chat-style model-inference request.
-Warden applies a two-second timeout, caps the response at 16 KiB, validates the model's JSON, and falls
-back to the deterministic verdict on every transport, timeout, or schema failure. Only paid `/scan`
-requests with `depth=thorough` can opt in; deterministic findings short-circuit the model call.
+The embedding tier independently requires `WARDEN_EMBEDDING_ENABLED=true`,
+`WARDEN_EMBEDDING_ENDPOINT`, `WARDEN_EMBEDDING_MODEL`, `WARDEN_EMBEDDING_API_KEY`, and `OKX_API_KEY`.
+Both endpoints must be HTTPS. Warden applies a two-second timeout, bounded uncompressed responses, and
+strict JSON decoding that rejects malformed data, duplicate object keys, and non-finite numbers. Transport,
+timeout, and schema failures preserve the deterministic verdict. Only paid `/scan` requests with
+`depth=thorough` can opt in; deterministic findings short-circuit both network tiers, and an embedding hit
+short-circuits semantic classification.
 
-Before enabling it, run `python scripts/benchmark_recall.py --semantic --json` in the configured runtime.
-The result includes `semantic_enablement_gate.passed`; keep the feature disabled unless recall beats the
-committed deterministic baseline and the held-out benign set remains at zero false positives. No semantic
-runtime is enabled by repository configuration.
+The benchmark exposes four exact modes:
 
-### APA and legacy audit badges
+```bash
+python scripts/benchmark_recall.py --mode deterministic --json
+python scripts/benchmark_recall.py --mode embedding-only --json
+python scripts/benchmark_recall.py --mode semantic-only --json
+python scripts/benchmark_recall.py --mode combined --json
+```
 
-| Contract               | Signature                                          | Evidence                                                                                                                       | Verification                                                                              |
-| ---------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| **APA attestation**    | Ed25519 issuer signature with a published key      | Fresh endpoint-key control, `guard-live` state, signed rolling 24-hour count or explicit unavailable state, and current status | Portable offline verification plus optional live proof refresh                            |
-| **Legacy audit badge** | HMAC-SHA256 with server-held `WARDEN_BADGE_SECRET` | Point-in-time, consented endpoint-audit score and battery result                                                               | Server verification through `/badge/{audit_id}` or `/api/badges`; not public-key portable |
+Each provider-backed mode refuses missing or extra tier configuration instead of silently attributing a
+combined result to one model. Its JSON reports the configured execution order, attack/false-positive
+attribution, and a comparison gate against the committed deterministic baseline. The fixed `0.82`
+embedding-similarity and `0.80` semantic-confidence thresholds are both explicitly `uncalibrated`; no
+independent labeled calibration data exists for either threshold. Synthetic fixtures test harness routing
+only and are not performance evidence.
+`--record` remains deterministic-only, so model-tier output cannot update public history or evaluation data.
+No network model tier is enabled by repository configuration.
 
-The legacy routes stay available for compatibility. They are not APA records and must not be presented as
-offline-verifiable attestations.
+### APA and endpoint audit evidence
+
+| Contract                    | Signature                                          | Evidence                                                                                                                       | Verification                                                                                                            |
+| --------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| **APA attestation**         | Ed25519 issuer signature with a published key      | Fresh endpoint-key control, `guard-live` state, signed rolling 24-hour count or explicit unavailable state, and current status | Portable offline verification plus optional live proof refresh                                                          |
+| **Portable endpoint audit** | Ed25519 issuer signature with a published key      | Exact subject, fixed battery identity and hash, conclusive result, consent, liveness, issue and expiry times, and limitations   | `/apa/audit/{audit_id}` verifies the signature, issuance-log binding, current expiry, and any append-only revocation    |
+| **Legacy audit badge**      | HMAC-SHA256 with server-held `WARDEN_BADGE_SECRET` | Point-in-time, consented endpoint-audit score and battery result                                                               | Server verification through `/badge/{audit_id}` or `/api/badges`; not public-key portable                               |
+
+Every new conclusive, consented audit issues the portable record and appends `audit-issued` to the shared
+transparency log. Revocation appends `audit-revoked` without mutating the signed record. The issuer signature
+can travel with the record; establishing its current lifecycle still requires the issuer key history and log.
+The legacy routes stay available for compatibility and remain clearly labelled as narrower server-verified
+records.
+
+### Warden Shield lifecycle
+
+[`warden/shield.py`](warden/shield.py) adds a source-ready recurring audit lifecycle for explicitly
+owner-enrolled endpoints. It runs only due targets through the existing consented fixed-battery auditor,
+accepts a renewal only when active portable evidence matches the enrolled subject and battery identity, and
+records `initial`, `unchanged`, `improved`, `regressed`, or `inconclusive` without replacing the prior
+baseline on stale or inconclusive evidence. State and drift events are cross-process safe and bounded; the
+optional HTTPS alert contains no probe payloads or secrets. The daily hardened timer and operator contract
+are documented in [`docs/SHIELD_LIFECYCLE.md`](docs/SHIELD_LIFECYCLE.md). They are not deployed or a
+commercial SLA claim.
 
 Issuer rotation keeps only the current signing seed. Set `WARDEN_ISSUER_KID` for that key and, after a
 rotation, point `WARDEN_ISSUER_HISTORY` at a public-only JSON file shaped as
@@ -228,16 +261,48 @@ an availability claim.
 | `GET`  | `/health/ready`                               | Local scanner and paid-route configuration readiness            |
 | `POST` | `/api/demo/scan`                              | Free, rate-limited, fast-only payload scan                      |
 | `POST` | `/api/demo/theater`                           | Verdict-gated, no-side-effect demo ASP with delivery receipt    |
+| `POST` | `/api/feedback`                               | Explicit opt-in, redacted outcome feedback                      |
+| `GET`  | `/api/threat-intel/v1/summary`                | Aggregate feedback counts with k=5 suppression                  |
 | `POST` | `/scan`                                       | Production x402 payload scan                                    |
 | `POST` | `/audit`                                      | Production x402 endpoint audit                                  |
 | `GET`  | `/.well-known/apa-issuer.json`                | Current and recent issuer Ed25519 verification keys             |
 | `POST` | `/apa/register`                               | Probe `{endpoint}`, TOFU-bind its key, and issue an attestation |
 | `GET`  | `/apa/attestation/{attestation_id}`           | Attestation JSON and effective status                           |
 | `GET`  | `/apa/attestation/{attestation_id}/badge.svg` | No-store SVG rendering the true current status                  |
+| `GET`  | `/apa/audit/{audit_id}`                       | Signed endpoint-audit record, log binding, and lifecycle        |
 | `GET`  | `/apa/log`                                    | HTML for browsers; hash-chained JSON entries for API clients    |
 | `POST` | `/apa/revoke`                                 | Key-signed attestation revocation                               |
 | `GET`  | `/badge/{audit_id}`                           | Legacy HMAC audit badge record                                  |
 | `GET`  | `/api/badges`                                 | Legacy public audit-badge registry                              |
+
+## Explicit feedback and aggregate threat intelligence
+
+Scans do not create feedback implicitly. `POST /api/feedback` is a separate, rate-limited action that accepts
+only an outcome, the observed verdict, one implemented threat class, a caller-prepared redacted reproducer,
+and two literal `true` confirmations: consent to retain and confirmation that the reproducer is redacted.
+Unknown fields are rejected. The contract has no field for the original scan payload, endpoint, wallet,
+submitter identity, or arbitrary metadata.
+
+Pending feedback is stored in a cross-process lock-safe private queue with a 90-day expiry and a hard cap of
+5,000 live records. Expired records are excluded and the queue is compacted on its next read or write.
+Scanner-equivalent Unicode and whitespace-normalized duplicate submissions share one pending record. The queue
+stores the redacted reproducer, structured labels, submission and expiry times, scanner version, corpus fingerprint,
+and verified duplicate/content digests. It is runtime state under `data/feedback/`, not committed source. That path
+remains inside the service's existing persistent writable data boundary; `WARDEN_FEEDBACK_STORE` can override it for
+another deployment layout.
+
+The separately rate-limited `GET /api/threat-intel/v1/summary` publishes a cell only when its exact
+outcome/threat-class group contains at least five accepted records. Smaller groups are absent from the cells,
+published total, and observation-window start; the route does not expose their exact size or timing. The response
+never contains submitted text, feedback identifiers, digests, endpoints, wallets, or submitter details. These
+self-reported, deduplicated counts do not measure threat prevalence.
+
+Nothing learns from feedback automatically. `scripts/review_feedback.py` requires an explicit human-review
+confirmation and can promote a consented redacted reproducer to exactly one training or held-out dataset.
+It shares one promotion lock with Gauntlet review and rejects scanner-equivalent overlap across all four datasets
+and the built-in injection list. The deterministic report generator remains `insufficient-data` until at least
+25 records are included in k=5 cells and at least 30 days have elapsed since the earliest included
+observation. Its paired JSON and Markdown outputs contain aggregate data only.
 
 ## Project layout
 
@@ -245,7 +310,7 @@ an availability claim.
 warden/                 # FastAPI service, verdict engine, APA issuer, and stores
 sdk/python/             # Source-installed sync/async SDK, middleware, decorator, proof, CLI
 sdk/ts/                 # Source-built hosted TypeScript client and Express-style middleware
-spec/                   # APA v0.1 wire spec and portable reference verifier
+spec/                   # APA wire spec, conformance pack, and public payload-security standard
 site/                   # Static product UI and generated public spec/docs
 tests/                  # API, crypto, corpus, site, and integration contracts
 corpus/                 # 94 attack cases and 30 benign false-positive guards
@@ -270,12 +335,21 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
   0.00% false positives (0/16), measured on the original 28-case set before the pre-pass and the expanded
   evasion family, so it is not directly comparable. Repository configuration still leaves the runtime
   disabled. Its fail-open behavior preserves the deterministic verdict when inference is unavailable, and
-  reproducing the recorded result requires an explicitly configured model.
+  reproducing the recorded result requires an explicitly configured model. Neither model tier has a
+  real-provider calibration result or independently labeled threshold-selection run; both fixed thresholds
+  remain uncalibrated and disabled by default.
 - The endpoint auditor assumes the target accepts `POST` JSON with a `payload` field. It rejects internal
-  network targets, redirects, oversized responses, and slow endpoints.
+  network targets, redirects, oversized responses, and slow endpoints. A portable endpoint-audit record is
+  point-in-time evidence, not certification, continuous monitoring, or proof of future behavior. Its current
+  active, stale, or revoked state depends on the issuer's key history and transparency log.
+- Warden Shield is a source-ready scheduling and comparison mechanism, not a deployed managed service. It
+  requires explicit owner enrollment and live target consent; an inconclusive result preserves prior
+  evidence, while a battery change requires a new enrollment revision before comparisons resume.
 - Marketplace evidence reports dated schema-v2 `sampled`, `expected`, and `dropped` coverage. Re-check
   listing state, service IDs, prices, and counts before an external claim.
-- The atomic six-hour Safety Index refresh and systemd units are source-ready, not deployed or claimed live.
+- The atomic 30-minute Marketplace Evidence Index refresh and systemd units are source-ready for the
+  documented versioned-index layout, not deployed or claimed live. The current flat VPS layout and its
+  marketplace CLI/provider remain operator preflight gates.
 - The TypeScript SDK has no local engine; its default free hosted path is best-effort because
   `failOpen: true` converts transport failures into `ALLOW` telemetry.
 - Trust Layer web routes are source-ready but require explicit deployment approval before they are live.

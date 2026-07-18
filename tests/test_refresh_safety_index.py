@@ -91,7 +91,7 @@ def _write_release(release: Path, summary: dict[str, object] | None = None) -> N
 def _build_runner(calls: list[list[str]], summary: dict[str, object] | None = None):
     def run(command: list[str], cwd: Path) -> None:
         calls.append(command)
-        assert cwd.name == "warden"
+        assert cwd == ROOT
         release = _argument(command, "--snapshot").parents[2]
         _write_release(release, summary)
 

@@ -137,10 +137,10 @@
         <p class="hero-text">
           These terms describe the implemented service boundary for public
           demos, paid scans and audits, the adversarial Gauntlet, and signed
-          audit badges.
+          audit badges, plus separately consented redacted feedback.
         </p>
         <p class="snapshot-note">
-          Last updated <time datetime="2026-07-17">17 July 2026</time>.
+          Last updated <time datetime="2026-07-18">18 July 2026</time>.
         </p>
       </section>
 
@@ -150,6 +150,7 @@
           <a href="#decision-boundary">Security decision boundary</a>
           <a href="#authorized-audits">Authorized endpoint audits</a>
           <a href="#gauntlet-submissions">Gauntlet submissions</a>
+          <a href="#feedback-submissions">Opt-in feedback</a>
           <a href="#badge-records">Badges and registry records</a>
           <a href="#payments">Payments and marketplace activity</a>
           <a href="#availability">Availability and limits</a>
@@ -164,6 +165,8 @@
               <code>/api/demo/gauntlet/stats</code>,
               <code>/api/demo/gauntlet/breakers</code>,
               <code>/api/demo/gauntlet/breakers/{certificate_id}</code>,
+              <code>POST /api/feedback</code>,
+              <code>GET /api/threat-intel/v1/summary</code>,
               <code>/api/badges</code>, <code>/badge/{audit_id}</code>,
               <code>/apa/log</code>, and <code>/health</code> routes. Production
               <code>POST /scan</code> and <code>POST /audit</code> are protected
@@ -228,6 +231,36 @@
             </p>
           </section>
 
+          <section id="feedback-submissions">
+            <h2>Opt-in feedback</h2>
+            <p>
+              Feedback is a separate action and is never inferred from a scan.
+              By calling <code>POST /api/feedback</code>, you confirm that the
+              submitted reproducer is redacted, that you are authorized to
+              share it, and that Warden may retain it for review. Do not submit
+              an original private payload, credentials, personal information,
+              wallet material, or content you lack permission to share.
+            </p>
+            <p>
+              Submission does not promise detector changes, publication, or
+              inclusion in a dataset. There is no automatic learning path. A
+              human reviewer may promote and publish the redacted reproducer in
+              exactly one training or held-out dataset only after category,
+              consent, duplicate, and cross-dataset checks. Once promoted, the
+              redacted reproducer may remain in that dataset beyond the pending
+              feedback-retention period.
+            </p>
+            <p>
+              Public threat-intelligence output contains only aggregate cells
+              with at least five accepted records. Smaller groups are absent
+              from published cells, totals, and observation timing. The output
+              excludes submitted text and record-level identifiers. Counts are
+              self-reported and scanner-equivalent duplicates are collapsed;
+              they are not a measurement of attack prevalence, detector
+              accuracy, or the safety of any agent or endpoint.
+            </p>
+          </section>
+
           <section id="badge-records">
             <h2>Badges and registry records</h2>
             <p>
@@ -256,7 +289,11 @@
             <p>
               The <code>/api/demo/*</code> routes use a dedicated public-demo
               rate-limit budget, while <code>/scan</code> and
-              <code>/audit</code> use the paid-route budget. The current
+              <code>/audit</code> use the paid-route budget.
+              <code>POST /api/feedback</code> uses a separate feedback budget.
+              <code>GET /api/threat-intel/v1/summary</code> uses a separate
+              read budget.
+              The current
               application does not apply that limiter to <code>/health</code>,
               <code>/api/badges</code>, or <code>/badge/{audit_id}</code>.
               Availability, marketplace listing state, corpus content, and

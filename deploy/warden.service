@@ -9,8 +9,12 @@ WorkingDirectory=/opt/warden
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=WARDEN_CORS_ORIGINS=https://warden.gudman.xyz
+Environment=WARDEN_METRICS_DB=/opt/warden/data/runtime-metrics.db
+Environment=WARDEN_RATE_LIMIT_DB=/opt/warden/data/rate-limit.db
+Environment=WARDEN_PROTECTION_DB=/opt/warden/data/protection.db
+Environment=WARDEN_REQUIRE_PAYWALL=1
 EnvironmentFile=/opt/warden/.env
-ExecStart=/opt/warden/.venv/bin/uvicorn warden.api:app --host 127.0.0.1 --port 8031
+ExecStart=/opt/warden/.venv/bin/uvicorn warden.api:app --host 127.0.0.1 --port 8031 --workers 2
 Restart=always
 RestartSec=5
 User=warden

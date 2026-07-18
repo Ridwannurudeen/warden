@@ -9,7 +9,12 @@ from datetime import date
 from urllib.parse import urlsplit
 
 from warden import protection, protection_store
-from warden.badges import canonical_target, ed25519_sign_record, ed25519_verify_record
+from warden.badges import (
+    canonical_host,
+    canonical_target,
+    ed25519_sign_record,
+    ed25519_verify_record,
+)
 
 SPEC_VERSION = "apa-audit/0.1"
 PREDICATE_TYPE = "https://warden.gudman.xyz/spec/endpoint-audit/v1"
@@ -73,22 +78,26 @@ def _valid_subject(subject: object, endpoint_host: object) -> bool:
     if (
         not endpoint_host
         or len(endpoint_host) > 253
-        or endpoint_host != endpoint_host.rstrip(".").casefold()
         or any(character.isspace() or ord(character) < 32 for character in endpoint_host)
     ):
         return False
     try:
+        canonical_endpoint_host = canonical_host(endpoint_host)
         parsed = urlsplit(subject)
         port = parsed.port
+        canonical_subject_host = (
+            canonical_host(parsed.hostname) if parsed.hostname is not None else None
+        )
     except ValueError:
         return False
     if (
-        parsed.scheme not in {"http", "https"}
+        endpoint_host != canonical_endpoint_host
+        or parsed.scheme not in {"http", "https"}
         or parsed.hostname is None
         or parsed.username is not None
         or parsed.password is not None
         or parsed.fragment
-        or parsed.hostname.rstrip(".").casefold() != endpoint_host.rstrip(".").casefold()
+        or canonical_subject_host != canonical_endpoint_host
     ):
         return False
     return (
@@ -141,9 +150,7 @@ def issue_audit_attestation(
         "liveness_passed": True,
         "observed_on": observed_on,
         "issued_at": current,
-        "expires_at": (
-            current + ATTESTATION_TTL_SECONDS if type(current) is int else current
-        ),
+        "expires_at": (current + ATTESTATION_TTL_SECONDS if type(current) is int else current),
         "limitations": LIMITATIONS,
         "log_seq": log_seq,
     }
@@ -219,9 +226,8 @@ def verify_audit_attestation(record: dict[str, object]) -> bool:
         or not 1 <= log_seq <= protection.MAX_SAFE_UNIX_SECONDS
     ):
         return False
-    if (
-        not isinstance(observed_on, str)
-        or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", observed_on)
+    if not isinstance(observed_on, str) or not re.fullmatch(
+        r"[0-9]{4}-[0-9]{2}-[0-9]{2}", observed_on
     ):
         return False
     try:
@@ -297,19 +303,25 @@ def publish_from_badge(badge: dict[str, object]) -> dict[str, object]:
         or (port is not None and (type(port) is not int or not 1 <= port <= 65535))
     ):
         raise ValueError("audit badge target is malformed")
-    subject = canonical_target(
-        scheme,
-        host,
-        port,
-        path,
-        query,
-    )
+    target_host = badge.get("target_host")
+    try:
+        endpoint_host = canonical_host(host)
+        badge_endpoint_host = canonical_host(target_host) if isinstance(target_host, str) else None
+        subject = canonical_target(
+            scheme,
+            host,
+            port,
+            path,
+            query,
+        )
+    except ValueError as exc:
+        raise ValueError("audit badge target is malformed") from exc
     blocked = badge.get("blocked")
     total = badge.get("total")
     benign_total = battery.get("benign_total")
     benign_passed = battery.get("benign_passed")
     if (
-        host != badge.get("target_host")
+        endpoint_host != badge_endpoint_host
         or not _is_lower_hex(badge.get("audit_id"), 16)
         or not isinstance(battery.get("id"), str)
         or not battery["id"]
@@ -339,7 +351,7 @@ def publish_from_badge(badge: dict[str, object]) -> dict[str, object]:
         record_factory=lambda log_seq: issue_audit_attestation(
             audit_id=str(badge["audit_id"]),
             subject=subject,
-            endpoint_host=str(badge["target_host"]),
+            endpoint_host=endpoint_host,
             battery_id=str(battery["id"]),
             battery_version=str(battery["version"]),
             battery_sha256=str(battery["hash"]),

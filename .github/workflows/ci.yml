@@ -9,14 +9,54 @@ permissions:
   contents: read
 
 jobs:
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install checksum-pinned TruffleHog
+        shell: bash
+        env:
+          TRUFFLEHOG_VERSION: "3.95.9"
+          TRUFFLEHOG_SHA256: f6d1106b85107d79527ed7a5b98b592beadd8b770dc3c9e8c1ad99e1b2cf127e
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/trufflehog.tar.gz"
+          binary_dir="$RUNNER_TEMP/trufflehog-bin"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            "https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/trufflehog_${TRUFFLEHOG_VERSION}_linux_amd64.tar.gz" \
+            --output "$archive"
+          printf '%s  %s\n' "$TRUFFLEHOG_SHA256" "$archive" | sha256sum --check --strict
+          mkdir -p "$binary_dir"
+          tar --extract --gzip --file "$archive" --directory "$binary_dir" trufflehog
+          chmod 0755 "$binary_dir/trufflehog"
+          test "$("$binary_dir/trufflehog" --version)" = "trufflehog ${TRUFFLEHOG_VERSION}"
+          printf 'TRUFFLEHOG_BIN=%s\n' "$binary_dir/trufflehog" >> "$GITHUB_ENV"
+      - name: Scan full current history for secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$TRUFFLEHOG_BIN" git "file://${GITHUB_WORKSPACE}" \
+            --branch HEAD \
+            --fail \
+            --fail-on-scan-errors \
+            --no-update \
+            --github-actions \
+            --results=verified,unknown \
+            --exclude-globs=benchmark/held_out_benign.jsonl,sdk/python/tests/test_ph5_reverse_proxy.py,tests/test_apa_browser_verifier.py
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.11"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: "22"
       - name: Install hash-locked Python dependencies

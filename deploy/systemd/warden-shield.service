@@ -1,0 +1,29 @@
+[Unit]
+Description=Run due owner-enrolled Warden Shield endpoint audits
+After=network-online.target warden.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+TimeoutStartSec=20m
+WorkingDirectory=/opt/warden
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=HOME=/opt/warden
+Environment=PATH=/opt/warden/.venv/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/opt/warden/shield.env
+ExecStart=/usr/bin/flock --exclusive --nonblock /opt/warden/data/shield/.runner.lock /opt/warden/.venv/bin/python /opt/warden/scripts/run_shield.py --config /opt/warden/shield-targets.json --state /opt/warden/data/shield/lifecycle.json
+User=warden
+Group=warden
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectProc=invisible
+PrivateTmp=true
+PrivateDevices=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+InaccessiblePaths=/opt/warden/.env -/opt/warden/index.env -/opt/warden/gauntlet -/opt/warden/logs -/opt/warden/monitor -/opt/warden/anchor
+ReadOnlyPaths=/opt/warden/shield-targets.json
+ReadWritePaths=/opt/warden/data /opt/warden/badges

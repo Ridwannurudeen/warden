@@ -18,14 +18,12 @@ def test_app_service_matches_flat_production_with_only_persistent_state_writable
         "Environment=PYTHONDONTWRITEBYTECODE=1",
         "EnvironmentFile=/opt/warden/.env",
         "ExecStart=/opt/warden/.venv/bin/uvicorn",
-        "ReadWritePaths=/opt/warden/data /opt/warden/badges "
-        "/opt/warden/gauntlet /opt/warden/logs",
+        "ReadWritePaths=/opt/warden/data /opt/warden/badges /opt/warden/gauntlet /opt/warden/logs",
     ):
         assert contract in service
     assert "/opt/warden/current" not in service
     assert [line for line in service.splitlines() if line.startswith("ReadWritePaths=")] == [
-        "ReadWritePaths=/opt/warden/data /opt/warden/badges "
-        "/opt/warden/gauntlet /opt/warden/logs"
+        "ReadWritePaths=/opt/warden/data /opt/warden/badges /opt/warden/gauntlet /opt/warden/logs"
     ]
 
 
@@ -89,14 +87,14 @@ def test_marketplace_fetch_runs_as_a_dedicated_secretless_identity():
     assert "EnvironmentFile=/opt/warden/index.env" in index_service
 
 
-def test_index_timer_is_persistent_six_hour_calendar_with_jitter():
+def test_index_timer_is_persistent_half_hour_calendar_with_bounded_jitter():
     timer = (SYSTEMD / "warden-index.timer").read_text(encoding="utf-8")
 
-    assert "OnCalendar=*-*-* 00/6:00:00 UTC" in timer
+    assert "OnCalendar=*-*-* *:00/30:00 UTC" in timer
     assert "Persistent=true" in timer
     randomized = re.search(r"^RandomizedDelaySec=(\d+)m$", timer, re.MULTILINE)
     assert randomized
-    assert 1 <= int(randomized.group(1)) <= 60
+    assert 1 <= int(randomized.group(1)) <= 5
     assert "WantedBy=timers.target" in timer
 
 
@@ -316,13 +314,9 @@ def test_rollback_installs_matching_versioned_configs_before_restart():
     ):
         assert f'install -m 0644 "$app/{source}" {destination}' in rollback
     assert (
-        'render_app_service "$app/deploy/warden.service" "$rollback_service" '
-        "/opt/warden/current"
+        'render_app_service "$app/deploy/warden.service" "$rollback_service" /opt/warden/current'
     ) in rollback
-    assert (
-        'install -m 0644 "$rollback_service" /etc/systemd/system/warden.service'
-        in rollback
-    )
+    assert 'install -m 0644 "$rollback_service" /etc/systemd/system/warden.service' in rollback
     assert rollback.index("install -m 0644") < rollback.index("systemctl daemon-reload")
     assert rollback.index("nginx -t") < rollback.index(
         'mv -Tf "/opt/warden/.current-rollback-$release" /opt/warden/current'

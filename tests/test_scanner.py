@@ -1,12 +1,10 @@
 """Tests for the copied ShieldBot injection scanner in Warden imports."""
 
-from pathlib import Path
 import re
-import subprocess
-import sys
 
 import pytest
 
+from tests.subprocess_helpers import run_python_operation_after_startup
 from warden.scanner.patterns import INJECTION_PATTERNS, KNOWN_INJECTIONS, SIMILARITY_THRESHOLD
 
 ROLE_OVERRIDE_CASES = [
@@ -139,67 +137,65 @@ class TestLayer1Regex:
         assert "encoding_tricks" in categories
 
     def test_web3_sign_pattern_completes_for_max_length_whitespace(self):
-        code = (
+        setup = (
             "import re\n"
             "from warden.models import MAX_PAYLOAD_LENGTH\n"
             "from warden.scanner.patterns import INJECTION_PATTERNS\n"
             "payload = 'sign' + ' ' * (MAX_PAYLOAD_LENGTH - len('sign'))\n"
+        )
+        operation = (
             "pattern = re.compile(INJECTION_PATTERNS['web3_specific'][7])\n"
             "assert pattern.search(payload) is None\n"
         )
 
-        subprocess.run(
-            [sys.executable, "-c", code],
-            cwd=Path(__file__).resolve().parents[1],
-            check=True,
+        run_python_operation_after_startup(
+            setup=setup,
+            operation=operation,
             timeout=2,
         )
 
     def test_web3_sign_pattern_completes_for_repeated_near_matches(self):
-        code = (
+        setup = (
             "import re\n"
             "from warden.models import MAX_PAYLOAD_LENGTH\n"
             "from warden.scanner.patterns import INJECTION_PATTERNS\n"
             "payload = ('sign x ' * 14286)[:MAX_PAYLOAD_LENGTH]\n"
+        )
+        operation = (
             "pattern = re.compile(INJECTION_PATTERNS['web3_specific'][7])\n"
             "assert pattern.search(payload) is None\n"
         )
 
-        subprocess.run(
-            [sys.executable, "-c", code],
-            cwd=Path(__file__).resolve().parents[1],
-            check=True,
+        run_python_operation_after_startup(
+            setup=setup,
+            operation=operation,
             timeout=2,
         )
 
     def test_web3_sign_pattern_preserves_repeated_prefix_and_long_distance_matches(self):
         pattern = re.compile(INJECTION_PATTERNS["web3_specific"][7])
-        long_distance = (
-            "sign "
-            + ("x" * (100_000 - 47))
-            + "0x"
-            + ("a" * 40)
-        )
+        long_distance = "sign " + ("x" * (100_000 - 47)) + "0x" + ("a" * 40)
 
         assert pattern.search("sign x sign y transaction") is not None
         assert len(long_distance) == 100_000
         assert pattern.search(long_distance) is not None
 
     def test_web3_approval_pattern_completes_for_max_length_whitespace(self):
-        code = (
+        setup = (
             "import re\n"
             "from warden.models import MAX_PAYLOAD_LENGTH\n"
             "from warden.scanner.patterns import INJECTION_PATTERNS\n"
             "prefix = 'authorize all assets'\n"
             "payload = prefix + ' ' * (MAX_PAYLOAD_LENGTH - len(prefix))\n"
+        )
+        operation = (
             "pattern = re.compile(INJECTION_PATTERNS['web3_specific'][8])\n"
             "assert pattern.search(payload) is None\n"
         )
 
-        subprocess.run(
-            [sys.executable, "-c", code],
-            cwd=Path(__file__).resolve().parents[1],
-            check=True,
+        run_python_operation_after_startup(
+            setup=setup,
+            operation=operation,
             timeout=2,
         )
 

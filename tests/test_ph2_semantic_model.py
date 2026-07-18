@@ -12,6 +12,7 @@ from warden.site_docs import render_docs
 from warden.scanner.semantic import (
     HttpSemanticAnalyzer,
     SemanticClassification,
+    SemanticThreatCategory,
     build_semantic_analyzer_from_env,
 )
 
@@ -58,6 +59,7 @@ async def test_semantic_adapter_uses_a_model_inference_contract():
                                     "flagged": True,
                                     "confidence": 0.93,
                                     "reason": "Instruction authority displacement.",
+                                    "category": "PROMPT_INJECTION",
                                 }
                             )
                         }
@@ -79,6 +81,7 @@ async def test_semantic_adapter_uses_a_model_inference_contract():
         flagged=True,
         confidence=0.93,
         reason="Instruction authority displacement.",
+        category=SemanticThreatCategory.PROMPT_INJECTION,
     )
 
 
@@ -113,6 +116,7 @@ async def test_semantic_adapter_parses_a_fenced_json_reply():
                     "flagged": True,
                     "confidence": 0.9,
                     "reason": "Policy bypass request.",
+                    "category": "PROMPT_INJECTION",
                 }
             )
             + "\n```"
@@ -132,6 +136,7 @@ async def test_semantic_adapter_parses_a_fenced_json_reply():
         flagged=True,
         confidence=0.9,
         reason="Policy bypass request.",
+        category=SemanticThreatCategory.PROMPT_INJECTION,
     )
 
 
@@ -165,6 +170,7 @@ class BenchmarkSemanticAnalyzer:
             flagged=flagged,
             confidence=0.95 if flagged else 0.05,
             reason="Instruction authority displacement." if flagged else "No displacement.",
+            category=(SemanticThreatCategory.PROMPT_INJECTION if flagged else None),
         )
 
 
@@ -201,8 +207,9 @@ async def test_semantic_benchmark_uses_paid_thorough_path_and_reports_gate(tmp_p
     result = await evaluate_benchmark(
         attacks,
         benign,
-        semantic=True,
+        mode="semantic-only",
         engine=WardenEngine(semantic_analyzer=analyzer),
+        harness_only=True,
     )
 
     assert analyzer.calls == [
@@ -211,10 +218,11 @@ async def test_semantic_benchmark_uses_paid_thorough_path_and_reports_gate(tmp_p
     ]
     assert result["attack_recall_percent"] == 100.0
     assert result["false_positive_rate_percent"] == 0.0
-    assert result["semantic_enablement_gate"] == {
-        "baseline_recall_percent": 92.55,
-        "requires_zero_false_positives": True,
-        "passed": True,
+    assert result["model_tier_enablement_gate"] == {
+        "mode": "semantic-only",
+        "eligible": False,
+        "passed": None,
+        "reason": "synthetic fixture results are not performance evidence",
     }
 
 

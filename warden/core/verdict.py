@@ -33,18 +33,38 @@ SCANNER_CATEGORY_REASON_CODES: dict[str, ReasonCode] = {
     "encoding_tricks": ReasonCode.ENCODING_TRICK,
     "statistical_analysis": ReasonCode.STATISTICAL_ANOMALY,
     "corpus_match": ReasonCode.CORPUS_MATCH,
-    "ai_analysis": ReasonCode.PROMPT_INJECTION,
-}
-
-SCANNER_RISK_SCORE = {
-    "NONE": 0.0,
-    "LOW": 30.0,
-    "MEDIUM": 55.0,
-    "HIGH": 80.0,
-    "CRITICAL": 100.0,
+    "embedding_match": ReasonCode.CORPUS_MATCH,
+    "ai_prompt_injection": ReasonCode.PROMPT_INJECTION,
+    "ai_drain_address": ReasonCode.DRAIN_ADDRESS,
+    "ai_secret_exfil": ReasonCode.SECRET_EXFIL,
+    "ai_tool_hijack": ReasonCode.TOOL_HIJACK,
 }
 
 REDACTED_SECRET_MATCH = "[REDACTED SECRET]"
+VERDICT_ORDER = {"ALLOW": 0, "SANITIZE": 1, "BLOCK": 2}
+RISK_ORDER = {"NONE": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
+
+
+@dataclass(frozen=True)
+class PolicyRule:
+    minimum_score: float
+    verdict: VerdictValue
+    risk_level: RiskLevel
+
+
+SCANNER_POLICY_TABLE: dict[str, PolicyRule] = {
+    "NONE": PolicyRule(0, "ALLOW", "NONE"),
+    "LOW": PolicyRule(0, "SANITIZE", "LOW"),
+    "MEDIUM": PolicyRule(0, "SANITIZE", "MEDIUM"),
+    "HIGH": PolicyRule(0, "SANITIZE", "HIGH"),
+    "CRITICAL": PolicyRule(0, "BLOCK", "CRITICAL"),
+}
+ANALYZER_POLICY_TABLE = (
+    PolicyRule(70, "BLOCK", "HIGH"),
+    PolicyRule(55, "SANITIZE", "MEDIUM"),
+    PolicyRule(20, "SANITIZE", "LOW"),
+    PolicyRule(0, "ALLOW", "NONE"),
+)
 
 
 @dataclass
@@ -61,7 +81,7 @@ class Verdict:
 
 
 class VerdictEngine:
-    """Short-circuit hard gates before applying deterministic risk bands."""
+    """Short-circuit hard gates before applying deterministic policy tables."""
 
     def decide(
         self,
@@ -107,13 +127,23 @@ class VerdictEngine:
             )
 
         scanner_risk = str(scanner_result.get("risk_level", "NONE")) if scanner_result else "NONE"
-        scanner_score = SCANNER_RISK_SCORE.get(scanner_risk, 100.0)
-        analyzer_score = self._analyzer_score(analyzer_results)
-        score = self._composite_score(scanner_score, analyzer_score, analyzer_results)
+        scanner_policy = SCANNER_POLICY_TABLE.get(scanner_risk)
+        if scanner_policy is None:
+            checks["scanner_risk"] = f"fail - unsupported risk level ({scanner_risk})"
+            return Verdict(
+                verdict="BLOCK",
+                risk_level="CRITICAL",
+                threat_classes=threat_classes,
+                detections=detections,
+                sanitized_payload=sanitized_payload,
+                recommendation="Block this payload. Scanner risk metadata is invalid.",
+                checks=checks,
+                failed_checks=threat_classes,
+            )
 
-        checks["scanner_risk"] = f"{scanner_risk.lower()} - score {scanner_score:.0f}"
+        analyzer_score = self._analyzer_score(analyzer_results)
+        checks["scanner_risk"] = f"{scanner_risk.lower()} - policy {scanner_policy.verdict.lower()}"
         checks["analyzer_score"] = f"score {analyzer_score:.1f}"
-        checks["composite_score"] = f"score {score:.1f}"
 
         hard_block = self._hard_block_reason(detections, scanner_risk)
         if hard_block is not None:
@@ -133,24 +163,45 @@ class VerdictEngine:
                 failed_checks=[hard_block],
             )
 
-        if not math.isfinite(score) or score < 0:
-            checks["score_validation"] = f"fail - invalid score ({score})"
+        if not math.isfinite(analyzer_score) or analyzer_score < 0:
+            checks["score_validation"] = f"fail - invalid analyzer score ({analyzer_score})"
             return Verdict(
                 verdict="BLOCK",
                 risk_level="CRITICAL",
                 threat_classes=threat_classes,
                 detections=detections,
                 sanitized_payload=sanitized_payload,
-                recommendation="Block this payload. Composite risk score is invalid.",
+                recommendation="Block this payload. Analyzer risk score is invalid.",
                 checks=checks,
                 failed_checks=threat_classes,
             )
 
-        if score >= 70:
-            checks["risk_band"] = f"block - score {score:.1f} >= 70"
+        analyzer_policy = next(
+            rule for rule in ANALYZER_POLICY_TABLE if analyzer_score >= rule.minimum_score
+        )
+        selected_policy = max(
+            (scanner_policy, analyzer_policy),
+            key=lambda rule: VERDICT_ORDER[rule.verdict],
+        )
+        selected_risk = max(
+            (scanner_policy.risk_level, analyzer_policy.risk_level),
+            key=lambda risk: RISK_ORDER[risk],
+        )
+        selected_verdict = selected_policy.verdict
+        if detections and selected_verdict == "ALLOW":
+            selected_verdict = "SANITIZE"
+            if selected_risk in {"NONE", "LOW"}:
+                selected_risk = "MEDIUM"
+        checks["policy_table"] = (
+            f"{selected_verdict.lower()} - scanner {scanner_policy.verdict.lower()}, "
+            f"analyzers {analyzer_policy.verdict.lower()}"
+        )
+
+        if selected_verdict == "BLOCK":
+            checks["risk_band"] = f"block - analyzer score {analyzer_score:.1f} or scanner policy"
             return Verdict(
                 verdict="BLOCK",
-                risk_level=self._risk_level(score, scanner_risk, hard_block=False),
+                risk_level=selected_risk,
                 threat_classes=threat_classes,
                 detections=detections,
                 sanitized_payload=sanitized_payload,
@@ -159,8 +210,10 @@ class VerdictEngine:
                 failed_checks=threat_classes,
             )
 
-        if score < 20 and not detections:
-            checks["risk_band"] = f"allow - score {score:.1f} < 20 and no detections"
+        if selected_verdict == "ALLOW":
+            checks["risk_band"] = (
+                f"allow - analyzer score {analyzer_score:.1f} and scanner policy allow"
+            )
             return Verdict(
                 verdict="ALLOW",
                 risk_level="NONE",
@@ -176,8 +229,8 @@ class VerdictEngine:
         # actually removed (e.g. a tool-hijack, which the redactor cannot rewrite),
         # do not hand back the untouched attack labelled "sanitized" — block it.
         if detections and sanitized_payload == payload:
-            checks["risk_band"] = f"block - threat present but not sanitizable (score {score:.1f})"
-            unsanitizable_risk = self._risk_level(score, scanner_risk, hard_block=False)
+            checks["risk_band"] = "block - threat present but not sanitizable"
+            unsanitizable_risk = selected_risk
             if unsanitizable_risk in ("NONE", "LOW"):
                 unsanitizable_risk = "MEDIUM"
             return Verdict(
@@ -191,8 +244,8 @@ class VerdictEngine:
                 failed_checks=threat_classes,
             )
 
-        checks["risk_band"] = f"sanitize - score {score:.1f} in review band or detections present"
-        risk_level = self._risk_level(score, scanner_risk, hard_block=False)
+        checks["risk_band"] = f"sanitize - analyzer score {analyzer_score:.1f} or scanner policy"
+        risk_level = selected_risk
         if detections and risk_level in {"NONE", "LOW"}:
             risk_level = "MEDIUM"
         return Verdict(
@@ -298,18 +351,6 @@ class VerdictEngine:
         return sum(result.score * result.weight for result in analyzer_results)
 
     @staticmethod
-    def _composite_score(
-        scanner_score: float,
-        analyzer_score: float,
-        analyzer_results: Sequence[AnalyzerResult],
-    ) -> float:
-        if scanner_score > 0 and analyzer_results:
-            return scanner_score * 0.5 + analyzer_score * 0.5
-        if analyzer_results:
-            return analyzer_score
-        return scanner_score
-
-    @staticmethod
     def _hard_block_reason(
         detections: Sequence[Mapping[str, object]],
         scanner_risk: str,
@@ -332,7 +373,7 @@ class VerdictEngine:
                 normalized_match = (
                     match.replace("\t", "").replace("\r", "").replace("\n", "").lower()
                 )
-                if normalized_match.startswith(("javascript:", "vbscript:")):
+                if normalized_match.startswith(("file:", "javascript:", "vbscript:")):
                     return ReasonCode.MALICIOUS_LINK
         if scanner_risk == "CRITICAL":
             return VerdictEngine._highest_confidence_scanner_reason(detections)
@@ -367,15 +408,3 @@ class VerdictEngine:
             if match:
                 sanitized = sanitized.replace(match, "[REDACTED]")
         return sanitized
-
-    @staticmethod
-    def _risk_level(score: float, scanner_risk: str, hard_block: bool) -> RiskLevel:
-        if hard_block or scanner_risk == "CRITICAL":
-            return "CRITICAL"
-        if score >= 70:
-            return "HIGH"
-        if score >= 55:
-            return "MEDIUM"
-        if score >= 20:
-            return "LOW"
-        return "NONE"

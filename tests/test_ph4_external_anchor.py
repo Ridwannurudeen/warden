@@ -261,6 +261,22 @@ def test_checkpoint_publication_requires_an_existing_history(tmp_path):
         )
 
 
+def test_anchor_history_rejects_growth_past_the_retained_entry_limit():
+    oversized = {
+        "schema_version": 1,
+        "status": "published",
+        "history_head_hash": "0" * 64,
+        "anchors": [{}] * (anchor_history.MAX_ANCHOR_HISTORY_ENTRIES + 1),
+    }
+
+    with pytest.raises(anchor_history.AnchorHistoryError, match="retained-entry limit"):
+        anchor_history.validate_anchor_history(
+            oversized,
+            [],
+            verify_signatures=False,
+        )
+
+
 def test_public_anchor_sentinel_is_explicitly_unpublished():
     root = Path(__file__).resolve().parents[1]
     sentinel = json.loads(
@@ -280,5 +296,10 @@ def test_public_anchor_sentinel_is_explicitly_unpublished():
     page = (root / "site" / "log.html").read_text(encoding="utf-8")
     script = (root / "site" / "log.js").read_text(encoding="utf-8")
     assert "data-apa-log-anchor" in page
-    assert "says explicitly when it is unpublished" in page
+    assert "data-apa-log-history-head" in page
+    assert 'name="history_head"' in page
+    assert "says explicitly when it is unpublished" in " ".join(page.split())
     assert 'fetchImpl("/data/apa-log-anchor.json"' in script
+    assert 'fetchImpl("/data/apa-log-anchor-history.json"' in script
+    assert "verifyLogChainWithPrefixes(entries, cryptoImpl)" in script
+    assert "entries.slice(0, anchor.checkpoint.seq)" not in script

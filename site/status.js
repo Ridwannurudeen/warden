@@ -121,7 +121,9 @@
       recall !== current.attack_recall_percent ||
       falsePositiveRate !== current.false_positive_rate_percent
     ) {
-      throw new Error("Evaluation recall or false-positive rate is inconsistent");
+      throw new Error(
+        "Evaluation recall or false-positive rate is inconsistent",
+      );
     }
     if (
       typeof current.measured_at !== "string" ||
@@ -137,7 +139,9 @@
       methodology.benign_false_positive !== "any non-ALLOW decision" ||
       typeof methodology.semantic_enabled !== "boolean"
     ) {
-      throw new Error("Evaluation methodology must describe the held-out contract");
+      throw new Error(
+        "Evaluation methodology must describe the held-out contract",
+      );
     }
     const expectedMode = methodology.semantic_enabled
       ? "paid thorough path; semantic after deterministic layers"
@@ -157,49 +161,86 @@
     };
   }
 
-  function normalizeMonitor(payload) {
+  function normalizeMonitor(payload, now = new Date()) {
     if (
       !payload ||
       typeof payload !== "object" ||
-      payload.schema_version !== 1 ||
+      Object.keys(payload).sort().join(",") !==
+        "samples,schema_version,status" ||
+      payload.schema_version !== 2 ||
       !Array.isArray(payload.samples) ||
+      payload.samples.length > 9_000 ||
       !["not_running", "collecting"].includes(payload.status)
     ) {
-      throw new Error("Monitor data must be a schema-v1 object");
+      throw new Error("Monitor data must be a schema-v2 object");
     }
     if (payload.status === "not_running") {
       if (payload.samples.length) {
         throw new Error("A stopped monitor cannot publish samples");
       }
       return {
-        state: "Not measured",
-        window: "No recorded readiness samples",
-        availability: "Not measured",
+        state: "Monitor not running",
+        monitorState: "not_running",
+        sourceState: "degraded",
+        window: "No scheduled readiness samples have been recorded",
+        applicationAvailability: "Not measured",
+        challengeReadiness: "Not measured",
         latest: "No probe recorded",
+        applicationLatest: "No probe recorded",
+        challengeLatest: "No probe recorded",
       };
     }
     if (!payload.samples.length) {
       throw new Error("A collecting monitor must publish at least one sample");
     }
 
+    function normalizeComponent(component, label, allowedStatuses) {
+      if (
+        !component ||
+        typeof component !== "object" ||
+        Object.keys(component).sort().join(",") !==
+          "http_status,latency_ms,status" ||
+        !allowedStatuses.includes(component.status) ||
+        (component.http_status !== null &&
+          (!Number.isInteger(component.http_status) ||
+            component.http_status < 100 ||
+            component.http_status > 599)) ||
+        !Number.isFinite(component.latency_ms) ||
+        component.latency_ms < 0
+      ) {
+        throw new Error(`Monitor ${label} sample is malformed`);
+      }
+      return { ...component };
+    }
+
     const samples = payload.samples.map((sample) => {
       if (
         !sample ||
         typeof sample !== "object" ||
+        Object.keys(sample).sort().join(",") !==
+          "application,checked_at,x402_challenge" ||
         typeof sample.checked_at !== "string" ||
         !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(sample.checked_at) ||
-        Number.isNaN(Date.parse(sample.checked_at)) ||
-        !["ready", "not_ready", "error"].includes(sample.status) ||
-        (sample.http_status !== null &&
-          (!Number.isInteger(sample.http_status) ||
-            sample.http_status < 100 ||
-            sample.http_status > 599)) ||
-        !Number.isFinite(sample.latency_ms) ||
-        sample.latency_ms < 0
+        Number.isNaN(Date.parse(sample.checked_at))
       ) {
         throw new Error("Monitor sample is malformed");
       }
-      return { ...sample, timestamp: Date.parse(sample.checked_at) };
+      const application = normalizeComponent(
+        sample.application,
+        "application",
+        ["ready", "not_ready", "error"],
+      );
+      const x402Challenge = normalizeComponent(
+        sample.x402_challenge,
+        "x402 challenge",
+        ["ready", "not_ready", "error", "disabled"],
+      );
+      return {
+        checked_at: sample.checked_at,
+        timestamp: Date.parse(sample.checked_at),
+        application,
+        x402Challenge,
+      };
     });
     for (let index = 1; index < samples.length; index += 1) {
       if (samples[index].timestamp <= samples[index - 1].timestamp) {
@@ -207,25 +248,66 @@
       }
     }
 
-    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-    const cadenceComplete = samples.every(
-      (sample, index) =>
-        index === 0 || sample.timestamp - samples[index - 1].timestamp <= 10 * 60 * 1000,
-    );
-    const complete =
-      samples.length >= 8640 &&
-      samples[samples.length - 1].timestamp - samples[0].timestamp >=
-        thirtyDaysMs &&
-      cadenceComplete;
-    const readyCount = samples.filter((sample) => sample.status === "ready").length;
+    const nowDate = now instanceof Date ? now : new Date(now);
+    const nowTimestamp = nowDate.getTime();
+    if (Number.isNaN(nowTimestamp)) {
+      throw new Error("Monitor evaluation time is invalid");
+    }
     const latest = samples[samples.length - 1];
+    if (latest.timestamp > nowTimestamp) {
+      throw new Error("Monitor evidence is newer than the evaluation time");
+    }
+
+    const cadenceMs = 5 * 60 * 1000;
+    const staleAfterMs = 10 * 60 * 1000;
+    const expectedSlots = 30 * 24 * 12;
+    const currentSlot = Math.floor(nowTimestamp / cadenceMs);
+    const firstSlot = currentSlot - expectedSlots + 1;
+    const slots = new Map();
+    for (const sample of samples) {
+      const slot = Math.floor(sample.timestamp / cadenceMs);
+      if (slot < firstSlot || slot > currentSlot) {
+        continue;
+      }
+      const existing = slots.get(slot) || {
+        applicationReady: true,
+        challengeReady: true,
+      };
+      existing.applicationReady =
+        existing.applicationReady && sample.application.status === "ready";
+      existing.challengeReady =
+        existing.challengeReady && sample.x402Challenge.status === "ready";
+      slots.set(slot, existing);
+    }
+    const complete = slots.size === expectedSlots;
+    const slotValues = [...slots.values()];
+    const applicationReady = slotValues.filter(
+      (slot) => slot.applicationReady,
+    ).length;
+    const challengeReady = slotValues.filter(
+      (slot) => slot.challengeReady,
+    ).length;
+    const percentage = (ready) =>
+      `${((ready / expectedSlots) * 100).toFixed(2)}%`;
+    const stale = nowTimestamp - latest.timestamp > staleAfterMs;
     return {
-      state: complete ? "30-day window measured" : "Collecting evidence",
-      window: `${samples.length.toLocaleString("en-US")} recorded readiness samples; 30-day window ${complete ? "complete" : "incomplete"}`,
-      availability: complete
-        ? `${((readyCount / samples.length) * 100).toFixed(2)}%`
+      state: stale
+        ? "Monitor stale"
+        : complete
+          ? "30-day window measured"
+          : "Collecting evidence",
+      monitorState: stale ? "stale" : "collecting",
+      sourceState: stale ? "degraded" : "dated",
+      window: `${slots.size.toLocaleString("en-US")} of ${expectedSlots.toLocaleString("en-US")} current-window slots observed; 30-day window ${complete ? "complete" : "incomplete"}`,
+      applicationAvailability: complete
+        ? percentage(applicationReady)
         : "Not measured",
-      latest: `${latest.checked_at} — ${latest.status.replace("_", " ")}`,
+      challengeReadiness: complete
+        ? percentage(challengeReady)
+        : "Not measured",
+      latest: `${latest.checked_at} \u2014 application ${latest.application.status.replaceAll("_", " ")}; unsigned x402 challenge ${latest.x402Challenge.status.replaceAll("_", " ")}`,
+      applicationLatest: `${latest.checked_at} \u2014 ${latest.application.status.replaceAll("_", " ")}`,
+      challengeLatest: `${latest.checked_at} \u2014 ${latest.x402Challenge.status.replaceAll("_", " ")}`,
     };
   }
 
@@ -539,14 +621,22 @@
       const monitor = normalizeMonitor(await response.json());
       text("[data-monitor-state]", monitor.state);
       text("[data-monitor-window]", monitor.window);
-      text("[data-monitor-availability]", monitor.availability);
       text("[data-monitor-latest]", monitor.latest);
+      text(
+        "[data-monitor-application-availability]",
+        monitor.applicationAvailability,
+      );
+      text("[data-monitor-challenge-readiness]", monitor.challengeReadiness);
+      text("[data-monitor-application-latest]", monitor.applicationLatest);
+      text("[data-monitor-challenge-latest]", monitor.challengeLatest);
       sourceStamp(
         "[data-monitor-source]",
-        monitor.state === "Not measured" ? "unknown" : "dated",
-        monitor.state === "Not measured"
-          ? "no readiness samples or snapshot timestamp are published"
-          : `latest readiness evidence ${monitor.latest}`,
+        monitor.sourceState,
+        monitor.monitorState === "not_running"
+          ? "scheduled readiness monitor has not started"
+          : monitor.monitorState === "stale"
+            ? `scheduled monitor is stale; latest sample ${monitor.latest}`
+            : `latest readiness evidence ${monitor.latest}`,
       );
     } catch (error) {
       sourceStamp(
@@ -556,8 +646,11 @@
       );
       text("[data-monitor-state]", "Evidence unavailable");
       text("[data-monitor-window]", "Evidence unavailable");
-      text("[data-monitor-availability]", "Not measured");
       text("[data-monitor-latest]", "Evidence unavailable");
+      text("[data-monitor-application-availability]", "Not measured");
+      text("[data-monitor-challenge-readiness]", "Not measured");
+      text("[data-monitor-application-latest]", "Evidence unavailable");
+      text("[data-monitor-challenge-latest]", "Evidence unavailable");
     }
   }
 
