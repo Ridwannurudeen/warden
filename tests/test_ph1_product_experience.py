@@ -234,12 +234,12 @@ def test_homepage_exposes_source_states_without_ambiguous_initial_placeholders()
         assert state in (SITE / "app.js").read_text(encoding="utf-8")
     assert 'data-source-stamp="ILLUSTRATIVE"' in page
     assert 'data-source-stamp="UNKNOWN"' in page
-    assert 'applySourceStamp(productProofStatus, "DATED")' in (
-        SITE / "app.js"
-    ).read_text(encoding="utf-8")
-    assert 'applySourceStamp(productProofStatus, "DEGRADED")' in (
-        SITE / "app.js"
-    ).read_text(encoding="utf-8")
+    assert 'applySourceStamp(productProofStatus, "DATED")' in (SITE / "app.js").read_text(
+        encoding="utf-8"
+    )
+    assert 'applySourceStamp(productProofStatus, "DEGRADED")' in (SITE / "app.js").read_text(
+        encoding="utf-8"
+    )
     assert ">Loading" not in page
     assert ">Checking" not in page
     assert ">—<" not in page
@@ -269,8 +269,8 @@ def test_homepage_brand_system_supports_both_themes_mobile_and_reduced_motion():
     css = (SITE / "styles.css").read_text(encoding="utf-8")
 
     assert "LUMINOUS TRUST" not in css
-    assert "--accent: #356f86" in css
-    assert "--accent: #68adc1" in css
+    assert "--accent: #b88a2a" in css
+    assert "--accent: #d7aa49" in css
     assert "--block: #b64045" in css
     assert ':root[data-theme="dark"]' in css
     for selector in (
