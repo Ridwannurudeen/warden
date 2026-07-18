@@ -1,10 +1,10 @@
 {
   "schemaVersion": 2,
-  "capturedAt": "2026-07-16T02:47:26Z",
+  "capturedAt": "2026-07-18T18:35:07Z",
   "query": "a",
-  "sampled": 730,
-  "expected": 752,
-  "dropped": 22,
-  "matchedCount": 2,
+  "sampled": 882,
+  "expected": 885,
+  "dropped": 3,
+  "matchedCount": 5,
   "auditedCount": 0
 }

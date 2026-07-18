@@ -18,7 +18,7 @@ def test_hire_catalog_is_derived_from_marketplace_snapshot():
 
     assert catalog["providerAgentId"] == "3808"
     assert catalog["schemaVersion"] == 1
-    assert catalog["snapshotFetchedAt"] == "2026-07-16T02:47:26Z"
+    assert catalog["snapshotFetchedAt"] == "2026-07-18T18:35:07Z"
     assert [service["key"] for service in catalog["services"]] == ["scan", "audit"]
     assert [service["feeAmount"] for service in catalog["services"]] == ["0.5", "0.5"]
     service_ids = [service["serviceId"] for service in catalog["services"]]

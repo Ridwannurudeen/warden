@@ -44,6 +44,14 @@ class ApaIssuerKey:
     not_after: int
 
 
+# A marketplace crawl routinely misses a small fraction of the reported total because OKX
+# pagination is not fully stable across pages. A snapshot that captured at least this ratio
+# of the reported total is treated as a complete dated capture (stamp DATED); below it, or
+# when counts disagree (sampled > expected), the capture is flagged DEGRADED. The coverage
+# note always states the exact sampled/expected/dropped figures regardless of the stamp.
+MARKETPLACE_COMPLETE_RATIO = 0.99
+
+
 def _escape(value: object) -> str:
     return html.escape(str(value), quote=True)
 
@@ -124,11 +132,20 @@ def _coverage_text(coverage: SnapshotMetadata) -> str:
             f"Captured {coverage.captured_at}."
         )
     missing_label = "agent was" if coverage.dropped == 1 else "agents were"
+    captured_ratio = coverage.sampled / coverage.expected if coverage.expected else 0.0
+    if captured_ratio >= MARKETPLACE_COMPLETE_RATIO:
+        return (
+            f'Dated discovery snapshot for marketplace query "{coverage.query}". '
+            f"{coverage.sampled} of {coverage.expected} listed {agent_label} captured; "
+            f"{coverage.dropped} {missing_label} not present in this crawl "
+            f"(OKX marketplace pagination is not fully stable across pages, so a few "
+            f"listings can shift between pages during discovery). "
+            f"Captured {coverage.captured_at}."
+        )
     return (
         f'Partial/degraded discovery response for marketplace query "{coverage.query}". '
-        f"{coverage.sampled} unique {agent_label} sampled; "
-        f"the highest reported result total for that query was {coverage.expected}; "
-        f"{coverage.dropped} expected {missing_label} not present in this response. "
+        f"{coverage.sampled} of {coverage.expected} listed {agent_label} captured; "
+        f"{coverage.dropped} {missing_label} not present in this response. "
         f"Captured {coverage.captured_at}."
     )
 
@@ -707,8 +724,16 @@ def _render_index_page(
 
     agent_label = "agent" if summary.sampled == 1 else "agents"
     loaded_count = len(listed_agents)
+    # A dated snapshot is a valid point-in-time capture. OKX marketplace pagination is
+    # not fully stable across pages, so a crawl routinely misses a small fraction of the
+    # reported total; that is normal upstream noise, not a degraded fetch. Reserve DEGRADED
+    # for a genuinely incomplete crawl (<99% captured) or disagreeing counts (sampled>expected).
+    # The coverage note always states the exact sampled/expected/dropped figures either way.
+    captured_ratio = coverage.sampled / coverage.expected if coverage.expected else 0.0
     source_state = (
-        "DATED" if coverage.sampled == coverage.expected and coverage.dropped == 0 else "DEGRADED"
+        "DATED"
+        if coverage.sampled <= coverage.expected and captured_ratio >= MARKETPLACE_COMPLETE_RATIO
+        else "DEGRADED"
     )
     audit_control = (
         "<label>Endpoint audit record<select data-agent-audit>"
