@@ -94,7 +94,7 @@ OUTBOUND_SINK_RE = re.compile(
     r")"
 )
 OUTBOUND_FLOW_RE = re.compile(
-    r"(?i)\b(?:include|attach|place|put|embed|append|copy|route|forward|send|"
+    r"(?i)\b(?:include|attach|place|put|embed|append|copy|route|forward|send(?:ing)?|"
     r"upload|post|transmit|write|add|contain|contains|containing|populate|set|"
     r"carry|insert|serialize|encode|export|map|includes)\b"
 )

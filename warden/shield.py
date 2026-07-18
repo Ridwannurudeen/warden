@@ -745,7 +745,7 @@ async def run_due_audits(
             observed: dict[str, object] | None = None
             try:
                 response = await audit_client.audit(target.target_url)
-            except ValueError:
+            except (RuntimeError, ValueError):
                 response = None
             if response is not None:
                 audit_id = _audit_id(response)
@@ -754,7 +754,7 @@ async def run_due_audits(
                 else:
                     try:
                         evidence = resolve_evidence(audit_id)
-                    except (OSError, ValueError):
+                    except (OSError, RuntimeError, ValueError):
                         reason = "evidence_unavailable"
                     else:
                         observed, evidence_problem = _baseline_from_evidence(

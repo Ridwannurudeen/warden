@@ -79,6 +79,26 @@ def test_shield_runner_requires_production_consent_and_signing_state(monkeypatch
         run_shield._require_production_environment()
 
 
+def test_shield_runner_converts_runtime_failure_to_generic_count_free_error(
+    monkeypatch,
+    capsys,
+):
+    async def fail_run(*_args, **_kwargs):
+        raise RuntimeError("sensitive runtime configuration detail")
+
+    monkeypatch.setattr(run_shield, "_require_production_environment", lambda: None)
+    monkeypatch.setattr(run_shield, "run_due_audits", fail_run)
+
+    exit_code = run_shield.main(["--config", "targets.json", "--state", "state.json"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert captured.out == ""
+    assert captured.err == "Warden Shield run failed; target and credential details withheld.\n"
+    assert "configured=" not in captured.err
+    assert "sensitive runtime configuration detail" not in captured.err
+
+
 def test_example_config_and_operator_document_are_explicit_and_honest():
     example = (ROOT / "deploy" / "shield-targets.example.json").read_text(encoding="utf-8")
     runbook = (ROOT / "docs" / "SHIELD_LIFECYCLE.md").read_text(encoding="utf-8")

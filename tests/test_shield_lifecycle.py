@@ -376,6 +376,64 @@ async def test_failed_inconclusive_and_stale_audits_never_renew_prior_evidence(t
     assert [summary["inconclusive"] for summary in summaries] == [0, 1, 1, 1]
 
 
+@pytest.mark.parametrize(
+    ("failure_stage", "reason"),
+    [
+        ("audit", "audit_failed"),
+        ("evidence", "evidence_unavailable"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_runtime_configuration_failure_persists_metadata_only_inconclusive_event(
+    tmp_path,
+    failure_stage,
+    reason,
+):
+    config = _write_config(tmp_path / "targets.json")
+    state = tmp_path / "state.json"
+    initial_id = "0000000000000001"
+    next_id = "0000000000000002"
+    await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(initial_id)]),
+        evidence_resolver=lambda _audit_id: _evidence(
+            initial_id,
+            blocked=18,
+            issued_at=NOW,
+        ),
+        now=NOW,
+    )
+    failure = RuntimeError("sensitive runtime configuration detail")
+    auditor = _QueuedAuditor([failure if failure_stage == "audit" else _response(next_id)])
+
+    def resolve(_audit_id: str) -> dict[str, object]:
+        raise failure
+
+    summary = await shield.run_due_audits(
+        config,
+        state,
+        auditor=auditor,
+        evidence_resolver=resolve,
+        now=NOW + 86_400,
+    )
+
+    lifecycle = _state(state)
+    target_state = lifecycle["targets"]["example-production"]
+    event = lifecycle["events"][-1]
+    serialized = json.dumps(event)
+    assert summary["inconclusive"] == 1
+    assert shield.service_exit_code(summary) == 1
+    assert target_state["baseline"]["audit_id"] == initial_id
+    assert event["comparison"] == "inconclusive"
+    assert event["reason"] == reason
+    assert event["previous_evidence"]["audit_id"] == initial_id
+    assert event["observed_evidence"] is None
+    assert event["notification"] == "not_configured"
+    assert "RuntimeError" not in serialized
+    assert "sensitive runtime configuration detail" not in serialized
+
+
 @pytest.mark.asyncio
 async def test_changed_enrollment_requires_a_revision_and_starts_a_new_baseline(tmp_path):
     config = _write_config(tmp_path / "targets.json")

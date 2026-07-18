@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
                 notifier=notifier,
             )
         )
-    except (OSError, ValueError, httpx.HTTPError):
+    except (OSError, RuntimeError, ValueError, httpx.HTTPError):
         print(
             "Warden Shield run failed; target and credential details withheld.",
             file=sys.stderr,
