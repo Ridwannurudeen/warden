@@ -544,7 +544,12 @@ def test_integrate_leads_with_source_installed_sdk_and_honest_tiers():
     assert "4,000" in page
     assert "pip install warden-guard" not in page
     assert "unrelated" in page
-    assert page.count("Source-backed OnchainOS, x402, Python, TypeScript, MCP, and agent-framework integration patterns for Warden.") == 2
+    assert (
+        page.count(
+            "Source-backed OnchainOS, x402, Python, TypeScript, MCP, and agent-framework integration patterns for Warden."
+        )
+        == 2
+    )
     assert page.count("returned transformed text") >= 2
     assert "returned safe text" not in page
     assert "forwards only safe text" not in page
@@ -727,11 +732,11 @@ def test_shared_styles_meet_wcag_contrast_contract():
     }
     assert required_tokens <= dark.keys()
     assert required_tokens <= light.keys()
-    assert light["accent-bright"] == "#285d73"
+    assert light["accent-bright"] == "#8c6516"
     assert light["danger"] == "#b64045"
-    assert light["faint"] == "#5b6974"
-    assert light["control-border"] == "#7a8b95"
-    assert dark["control-border"] == "#677887"
+    assert light["faint"] == "#675e4f"
+    assert light["control-border"] == "#8a7c64"
+    assert dark["control-border"] == "#7a6f58"
 
     text_pairs = (
         ("on-accent", "accent"),
