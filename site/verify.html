@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Verify a Warden Agent Protection Attestation independently in your browser with WebCrypto Ed25519."
+      content="Verify Warden APA attestations and WARDEN BREAKER certificates locally with browser-native Ed25519."
     />
     <meta name="color-scheme" content="dark light" />
-    <title>Verify an APA Attestation | Warden</title>
+    <title>Verify a signed record | Warden</title>
     <link rel="canonical" href="https://warden.gudman.xyz/verify" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Warden" />
-    <meta property="og:title" content="Verify an APA Attestation | Warden" />
+    <meta property="og:title" content="Verify a signed record | Warden" />
     <meta
       property="og:description"
-      content="Verify a Warden Agent Protection Attestation independently in your browser with WebCrypto Ed25519."
+      content="Verify Warden APA attestations and WARDEN BREAKER certificates locally with browser-native Ed25519."
     />
     <meta property="og:url" content="https://warden.gudman.xyz/verify" />
     <meta
@@ -27,28 +27,19 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="32x32"
-      href="/assets/favicon-32.png"
-    />
-    <link
-      rel="apple-touch-icon"
-      sizes="180x180"
-      href="/assets/apple-touch-icon.png"
-    />
-    <link rel="stylesheet" href="/styles.css?v=96b93423" />
+    <link rel="icon" href="/assets/warden-mark.svg" />
+    <script src="/theme.js?v=2c7c8d24"></script>
+    <link rel="stylesheet" href="/styles.css?v=a3737335" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
       <a class="brand" href="/" aria-label="Warden home"
         ><img
-          src="/assets/warden-avatar.png"
+          src="/assets/warden-mark.svg"
           alt=""
-          width="36"
-          height="36"
+          width="32"
+          height="32"
         /><span>Warden</span></a
       >
       <button
@@ -61,44 +52,15 @@
         Menu
       </button>
       <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
-        <details class="nav-group">
-          <summary>Product</summary>
-          <div class="nav-menu">
-            <a href="/">Overview</a>
-            <a href="/playground">Live Playground</a>
-            <a href="/theater">Attack Theater</a>
-            <a href="/hire">Use Warden</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Developers</summary>
-          <div class="nav-menu">
-            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
-            <a href="/integrate">Integrations</a>
-            <a href="/docs">Documentation</a>
-          </div>
-        </details>
-        <details class="nav-group has-current">
-          <summary>Evidence</summary>
-          <div class="nav-menu">
-            <a href="/verify" aria-current="page">Verify an Attestation</a>
-            <a href="/apa/log">Transparency Log</a>
-            <a href="/badges">Endpoint Audit Records</a>
-            <a href="/agents">Marketplace Evidence Index</a>
-            <a href="/status">Service Status</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Research</summary>
-          <div class="nav-menu">
-            <a href="/gauntlet">Gauntlet</a>
-            <a href="/agents#methodology">Methodology</a>
-            <a href="/showcase">Product Tour</a>
-          </div>
-        </details>
+        <a class="nav-link" href="/">Product</a>
+        <a class="nav-link" href="/playground">Playground</a>
+        <a class="nav-link" href="/integrate">Developers</a>
+        <a class="nav-link" href="/docs">Docs</a>
+        <a class="nav-link" href="/verify" aria-current="page">Evidence</a>
+        <a class="nav-link" href="/gauntlet">Research</a>
         <div class="nav-mobile-actions">
           <a class="button secondary" href="/integrate">Integrate</a>
-          <a class="button primary" href="/playground">Run live scan</a>
+          <a class="button primary" href="/playground">Run a live scan</a>
         </div>
       </nav>
       <div class="header-actions">
@@ -114,8 +76,7 @@
           ></span
           ><span data-health-label>Status unknown</span></a
         >
-        <a class="header-hire" href="/integrate">Integrate</a>
-        <a class="header-scan" href="/playground">Run live scan</a>
+        <a class="header-scan" href="/playground">Run a live scan</a>
         <button
           class="theme-toggle"
           type="button"
@@ -130,92 +91,43 @@
     <main id="main" class="page-shell site-main">
       <nav class="breadcrumbs" aria-label="Breadcrumb">
         <a href="/">Home</a><span aria-hidden="true">/</span
-        ><span aria-current="page">Verify an Attestation</span>
+        ><span aria-current="page">Verify</span>
       </nav>
       <section class="page-hero page-hero--compact">
-        <p class="eyebrow">Evidence / Local verification</p>
-        <h1>Check the signed bytes. Keep the proof boundary.</h1>
+        <p class="eyebrow">Local record verification</p>
+        <h1>Verify a Warden record</h1>
         <p class="hero-text">
-          Paste an APA record, API envelope, attestation ID, same-origin
-          attestation URL, or same-origin <code>badge.svg</code> URL. This page
-          fetches the public issuer document and performs WebCrypto Ed25519
-          verification locally; it never trusts the API's
-          <code>verified</code> flag. A
-          <code>/verify?breaker=&lt;certificate-id&gt;</code> link also checks
-          the signed WARDEN BREAKER certificate against every page of the mixed
-          transparency log and its signed checkpoint. Browser verification fails
-          closed when a log exceeds 10,000 entries rather than accepting an
-          incomplete chain.
+          Check an APA attestation or WARDEN BREAKER certificate in this
+          browser. The verifier uses canonical signed bytes and WebCrypto
+          Ed25519; it does not accept an API's <code>verified</code> flag as
+          proof.
         </p>
         <div class="hero-actions">
-          <button
-            class="button primary"
-            type="button"
-            data-apa-load-latest
-          >
-            Load latest public attestation
-          </button>
-          <button
-            class="button secondary"
-            type="button"
-            data-apa-verify-reference
-          >
-            Verify signed reference sample
-          </button>
-          <a class="button secondary" href="/apa/log"
-            >Inspect the transparency log</a
-          >
+          <a class="button primary" href="#record-verifier">Open verifier</a>
+          <a class="button secondary" href="/apa/log">Inspect the log</a>
         </div>
-        <p class="form-hint">
-          The reference sample is a signed, dated cross-language fixture from
-          14 July 2026. It verifies locally and is expected to report archival
-          freshness; it is not a current endpoint claim.
-        </p>
-      </section>
-
-      <aside class="scan-boundary" aria-label="Verifier properties">
-        <strong>Browser verifier</strong>
-        <span
-          class="source-stamp source-stamp--unknown"
-          data-apa-verification-source
-          data-source-stamp
-          data-source-state="unknown"
-          >UNKNOWN · no record checked</span
-        >
-        <span>APA v0.1 canonical JSON</span>
-        <span>WebCrypto Ed25519</span>
-        <span>Same-origin fetches only</span>
-        <span>Expiry and signed status enforced</span>
-        <span>Full BREAKER log inclusion enforced</span>
-      </aside>
-
-      <section aria-labelledby="verification-sequence-title">
-        <div class="section-heading">
-          <p class="eyebrow">Local verification sequence</p>
-          <h2 id="verification-sequence-title">
-            Five checks before a result is accepted.
-          </h2>
-        </div>
-        <ol class="action-sequence">
-          <li><span>01</span><strong>Parse</strong><p>Reject malformed or unsupported records.</p></li>
-          <li><span>02</span><strong>Resolve key</strong><p>Select a current or recent issuer key by signed time.</p></li>
-          <li><span>03</span><strong>Verify</strong><p>Check canonical bytes with WebCrypto Ed25519.</p></li>
-          <li><span>04</span><strong>Freshness</strong><p>Evaluate expiry and the signed record status.</p></li>
-          <li><span>05</span><strong>Read boundary</strong><p>Display the subject, result, and justified conclusion.</p></li>
-        </ol>
       </section>
 
       <section
+        id="record-verifier"
         class="scan-workspace"
         aria-label="Evidence verification workspace"
       >
         <form class="scan-input-panel" data-apa-verify-form novalidate>
           <div class="scan-panel-heading">
             <div>
-              <p class="eyebrow">01 / Public input</p>
-              <h2>Attestation, ID, or URL</h2>
+              <h2>Record input</h2>
+              <p>
+                Paste JSON, an attestation ID, or a supported same-origin URL.
+              </p>
             </div>
-            <span class="status-label status-label--pending">No account</span>
+            <span
+              class="source-stamp source-stamp--unknown"
+              data-apa-verification-source
+              data-source-stamp
+              data-source-state="unknown"
+              >UNKNOWN · no record checked</span
+            >
           </div>
           <label for="apa-verify-input">Attestation material</label>
           <textarea
@@ -228,12 +140,10 @@
             placeholder='{"attestation":{"spec_version":"apa/0.1",...}}'
           ></textarea>
           <p class="field-hint" id="apa-input-hint">
-            Remote lookups accept exactly 32 lowercase hexadecimal characters or
-            this origin's <code>/apa/attestation/&lt;id&gt;</code> and
-            <code>/apa/attestation/&lt;id&gt;/badge.svg</code> URLs.
-            Cross-origin URLs are rejected before fetch.
+            Remote lookup accepts a 32-character lowercase ID or this origin's
+            attestation and badge URLs. Cross-origin URLs are rejected.
           </p>
-          <label for="apa-verify-file">Or choose a JSON file</label>
+          <label for="apa-verify-file">JSON file</label>
           <input
             id="apa-verify-file"
             data-apa-verify-file
@@ -247,29 +157,32 @@
             data-apa-file-status
             aria-live="polite"
           >
-            Choose or drop one JSON file (maximum 256 KiB). It is read locally
-            and is not uploaded.
+            Maximum 256 KiB. The file is read locally and is not uploaded.
           </p>
           <div class="hero-actions">
-            <button class="button primary" type="submit">
-              Verify independently
+            <button class="button primary" type="submit">Verify record</button>
+            <button class="button secondary" type="button" data-apa-load-latest>
+              Load latest public record
             </button>
             <button
               class="button secondary"
               type="button"
-              data-apa-load-latest
+              data-apa-verify-reference
             >
-              Load latest public record
+              Load dated sample
             </button>
           </div>
+          <p class="field-hint">
+            The sample is a signed cross-language fixture dated 14 July 2026,
+            not a current endpoint claim.
+          </p>
           <p
             class="scan-status"
             id="apa-verify-status"
             data-apa-verify-status
             aria-live="polite"
           >
-            Ready. No verification result is implied until the browser checks
-            the signed bytes.
+            Ready. No result is implied until the signed bytes are checked.
           </p>
           <div
             class="scan-error"
@@ -281,23 +194,18 @@
             <p data-apa-verify-error-message></p>
           </div>
           <p class="privacy-note">
-            Raw JSON stays in this page. ID and URL inputs fetch only the
-            canonical same-origin attestation route and the public same-origin
-            issuer document. BREAKER links fetch only the canonical certificate,
-            issuer, paginated log, and checkpoint routes.
+            Pasted JSON stays on this page. Identifier lookups fetch only public
+            issuer and record routes on this origin.
           </p>
         </form>
 
         <div class="scan-result-panel">
           <div class="scan-empty-state" data-apa-verify-empty>
-            <p class="eyebrow">02 / Independent result</p>
-            <h2>Waiting for signed material.</h2>
+            <h2>Verification result</h2>
             <p>
-              The browser removes <code>issuer_sig</code>, recursively sorts the
-              remaining JSON keys, encodes compact UTF-8, and checks the
-              signature against every applicable current or recent key in the
-              issuer document, selected by the signed
-              <code>verified_at</code> cutoff.
+              Load a public record, use the dated sample, or paste your own
+              material. The result separates signature validity, freshness,
+              record status, and the limits of the claim.
             </p>
           </div>
 
@@ -310,7 +218,6 @@
             hidden
           >
             <div class="verdict-summary">
-              <p class="eyebrow">02 / Independent result</p>
               <div class="verdict-heading-row">
                 <h2 id="apa-result-heading" data-apa-result-heading>
                   Verification pending
@@ -324,107 +231,60 @@
               <p data-apa-result-message></p>
               <p class="field-hint">
                 Local check completed
-                <time data-apa-verification-time>when the result is rendered</time>.
+                <time data-apa-verification-time
+                  >when the result is rendered</time
+                >.
               </p>
             </div>
 
             <details class="snippet-card">
-              <summary>Inspect cryptographic and subject details</summary>
-              <div class="badge-evidence-grid">
-              <section
-                class="badge-evidence"
-                aria-labelledby="apa-issuer-title"
-              >
-                <p class="eyebrow">Issuer</p>
-                <h3 id="apa-issuer-title">Published signing identity</h3>
-                <dl class="data-list">
-                  <div>
-                    <dt>Issuer</dt>
-                    <dd data-apa-issuer>Not available until verified</dd>
-                  </div>
-                  <div>
-                    <dt>Matched key</dt>
-                    <dd data-apa-issuer-key>Not available until verified</dd>
-                  </div>
-                </dl>
-              </section>
-
-              <section
-                class="badge-evidence"
-                aria-labelledby="apa-signature-title"
-              >
-                <p class="eyebrow">Signature</p>
-                <h3 id="apa-signature-title" data-apa-signature-state>
-                  Not checked
-                </h3>
-                <dl class="data-list">
-                  <div>
-                    <dt>Issuer signature</dt>
-                    <dd>
-                      <code data-apa-signature
-                        >Not available until verified</code
-                      >
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-
-              <section
-                class="badge-evidence"
-                aria-labelledby="apa-subject-title"
-              >
-                <p class="eyebrow">Subject</p>
-                <h3 id="apa-subject-title">Guard claim</h3>
-                <dl class="data-list">
-                  <div>
-                    <dt>Endpoint host</dt>
-                    <dd data-apa-endpoint>Not available until verified</dd>
-                  </div>
-                  <div>
-                    <dt>Tier</dt>
-                    <dd data-apa-tier>Not available until verified</dd>
-                  </div>
-                  <div>
-                    <dt>Scans</dt>
-                    <dd data-apa-scans>Not available until verified</dd>
-                  </div>
-                </dl>
-              </section>
-
-              <section class="badge-evidence" aria-labelledby="apa-state-title">
-                <p class="eyebrow">State</p>
-                <h3 id="apa-state-title">Signed and effective status</h3>
-                <dl class="data-list">
-                  <div>
-                    <dt>Signed status</dt>
-                    <dd data-apa-stored-status>
-                      Not available until verified
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Effective status</dt>
-                    <dd data-apa-effective-status>
-                      Not available until verified
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-
-              <section class="badge-evidence" aria-labelledby="apa-time-title">
-                <p class="eyebrow">Time</p>
-                <h3 id="apa-time-title">Freshness window</h3>
-                <dl class="data-list">
-                  <div>
-                    <dt>Verified at</dt>
-                    <dd data-apa-verified-at>Not available until verified</dd>
-                  </div>
-                  <div>
-                    <dt>Expires at</dt>
-                    <dd data-apa-expires-at>Not available until verified</dd>
-                  </div>
-                </dl>
-              </section>
-              </div>
+              <summary>Record and cryptographic details</summary>
+              <dl class="data-list">
+                <div>
+                  <dt>Issuer</dt>
+                  <dd data-apa-issuer>Pending</dd>
+                </div>
+                <div>
+                  <dt>Matched key</dt>
+                  <dd data-apa-issuer-key>Pending</dd>
+                </div>
+                <div>
+                  <dt>Signature state</dt>
+                  <dd data-apa-signature-state>Not checked</dd>
+                </div>
+                <div>
+                  <dt>Issuer signature</dt>
+                  <dd><code data-apa-signature>Pending</code></dd>
+                </div>
+                <div>
+                  <dt>Endpoint host</dt>
+                  <dd data-apa-endpoint>Pending</dd>
+                </div>
+                <div>
+                  <dt>Tier</dt>
+                  <dd data-apa-tier>Pending</dd>
+                </div>
+                <div>
+                  <dt>Scans</dt>
+                  <dd data-apa-scans>Pending</dd>
+                </div>
+                <div>
+                  <dt>Signed status</dt>
+                  <dd data-apa-stored-status>Pending</dd>
+                </div>
+                <div>
+                  <dt>Effective status</dt>
+                  <dd data-apa-effective-status>Pending</dd>
+                </div>
+                <div>
+                  <dt>Verified at</dt>
+                  <dd data-apa-verified-at>Pending</dd>
+                </div>
+                <div>
+                  <dt>Expires at</dt>
+                  <dd data-apa-expires-at>Pending</dd>
+                </div>
+              </dl>
             </details>
           </section>
 
@@ -437,7 +297,6 @@
             hidden
           >
             <div class="verdict-summary">
-              <p class="eyebrow">02 / Independent result</p>
               <div class="verdict-heading-row">
                 <h2 id="breaker-result-heading" data-breaker-result-heading>
                   Verification pending
@@ -458,140 +317,106 @@
             </div>
 
             <details class="snippet-card">
-              <summary>Inspect certificate and inclusion details</summary>
-              <div class="badge-evidence-grid">
-              <section
-                class="badge-evidence"
-                aria-labelledby="breaker-issuer-title"
-              >
-                <p class="eyebrow">Issuer signature</p>
-                <h3 id="breaker-issuer-title" data-breaker-signature-state>
-                  Not checked
-                </h3>
-                <dl class="data-list">
-                  <div>
-                    <dt>Issuer</dt>
-                    <dd data-breaker-issuer>Not available until verified</dd>
-                  </div>
-                  <div>
-                    <dt>Matched key</dt>
-                    <dd data-breaker-issuer-key>
-                      Not available until verified
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Signature</dt>
-                    <dd>
-                      <code data-breaker-signature
-                        >Not available until verified</code
-                      >
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-
-              <section
-                class="badge-evidence"
-                aria-labelledby="breaker-certificate-title"
-              >
-                <p class="eyebrow">Certificate</p>
-                <h3 id="breaker-certificate-title" data-breaker-award>
-                  WARDEN BREAKER
-                </h3>
-                <dl class="data-list">
-                  <div>
-                    <dt>Certificate ID</dt>
-                    <dd>
-                      <code data-breaker-certificate-id
-                        >Not available until verified</code
-                      >
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Finder</dt>
-                    <dd data-breaker-finder>Not available until verified</dd>
-                  </div>
-                  <div>
-                    <dt>Confirmed</dt>
-                    <dd data-breaker-confirmed-at>
-                      Not available until verified
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-
-              <section
-                class="badge-evidence"
-                aria-labelledby="breaker-case-title"
-              >
-                <p class="eyebrow">Reviewed reproducer</p>
-                <h3 id="breaker-case-title">Digest-bound benchmark case</h3>
-                <dl class="data-list">
-                  <div>
-                    <dt>Threat class</dt>
-                    <dd data-breaker-threat-class>
-                      Not available until verified
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Benchmark case</dt>
-                    <dd>
-                      <code data-breaker-benchmark-case
-                        >Not available until verified</code
-                      >
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Payload SHA-256</dt>
-                    <dd>
-                      <code data-breaker-payload-digest
-                        >Not available until verified</code
-                      >
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Payload scope</dt>
-                    <dd data-breaker-payload-scope>
-                      Not available until verified
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-
-              <section
-                class="badge-evidence"
-                aria-labelledby="breaker-log-title"
-              >
-                <p class="eyebrow">Transparency inclusion</p>
-                <h3 id="breaker-log-title" data-breaker-log-state>
-                  Not checked
-                </h3>
-                <dl class="data-list">
-                  <div>
-                    <dt>Log sequence</dt>
-                    <dd class="num" data-breaker-log-sequence>
-                      Not available until verified
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Signed checkpoint head</dt>
-                    <dd>
-                      <code data-breaker-checkpoint-head
-                        >Not available until verified</code
-                      >
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-              </div>
+              <summary>Certificate and log inclusion details</summary>
+              <dl class="data-list">
+                <div>
+                  <dt>Issuer</dt>
+                  <dd data-breaker-issuer>Pending</dd>
+                </div>
+                <div>
+                  <dt>Matched key</dt>
+                  <dd data-breaker-issuer-key>Pending</dd>
+                </div>
+                <div>
+                  <dt>Signature state</dt>
+                  <dd data-breaker-signature-state>Not checked</dd>
+                </div>
+                <div>
+                  <dt>Signature</dt>
+                  <dd><code data-breaker-signature>Pending</code></dd>
+                </div>
+                <div>
+                  <dt>Award</dt>
+                  <dd data-breaker-award>WARDEN BREAKER</dd>
+                </div>
+                <div>
+                  <dt>Certificate ID</dt>
+                  <dd><code data-breaker-certificate-id>Pending</code></dd>
+                </div>
+                <div>
+                  <dt>Finder</dt>
+                  <dd data-breaker-finder>Pending</dd>
+                </div>
+                <div>
+                  <dt>Confirmed</dt>
+                  <dd data-breaker-confirmed-at>Pending</dd>
+                </div>
+                <div>
+                  <dt>Threat class</dt>
+                  <dd data-breaker-threat-class>Pending</dd>
+                </div>
+                <div>
+                  <dt>Benchmark case</dt>
+                  <dd><code data-breaker-benchmark-case>Pending</code></dd>
+                </div>
+                <div>
+                  <dt>Payload SHA-256</dt>
+                  <dd><code data-breaker-payload-digest>Pending</code></dd>
+                </div>
+                <div>
+                  <dt>Payload scope</dt>
+                  <dd data-breaker-payload-scope>Pending</dd>
+                </div>
+                <div>
+                  <dt>Log sequence</dt>
+                  <dd class="num" data-breaker-log-sequence>Pending</dd>
+                </div>
+                <div>
+                  <dt>Log state</dt>
+                  <dd data-breaker-log-state>Not checked</dd>
+                </div>
+                <div>
+                  <dt>Signed checkpoint head</dt>
+                  <dd><code data-breaker-checkpoint-head>Pending</code></dd>
+                </div>
+              </dl>
             </details>
           </section>
         </div>
       </section>
 
-      <section class="feature-panel" aria-labelledby="apa-boundary-title">
+      <details class="methodology-drawer">
+        <summary>How local verification works</summary>
+        <ol class="action-sequence">
+          <li>
+            <span>01</span><strong>Parse</strong>
+            <p>Reject malformed or unsupported material.</p>
+          </li>
+          <li>
+            <span>02</span><strong>Resolve key</strong>
+            <p>Select the applicable current or recent key by signed time.</p>
+          </li>
+          <li>
+            <span>03</span><strong>Verify</strong>
+            <p>Check canonical bytes with WebCrypto Ed25519.</p>
+          </li>
+          <li>
+            <span>04</span><strong>Freshness</strong>
+            <p>Evaluate expiry and signed record status.</p>
+          </li>
+          <li>
+            <span>05</span><strong>Read boundary</strong>
+            <p>Separate what the record establishes from what it cannot.</p>
+          </li>
+        </ol>
+      </details>
+
+      <details
+        class="feature-panel methodology-drawer"
+        aria-labelledby="apa-boundary-title"
+      >
+        <summary>Verification limits</summary>
         <div class="section-heading">
-          <p class="eyebrow">Verification boundary</p>
           <h2 id="apa-boundary-title">
             What a valid signature does—and does not—prove
           </h2>
@@ -636,55 +461,53 @@
           universally safe, uncompromised, or correctly placed in every
           execution path.
         </aside>
-      </section>
+      </details>
     </main>
 
     <footer class="site-footer page-shell">
       <div>
-        <strong>Warden</strong
-        ><span>Verifiable pre-action security for AI agents.</span
-        ><span>Gate the action. Keep the proof.</span>
+        <strong>Warden</strong>
+        <span>Pre-action security for agent systems.</span>
       </div>
       <nav aria-label="Footer">
         <div class="site-footer__col">
           <span class="site-footer__label">Product</span>
           <a href="/">Overview</a>
-          <a href="/playground">Live Playground</a>
-          <a href="/theater">Attack Theater</a>
+          <a href="/playground">Live playground</a>
+          <a href="/theater">Incident replay</a>
           <a href="/hire">Use Warden</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Developers</span>
-          <a href="/integrate#sdk-first">5-Minute Quickstart</a>
-          <a href="/integrate">Integrations</a>
+          <a href="/integrate#sdk-first">5-minute quickstart</a>
+          <a href="/integrate">Integration guide</a>
           <a href="/docs">Documentation</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Evidence</span>
-          <a href="/verify">Verify an Attestation</a>
-          <a href="/apa/log">Transparency Log</a>
-          <a href="/badges">Endpoint Audit Records</a>
-          <a href="/agents">Marketplace Evidence Index</a>
-          <a href="/status">Service Status</a>
+          <a href="/verify">Verify an attestation</a>
+          <a href="/apa/log">Transparency log</a>
+          <a href="/badges">Endpoint audit records</a>
+          <a href="/agents">Marketplace evidence index</a>
+          <a href="/status">Service status</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Research</span>
           <a href="/gauntlet">Gauntlet</a>
           <a href="/agents#methodology">Methodology</a>
-          <a href="/showcase">Product Tour</a>
+          <a href="/showcase">Product tour</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Policy</span>
-          <a href="/trust">Trust &amp; Security</a>
+          <a href="/trust">Trust &amp; security</a>
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>
-          <a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
         </div>
       </nav>
     </footer>
-    <script src="/app.js?v=5c7f3a4c" defer></script>
-    <script src="/log.js" defer></script>
-    <script src="/home-proof.js" defer></script>
-    <script src="/verify.js" defer></script>
+    <script src="/app.js?v=0abdbc0f" defer></script>
+    <script src="/log.js?v=67d4867f" defer></script>
+    <script src="/home-proof.js?v=52727552" defer></script>
+    <script src="/verify.js?v=7713f99b" defer></script>
   </body>
 </html>

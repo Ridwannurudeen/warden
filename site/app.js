@@ -31,11 +31,6 @@
     return catalog.services.find((service) => service?.key === key) || null;
   }
 
-  function summaryToRestoreOnEscape(activeElement) {
-    const group = activeElement?.closest?.("details[open]");
-    return group?.querySelector?.("summary") || null;
-  }
-
   function isOutsideNavigationPointer(siteNav, navToggle, target) {
     return !siteNav?.contains?.(target) && !navToggle?.contains?.(target);
   }
@@ -286,8 +281,7 @@
     const state =
       typeof value === "string" ? value.trim().toUpperCase() : "UNKNOWN";
     const presentation =
-      SOURCE_STAMP_PRESENTATIONS[state] ||
-      SOURCE_STAMP_PRESENTATIONS.UNKNOWN;
+      SOURCE_STAMP_PRESENTATIONS[state] || SOURCE_STAMP_PRESENTATIONS.UNKNOWN;
     return {
       state: presentation.label,
       label: presentation.label,
@@ -308,9 +302,7 @@
       (state) => `source-stamp--${state.toLowerCase()}`,
     );
     element.classList?.remove(...modifierClasses);
-    element.classList?.add(
-      `source-stamp--${presentation.state.toLowerCase()}`,
-    );
+    element.classList?.add(`source-stamp--${presentation.state.toLowerCase()}`);
     const label = element.querySelector?.("[data-source-stamp-label]");
     if (label) {
       label.textContent = presentation.label;
@@ -417,7 +409,6 @@
     normalizeProductProof,
     resolveTheme,
     sourceStampPresentation,
-    summaryToRestoreOnEscape,
   };
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
@@ -440,57 +431,12 @@
     applyAsyncPanelState(panel, panel.dataset.state || "unknown");
   }
 
-  const prefersReducedMotion =
-    root.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-  if (
-    !prefersReducedMotion &&
-    typeof root.IntersectionObserver === "function"
-  ) {
-    const main = document.querySelector("main");
-    const revealTargets = main
-      ? main.querySelectorAll(
-          ":scope > section, :scope > .page-shell > section",
-        )
-      : [];
-    if (revealTargets.length > 0) {
-      const revealObserver = new root.IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            if (entry.isIntersecting) {
-              entry.target.classList.add("reveal-in");
-              revealObserver.unobserve(entry.target);
-            }
-          }
-        },
-        { rootMargin: "0px 0px -8% 0px" },
-      );
-      for (const target of revealTargets) {
-        target.classList.add("reveal");
-        revealObserver.observe(target);
-      }
-    }
-  }
-  const siteHeader = document.querySelector(".site-header");
-  if (siteHeader) {
-    const syncHeaderScroll = () => {
-      siteHeader.classList.toggle("is-scrolled", root.scrollY > 8);
-    };
-    syncHeaderScroll();
-    root.addEventListener("scroll", syncHeaderScroll, { passive: true });
-  }
-
   const themeButtons = Array.from(
     document.querySelectorAll("[data-theme-toggle]"),
   );
-  let storedTheme = null;
-  try {
-    storedTheme = root.localStorage.getItem("warden-theme");
-  } catch {
-    storedTheme = null;
-  }
   const initialTheme = resolveTheme(
-    storedTheme,
-    root.matchMedia?.("(prefers-color-scheme: light)").matches === true,
+    document.documentElement.dataset.theme,
+    false,
   );
 
   function setTheme(theme, persist) {
@@ -538,15 +484,11 @@
 
     function focusableNavigationElements() {
       const candidates = Array.from(
-        siteNav.querySelectorAll(
-          "summary, a[href], button:not([disabled]), input:not([disabled]), select:not([disabled])",
-        ),
+        siteNav.querySelectorAll("a[href], button:not([disabled])"),
       );
-      return candidates.filter((element) => {
-        const closedGroup = element.closest("details:not([open])");
-        const visibleGroup = !closedGroup || element.tagName === "SUMMARY";
-        return visibleGroup && element.getClientRects().length > 0;
-      });
+      return candidates.filter(
+        (element) => element.getClientRects().length > 0,
+      );
     }
 
     function setNavigation(open, restoreFocus) {
@@ -559,9 +501,6 @@
         const first = focusableNavigationElements()[0];
         first?.focus();
       } else {
-        for (const group of siteNav.querySelectorAll("details[open]")) {
-          group.open = false;
-        }
         if (restoreFocus) {
           navToggle.focus();
         }
@@ -580,40 +519,18 @@
         setNavigation(false, false);
       }
     });
-    for (const group of siteNav.querySelectorAll("details")) {
-      group.addEventListener("toggle", () => {
-        if (!group.open) {
-          return;
-        }
-        for (const sibling of siteNav.querySelectorAll("details[open]")) {
-          if (sibling !== group) {
-            sibling.open = false;
-          }
-        }
-      });
-    }
     document.addEventListener("pointerdown", (event) => {
       if (!isOutsideNavigationPointer(siteNav, navToggle, event.target)) {
         return;
       }
       if (siteNav.classList.contains("is-open")) {
         setNavigation(false, false);
-        return;
-      }
-      for (const group of siteNav.querySelectorAll("details[open]")) {
-        group.open = false;
       }
     });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         if (siteNav.classList.contains("is-open")) {
           setNavigation(false, true);
-        } else {
-          const summary = summaryToRestoreOnEscape(document.activeElement);
-          for (const group of siteNav.querySelectorAll("details[open]")) {
-            group.open = false;
-          }
-          summary?.focus();
         }
         return;
       }

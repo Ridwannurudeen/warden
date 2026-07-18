@@ -1221,7 +1221,7 @@
       submitButton.disabled = busy;
       submitButton.textContent = busy
         ? "Verifying in this browser..."
-        : "Verify independently";
+        : "Verify record";
     }
     if (fileInput) {
       fileInput.disabled = busy;
@@ -1564,7 +1564,7 @@
       input.value = await file.text();
       text(
         "[data-apa-file-status]",
-        `${file.name} loaded locally (${file.size.toLocaleString("en-US")} bytes). Select Verify independently to check it.`,
+        `${file.name} loaded locally (${file.size.toLocaleString("en-US")} bytes). Select Verify record to check it.`,
       );
       sourceStamp("unknown", "local file loaded; verification not run");
       errorPanel.hidden = true;

@@ -213,7 +213,7 @@
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "address-chip-remove";
-      remove.textContent = "Remove";
+      remove.textContent = "×";
       remove.setAttribute("aria-label", `Remove expected recipient ${address}`);
       remove.addEventListener("click", () => {
         const removedIndex = expectedAddresses.indexOf(address);

@@ -8,7 +8,6 @@ const test = require("node:test");
 const {
   EXAMPLE_RESULT,
   LIVE_REQUEST,
-  canAutoAdvance,
   createShowcaseState,
   transitionShowcase,
 } = require(path.join(__dirname, "..", "..", "site", "showcase.js"));
@@ -17,7 +16,6 @@ test("showcase resets to a predictable no-scan state", () => {
   const initial = createShowcaseState();
   assert.deepEqual(initial, {
     scene: 0,
-    auto: false,
     scanning: false,
     source: "none",
     result: null,
@@ -26,7 +24,7 @@ test("showcase resets to a predictable no-scan state", () => {
   });
   assert.deepEqual(
     transitionShowcase(
-      { ...initial, scene: 5, result: EXAMPLE_RESULT },
+      { ...initial, scene: 2, result: EXAMPLE_RESULT },
       { type: "RESET" },
     ),
     initial,
@@ -36,18 +34,12 @@ test("showcase resets to a predictable no-scan state", () => {
 test("showcase cannot pass the action gate before an explicit result", () => {
   let state = createShowcaseState();
   state = transitionShowcase(state, { type: "NEXT" });
-  state = transitionShowcase(state, { type: "NEXT" });
-  assert.equal(state.scene, 2);
+  assert.equal(state.scene, 1);
   assert.equal(transitionShowcase(state, { type: "NEXT" }), state);
-  assert.equal(canAutoAdvance({ ...state, auto: true }), false);
-  assert.equal(
-    canAutoAdvance({ ...createShowcaseState(), auto: true }, true),
-    false,
-  );
 });
 
 test("live success and labeled fallback both unlock the verdict scene", () => {
-  const gate = { ...createShowcaseState(), scene: 2 };
+  const gate = { ...createShowcaseState(), scene: 1 };
   const scanning = transitionShowcase(gate, { type: "START_SCAN" });
   assert.equal(scanning.scanning, true);
 
@@ -56,7 +48,7 @@ test("live success and labeled fallback both unlock the verdict scene", () => {
     result: EXAMPLE_RESULT,
     checkedAt: "2026-07-17T12:00:00.000Z",
   });
-  assert.equal(live.scene, 3);
+  assert.equal(live.scene, 2);
   assert.equal(live.source, "live");
   assert.equal(live.result.verdict, "BLOCK");
   assert.equal(live.checkedAt, "2026-07-17T12:00:00.000Z");
@@ -65,10 +57,10 @@ test("live success and labeled fallback both unlock the verdict scene", () => {
     type: "SCAN_ERROR",
     message: "offline",
   });
-  assert.equal(failed.scene, 2);
+  assert.equal(failed.scene, 1);
   assert.equal(failed.error, "offline");
   const fallback = transitionShowcase(failed, { type: "USE_FALLBACK" });
-  assert.equal(fallback.scene, 3);
+  assert.equal(fallback.scene, 2);
   assert.equal(fallback.source, "example");
   assert.equal(fallback.checkedAt, null);
 });
@@ -76,14 +68,14 @@ test("live success and labeled fallback both unlock the verdict scene", () => {
 test("showcase rejects a valid response that does not prove the scripted stop", () => {
   const scanning = {
     ...createShowcaseState(),
-    scene: 2,
+    scene: 1,
     scanning: true,
   };
   const wrongVerdict = transitionShowcase(scanning, {
     type: "SCAN_SUCCESS",
     result: { ...EXAMPLE_RESULT, verdict: "ALLOW" },
   });
-  assert.equal(wrongVerdict.scene, 2);
+  assert.equal(wrongVerdict.scene, 1);
   assert.equal(wrongVerdict.result, null);
   assert.match(wrongVerdict.error, /unexpected outcome/i);
 
@@ -91,7 +83,7 @@ test("showcase rejects a valid response that does not prove the scripted stop", 
     type: "SCAN_SUCCESS",
     result: { ...EXAMPLE_RESULT, threat_classes: ["TOOL_HIJACK"] },
   });
-  assert.equal(wrongReason.scene, 2);
+  assert.equal(wrongReason.scene, 1);
   assert.equal(wrongReason.result, null);
   assert.match(wrongReason.error, /unexpected outcome/i);
 });
@@ -106,17 +98,22 @@ test("showcase live request uses the frozen drain-address demo shape", () => {
   ]);
 });
 
-test("showcase separates the live verdict from illustrative caller enforcement", () => {
+test("showcase keeps the product tour compact and bounds caller enforcement", () => {
   const page = fs.readFileSync(
     path.join(__dirname, "..", "..", "site", "showcase.html"),
     "utf8",
   );
 
+  assert.equal((page.match(/data-showcase-scene=/g) || []).length, 3);
   assert.match(
     page,
-    /LIVE verdict;\s+no wallet or\s+downstream action was invoked/,
+    /does not invoke\s+a wallet or prove that a downstream caller withheld/,
   );
   assert.match(page, /Recommended caller action/);
+  assert.doesNotMatch(page, /data-showcase-auto/);
+  assert.doesNotMatch(page, /showcase-progress--sticky/);
+  assert.doesNotMatch(page, /class="verdict-badge"/);
+  assert.doesNotMatch(page, /data-product-proof/);
   assert.doesNotMatch(page, /The instruction stops before wallet execution/);
   assert.doesNotMatch(page, /<dt>Prevented action<\/dt>/);
 });

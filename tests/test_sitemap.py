@@ -1,5 +1,6 @@
 """Deterministic crawler-artifact tests."""
 
+import hashlib
 from argparse import Namespace
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,6 +11,7 @@ import pytest
 from scripts import build_index, build_site
 from warden import sitemap as sitemap_module
 from warden.site_docs import render_docs
+from warden.site_render import page_shell
 from warden.sitemap import (
     PUBLIC_ORIGIN,
     PUBLIC_TOP_LEVEL_ROUTES,
@@ -204,6 +206,63 @@ def test_custom_docs_build_does_not_rewrite_the_repository_site(tmp_path):
         )
         == build_site.DEFAULT_SITE_ROOT
     )
+
+
+def test_shared_shell_loads_external_theme_initializer_before_css():
+    page = page_shell("Warden", "Description", "<p>Content</p>")
+    head = page.split("</head>", 1)[0]
+
+    theme_script = '<script src="/theme.js"></script>'
+    stylesheet = '<link rel="stylesheet" href="/styles.css">'
+    assert theme_script in head
+    assert stylesheet in head
+    assert head.index(theme_script) < head.index(stylesheet)
+    assert 'localStorage.getItem("warden-theme")' not in head
+
+
+def test_static_asset_versioning_covers_every_local_stylesheet_and_script(tmp_path):
+    site_root = tmp_path / "site"
+    (site_root / "widgets").mkdir(parents=True)
+    assets = {
+        "styles.css": "body { color: black; }\n",
+        "app.js": "export const app = true;\n",
+        "theme.js": "document.documentElement.dataset.theme = 'dark';\n",
+        "playground.js": "export const playground = true;\n",
+        "widgets/panel.css": ".panel { display: grid; }\n",
+        "widgets/verifier.js": "export const verifier = true;\n",
+    }
+    for relative_path, source in assets.items():
+        path = site_root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(source, encoding="utf-8")
+    page = site_root / "index.html"
+    page.write_text(
+        """
+<link rel="stylesheet" href="/styles.css?v=00000000">
+<link rel="stylesheet" href="/widgets/panel.css">
+<link rel="stylesheet" href="/missing.css">
+<script src="/app.js"></script>
+<script src="/theme.js"></script>
+<script src="/playground.js?v=11111111"></script>
+<script src="/widgets/verifier.js"></script>
+<script src="/missing.js"></script>
+<link rel="stylesheet" href="https://cdn.example.org/external.css">
+<script src="https://cdn.example.org/external.js"></script>
+""",
+        encoding="utf-8",
+    )
+
+    assert build_site.version_static_assets(site_root) == 1
+
+    versioned = page.read_text(encoding="utf-8")
+    for relative_path in assets:
+        digest = hashlib.sha256((site_root / relative_path).read_bytes()).hexdigest()[:8]
+        assert f"/{relative_path}?v={digest}" in versioned
+    assert 'href="/missing.css"' in versioned
+    assert 'src="/missing.js"' in versioned
+    assert 'href="https://cdn.example.org/external.css"' in versioned
+    assert 'src="https://cdn.example.org/external.js"' in versioned
+    assert build_site.version_static_assets(site_root) == 0
 
 
 def test_docs_generation_removes_obsolete_generated_pages(tmp_path):

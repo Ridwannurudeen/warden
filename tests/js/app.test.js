@@ -4,8 +4,17 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const vm = require("node:vm");
 
 const appApi = require(path.join(__dirname, "..", "..", "site", "app.js"));
+const appSource = fs.readFileSync(
+  path.join(__dirname, "..", "..", "site", "app.js"),
+  "utf8",
+);
+const themeInitializer = fs.readFileSync(
+  path.join(__dirname, "..", "..", "site", "theme.js"),
+  "utf8",
+);
 
 const {
   applyAsyncPanelState,
@@ -25,7 +34,6 @@ const {
   normalizeProductProof,
   resolveTheme,
   sourceStampPresentation,
-  summaryToRestoreOnEscape,
 } = appApi;
 
 const productProof = JSON.parse(
@@ -40,6 +48,48 @@ test("theme resolution respects a stored choice and otherwise defaults to dark",
   assert.equal(resolveTheme("dark", true), "dark");
   assert.equal(resolveTheme(null, true), "dark");
   assert.equal(resolveTheme(null, false), "dark");
+});
+
+test("early theme initialization applies persisted choices and defaults to dark", () => {
+  for (const [storedTheme, expectedTheme] of [
+    ["light", "light"],
+    ["dark", "dark"],
+    ["unsupported", "dark"],
+    [null, "dark"],
+  ]) {
+    const document = { documentElement: { dataset: {} } };
+    vm.runInNewContext(themeInitializer, {
+      document,
+      localStorage: {
+        getItem(key) {
+          assert.equal(key, "warden-theme");
+          return storedTheme;
+        },
+      },
+    });
+    assert.equal(document.documentElement.dataset.theme, expectedTheme);
+  }
+});
+
+test("early theme initialization stays dark when storage is unavailable", () => {
+  const document = { documentElement: { dataset: {} } };
+  vm.runInNewContext(themeInitializer, {
+    document,
+    localStorage: {
+      getItem() {
+        throw new Error("Storage denied");
+      },
+    },
+  });
+  assert.equal(document.documentElement.dataset.theme, "dark");
+});
+
+test("shared app consumes the theme already initialized on the root element", () => {
+  assert.match(
+    appSource,
+    /resolveTheme\(\s*document\.documentElement\.dataset\.theme,\s*false,\s*\)/,
+  );
+  assert.doesNotMatch(appSource, /localStorage\.getItem\("warden-theme"\)/);
 });
 
 test("header reachability accepts only the documented healthy response", () => {
@@ -112,28 +162,18 @@ test("source-stamp behavior updates state, visible label, and accessible copy", 
 });
 
 test("shared initialization manages legacy and canonical source-stamp markup", () => {
-  const source = fs.readFileSync(
-    path.join(__dirname, "..", "..", "site", "app.js"),
-    "utf8",
-  );
-
   assert.match(
-    source,
+    appSource,
     /querySelectorAll\(\s*"\[data-source-stamp\], \.source-stamp\[data-source-state\]"/,
   );
 });
 
 test("evaluation fetch failures retain explicit metric labels", () => {
-  const source = fs.readFileSync(
-    path.join(__dirname, "..", "..", "site", "app.js"),
-    "utf8",
-  );
-
-  assert.match(source, /Recall unavailable/);
-  assert.match(source, /False-positive rate unavailable/);
-  assert.match(source, /Evaluation corpus unavailable/);
+  assert.match(appSource, /Recall unavailable/);
+  assert.match(appSource, /False-positive rate unavailable/);
+  assert.match(appSource, /Evaluation corpus unavailable/);
   assert.doesNotMatch(
-    source,
+    appSource,
     /element\.dataset\.evalStat === "benign-cases"\s*\?\s*"Evaluation snapshot unavailable"\s*:\s*"—"/,
   );
 });
@@ -157,11 +197,17 @@ test("async-panel behavior exposes loading and settled states without stale busy
 
   assert.equal(normalizeAsyncPanelState(" Loading "), "loading");
   assert.equal(normalizeAsyncPanelState("unsupported"), "unknown");
-  assert.equal(applyAsyncPanelState(panel, "loading", "Loading evidence"), "loading");
+  assert.equal(
+    applyAsyncPanelState(panel, "loading", "Loading evidence"),
+    "loading",
+  );
   assert.equal(panel.dataset.asyncState, "loading");
   assert.equal(attributes.get("aria-busy"), "true");
   assert.equal(status.textContent, "Loading evidence");
-  assert.equal(applyAsyncPanelState(panel, "degraded", "Partial evidence"), "degraded");
+  assert.equal(
+    applyAsyncPanelState(panel, "degraded", "Partial evidence"),
+    "degraded",
+  );
   assert.equal(attributes.has("aria-busy"), false);
   assert.equal(status.textContent, "Partial evidence");
   assert.equal(applyAsyncPanelState(null, "ready"), null);
@@ -221,24 +267,7 @@ test("mobile navigation focus cycles in both directions", () => {
   assert.equal(cycleFocusIndex(0, "forward", 0), -1);
 });
 
-test("desktop menu escape restores focus to the owning summary", () => {
-  const summary = { focus() {} };
-  const activeElement = {
-    closest(selector) {
-      assert.equal(selector, "details[open]");
-      return {
-        querySelector(query) {
-          assert.equal(query, "summary");
-          return summary;
-        },
-      };
-    },
-  };
-  assert.equal(summaryToRestoreOnEscape(activeElement), summary);
-  assert.equal(summaryToRestoreOnEscape(null), null);
-});
-
-test("desktop menus recognize pointer interaction outside the navigation", () => {
+test("mobile navigation recognizes pointer interaction outside the dialog", () => {
   const siteNav = { contains: (target) => target === "nav" };
   const navToggle = { contains: (target) => target === "toggle" };
 

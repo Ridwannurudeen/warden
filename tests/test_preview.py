@@ -20,19 +20,19 @@ def client():
 @pytest.mark.parametrize(
     ("path", "marker"),
     [
-        ("/", "Stop poisoned agent output before it becomes an action."),
-        ("/theater", "Run three attacks through one visible boundary."),
-        ("/showcase", "Follow unsafe output from instruction to verdict."),
-        ("/gauntlet", "Warden signs its own defeats."),
+        ("/", "A security boundary for agent actions."),
+        ("/theater", "Inspect the handoff."),
+        ("/showcase", "Trace a recipient change."),
+        ("/gauntlet", "Submit a bypass test."),
         ("/agents", "Marketplace Evidence Index"),
         ("/agents/3808", "Warden"),
         ("/docs", "Reason-code matrix"),
         ("/docs/drain-address", "DRAIN_ADDRESS"),
-        ("/trust", "Four layers. Four different proof boundaries."),
-        ("/verify", "Check the signed bytes. Keep the proof boundary."),
-        ("/badges", "Inspect the result. Keep its limits attached."),
-        ("/badges/0123456789abcdef", "Separate the audit result from its integrity."),
-        ("/privacy", "Privacy"),
+        ("/trust", "How Warden’s evidence fits together"),
+        ("/verify", "Verify a Warden record"),
+        ("/badges", "Endpoint audit records"),
+        ("/badges/0123456789abcdef", "Endpoint audit record"),
+        ("/privacy", "Data handling summary"),
     ],
 )
 def test_preview_serves_production_clean_routes(client, path, marker):

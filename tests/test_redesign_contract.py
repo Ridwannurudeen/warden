@@ -37,6 +37,24 @@ def test_documentation_index_covers_the_complete_integration_journey(tmp_path):
     assert "Last updated" in page
 
 
+def test_documentation_index_leads_with_reference_content_not_marketing_cards(tmp_path):
+    render_docs(ROOT, tmp_path)
+    page = (tmp_path / "index.html").read_text(encoding="utf-8")
+
+    assert "<h1>Warden documentation</h1>" in page
+    assert page.index('id="quickstart"') < page.index('id="reason-matrix"')
+    assert page.index('id="reason-matrix"') < page.index('id="concepts"')
+    assert "Filter reason codes" in page
+    assert page.count('<div class="docs-reference-table"><table>') == 2
+    assert page.count("<caption>") == 3
+    assert "Implemented reason codes and observed regression outcomes" in page
+    assert "Core concepts and their operational meaning" in page
+    assert "Decision response fields and caller guidance" in page
+    assert '<table class="docs-reference-table">' not in page
+    assert "docs-decision-grid" not in page
+    assert '<p class="eyebrow">Concepts</p>' not in page
+
+
 def test_reason_pages_publish_machine_value_false_positive_and_guidance(tmp_path):
     documents = load_reason_documents(ROOT)
     render_docs(ROOT, tmp_path)
@@ -46,4 +64,11 @@ def test_reason_pages_publish_machine_value_false_positive_and_guidance(tmp_path
         assert f"<code>{document.reason_code.value}</code>" in page
         assert "False-positive considerations" in page
         assert "Related integration guidance" in page
+        assert '<div class="docs-reference-table"><table>' in page
+        assert page.count("<caption>") == 1
+        assert (
+            f"<caption>{document.reason_code.value} observed detector contract</caption>"
+            in page
+        )
+        assert '<table class="docs-reference-table">' not in page
         assert re.search(r'<nav class="table-of-contents"', page)

@@ -19,42 +19,62 @@ function page(name) {
   return fs.readFileSync(path.join(SITE, name), "utf8");
 }
 
-test("evidence routes use the canonical four-group information architecture", () => {
-  const expectedGroups = {
-    Product: ["/", "/playground", "/theater", "/hire"],
-    Developers: ["/integrate#sdk-first", "/integrate", "/docs"],
-    Evidence: ["/verify", "/apa/log", "/badges", "/agents", "/status"],
-    Research: ["/gauntlet", "/agents#methodology", "/showcase"],
-  };
+test("evidence routes use the canonical direct site shell", () => {
+  const expectedLinks = [
+    ["/", "Product"],
+    ["/playground", "Playground"],
+    ["/integrate", "Developers"],
+    ["/docs", "Docs"],
+    ["/verify", "Evidence"],
+    ["/gauntlet", "Research"],
+  ];
 
   for (const name of ROUTES) {
     const html = page(name);
-    for (const [group, hrefs] of Object.entries(expectedGroups)) {
-      const match = html.match(
-        new RegExp(
-          `<details class="nav-group[^"]*">\\s*<summary>${group}</summary>\\s*<div class="nav-menu">([\\s\\S]*?)</div>`,
+    const navigation = html.match(
+      /<nav class="site-nav"[^>]*>([\s\S]*?)<\/nav>/,
+    );
+    assert.ok(navigation, name);
+    assert.doesNotMatch(navigation[1], /nav-group|<summary>/, name);
+    assert.deepEqual(
+      [
+        ...navigation[1].matchAll(
+          /<a class="nav-link" href="([^"]+)"[^>]*>([^<]+)<\/a>/g,
         ),
-      );
-      assert.ok(match, `${name}: ${group}`);
-      assert.deepEqual(
-        [...match[1].matchAll(/href="([^"]+)"/g)].map((entry) => entry[1]),
-        hrefs,
-        `${name}: ${group}`,
-      );
-    }
+      ].map((entry) => [entry[1], entry[2]]),
+      expectedLinks,
+      name,
+    );
+    assert.match(html, /src="\/assets\/warden-mark\.svg"/, name);
     assert.match(html, />Status unknown</);
     assert.match(html, /href="\/integrate">Integrate</);
-    assert.match(html, /href="\/playground">Run live scan</);
+    assert.match(html, /href="\/playground">Run a live scan</);
+    assert.doesNotMatch(html, /class="header-hire"/, name);
     assert.match(
       html,
-      /<span class="site-footer__label">Policy<\/span>[\s\S]*?href="\/trust">Trust &amp; Security<\/a>[\s\S]*?href="\/privacy">Privacy<\/a>[\s\S]*?href="\/terms">Terms<\/a>/,
+      /<footer class="site-footer page-shell">\s*<div>\s*<strong>Warden<\/strong>\s*<span>Pre-action security for agent systems\.<\/span>\s*<\/div>/,
+      `${name}: footer positioning`,
+    );
+    assert.match(
+      html,
+      /<span class="site-footer__label">Policy<\/span>[\s\S]*?href="\/trust">Trust &amp; security<\/a>[\s\S]*?href="\/privacy">Privacy<\/a>[\s\S]*?href="\/terms">Terms<\/a>/,
       `${name}: policy footer`,
     );
   }
-  assert.doesNotMatch(
-    page("trust.html"),
-    /<details class="nav-group has-current">\s*<summary>Evidence<\/summary>/,
-  );
+  for (const name of [
+    "badges.html",
+    "badge.html",
+    "verify.html",
+    "log.html",
+    "status.html",
+  ]) {
+    assert.match(
+      page(name),
+      /<a class="nav-link" href="\/verify" aria-current="page">Evidence<\/a>/,
+      name,
+    );
+  }
+  assert.doesNotMatch(page("trust.html"), /class="nav-link"[^>]*aria-current/);
 });
 
 test("evidence routes expose explicit provenance without ambiguous placeholders", () => {
@@ -73,8 +93,13 @@ test("endpoint audit records remain bounded, searchable, and inspectable", () =>
   assert.match(registry, /data-badge-search/);
   assert.match(registry, /data-badge-integrity-filter/);
   assert.match(registry, /This is point-in-time evidence, not certification/);
+  assert.ok(
+    registry.indexOf("data-badge-registry") <
+      registry.indexOf("What an audit record contains"),
+  );
   assert.match(detail, /data-badge-raw-json/);
   assert.match(detail, /expiry or revocation status/);
+  assert.equal((detail.match(/class="badge-evidence"/g) || []).length, 0);
   assert.match(script, /renderRegistryFilters/);
   assert.match(script, /JSON\.stringify\(rawRecord, null, 2\)/);
   assert.doesNotMatch(script, /innerHTML|insertAdjacentHTML|document\.write/);
@@ -84,15 +109,25 @@ test("attestation verifier offers explicit real-record and local-file paths", ()
   const html = page("verify.html");
   const script = page("verify.js");
 
-  for (const label of ["Parse", "Resolve key", "Verify", "Freshness", "Read boundary"]) {
+  for (const label of [
+    "Parse",
+    "Resolve key",
+    "Verify",
+    "Freshness",
+    "Read boundary",
+  ]) {
     assert.match(html, new RegExp(`>${label}<`));
   }
   assert.match(html, /data-apa-load-latest/);
   assert.match(html, /data-apa-verify-reference/);
-  assert.match(html, /dated cross-language fixture/);
+  assert.match(html, /cross-language fixture dated 14 July 2026/);
   assert.match(html, /data-apa-verify-file/);
-  assert.match(html, /maximum 256 KiB/);
+  assert.match(html, /maximum 256 KiB/i);
   assert.match(html, /A valid signature is not a safe-endpoint verdict/);
+  assert.ok(
+    html.indexOf('id="record-verifier"') <
+      html.indexOf("How local verification works"),
+  );
   assert.match(script, /loadLatestPublicAttestation/);
   assert.match(script, /verifySignedReference/);
   assert.match(script, /Logged APA identifiers are currently unavailable/);
@@ -108,6 +143,10 @@ test("transparency ledger exposes local recomputation and a one-byte challenge",
   assert.match(html, /data-apa-log-raw/);
   assert.match(html, /data-apa-log-copy-raw/);
   assert.match(html, /data-apa-log-tamper/);
+  assert.ok(
+    html.indexOf('class="status-live-panel"') <
+      html.indexOf("How chain continuity is checked"),
+  );
   assert.match(script, /verifiedMaterial/);
   assert.match(script, /Local tamper rejected/);
   assert.match(script, /verifySignedLog\(\s*changed,/);
@@ -128,19 +167,19 @@ test("status and trust pages keep unlike evidence layers separate", () => {
   ]) {
     assert.match(status, new RegExp(hook));
   }
-  assert.match(status, /not a contractual SLA/);
+  assert.match(status, /not\s+a\s+contractual SLA/);
   assert.match(status, />Historical uptime<\/span/);
   assert.match(status, />Not measured<\/strong/);
   for (const layer of [
-    "Caller-side enforcement",
-    "Signed APA evidence",
+    "Local enforcement",
+    "Agent Protection Attestation",
     "Public transparency",
     "Dated context",
   ]) {
     assert.match(trust, new RegExp(layer));
   }
-  assert.equal((trust.match(/<dt>What it proves<\/dt>/g) || []).length, 4);
-  assert.equal((trust.match(/<dt>What it does not prove<\/dt>/g) || []).length, 4);
-  assert.equal((trust.match(/<dt>Who verifies it<\/dt>/g) || []).length, 4);
-  assert.equal((trust.match(/<dt>Where to inspect<\/dt>/g) || []).length, 4);
+  assert.match(trust, /<table>/);
+  assert.match(trust, /Warden evidence layers and their limits/);
+  assert.equal((trust.match(/<th scope="row">/g) || []).length, 4);
+  assert.equal((trust.match(/class="badge-evidence"/g) || []).length, 0);
 });

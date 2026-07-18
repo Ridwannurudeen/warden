@@ -15,36 +15,35 @@
     <meta property="og:image" content="https://warden.gudman.xyz/assets/warden-social-card.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="https://warden.gudman.xyz/assets/warden-social-card.png">
-    <link rel="icon" href="/assets/warden-avatar.png">
-    <link rel="stylesheet" href="/styles.css?v=96b93423">
+    <link rel="icon" href="/assets/warden-mark.svg">
+    <script src="/theme.js?v=2c7c8d24"></script>
+    <link rel="stylesheet" href="/styles.css?v=a3737335">
   </head>
   <body class="page-archetype--docs">
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
-      <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
+      <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-mark.svg" alt="" width="32" height="32"><span>Warden</span></a>
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
-      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><details class="nav-group"><summary>Product</summary><div class="nav-menu"><a href="/">Overview</a><a href="/playground">Live Playground</a><a href="/theater">Attack Theater</a><a href="/hire">Use Warden</a></div></details><details class="nav-group has-current"><summary>Developers</summary><div class="nav-menu"><a href="/integrate#sdk-first">5-Minute Quickstart</a><a href="/integrate">Integrations</a><a href="/docs" aria-current="page">Documentation</a></div></details><details class="nav-group"><summary>Evidence</summary><div class="nav-menu"><a href="/verify">Verify an Attestation</a><a href="/apa/log">Transparency Log</a><a href="/badges">Endpoint Audit Records</a><a href="/agents">Marketplace Evidence Index</a><a href="/status">Service Status</a></div></details><details class="nav-group"><summary>Research</summary><div class="nav-menu"><a href="/gauntlet">Gauntlet</a><a href="/agents#methodology">Methodology</a><a href="/showcase">Product Tour</a></div></details><div class="nav-mobile-actions"><a class="button secondary" href="/integrate">Integrate</a><a class="button primary" href="/playground">Run live scan</a></div></nav>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav><a class="nav-link" href="/">Product</a><a class="nav-link" href="/playground">Playground</a><a class="nav-link" href="/integrate">Developers</a><a class="nav-link" href="/docs" aria-current="page">Docs</a><a class="nav-link" href="/verify">Evidence</a><a class="nav-link" href="/gauntlet">Research</a><div class="nav-mobile-actions"><a class="button secondary" href="/integrate">Integrate</a><a class="button primary" href="/playground">Run a live scan</a></div></nav>
       <div class="header-actions">
         <a class="status-pill" href="/status" aria-label="Service status: unknown" data-health-state="unknown"><span class="live-dot is-unknown" data-health-dot aria-hidden="true"></span><span data-health-label>Status unknown</span></a>
-        <a class="header-hire" href="/integrate">Integrate</a>
-        <a class="header-scan" href="/playground">Run live scan</a>
+        <a class="header-scan" href="/playground">Run a live scan</a>
         <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button>
       </div>
     </header>
     <main id="main" class="page-shell site-main">
 <section class="page-hero page-hero--compact">
   <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span>Documentation</span></nav>
-  <p class="eyebrow">Detection reference</p>
-  <h1>Build the action boundary, then inspect every decision.</h1>
-  <p class="hero-text">Start with local fail-closed enforcement, learn the ALLOW / SANITIZE / BLOCK contract, and use the reason reference when a detector fires.</p>
-  <p class="docs-metadata"><span>Documentation version <code>0.1.0</code></span><span>Last updated <time datetime="2026-07-17">2026-07-17</time></span></p>
+  <h1>Warden documentation</h1>
+  <p class="hero-text">Integrate the guard, handle its three decisions, and look up the exact detector that produced a result.</p>
+  <p class="docs-metadata"><span>Documentation version <code>0.1.0</code></span><span>Last updated <time datetime="2026-07-18">2026-07-18</time></span></p>
 </section>
 <div class="doc-layout">
   <aside class="doc-nav" aria-label="Documentation sections">
     <a href="#quickstart">Quickstart</a>
+    <a href="#reason-matrix">Reason matrix</a>
     <a href="#concepts">Concepts</a>
     <a href="#decision-contract">Decision contract</a>
-    <a href="#reason-matrix">Reason matrix</a>
     <a href="#integration-patterns">Integration patterns</a>
     <a href="#evidence-apa">Evidence and APA</a>
     <a href="#transparency">Transparency</a>
@@ -56,11 +55,10 @@
   <article class="prose">
     <nav class="table-of-contents" aria-label="On this page">
       <strong>On this page</strong>
-      <a href="#quickstart">Quickstart</a><a href="#concepts">Concepts</a><a href="#decision-contract">Decision contract</a><a href="#reason-matrix">Reason matrix</a><a href="#integration-patterns">Integration patterns</a><a href="#evidence-apa">Evidence and APA</a><a href="#transparency">Transparency</a><a href="#endpoint-audit">Endpoint audit</a><a href="#limits">Limits</a><a href="#troubleshooting">Troubleshooting</a>
+      <a href="#quickstart">Quickstart</a><a href="#reason-matrix">Reason matrix</a><a href="#concepts">Concepts</a><a href="#decision-contract">Decision contract</a><a href="#integration-patterns">Integration patterns</a><a href="#evidence-apa">Evidence and APA</a><a href="#transparency">Transparency</a><a href="#endpoint-audit">Endpoint audit</a><a href="#limits">Limits</a><a href="#troubleshooting">Troubleshooting</a>
     </nav>
     <section id="quickstart">
-      <p class="eyebrow">5-minute quickstart</p>
-      <h2>Run a local, fail-closed guard <a class="heading-anchor" href="#quickstart" aria-label="Link to quickstart">#</a></h2>
+      <h2>Quickstart <a class="heading-anchor" href="#quickstart" aria-label="Link to quickstart">#</a></h2>
       <p>Install both the repository root and the reference Python client from the same source checkout. The similarly named package on PyPI is unrelated.</p>
       <pre><code>python -m pip install -e . -e sdk/python
 
@@ -70,36 +68,13 @@ safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)
 execute(safe)</code></pre>
       <aside class="callout"><strong>Placement:</strong> call the guard immediately before payment, tool dispatch, link navigation, secret handling, or another consequential action. The caller keeps final authority.</aside>
     </section>
-    <section id="concepts">
-      <p class="eyebrow">Concepts</p>
-      <h2>Separate the verdict from the evidence <a class="heading-anchor" href="#concepts" aria-label="Link to concepts">#</a></h2>
-      <div class="card-grid docs-decision-grid">
-        <article><h3>Action boundary</h3><p>Untrusted output is evaluated before the caller invokes a consequential handler.</p></article>
-        <article><h3>Verdict</h3><p>ALLOW continues under caller policy, SANITIZE returns transformed text for review, and BLOCK withholds the proposed action.</p></article>
-        <article><h3>Evidence</h3><p>Qualifying decisions may produce a signed APA record that can be inspected separately from the live response.</p></article>
-        <article><h3>Proof boundary</h3><p>A valid signature proves integrity under the applicable key. It does not prove universal safety.</p></article>
-      </div>
-    </section>
-    <section id="decision-contract">
-      <p class="eyebrow">Decision model</p>
-      <h2>Read the operational decision before the diagnostic detail <a class="heading-anchor" href="#decision-contract" aria-label="Link to decision contract">#</a></h2>
-      <div class="card-grid docs-decision-grid">
-        <article><h3>Decision</h3><p><strong>ALLOW</strong>, <strong>SANITIZE</strong>, or <strong>BLOCK</strong> tells the integrating agent what to do next.</p></article>
-        <article><h3>Risk</h3><p>The observed severity band comes from the deterministic score and hard gates. It is not the decision itself.</p></article>
-        <article><h3>Reason and threat class</h3><p>A reason code names the detector that fired. The response's threat_classes array deduplicates those reasons.</p></article>
-        <article><h3>Confidence and score</h3><p>Detection confidence and the composite score are evidence used by the decision engine, not probabilities of safety.</p></article>
-        <article><h3>Detector boundary</h3><p>Fast and thorough depth do not run identical checks. CORPUS_MATCH is thorough-only.</p></article>
-      </div>
-      <aside class="callout"><strong>Detected threats start at risk MEDIUM:</strong> a finding that changes or withholds an action is never presented as low severity. Decision answers what to do; risk communicates the calibrated review floor.</aside>
-    </section>
     <section id="reason-matrix">
       <div class="section-heading">
-        <p class="eyebrow">Reason-code matrix</p>
-        <h2>Coverage, context, and intended action</h2>
-        <p class="section-copy">These are observed regression outcomes, not universal guarantees for every payload.</p>
+        <h2>Reason-code matrix</h2>
+        <p class="section-copy">Observed regression outcomes for each implemented reason code. They are not guarantees for every payload.</p>
       </div>
-      <div class="filter-bar docs-filter-bar" aria-label="Reason-code filters">
-        <label>Search reasons<input type="search" data-doc-search autocomplete="off" placeholder="Reason, behavior, context, or action"></label>
+      <div class="filter-bar docs-filter-bar" aria-label="Filter reason codes">
+        <label>Filter reason codes<input type="search" data-doc-search autocomplete="off" placeholder="Code, behavior, context, or action"></label>
         <label>Decision<select data-doc-decision><option value="">All decisions</option><option value="ALLOW">ALLOW</option><option value="SANITIZE">SANITIZE</option><option value="BLOCK">BLOCK</option></select></label>
         <label>Availability<select data-doc-availability><option value="">All paths</option><option value="fast-and-thorough">Fast and thorough</option><option value="thorough-only">Thorough-only signal</option></select></label>
         <button class="button secondary" type="button" data-doc-reset>Clear filters</button>
@@ -107,7 +82,8 @@ execute(safe)</code></pre>
       <p class="snapshot-note" aria-live="polite"><span class="num" data-doc-visible>11</span> reason codes shown</p>
       <div class="reason-matrix" data-doc-results>
         <table>
-          <thead><tr><th scope="col">Reason</th><th scope="col">Fast</th><th scope="col">Thorough</th><th scope="col">Context</th><th scope="col">Intended action</th></tr></thead>
+          <caption>Implemented reason codes and observed regression outcomes</caption>
+          <thead><tr><th scope="col">Reason</th><th scope="col">Fast</th><th scope="col">Thorough</th><th scope="col">Context</th><th scope="col">Caller action</th></tr></thead>
           <tbody><tr data-doc-entry data-search="PROMPT_INJECTION Prompt injection Seller or service text attempts to replace the buyer agent&#x27;s operating instructions. None Use the sanitized payload and keep the original instruction untrusted." data-decisions="SANITIZE" data-availability="fast-and-thorough">
   <th scope="row"><a href="/docs/prompt-injection"><span class="reason-code">PROMPT_INJECTION</span><span>Prompt injection</span></a></th>
   <td data-label="Fast"><strong>SANITIZE</strong></td>
@@ -179,48 +155,69 @@ execute(safe)</code></pre>
       </div>
       <p class="empty-state" data-doc-empty hidden>No reason codes match these filters. Clear a filter to restore the full matrix.</p>
     </section>
+    <section id="concepts">
+      <h2>Core concepts <a class="heading-anchor" href="#concepts" aria-label="Link to concepts">#</a></h2>
+      <div class="docs-reference-table"><table>
+        <caption>Core concepts and their operational meaning</caption>
+        <tbody>
+          <tr><th scope="row">Action boundary</th><td>Warden evaluates untrusted output before the caller invokes a consequential handler.</td></tr>
+          <tr><th scope="row">Decision</th><td>ALLOW continues under caller policy, SANITIZE returns transformed text, and BLOCK withholds the proposed action.</td></tr>
+          <tr><th scope="row">Evidence</th><td>A qualifying decision may produce a signed APA record separate from the live response.</td></tr>
+          <tr><th scope="row">Signature boundary</th><td>A valid signature proves record integrity under the applicable key. It does not prove universal safety.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+    <section id="decision-contract">
+      <h2>Decision model <a class="heading-anchor" href="#decision-contract" aria-label="Link to decision contract">#</a></h2>
+      <div class="docs-reference-table"><table>
+        <caption>Decision response fields and caller guidance</caption>
+        <thead><tr><th scope="col">Field</th><th scope="col">How to use it</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Decision</th><td>ALLOW, SANITIZE, or BLOCK is the operational result.</td></tr>
+          <tr><th scope="row">Risk</th><td>The severity band comes from deterministic scoring and hard gates; it is not the decision.</td></tr>
+          <tr><th scope="row">Reason</th><td>The machine-readable code names the detector that fired. Threat classes deduplicate related reasons.</td></tr>
+          <tr><th scope="row">Confidence and score</th><td>Diagnostic evidence used by the engine, not a probability of safety.</td></tr>
+          <tr><th scope="row">Depth</th><td>Fast and thorough do not run identical checks. CORPUS_MATCH is thorough-only.</td></tr>
+        </tbody>
+      </table></div>
+      <aside class="callout"><strong>Detected threats start at risk MEDIUM:</strong> a finding that changes or withholds an action is never presented as low severity. Decision answers what to do; risk communicates the calibrated review floor.</aside>
+    </section>
     <aside class="callout"><strong>Interpretation:</strong> ALLOW means no implemented detector fired. It is not proof that content is safe, and multiple threat classes can appear in one result.</aside>
     <section id="integration-patterns">
-      <p class="eyebrow">Integration patterns</p>
-      <h2>Choose the boundary your runtime can actually enforce <a class="heading-anchor" href="#integration-patterns" aria-label="Link to integration patterns">#</a></h2>
+      <h2>Integration patterns <a class="heading-anchor" href="#integration-patterns" aria-label="Link to integration patterns">#</a></h2>
       <p>Python supports local in-process enforcement. The source-built TypeScript client calls the hosted endpoint and has no local scanner engine. LangChain and LlamaIndex guards ship with the Python SDK; direct HTTP, x402, OnchainOS, and MCP paths are documented on the integration route.</p>
       <p><a class="button secondary" href="/integrate">Open exact integration contracts</a></p>
     </section>
     <section id="evidence-apa">
-      <p class="eyebrow">Evidence and APA</p>
-      <h2>Verify integrity, freshness, and subject separately <a class="heading-anchor" href="#evidence-apa" aria-label="Link to evidence and APA">#</a></h2>
+      <h2>Evidence and APA <a class="heading-anchor" href="#evidence-apa" aria-label="Link to evidence and APA">#</a></h2>
       <p>An Agent Protection Attestation binds a canonical record to an issuer signature. Local verification can establish whether the bytes match the signature under an applicable key. Freshness, revocation, subject identity, and issuer-key provenance remain separate checks.</p>
       <p><a href="/verify">Verify an attestation</a> · <a href="/spec/APA-SPEC.md">Read APA v0.1</a></p>
     </section>
     <section id="transparency">
-      <p class="eyebrow">Transparency verification</p>
-      <h2>Recompute the chain before relying on its head <a class="heading-anchor" href="#transparency" aria-label="Link to transparency verification">#</a></h2>
+      <h2>Transparency verification <a class="heading-anchor" href="#transparency" aria-label="Link to transparency verification">#</a></h2>
       <p>The public log exposes hash-chained entries and checkpoint state. A continuous unanchored chain detects local inconsistency, but cannot by itself expose a complete, internally consistent rewrite.</p>
       <p><a href="/apa/log">Inspect and recompute the log</a></p>
     </section>
     <section id="endpoint-audit">
-      <p class="eyebrow">Endpoint audit contract</p>
-      <h2>Read dated endpoint evidence as a snapshot <a class="heading-anchor" href="#endpoint-audit" aria-label="Link to endpoint audit contract">#</a></h2>
+      <h2>Endpoint audit contract <a class="heading-anchor" href="#endpoint-audit" aria-label="Link to endpoint audit contract">#</a></h2>
       <p>The endpoint service runs a fixed battery against a public endpoint the caller is authorized to test. Its output is point-in-time evidence, not certification, and does not predict every future response.</p>
       <p><a href="/badges">Review Endpoint Audit Records</a></p>
     </section>
     <section id="limits">
-      <p class="eyebrow">Limits</p>
       <h2>Known patterns are not the full attack space <a class="heading-anchor" href="#limits" aria-label="Link to limits">#</a></h2>
       <ul><li>Fast and thorough depth do not run identical checks.</li><li>Novel phrasing can evade deterministic and corpus-backed coverage.</li><li>Expected-recipient context is required for the strongest recipient-mismatch gate.</li><li>Hosted availability and timeout policy belong in the caller's enforcement design.</li><li>Do not log pasted secrets or private payloads to analytics.</li></ul>
     </section>
     <section id="troubleshooting">
-      <p class="eyebrow">Troubleshooting</p>
-      <h2>Keep an unavailable verifier from becoming an implicit ALLOW <a class="heading-anchor" href="#troubleshooting" aria-label="Link to troubleshooting">#</a></h2>
+      <h2>Troubleshooting <a class="heading-anchor" href="#troubleshooting" aria-label="Link to troubleshooting">#</a></h2>
       <dl class="data-list"><div><dt>Timeout or network error</dt><dd>Fail closed on consequential paths, surface the unavailable state, and retry only under caller policy.</dd></div><div><dt>Malformed response</dt><dd>Reject it as unusable evidence; do not infer a verdict.</dd></div><div><dt>Unexpected ALLOW</dt><dd>Confirm depth, context, payload limits, and the documented detector boundary.</dd></div><div><dt>Invalid signature</dt><dd>Stop using the record and inspect version, issuer key, canonicalization, freshness, and revocation independently.</dd></div></dl>
     </section>
   </article>
 </div>
 </main>
     <footer class="site-footer page-shell">
-      <div><strong>Warden</strong><span>Verifiable pre-action security for AI agents.</span><span>Gate the action. Keep the proof.</span></div>
-      <nav aria-label="Footer"><div class="site-footer__col"><span class="site-footer__label">Product</span><a href="/">Overview</a><a href="/playground">Live Playground</a><a href="/theater">Attack Theater</a><a href="/hire">Use Warden</a></div><div class="site-footer__col"><span class="site-footer__label">Developers</span><a href="/integrate#sdk-first">5-Minute Quickstart</a><a href="/integrate">Integrations</a><a href="/docs">Documentation</a></div><div class="site-footer__col"><span class="site-footer__label">Evidence</span><a href="/verify">Verify an Attestation</a><a href="/apa/log">Transparency Log</a><a href="/badges">Endpoint Audit Records</a><a href="/agents">Marketplace Evidence Index</a><a href="/status">Service Status</a></div><div class="site-footer__col"><span class="site-footer__label">Research</span><a href="/gauntlet">Gauntlet</a><a href="/agents#methodology">Methodology</a><a href="/showcase">Product Tour</a></div><div class="site-footer__col"><span class="site-footer__label">Policy</span><a href="/trust">Trust &amp; Security</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a></div></nav>
+      <div><strong>Warden</strong><span>Pre-action security for agent systems.</span></div>
+      <nav aria-label="Footer"><div class="site-footer__col"><span class="site-footer__label">Product</span><a href="/">Overview</a><a href="/playground">Live playground</a><a href="/theater">Incident replay</a><a href="/hire">Use Warden</a></div><div class="site-footer__col"><span class="site-footer__label">Developers</span><a href="/integrate#sdk-first">5-minute quickstart</a><a href="/integrate">Integration guide</a><a href="/docs">Documentation</a></div><div class="site-footer__col"><span class="site-footer__label">Evidence</span><a href="/verify">Verify an attestation</a><a href="/apa/log">Transparency log</a><a href="/badges">Endpoint audit records</a><a href="/agents">Marketplace evidence index</a><a href="/status">Service status</a></div><div class="site-footer__col"><span class="site-footer__label">Research</span><a href="/gauntlet">Gauntlet</a><a href="/agents#methodology">Methodology</a><a href="/showcase">Product tour</a></div><div class="site-footer__col"><span class="site-footer__label">Policy</span><a href="/trust">Trust &amp; security</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div></nav>
     </footer>
-    <script src="/app.js?v=5c7f3a4c" defer></script><script src="/agents.js" defer></script>
+    <script src="/app.js?v=0abdbc0f" defer></script><script src="/agents.js?v=6f9c9326" defer></script>
   </body>
 </html>

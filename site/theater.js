@@ -94,14 +94,14 @@
 
   function deliveryPresentation(attack, result) {
     if (!hasValidAspReceipt(attack, result)) {
-      return "DELIVERY RECEIPT INVALID";
+      return "Receipt invalid";
     }
     if (!result.asp_receipt.invoked) {
-      return "DEMO ASP NOT INVOKED (BLOCKED)";
+      return "Demo handler not invoked";
     }
     return result.verdict === "SANITIZE"
-      ? "DEMO ASP RECEIVED SANITIZED PAYLOAD"
-      : "DEMO ASP RECEIVED ORIGINAL PAYLOAD";
+      ? "Demo handler received sanitized payload"
+      : "Demo handler received original payload";
   }
 
   function transitionTheater(state, event) {
@@ -243,23 +243,23 @@
             ? Math.min(state.nextIndex, ATTACKS.length - 1)
             : state.activeIndex
         ];
-    let outcome = "NOT RUN";
-    let delivery = "NO DOWNSTREAM INVOCATION";
-    let evidence = "ILLUSTRATIVE SCENE · NO RECEIPT";
+    let outcome = "Not run";
+    let delivery = "No downstream call";
+    let evidence = "Example · no response yet";
     if (state.status === "scanning") {
-      outcome = "REQUEST IN PROGRESS";
-      delivery = "DELIVERY PENDING · NO RECEIPT YET";
-      evidence = "UNKNOWN · RESPONSE NOT YET ESTABLISHED";
+      outcome = "Request in progress";
+      delivery = "Awaiting response";
+      evidence = "No response accepted yet";
     } else if (state.status === "error") {
-      outcome = "REQUEST STOPPED";
-      delivery = "DELIVERY UNKNOWN — NO RECEIPT";
-      evidence = "DEGRADED · NO VALID RESULT ACCEPTED";
+      outcome = "Request failed";
+      delivery = "Execution unknown";
+      evidence = "No valid response accepted";
     } else if (showLiveResult) {
       outcome = `${latest.verdict} · ${latest.threats.join(", ") || "No threat class"}`;
       delivery = latest.delivery;
       evidence = latest.expected
-        ? "LIVE · VERDICT AND DEMO ASP RECEIPT VALIDATED"
-        : "LIVE · UNEXPECTED RESULT REQUIRES INSPECTION";
+        ? "Live · verdict and handler receipt validated"
+        : "Live · unexpected result; inspect response";
     }
     return {
       label: attack.label,
@@ -339,17 +339,17 @@
       const proposedAction = document.createElement("span");
       proposedAction.textContent = `Proposed action · ${attack?.payloadLabel || "Unavailable"}`;
       const verdict = document.createElement("span");
-      verdict.textContent = `Detector / verdict · ${item.threats.join(", ") || "No threat class"} · ${item.verdict}`;
+      verdict.textContent = `Verdict · ${item.verdict} · ${item.threats.join(", ") || "No reason code"}`;
       const delivery = document.createElement("span");
       delivery.textContent = `Execution · ${item.delivery}`;
       const evidence = document.createElement("span");
       evidence.className = "source-stamp source-stamp--live";
       evidence.dataset.sourceState = "live";
       evidence.textContent = item.checkedAt
-        ? `LIVE · validated ${item.checkedAt}`
-        : "LIVE · validated response";
+        ? `Live · ${item.checkedAt}`
+        : "Live response";
       const timing = document.createElement("span");
-      timing.textContent = `Live compute ${formatComputeLatency(item.latencyMs)}`;
+      timing.textContent = `Compute · ${formatComputeLatency(item.latencyMs)}`;
 
       row.append(
         title,
@@ -367,18 +367,18 @@
   function renderSourceStamp() {
     const latest = state.feed.at(-1);
     let sourceState = "illustrative";
-    let message = "Staged input only; no verdict or delivery receipt exists yet.";
+    let message = "Test input; no response yet.";
     if (state.status === "scanning") {
       sourceState = "unknown";
-      message = "Request in progress; no result has been accepted.";
+      message = "Request in progress.";
     } else if (state.status === "error") {
       sourceState = "degraded";
-      message = "The request failed; no valid verdict or receipt was accepted.";
+      message = "No valid response was accepted.";
     } else if (latest) {
       sourceState = "live";
       message = latest.checkedAt
-        ? `Validated response received at ${latest.checkedAt}.`
-        : "Validated response received during this session.";
+        ? `Response received at ${latest.checkedAt}.`
+        : "Response received during this session.";
     }
     sourceStamp.dataset.sourceState = sourceState;
     sourceStamp.className = `source-stamp source-stamp--${sourceState}`;
@@ -400,26 +400,26 @@
 
   function statusMessage() {
     if (state.status === "scanning") {
-      return "Sending this attack through the live Warden gate before the no-side-effect demo ASP…";
+      return "Running the current case through Warden…";
     }
     if (state.status === "complete") {
-      return "Pass complete. Three live attacks gated with validated downstream receipts.";
+      return "All three cases completed with validated handler receipts.";
     }
     if (state.status === "unexpected") {
-      return "The live gate returned an unexpected verdict or downstream receipt. Autoplay is paused; no neutralization was counted.";
+      return "The response did not match the expected verdict or handler receipt. Inspect it before retrying.";
     }
     if (state.status === "error") {
-      return `${state.error} Autoplay is paused; no verdict was accepted.`;
+      return `${state.error} No verdict was accepted.`;
     }
     if (state.status === "paused") {
       return reducedMotion
-        ? "Reduced motion is enabled. Run each live attack manually."
-        : "The sequence is paused. Run the next attack or resume when ready.";
+        ? "Reduced motion is enabled. Run each case manually."
+        : "Paused. Run the next case or resume the sequence.";
     }
     if (state.status === "idle") {
-      return "No request has been sent. Start the sequence or run the first attack manually.";
+      return "No request has been sent.";
     }
-    return "The sequence is ready for the next live attack.";
+    return "Ready for the next case.";
   }
 
   function render() {
@@ -441,8 +441,16 @@
     status.dataset.state = state.status;
 
     startButton.disabled = state.status !== "idle";
-    toggleButton.textContent = state.auto ? "Pause sequence" : "Resume sequence";
+    startButton.hidden = state.status !== "idle";
+    toggleButton.textContent = state.auto ? "Pause" : "Resume";
     toggleButton.disabled =
+      reducedMotion ||
+      state.status === "idle" ||
+      state.status === "scanning" ||
+      state.status === "complete" ||
+      state.status === "unexpected" ||
+      state.status === "error";
+    toggleButton.hidden =
       reducedMotion ||
       state.status === "idle" ||
       state.status === "scanning" ||
@@ -453,11 +461,19 @@
       state.status === "scanning" || state.status === "complete";
     nextButton.textContent =
       state.status === "error" || state.status === "unexpected"
-        ? "Retry attack"
-        : "Next attack";
+        ? "Retry case"
+        : "Next case";
+    nextButton.hidden =
+      state.status === "idle" ||
+      state.status === "scanning" ||
+      state.status === "complete";
     replayButton.disabled =
       state.status === "scanning" || state.status === "idle";
+    replayButton.hidden = !["complete", "unexpected", "error"].includes(
+      state.status,
+    );
     resetButton.disabled = state.status === "scanning";
+    resetButton.hidden = state.status === "idle" || state.status === "scanning";
 
     renderFeed();
     renderSourceStamp();
