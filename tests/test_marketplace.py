@@ -159,34 +159,45 @@ def test_committed_snapshot_has_honest_schema_v2_coverage():
 
     assert snapshot.metadata.model_dump() == {
         "schema_version": 2,
-        "captured_at": "2026-07-16T02:47:26Z",
+        "captured_at": "2026-07-18T18:35:07Z",
         "query": "a",
         "page_size": 100,
-        "sampled": 730,
-        "expected": 752,
-        "dropped": 22,
+        "sampled": 882,
+        "expected": 885,
+        "dropped": 3,
     }
-    assert len(snapshot.agents) == 730
+    assert len(snapshot.agents) == 882
 
 
 def test_committed_warden_marketplace_numbers_are_explicitly_snapshot_dated():
     agent_html = (ROOT / "site" / "agents" / "3808.html").read_text(encoding="utf-8")
     index_html = (ROOT / "site" / "agents" / "index.html").read_text(encoding="utf-8")
 
-    assert '<span>Sold at snapshot</span><strong class="num">14</strong>' in agent_html
-    assert '<span>Buyer review at snapshot</span><strong class="num">4 / 5</strong>' in agent_html
-    assert "<span>Sold at 2026-07-16 snapshot</span>" in index_html
-    assert "<span>Buyer review at 2026-07-16 snapshot</span>" in index_html
-    assert (
-        "Agent: Warden; Agent ID: 3808; Category: SOFTWARE_SERVICES; "
-        "Sold at 2026-07-16 snapshot: 14;"
-    ) in index_html
-    assert "Buyer review at 2026-07-16 snapshot: 4 / 5" in index_html
-    assert '<span class="num" data-label="Sold at 2026-07-16 snapshot">14</span>' in index_html
-    assert (
-        '<span class="num" data-label="Buyer review at 2026-07-16 snapshot">4 / 5</span>'
-        in index_html
+    index_data = json.loads(
+        (ROOT / "site" / "agents" / "index-data.json").read_text(encoding="utf-8")
     )
+    agents_js = (ROOT / "site" / "agents.js").read_text(encoding="utf-8")
+
+    assert '<span>Sold at snapshot</span><strong class="num">16</strong>' in agent_html
+    assert '<span>Buyer review at snapshot</span><strong class="num">4.8 / 5</strong>' in agent_html
+    assert (
+        "Dated discovery snapshot for marketplace query &quot;a&quot;. "
+        "882 of 885 listed agents captured"
+    ) in agent_html
+    assert "Captured 2026-07-18T18:35:07Z." in agent_html
+    assert "<span>Sold at 2026-07-18 snapshot</span>" in index_html
+    assert "<span>Buyer review at 2026-07-18 snapshot</span>" in index_html
+    # Warden #3808 is no longer inside the static first-50 rows of index.html; it is
+    # rendered client-side from index-data.json, so the snapshot dating for its numbers
+    # is asserted on the data record plus the renderer that stamps the dated labels.
+    assert 'data-agent-id="3808"' not in index_html
+    assert index_data["capturedAt"] == "2026-07-18T18:35:07Z"
+    warden_record = next(record for record in index_data["records"] if record["agentId"] == "3808")
+    assert warden_record["name"] == "Warden"
+    assert warden_record["sold"] == 16
+    assert warden_record["review"] == 4.8
+    assert 'record.agentId === "3808" ? `Sold at ${snapshotDate} snapshot` : "Sold"' in agents_js
+    assert "? `Buyer review at ${snapshotDate} snapshot`" in agents_js
 
 
 def test_fetch_paginates_until_empty_and_persists_snapshot(tmp_path):
@@ -847,23 +858,42 @@ def test_renderer_distinguishes_complete_and_degraded_capture_coverage(tmp_path)
         inconsistent_dir,
         coverage=_coverage(sampled=1, expected=0),
     )
+    near_complete_dir = tmp_path / "near_complete"
+    near_complete_indexed = [
+        indexed.model_copy(update={"agent": _agent(agentId=str(3808 + offset))})
+        for offset in range(99)
+    ]
+    render_marketplace(
+        near_complete_indexed,
+        near_complete_dir,
+        coverage=_coverage(sampled=99, expected=100),
+    )
 
     complete_html = (complete_dir / "index.html").read_text(encoding="utf-8")
     degraded_html = (degraded_dir / "index.html").read_text(encoding="utf-8")
     inconsistent_html = (inconsistent_dir / "index.html").read_text(encoding="utf-8")
+    near_complete_html = (near_complete_dir / "index.html").read_text(encoding="utf-8")
     assert "Complete discovery response for marketplace query &quot;Warden&quot;" in complete_html
     assert "Partial/degraded discovery response" not in complete_html
+    assert 'data-source-stamp="DATED"' in complete_html
     assert (
         "Partial/degraded discovery response for marketplace query &quot;Warden&quot;"
         in degraded_html
     )
-    assert "1 unique agent sampled" in degraded_html
-    assert "highest reported result total for that query was 3" in degraded_html
-    assert "2 expected agents were not present in this response" in degraded_html
+    assert "1 of 3 listed agent captured" in degraded_html
+    assert "2 agents were not present in this response" in degraded_html
     assert "API dropped" not in degraded_html
+    assert 'data-source-stamp="DEGRADED"' in degraded_html
     assert "sample exceeded the highest reported result total" in inconsistent_html
     assert "upstream counts disagree" in inconsistent_html
     assert "0 expected agents were not present" not in inconsistent_html
+    assert 'data-source-stamp="DEGRADED"' in inconsistent_html
+    assert "Dated discovery snapshot for marketplace query &quot;Warden&quot;" in near_complete_html
+    assert "99 of 100 listed agents captured" in near_complete_html
+    assert "1 agent was not present in this crawl" in near_complete_html
+    assert "OKX marketplace pagination is not fully stable across pages" in near_complete_html
+    assert "Partial/degraded discovery response" not in near_complete_html
+    assert 'data-source-stamp="DATED"' in near_complete_html
 
 
 @pytest.mark.asyncio
