@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-labelledby="title">
   <title id="title">Warden</title>
-  <rect x="1" y="1" width="30" height="30" rx="7" fill="#17212b" stroke="#354552"/>
-  <path d="M8 9.5 12.2 23l3.8-9.2L19.8 23 24 9.5" fill="none" stroke="#edf2f6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M16 5.5v4" stroke="#68adc1" stroke-width="2.2" stroke-linecap="round"/>
+  <rect x="1" y="1" width="30" height="30" rx="7" fill="#14110b" stroke="#463f2c"/>
+  <path d="M8 9.5 12.2 23l3.8-9.2L19.8 23 24 9.5" fill="none" stroke="#f6f0e1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M16 5.5v4" stroke="#d7aa49" stroke-width="2.2" stroke-linecap="round"/>
 </svg>
