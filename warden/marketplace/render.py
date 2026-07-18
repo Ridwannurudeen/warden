@@ -84,8 +84,7 @@ def _language_attribute(value: object) -> str:
     if any("\uac00" <= character <= "\ud7af" for character in text):
         return ' lang="ko"'
     if any(
-        "\u3400" <= character <= "\u4dbf" or "\u4e00" <= character <= "\u9fff"
-        for character in text
+        "\u3400" <= character <= "\u4dbf" or "\u4e00" <= character <= "\u9fff" for character in text
     ):
         return ' lang="zh"'
     return ""
@@ -487,6 +486,13 @@ def _render_agent_page(
         if agent.agent_id == WARDEN_MARKETPLACE_AGENT_ID
         else "Buyer review average"
     )
+    verdict_chip_class = {
+        "ALLOW": "status-label status-label--allow",
+        "SANITIZE": "status-label status-label--sanitize",
+        "BLOCK": "status-label",
+    }.get(verdict, "status-label status-label--unscanned")
+    audit_evidence_state = "none" if badge is None else "linked"
+    apa_evidence_state = "none" if attestation is None else "linked"
     body = f"""
 <section class="agent-hero">
   <div class="agent-avatar" aria-hidden="true">{_escape(_initials(agent.name))}</div>
@@ -505,9 +511,15 @@ def _render_agent_page(
   <div><span>Feedback rate</span><strong class="num">{_raw_stat(agent.feedback_rate)}</strong></div>
   <div><span>{buyer_review_label}</span><strong class="num">{_buyer_review(agent.security_rate)}</strong></div>
 </section>
-<section class="feature-panel">
-  <p class="eyebrow">Public listing text only</p>
-  <h2>{_escape(public_text_label)}</h2>
+<section class="feature-panel scan-verdict" data-verdict="{_escape(verdict)}">
+  <div class="scan-verdict__head">
+    <div>
+      <p class="eyebrow">Public listing text only</p>
+      <h2>{_escape(public_text_label)}</h2>
+    </div>
+    <span class="{verdict_chip_class}">{_escape(verdict)}</span>
+  </div>
+  <div class="scan-verdict__body">
   <p>{_escape(indexed.rationale)}</p>
   <dl class="data-list">
     <div><dt>Warden decision</dt><dd>{_escape(verdict)}</dd></div>
@@ -515,13 +527,14 @@ def _render_agent_page(
     <div><dt>Fields scanned</dt><dd class="num">{indexed.fields_scanned}</dd></div>
   </dl>
   <p class="caveat"><strong>Scope:</strong> This scans only the public profile and service descriptions captured in the dated marketplace snapshot. It does not call the endpoint, establish malicious intent, or certify security.</p>
+  </div>
 </section>
 <section>
   <p class="eyebrow">Linked evidence</p>
   <h2>Endpoint and guard records</h2>
   <dl class="data-list linked-evidence-ledger">
-    <div><dt>Endpoint audit record</dt><dd>{audit_status}</dd></div>
-    <div><dt>APA guard proof</dt><dd>{apa_status}</dd></div>
+    <div data-evidence="{audit_evidence_state}"><dt>Endpoint audit record</dt><dd>{audit_status}</dd></div>
+    <div data-evidence="{apa_evidence_state}"><dt>APA guard proof</dt><dd>{apa_status}</dd></div>
   </dl>
   <p class="caveat">No linked record is not evidence of safety or risk. An endpoint audit record is point-in-time evidence, not certification. A guard proof is not an endpoint audit or security certification and does not prove every request traversed the guard.</p>
 </section>
@@ -698,7 +711,7 @@ def _render_index_page(
         "DATED" if coverage.sampled == coverage.expected and coverage.dropped == 0 else "DEGRADED"
     )
     audit_control = (
-        '<label>Endpoint audit record<select data-agent-audit>'
+        "<label>Endpoint audit record<select data-agent-audit>"
         '<option value="">All record states</option>'
         '<option value="audited">Linked signed endpoint audit record</option>'
         '<option value="not-audited">No linked endpoint audit record</option></select></label>'
@@ -775,8 +788,10 @@ def _render_index_page(
   <p class="snapshot-note" data-agent-index-state hidden aria-live="polite"></p>
   <button class="button secondary" type="button" data-agent-index-retry hidden>Retry full index</button>
   <noscript><p class="snapshot-note">Search and filter controls require JavaScript. {_escape(no_script_note)}</p></noscript>
+  <div class="agent-ledger">
   <div class="{header_class}" aria-hidden="true"><span>Agent</span><span>Category</span><span>Sold at {snapshot_date} snapshot</span><span>Public listing text</span>{endpoint_header}<span>Buyer review at {snapshot_date} snapshot</span></div>
   <div data-agent-results data-agent-total="{summary.sampled}" data-agent-captured-at="{_escape(coverage.captured_at)}">{"".join(rows)}</div>
+  </div>
   <button class="button secondary" type="button" data-agent-more hidden>Show more agents</button>
   <p class="empty-state" data-agent-empty hidden>No loaded records match these filters. Clear a filter to restore this page.</p>
 </section>
