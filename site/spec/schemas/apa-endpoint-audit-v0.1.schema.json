@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://warden.gudman.xyz/spec/schemas/apa-endpoint-audit-v0.1.schema.json",
+  "title": "APA endpoint-audit attestation v0.1",
+  "type": "object",
+  "properties": {
+    "spec_version": { "const": "apa-audit/0.1" },
+    "predicate_type": {
+      "const": "https://warden.gudman.xyz/spec/endpoint-audit/v1"
+    },
+    "audit_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "issuer": { "const": "warden" },
+    "subject": {
+      "type": "string",
+      "pattern": "^https?://",
+      "maxLength": 4096
+    },
+    "endpoint_host": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253
+    },
+    "battery_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "battery_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "battery_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "blocked": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "total": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "conclusive": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "inconclusive": { "const": 0 },
+    "benign_total": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "benign_passed": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "grade": { "enum": ["A", "B", "C", "D", "F"] },
+    "consent_verified": { "const": true },
+    "liveness_passed": { "const": true },
+    "observed_on": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "issued_at": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199252148991
+    },
+    "expires_at": {
+      "type": "integer",
+      "minimum": 2592000,
+      "maximum": 9007199254740991
+    },
+    "limitations": {
+      "const": "Point-in-time endpoint audit; not certification, continuous monitoring, or proof of future safety."
+    },
+    "log_seq": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "issuer_sig": {
+      "type": "string",
+      "pattern": "^sig:[A-Za-z0-9_-]{86}$"
+    }
+  },
+  "required": [
+    "spec_version",
+    "predicate_type",
+    "audit_id",
+    "issuer",
+    "subject",
+    "endpoint_host",
+    "battery_id",
+    "battery_version",
+    "battery_sha256",
+    "blocked",
+    "total",
+    "conclusive",
+    "inconclusive",
+    "benign_total",
+    "benign_passed",
+    "grade",
+    "consent_verified",
+    "liveness_passed",
+    "observed_on",
+    "issued_at",
+    "expires_at",
+    "limitations",
+    "log_seq",
+    "issuer_sig"
+  ],
+  "additionalProperties": false
+}

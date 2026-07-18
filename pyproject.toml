@@ -20,9 +20,10 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["warden*"]
+include = ["audit", "warden*"]
 
 [tool.setuptools.package-data]
+"audit" = ["warden-core-http-2026-07.json"]
 "warden" = ["corpus_fingerprint.txt"]
 "warden.analyzers" = ["bip39_words.txt"]
 

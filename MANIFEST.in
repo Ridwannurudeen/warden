@@ -1,2 +1,3 @@
+include audit/warden-core-http-2026-07.json
 include warden/analyzers/bip39_words.txt
 include warden/corpus_fingerprint.txt

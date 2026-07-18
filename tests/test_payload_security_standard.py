@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -119,8 +120,16 @@ def test_site_builder_publishes_the_standard_and_machine_profile(tmp_path: Path)
 
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert public_spec.read_bytes() == (ROOT / "spec" / "APA-SPEC.md").read_bytes()
-    for name in (
-        "ASP-PAYLOAD-SECURITY-STANDARD.md",
-        "payload-security-profile-v0.1.json",
-    ):
-        assert (public_spec.parent / name).read_bytes() == (ROOT / "spec" / name).read_bytes()
+    public_standard = public_spec.parent / STANDARD_PATH.name
+    assert public_standard.read_bytes() == STANDARD_PATH.read_bytes()
+
+    linked_assets = re.findall(
+        r"\[[^\]]+\]\((?![a-z][a-z0-9+.-]*:|/|#)([^)#]+)(?:#[^)]+)?\)",
+        STANDARD_PATH.read_text(encoding="utf-8"),
+        flags=re.IGNORECASE,
+    )
+    assert linked_assets
+    for relative_path in linked_assets:
+        source = (STANDARD_PATH.parent / relative_path).resolve()
+        published = (public_standard.parent / relative_path).resolve()
+        assert published.read_bytes() == source.read_bytes()

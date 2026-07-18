@@ -20,8 +20,11 @@ DEFAULT_SPEC_OUTPUT = ROOT / "site" / "spec" / "APA-SPEC.md"
 DEFAULT_SITE_ROOT = ROOT / "site"
 PUBLIC_SPEC_FILES = (
     "ASP-PAYLOAD-SECURITY-STANDARD.md",
+    "CONFORMANCE.md",
     "payload-security-profile-v0.1.json",
 )
+PUBLIC_SPEC_SCHEMA_FILES = ("apa-endpoint-audit-v0.1.schema.json",)
+PUBLIC_AUDIT_FILES = ("warden-core-http-2026-07.json",)
 
 
 def parse_args() -> argparse.Namespace:
@@ -81,9 +84,17 @@ def main() -> None:
     args.spec_output.write_bytes((ROOT / "spec" / "APA-SPEC.md").read_bytes())
     for name in PUBLIC_SPEC_FILES:
         (args.spec_output.parent / name).write_bytes((ROOT / "spec" / name).read_bytes())
+    public_schema_dir = args.spec_output.parent / "schemas"
+    public_schema_dir.mkdir(parents=True, exist_ok=True)
+    for name in PUBLIC_SPEC_SCHEMA_FILES:
+        (public_schema_dir / name).write_bytes((ROOT / "spec" / "schemas" / name).read_bytes())
+    public_audit_dir = args.spec_output.parent.parent / "audit"
+    public_audit_dir.mkdir(parents=True, exist_ok=True)
+    for name in PUBLIC_AUDIT_FILES:
+        (public_audit_dir / name).write_bytes((ROOT / "audit" / name).read_bytes())
     print(
         "Built 11 reason-code pages, the documentation index, the public APA spec, "
-        "and the ASP payload-security standard."
+        "the ASP payload-security standard, and its linked conformance assets."
     )
     site_root = _crawler_site_root(args)
     if site_root is not None:
