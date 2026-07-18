@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +25,7 @@ APA_PROTECTOR = "warden"
 APA_ATTESTATION_TTL_SECONDS = 3_600
 MAX_SAFE_UNIX_SECONDS = 9_007_199_254_740_991
 WARDEN_MARKETPLACE_AGENT_ID = "3808"
+MARKETPLACE_INDEX_ROW_LIMIT = 50
 
 
 @dataclass(frozen=True)
@@ -76,7 +78,17 @@ def _initials(name: str) -> str:
 
 
 def _language_attribute(value: object) -> str:
-    return ' lang="und"' if any(ord(character) > 127 for character in str(value)) else ""
+    text = str(value)
+    if any("\u3040" <= character <= "\u30ff" for character in text):
+        return ' lang="ja"'
+    if any("\uac00" <= character <= "\ud7af" for character in text):
+        return ' lang="ko"'
+    if any(
+        "\u3400" <= character <= "\u4dbf" or "\u4e00" <= character <= "\u9fff"
+        for character in text
+    ):
+        return ' lang="zh"'
+    return ""
 
 
 def _number(value: int | None) -> str:
@@ -390,20 +402,23 @@ def _render_services(indexed: IndexedAgent) -> str:
     if not indexed.agent.services:
         return '<p class="empty-state">No services listed in this marketplace snapshot.</p>'
     rows = []
+    open_attribute = " open" if len(indexed.agent.services) == 1 else ""
     for service in indexed.agent.services:
         endpoint = _escape(service.endpoint or "Not reported")
         fee = _escape(service.fee_amount if service.fee_amount is not None else "Not reported")
         rows.append(
-            f"""<article class="service-card">
-  <p class="eyebrow">Service #{_escape(service.service_id)}</p>
-  <h3{_language_attribute(service.service_name)}>{_escape(service.service_name or "Unnamed service")}</h3>
-  <dl class="data-list">
-    <div><dt>Type</dt><dd>{_escape(service.service_type or "Not reported")}</dd></div>
-    <div><dt>Fee amount</dt><dd class="num">{fee}</dd></div>
+            f"""<details class="marketplace-service"{open_attribute}>
+  <summary><span class="marketplace-service__summary">
+    <span class="marketplace-service__identity"><span class="service-id">Service #{_escape(service.service_id)}</span><strong{_language_attribute(service.service_name)}>{_escape(service.service_name or "Unnamed service")}</strong></span>
+    <span class="marketplace-service__meta"><span><span class="sr-only">Type: </span>{_escape(service.service_type or "Not reported")}</span><span class="num"><span class="sr-only">Fee amount: </span>{fee}</span></span>
+  </span></summary>
+  <div class="marketplace-service__body">
+    <dl class="data-list">
     <div><dt>Endpoint</dt><dd><code>{endpoint}</code></dd></div>
-  </dl>
-  <p{_language_attribute(service.service_description)}>{_escape(service.service_description or "No public service description.")}</p>
-</article>"""
+    </dl>
+    <p class="marketplace-service__description"{_language_attribute(service.service_description)}>{_escape(service.service_description or "No public service description.")}</p>
+  </div>
+</details>"""
         )
     return "".join(rows)
 
@@ -420,15 +435,17 @@ def _render_agent_page(
     badge = _verified_badge(badge_records)
     if badge is None:
         audit_status = (
-            '<p class="status-label status-label--pending">No linked Warden audit</p>'
-            '<a class="button secondary" href="/hire">Request an authorized endpoint audit</a>'
+            "<span>No linked endpoint audit record in this dated build.</span>"
+            '<a class="text-link" href="/hire">Request an authorized endpoint audit</a>'
         )
     else:
         audit_id = _escape(badge.get("audit_id", ""))
         audit_status = (
-            '<p class="status-label status-label--allow">Verified audit badge</p>'
-            f'<a class="button secondary" href="/badges/{audit_id}">Open badge {audit_id}</a>'
-            '<p class="caveat">The badge signature verifies record integrity. Its agent association comes from a reviewed build manifest and a matching listed-service host.</p>'
+            "<strong>Linked signed endpoint audit record</strong>"
+            f'<a class="text-link" href="/badges/{audit_id}">'
+            f"Open endpoint audit record {audit_id}</a>"
+            "<small>The signature verifies record integrity. The agent link comes from a "
+            "reviewed build manifest and a matching listed-service host.</small>"
         )
 
     attestation = _verified_attestation(
@@ -437,15 +454,19 @@ def _render_agent_page(
         apa_issuer_history,
     )
     if attestation is None:
-        apa_status = '<p class="status-label status-label--pending">No linked APA guard proof</p>'
+        apa_status = "<span>No linked APA guard proof in this dated build.</span>"
     else:
         attestation_id = _escape(attestation["attestation_id"])
         scans = attestation["scans_24h"]
         scans_label = "exact count unavailable" if scans is None else f"{int(scans):,} / 24h"
         apa_status = (
-            '<p class="status-label status-label--pending">Linked signed APA guard proof; open record for current status</p>'
-            f'<a class="button secondary" href="/apa/attestation/{attestation_id}">Open attestation {attestation_id}</a>'
-            f'<p class="caveat">Signed usage claim at verification time: {_escape(scans_label)}. This static page does not claim the record is currently active. This is not an endpoint audit or security certification. The issuer signature authenticates the record; its agent association comes from a reviewed manifest plus a matching listed-service endpoint host. Guard-live does not prove every request traversed the guard.</p>'
+            "<strong>Linked signed APA guard proof</strong>"
+            f'<a class="text-link" href="/apa/attestation/{attestation_id}">'
+            f"Open attestation {attestation_id}</a>"
+            f"<small>Signed usage claim at verification time: {_escape(scans_label)}. "
+            "This static page does not claim the record is currently active. The issuer "
+            "signature authenticates the record; the agent link comes from a reviewed "
+            "manifest and a matching listed-service endpoint host.</small>"
         )
 
     avatar_url = _safe_external_url(agent.profile_picture)
@@ -496,19 +517,18 @@ def _render_agent_page(
   <p class="caveat"><strong>Scope:</strong> This scans only the public profile and service descriptions captured in the dated marketplace snapshot. It does not call the endpoint, establish malicious intent, or certify security.</p>
 </section>
 <section>
-  <p class="eyebrow">Independent audit</p>
-  <h2>Audit status</h2>
-  {audit_status}
-</section>
-<section>
-  <p class="eyebrow">Agent Protection Attestation</p>
-  <h2>Guard-proof status</h2>
-  {apa_status}
+  <p class="eyebrow">Linked evidence</p>
+  <h2>Endpoint and guard records</h2>
+  <dl class="data-list linked-evidence-ledger">
+    <div><dt>Endpoint audit record</dt><dd>{audit_status}</dd></div>
+    <div><dt>APA guard proof</dt><dd>{apa_status}</dd></div>
+  </dl>
+  <p class="caveat">No linked record is not evidence of safety or risk. An endpoint audit record is point-in-time evidence, not certification. A guard proof is not an endpoint audit or security certification and does not prove every request traversed the guard.</p>
 </section>
 <section>
   <p class="eyebrow">Public services</p>
   <h2>{len(agent.services)} listed service{"s" if len(agent.services) != 1 else ""}</h2>
-  <div class="service-grid">{_render_services(indexed)}</div>
+  <div class="marketplace-service-list">{_render_services(indexed)}</div>
 </section>
 <p class="snapshot-note">{_escape(_coverage_text(coverage))}</p>
 """
@@ -522,6 +542,51 @@ def _render_agent_page(
     )
 
 
+def _sorted_indexed_agents(indexed_agents: list[IndexedAgent]) -> list[IndexedAgent]:
+    return sorted(
+        indexed_agents,
+        key=lambda indexed: (
+            -(indexed.agent.sold_count if indexed.agent.sold_count is not None else -1),
+            indexed.agent.name.casefold(),
+        ),
+    )
+
+
+def _marketplace_index_data(
+    indexed_agents: list[IndexedAgent],
+    coverage: SnapshotMetadata,
+    audited_agent_ids: set[str],
+    attested_agent_ids: set[str],
+) -> dict[str, object]:
+    records = []
+    for indexed in _sorted_indexed_agents(indexed_agents):
+        agent = indexed.agent
+        match_state, public_text_label = _public_text_status(indexed)
+        records.append(
+            {
+                "agentId": agent.agent_id,
+                "name": agent.name,
+                "categories": list(agent.category_codes),
+                "sold": agent.sold_count,
+                "review": agent.security_rate,
+                "match": match_state,
+                "publicTextLabel": public_text_label,
+                "verdict": indexed.verdict,
+                "threatClasses": list(indexed.threat_classes),
+                "audit": ("audited" if agent.agent_id in audited_agent_ids else "not-audited"),
+                "apa": ("attested" if agent.agent_id in attested_agent_ids else "not-attested"),
+            }
+        )
+    return {
+        "schemaVersion": 1,
+        "capturedAt": coverage.captured_at,
+        "sampled": coverage.sampled,
+        "hasAudits": bool(audited_agent_ids),
+        "hasAttestations": bool(attested_agent_ids),
+        "records": records,
+    }
+
+
 def _render_index_page(
     indexed_agents: list[IndexedAgent],
     coverage: SnapshotMetadata,
@@ -530,45 +595,48 @@ def _render_index_page(
     attested_agent_ids: set[str],
 ) -> str:
     snapshot_date = coverage.captured_at[:10]
+    sorted_agents = _sorted_indexed_agents(indexed_agents)
+    listed_agents = sorted_agents[:MARKETPLACE_INDEX_ROW_LIMIT]
     categories = sorted(
-        {category for indexed in indexed_agents for category in indexed.agent.category_codes}
+        {category for indexed in sorted_agents for category in indexed.agent.category_codes}
     )
     options = "".join(
         f'<option value="{_escape(category)}">{_escape(category)}</option>'
         for category in categories
     )
-    sorted_agents = sorted(
-        indexed_agents,
-        key=lambda indexed: (
-            -(indexed.agent.sold_count if indexed.agent.sold_count is not None else -1),
-            indexed.agent.name.casefold(),
-        ),
-    )
+    has_audits = bool(audited_agent_ids)
+    has_attestations = bool(attested_agent_ids)
+    has_endpoint_evidence = has_audits or has_attestations
     rows = []
-    for indexed in sorted_agents:
+    for indexed in listed_agents:
         agent = indexed.agent
         match_state, public_text_label = _public_text_status(indexed)
         audit_state = "audited" if agent.agent_id in audited_agent_ids else "not-audited"
-        audit_label = "Linked signed audit" if audit_state == "audited" else "No linked audit"
+        audit_label = (
+            "Linked signed endpoint audit record"
+            if audit_state == "audited"
+            else "No linked endpoint audit record"
+        )
         apa_label = (
-            "Linked signed APA guard proof; open record for current status"
+            "Linked signed APA guard proof"
             if agent.agent_id in attested_agent_ids
             else "No linked APA guard proof"
         )
         apa_state = "attested" if agent.agent_id in attested_agent_ids else "not-attested"
         categories_text = ", ".join(agent.category_codes) or "Uncategorized"
         category_data = "|".join(agent.category_codes)
-        search_text = " ".join(
-            (
-                agent.agent_id,
-                agent.name,
-                categories_text,
-                public_text_label,
-                " ".join(indexed.threat_classes),
-                audit_label,
-                apa_label,
-            )
-        )
+        search_parts = [
+            agent.agent_id,
+            agent.name,
+            categories_text,
+            public_text_label,
+            " ".join(indexed.threat_classes),
+        ]
+        if has_audits:
+            search_parts.append(audit_label)
+        if has_attestations:
+            search_parts.append(apa_label)
+        search_text = " ".join(search_parts)
         sold_sort = "" if agent.sold_count is None else str(agent.sold_count)
         review_sort = "" if agent.security_rate is None else str(agent.security_rate)
         sold_label = (
@@ -584,76 +652,149 @@ def _render_index_page(
         buyer_review_data_label = (
             buyer_review_label if agent.agent_id == WARDEN_MARKETPLACE_AGENT_ID else "Buyer reviews"
         )
-        row_label = (
-            f"Agent: {agent.name or 'Unnamed agent'}; Agent ID: {agent.agent_id}; "
-            f"Category: {categories_text}; {sold_label}: {_number(agent.sold_count)}; "
-            f"Public listing text: {public_text_label}; "
-            f"Verdict: {indexed.verdict or 'NOT_SCANNED'}; "
-            f"Endpoint audit: {audit_label}; "
-            f"APA attestation: {apa_label}; "
-            f"{buyer_review_label}: {_buyer_review(agent.security_rate)}"
-        )
+        row_label_parts = [
+            f"Agent: {agent.name or 'Unnamed agent'}",
+            f"Agent ID: {agent.agent_id}",
+            f"Category: {categories_text}",
+            f"{sold_label}: {_number(agent.sold_count)}",
+            f"Public listing text: {public_text_label}",
+        ]
+        if has_audits:
+            row_label_parts.append(f"Endpoint audit record: {audit_label}")
+        if has_attestations:
+            row_label_parts.append(f"APA attestation: {apa_label}")
+        row_label_parts.append(f"{buyer_review_label}: {_buyer_review(agent.security_rate)}")
+        row_label = "; ".join(row_label_parts)
+        if has_audits and has_attestations:
+            endpoint_evidence = (
+                f'<span data-label="Endpoint evidence"><strong>{audit_label}</strong>'
+                f"<small>{apa_label}</small></span>"
+            )
+        elif has_audits:
+            endpoint_evidence = (
+                f'<span data-label="Endpoint evidence"><strong>{audit_label}</strong></span>'
+            )
+        elif has_attestations:
+            endpoint_evidence = (
+                f'<span data-label="Endpoint evidence"><strong>{apa_label}</strong></span>'
+            )
+        else:
+            endpoint_evidence = ""
+        row_class = "agent-row" if has_endpoint_evidence else "agent-row agent-row--no-evidence"
         rows.append(
-            f"""<a class="agent-row" href="/agents/{_escape(agent.agent_id)}" aria-label="{_escape(row_label)}" data-agent-row data-search="{_escape(search_text)}" data-category="{_escape(category_data)}" data-match="{match_state}" data-audit="{audit_state}" data-apa="{apa_state}" data-name="{_escape(agent.name.casefold())}" data-agent-id="{_escape(agent.agent_id)}" data-sold="{sold_sort}" data-review="{review_sort}">
+            f"""<a class="{row_class}" href="/agents/{_escape(agent.agent_id)}" aria-label="{_escape(row_label)}" data-agent-row data-search="{_escape(search_text)}" data-category="{_escape(category_data)}" data-match="{match_state}" data-audit="{audit_state}" data-apa="{apa_state}" data-name="{_escape(agent.name.casefold())}" data-agent-id="{_escape(agent.agent_id)}" data-sold="{sold_sort}" data-review="{review_sort}">
   <span><strong{_language_attribute(agent.name)}>{_escape(agent.name or "Unnamed agent")}</strong><small>Agent #{_escape(agent.agent_id)}</small></span>
   <span data-label="Category">{_escape(categories_text)}</span>
   <span class="num" data-label="{_escape(sold_label)}">{_number(agent.sold_count)}</span>
-  <span data-label="Public text"><strong>{_escape(public_text_label)}</strong><small>{_escape(indexed.verdict or "NOT_SCANNED")}</small></span>
-  <span data-label="Endpoint evidence"><strong>{audit_label}</strong><small>{apa_label}</small></span>
+  <span data-label="Public text"><strong>{_escape(public_text_label)}</strong></span>
+  {endpoint_evidence}
   <span class="num" data-label="{_escape(buyer_review_data_label)}">{_buyer_review(agent.security_rate)}</span>
 </a>"""
         )
 
     agent_label = "agent" if summary.sampled == 1 else "agents"
+    loaded_count = len(listed_agents)
+    source_state = (
+        "DATED" if coverage.sampled == coverage.expected and coverage.dropped == 0 else "DEGRADED"
+    )
+    audit_control = (
+        '<label>Endpoint audit record<select data-agent-audit>'
+        '<option value="">All record states</option>'
+        '<option value="audited">Linked signed endpoint audit record</option>'
+        '<option value="not-audited">No linked endpoint audit record</option></select></label>'
+        if has_audits
+        else '<select data-agent-audit hidden><option value=""></option></select>'
+    )
+    apa_control = (
+        '<label>APA guard proof<select data-agent-apa><option value="">All guard-proof states</option>'
+        '<option value="attested">Linked signed guard proof</option>'
+        '<option value="not-attested">No linked guard proof</option></select></label>'
+        if has_attestations
+        else '<select data-agent-apa hidden><option value=""></option></select>'
+    )
+    audit_sort_option = (
+        '<option value="audit-first">Linked endpoint audit records first</option>'
+        if has_audits
+        else ""
+    )
+    audit_summary = (
+        f'<div><dt>Linked endpoint audit records</dt><dd class="num">'
+        f"{summary.audited_count}</dd></div>"
+        if has_audits
+        else ""
+    )
+    endpoint_header = "<span>Endpoint evidence</span>" if has_endpoint_evidence else ""
+    header_class = (
+        "agent-row agent-row--header"
+        if has_endpoint_evidence
+        else "agent-row agent-row--header agent-row--no-evidence"
+    )
+    if loaded_count < summary.sampled:
+        loaded_note = (
+            f"First {loaded_count} of {summary.sampled} snapshot records are shown. "
+            "Search, filters, sorting, and Show more load the complete dated index."
+        )
+        no_script_note = (
+            f"The first {loaded_count} of {summary.sampled} snapshot records are listed below."
+        )
+        search_placeholder = f"Search all {summary.sampled} records"
+    else:
+        loaded_note = f"All {summary.sampled} snapshot records are loaded."
+        no_script_note = "All records in this dated snapshot are listed below."
+        search_placeholder = "Name, agent ID, category, or signal"
+
     body = f"""
 <section class="index-hero">
   <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span>Marketplace Evidence Index</span></nav>
-  <p class="eyebrow">Qualified marketplace evidence</p>
   <h1>Marketplace Evidence Index</h1>
-  <p class="hero-text"><span class="num">{summary.sampled}</span> {agent_label} in this dated discovery response. This is not a universal ranking of agent safety.</p>
-  <span class="source-stamp" data-source-stamp="{"DATED" if coverage.sampled == coverage.expected and coverage.dropped == 0 else "DEGRADED"}"><span data-source-stamp-label>{"DATED" if coverage.sampled == coverage.expected and coverage.dropped == 0 else "DEGRADED"}</span></span>
-  <div class="data-grid" aria-label="Marketplace evidence snapshot">
-    <div><span>Snapshot timestamp</span><strong><time datetime="{_escape(coverage.captured_at)}">{_escape(coverage.captured_at)}</time></strong></div>
-    <div><span>Sampled</span><strong class="num">{summary.sampled}</strong></div>
-    <div><span>Expected discovery total</span><strong class="num">{summary.expected}</strong></div>
-    <div><span>Missing or degraded</span><strong class="num">{summary.dropped}</strong></div>
-    <div><span>Public-text signals</span><strong class="num">{summary.matched_count}</strong></div>
-    <div><span>Linked signed endpoint audits</span><strong class="num">{summary.audited_count}</strong></div>
-  </div>
-  <p class="caveat"><strong>Public listing text only.</strong> {_escape(_coverage_text(coverage))} A text signal is not a finding that an agent is malicious, compromised, or unsafe.</p>
+  <p class="hero-text"><span class="num">{summary.sampled}</span> {agent_label} in this dated discovery response. Browse what the marketplace published and what Warden found in that public text. This is not a safety ranking.</p>
+  <span class="source-stamp" data-source-stamp="{source_state}"><span data-source-stamp-label>{source_state}</span></span>
+  <dl class="snapshot-summary data-list" aria-label="Marketplace evidence snapshot">
+    <div><dt>Captured</dt><dd><time datetime="{_escape(coverage.captured_at)}">{_escape(coverage.captured_at)}</time></dd></div>
+    <div><dt>Sampled</dt><dd class="num">{summary.sampled}</dd></div>
+    <div><dt>Expected discovery total</dt><dd class="num">{summary.expected}</dd></div>
+    <div><dt>Missing or degraded</dt><dd class="num">{summary.dropped}</dd></div>
+    <div><dt>Public-text signals</dt><dd class="num">{summary.matched_count}</dd></div>
+    {audit_summary}
+  </dl>
+  <p class="caveat"><strong>Public listing text only.</strong> Warden did not call these agents. A pattern match is not evidence that an agent is malicious, compromised, or unsafe.</p>
+  <p class="snapshot-note">{_escape(_coverage_text(coverage))}</p>
+</section>
+<section class="filter-bar marketplace-filter-bar" data-agent-controls hidden aria-label="Search, filter, and sort agents">
+  <label>Search records<input type="search" data-agent-search autocomplete="off" placeholder="{search_placeholder}"></label>
+  <label>Category<select data-agent-category><option value="">All categories</option>{options}</select></label>
+  <label>Public-text result<select data-agent-match><option value="">All text results</option><option value="signal">Pattern match</option><option value="none">No pattern match</option><option value="unscanned">No public text to scan</option></select></label>
+  {audit_control}
+  {apa_control}
+  <label>Sort<select data-agent-sort><option value="sold-desc">Sold count, high to low</option><option value="name-asc">Name, A to Z</option><option value="review-desc">Buyer review, high to low</option><option value="signal-first">Public-text signals first</option>{audit_sort_option}</select></label>
+  <button class="button secondary" type="button" data-agent-reset>Clear filters</button>
+</section>
+<section aria-labelledby="marketplace-results-title">
+  <h2 id="marketplace-results-title">Snapshot records</h2>
+  <p class="snapshot-note" aria-live="polite" aria-atomic="true">Showing <span class="num" data-agent-rendered>{loaded_count}</span> of <span class="num" data-agent-visible>{loaded_count}</span> matching records. <span data-agent-scope>{_escape(loaded_note)}</span></p>
+  <p class="snapshot-note" data-agent-index-state hidden aria-live="polite"></p>
+  <button class="button secondary" type="button" data-agent-index-retry hidden>Retry full index</button>
+  <noscript><p class="snapshot-note">Search and filter controls require JavaScript. {_escape(no_script_note)}</p></noscript>
+  <div class="{header_class}" aria-hidden="true"><span>Agent</span><span>Category</span><span>Sold at {snapshot_date} snapshot</span><span>Public listing text</span>{endpoint_header}<span>Buyer review at {snapshot_date} snapshot</span></div>
+  <div data-agent-results data-agent-total="{summary.sampled}" data-agent-captured-at="{_escape(coverage.captured_at)}">{"".join(rows)}</div>
+  <button class="button secondary" type="button" data-agent-more hidden>Show more agents</button>
+  <p class="empty-state" data-agent-empty hidden>No loaded records match these filters. Clear a filter to restore this page.</p>
 </section>
 <details class="methodology-drawer" id="methodology">
-  <summary>Methodology and evidence boundary</summary>
+  <summary>How this index was produced</summary>
   <div class="feature-panel">
     <h2>What the index checks</h2>
-    <p>Warden runs its deterministic fast path over each captured public profile description and public service description. The dated snapshot supplies names, categories, listing statistics, and service metadata.</p>
+    <p>Warden runs its deterministic fast path over the public profile and service descriptions captured in the dated marketplace snapshot.</p>
     <h3>What this does not mean</h3>
     <p>The index does not call agent endpoints, inspect private prompts, prove ownership, establish intent, or provide continuous monitoring. “No public-text pattern match” means only that no implemented fast detector fired on the captured listing fields.</p>
-    <h3>Independent endpoint audits</h3>
-    <p>Audit status is separate. “Linked signed audit” requires a valid Warden badge plus a reviewed audit-to-agent link and matching listed-service host. A badge is point-in-time evidence, not certification.</p>
+    <h3>Endpoint audit records</h3>
+    <p>“Linked signed endpoint audit record” requires a valid Warden record, a reviewed audit-to-agent link, and a matching listed-service host. A record is point-in-time evidence, not certification.</p>
     <p><a class="button secondary" href="/hire">Configure an authorized endpoint audit</a></p>
     <p class="caveat">Audit only a public endpoint you own or are authorized to test. A returned result is not independent proof of target-owner permission.</p>
     <h3>APA guard proofs</h3>
-    <p>“Linked signed APA guard proof” requires a valid Warden issuer signature, an explicit reviewed attestation-to-agent link, and the attested endpoint host in that agent's listed services. It records live-guard evidence at verification time; open the attestation for current status. It is not an endpoint audit or security certification, and it does not prove every request traversed the guard.</p>
+    <p>“Linked signed APA guard proof” requires a valid Warden issuer signature, a reviewed attestation-to-agent link, and a matching listed-service endpoint host. It is not an endpoint audit or security certification, and it does not prove every request traversed the guard.</p>
   </div>
 </details>
-<section class="filter-bar marketplace-filter-bar" data-agent-controls hidden aria-label="Search, filter, and sort agents">
-  <label>Search listings<input type="search" data-agent-search autocomplete="off" placeholder="Name, agent ID, category, or signal"></label>
-  <label>Category<select data-agent-category><option value="">All categories</option>{options}</select></label>
-  <label>Public-text signal<select data-agent-match><option value="">All public-text results</option><option value="signal">Pattern match</option><option value="none">No pattern match</option><option value="unscanned">No public text to scan</option></select></label>
-  <label>Endpoint audit<select data-agent-audit><option value="">All audit states</option><option value="audited">Linked signed audit</option><option value="not-audited">No linked audit</option></select></label>
-  <label>APA guard proof<select data-agent-apa><option value="">All guard-proof states</option><option value="attested">Linked signed guard proof</option><option value="not-attested">No linked guard proof</option></select></label>
-  <label>Sort<select data-agent-sort><option value="sold-desc">Sold count, high to low</option><option value="name-asc">Name, A to Z</option><option value="review-desc">Buyer review, high to low</option><option value="signal-first">Public-text signals first</option><option value="audit-first">Linked audits first</option></select></label>
-  <button class="button secondary" type="button" data-agent-reset>Clear filters</button>
-</section>
-<section>
-  <p class="snapshot-note" aria-live="polite" aria-atomic="true">Showing <span class="num" data-agent-rendered>{summary.sampled}</span> of <span class="num" data-agent-visible>{summary.sampled}</span> matching agents.</p>
-  <noscript><p class="snapshot-note">Search and filter controls require JavaScript. All agents in this dated snapshot are listed below.</p></noscript>
-  <div class="agent-row agent-row--header" aria-hidden="true"><span>Agent</span><span>Category</span><span>Sold at {snapshot_date} snapshot</span><span>Public listing text</span><span>Endpoint evidence</span><span>Buyer review at {snapshot_date} snapshot</span></div>
-  <div data-agent-results>{"".join(rows)}</div>
-  <button class="button secondary" type="button" data-agent-more hidden>Show more agents</button>
-  <p class="empty-state" data-agent-empty hidden>No marketplace listings match these filters. Clear a filter to restore the full dated snapshot.</p>
-</section>
 """
     return page_shell(
         "Marketplace Evidence Index | Warden",
@@ -730,4 +871,14 @@ def render_marketplace(
         attested_agent_ids,
     )
     (output_dir / "index.html").write_text(index_page, encoding="utf-8")
+    index_data = _marketplace_index_data(
+        indexed_agents,
+        coverage,
+        audited_agent_ids,
+        attested_agent_ids,
+    )
+    (output_dir / "index-data.json").write_text(
+        json.dumps(index_data, ensure_ascii=False, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
     return summary

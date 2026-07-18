@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Inspect Warden's trust architecture: caller-side enforcement, signed APA evidence, public transparency, and dated marketplace or audit context."
+      content="See how Warden enforcement, signed APA records, transparency logging, and dated audit context fit together."
     />
     <meta name="color-scheme" content="dark light" />
-    <title>Trust Architecture | Warden</title>
+    <title>How Warden evidence works | Warden</title>
     <link rel="canonical" href="https://warden.gudman.xyz/trust" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Warden" />
-    <meta property="og:title" content="Warden Trust Architecture" />
+    <meta property="og:title" content="How Warden evidence works" />
     <meta
       property="og:description"
-      content="Caller-side enforcement, signed APA evidence, public transparency, and dated marketplace or audit context."
+      content="See how Warden enforcement, signed APA records, transparency logging, and dated audit context fit together."
     />
     <meta property="og:url" content="https://warden.gudman.xyz/trust" />
     <meta
@@ -27,19 +27,19 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=96b93423" />
+    <link rel="icon" href="/assets/warden-mark.svg" />
+    <script src="/theme.js?v=2c7c8d24"></script>
+    <link rel="stylesheet" href="/styles.css?v=a3737335" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
       <a class="brand" href="/" aria-label="Warden home"
         ><img
-          src="/assets/warden-avatar.png"
+          src="/assets/warden-mark.svg"
           alt=""
-          width="36"
-          height="36"
+          width="32"
+          height="32"
         /><span>Warden</span></a
       >
       <button
@@ -52,44 +52,15 @@
         Menu
       </button>
       <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
-        <details class="nav-group">
-          <summary>Product</summary>
-          <div class="nav-menu">
-            <a href="/">Overview</a>
-            <a href="/playground">Live Playground</a>
-            <a href="/theater">Attack Theater</a>
-            <a href="/hire">Use Warden</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Developers</summary>
-          <div class="nav-menu">
-            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
-            <a href="/integrate">Integrations</a>
-            <a href="/docs">Documentation</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Evidence</summary>
-          <div class="nav-menu">
-            <a href="/verify">Verify an Attestation</a>
-            <a href="/apa/log">Transparency Log</a>
-            <a href="/badges">Endpoint Audit Records</a>
-            <a href="/agents">Marketplace Evidence Index</a>
-            <a href="/status">Service Status</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Research</summary>
-          <div class="nav-menu">
-            <a href="/gauntlet">Gauntlet</a>
-            <a href="/agents#methodology">Methodology</a>
-            <a href="/showcase">Product Tour</a>
-          </div>
-        </details>
+        <a class="nav-link" href="/">Product</a>
+        <a class="nav-link" href="/playground">Playground</a>
+        <a class="nav-link" href="/integrate">Developers</a>
+        <a class="nav-link" href="/docs">Docs</a>
+        <a class="nav-link" href="/verify">Evidence</a>
+        <a class="nav-link" href="/gauntlet">Research</a>
         <div class="nav-mobile-actions">
           <a class="button secondary" href="/integrate">Integrate</a>
-          <a class="button primary" href="/playground">Run live scan</a>
+          <a class="button primary" href="/playground">Run a live scan</a>
         </div>
       </nav>
       <div class="header-actions">
@@ -105,8 +76,7 @@
           ></span
           ><span data-health-label>Status unknown</span></a
         >
-        <a class="header-hire" href="/integrate">Integrate</a>
-        <a class="header-scan" href="/playground">Run live scan</a>
+        <a class="header-scan" href="/playground">Run a live scan</a>
         <button
           class="theme-toggle"
           type="button"
@@ -121,16 +91,16 @@
     <main id="main" class="page-shell site-main">
       <nav class="breadcrumbs" aria-label="Breadcrumb">
         <a href="/">Home</a><span aria-hidden="true">/</span
-        ><span aria-current="page">Trust Architecture</span>
+        ><span aria-current="page">Trust</span>
       </nav>
 
       <section class="page-hero">
-        <p class="eyebrow">Evidence / Trust architecture</p>
-        <h1>Four layers. Four different proof boundaries.</h1>
+        <p class="eyebrow">Evidence architecture</p>
+        <h1>How Warden’s evidence fits together</h1>
         <p class="hero-text">
-          Warden gates a proposed action at the caller, leaves a signed decision
-          record, publishes chain continuity, and adds dated audit or marketplace
-          context without collapsing those facts into a universal trust score.
+          Enforcement happens before the caller executes an action. Signed
+          records, the public log, and dated audits make different parts of that
+          decision inspectable; none is a universal safety certificate.
         </p>
         <div class="hero-actions">
           <a class="button primary" href="/verify">Verify an attestation</a>
@@ -140,150 +110,85 @@
         </div>
       </section>
 
-      <section class="proof-strip" aria-label="Trust architecture layers">
-        <div><span>01</span><strong>Enforce</strong></div>
-        <div><span>02</span><strong>Attest</strong></div>
-        <div><span>03</span><strong>Publish</strong></div>
-        <div><span>04</span><strong>Contextualize</strong></div>
-      </section>
-
       <section aria-labelledby="trust-stack-title">
         <div class="section-heading">
-          <p class="eyebrow">The truth stack</p>
-          <h2 id="trust-stack-title">
-            Inspect each layer on its own terms.
-          </h2>
+          <h2 id="trust-stack-title">One decision, four kinds of evidence</h2>
           <p>
-            Every layer identifies what it proves, what it does not prove, who
-            can verify it, and where the underlying material can be inspected.
+            Read each row independently. A stronger row does not expand the
+            scope of the rows below it.
           </p>
         </div>
-        <div class="badge-evidence-grid">
-          <article class="badge-evidence">
-            <p class="eyebrow">01 / Caller-side enforcement</p>
-            <h3>Local enforcement</h3>
-            <dl class="data-list">
-              <div>
-                <dt>What it proves</dt>
-                <dd>
-                  An observed caller trace can show Warden returned a verdict
-                  before that proposed action branch.
-                </dd>
-              </div>
-              <div>
-                <dt>What it does not prove</dt>
-                <dd>That every other execution path is gated.</dd>
-              </div>
-              <div>
-                <dt>Who verifies it</dt>
-                <dd>The integrating caller through its own control flow.</dd>
-              </div>
-              <div>
-                <dt>Where to inspect</dt>
-                <dd><a href="/integrate">Integration contract</a></dd>
-              </div>
-            </dl>
-            <pre><code>safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)</code></pre>
-          </article>
-
-          <article class="badge-evidence">
-            <p class="eyebrow">02 / Signed APA evidence</p>
-            <h3>Agent Protection Attestation</h3>
-            <dl class="data-list">
-              <div>
-                <dt>What it proves</dt>
-                <dd>
-                  A valid, fresh issuer signature over the stated endpoint,
-                  guard state, and rolling count or explicit unavailable state.
-                </dd>
-              </div>
-              <div>
-                <dt>What it does not prove</dt>
-                <dd>
+        <div class="table-shell">
+          <table>
+            <caption>
+              Warden evidence layers and their limits
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Layer</th>
+                <th scope="col">What it establishes</th>
+                <th scope="col">Limit</th>
+                <th scope="col">Inspect</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Local enforcement</th>
+                <td>
+                  Caller-side enforcement shows Warden returned a verdict before
+                  the observed action branch.
+                </td>
+                <td>It does not prove every execution path is gated.</td>
+                <td><a href="/integrate">Integration contract</a></td>
+              </tr>
+              <tr>
+                <th scope="row">Agent Protection Attestation</th>
+                <td>
+                  Signed APA evidence binds the stated endpoint, guard state,
+                  and rolling count or explicit unavailable state.
+                </td>
+                <td>
                   It does not prove that every request traversed the guard or
-                  that a valid key was never stolen.
-                </dd>
-              </div>
-              <div>
-                <dt>Who verifies it</dt>
-                <dd>Anyone with browser-native WebCrypto and the issuer keys.</dd>
-              </div>
-              <div>
-                <dt>Where to inspect</dt>
-                <dd><a href="/verify">Local attestation verifier</a></dd>
-              </div>
-            </dl>
-          </article>
-
-          <article class="badge-evidence">
-            <p class="eyebrow">03 / Public transparency</p>
-            <h3>Hash-chained evidence history</h3>
-            <dl class="data-list">
-              <div>
-                <dt>What it proves</dt>
-                <dd>Internal chain continuity against the signed checkpoint.</dd>
-              </div>
-              <div>
-                <dt>What it does not prove</dt>
-                <dd>
-                  Completeness or an external timestamp when no independent
-                  checkpoint has been published.
-                </dd>
-              </div>
-              <div>
-                <dt>Who verifies it</dt>
-                <dd>Any browser or client that recomputes the canonical chain.</dd>
-              </div>
-              <div>
-                <dt>Where to inspect</dt>
-                <dd><a href="/apa/log">Transparency Log</a></dd>
-              </div>
-            </dl>
-          </article>
-
-          <article class="badge-evidence">
-            <p class="eyebrow">04 / Dated context</p>
-            <h3>Marketplace Evidence Index and endpoint audits</h3>
-            <p class="field-hint">
-              <span
-                class="source-stamp source-stamp--illustrative"
-                data-source-stamp
-                data-source-state="illustrative"
-                >ILLUSTRATIVE · inspect each linked record for its date</span
-              >
-            </p>
-            <dl class="data-list">
-              <div>
-                <dt>What it proves</dt>
-                <dd>
-                  What a bounded Safety Map snapshot or fixed endpoint audit
-                  observed at its published time.
-                </dd>
-              </div>
-              <div>
-                <dt>What it does not prove</dt>
-                <dd>Certification, permanent safety, or complete discovery.</dd>
-              </div>
-              <div>
-                <dt>Who verifies it</dt>
-                <dd>Readers who inspect the source, methodology, and record.</dd>
-              </div>
-              <div>
-                <dt>Where to inspect</dt>
-                <dd>
-                  <a href="/agents">Marketplace Evidence Index</a> and
-                  <a href="/badges">Endpoint Audit Records</a>
-                </dd>
-              </div>
-            </dl>
-          </article>
+                  rule out key theft.
+                </td>
+                <td><a href="/verify">Local verifier</a></td>
+              </tr>
+              <tr>
+                <th scope="row">Public transparency</th>
+                <td>
+                  Recomputed chain continuity can be checked against the signed
+                  checkpoint.
+                </td>
+                <td>
+                  It does not establish completeness or an external timestamp
+                  when no independent checkpoint exists.
+                </td>
+                <td><a href="/apa/log">Transparency log</a></td>
+              </tr>
+              <tr>
+                <th scope="row">Dated context</th>
+                <td>
+                  A Marketplace Evidence Index snapshot or endpoint audit
+                  records what its bounded method observed at a stated time.
+                </td>
+                <td>
+                  It is not certification, permanent safety, or complete
+                  discovery.
+                </td>
+                <td>
+                  <a href="/agents">Marketplace index</a> ·
+                  <a href="/badges">Endpoint audits</a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
+        <pre><code>safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)</code></pre>
       </section>
 
       <section class="surface-callout" aria-labelledby="proof-title">
         <div>
-          <p class="eyebrow">Evidence boundary</p>
-          <h2 id="proof-title">Signature validity is not endpoint safety.</h2>
+          <h2 id="proof-title">A valid signature is not endpoint safety</h2>
           <p>
             A signature can establish issuer identity and record integrity. A
             freshness check can establish whether the signed claim is current
@@ -298,13 +203,10 @@
         </div>
       </section>
 
-      <section class="snippet-card" aria-labelledby="badge-embed-title">
-        <header>
-          <div>
-            <p class="eyebrow">Status-aware embed</p>
-            <h2 id="badge-embed-title">Embed only an issued attestation ID.</h2>
-          </div>
-        </header>
+      <details class="snippet-card" aria-labelledby="badge-embed-title">
+        <summary id="badge-embed-title">
+          Embed an issued attestation badge
+        </summary>
         <p>
           Replace <code>ATTESTATION_ID</code> after issuance. The SVG route
           renders the attestation's current status and is served with
@@ -333,52 +235,50 @@
             >Agent Protection Attestation specification</a
           >.
         </p>
-      </section>
+      </details>
     </main>
 
     <footer class="site-footer page-shell">
       <div>
-        <strong>Warden</strong
-        ><span>Verifiable pre-action security for AI agents.</span
-        ><span>Gate the action. Keep the proof.</span>
+        <strong>Warden</strong>
+        <span>Pre-action security for agent systems.</span>
       </div>
       <nav aria-label="Footer">
         <div class="site-footer__col">
           <span class="site-footer__label">Product</span>
           <a href="/">Overview</a>
-          <a href="/playground">Live Playground</a>
-          <a href="/theater">Attack Theater</a>
+          <a href="/playground">Live playground</a>
+          <a href="/theater">Incident replay</a>
           <a href="/hire">Use Warden</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Developers</span>
-          <a href="/integrate#sdk-first">5-Minute Quickstart</a>
-          <a href="/integrate">Integrations</a>
+          <a href="/integrate#sdk-first">5-minute quickstart</a>
+          <a href="/integrate">Integration guide</a>
           <a href="/docs">Documentation</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Evidence</span>
-          <a href="/verify">Verify an Attestation</a>
-          <a href="/apa/log">Transparency Log</a>
-          <a href="/badges">Endpoint Audit Records</a>
-          <a href="/agents">Marketplace Evidence Index</a>
-          <a href="/status">Service Status</a>
+          <a href="/verify">Verify an attestation</a>
+          <a href="/apa/log">Transparency log</a>
+          <a href="/badges">Endpoint audit records</a>
+          <a href="/agents">Marketplace evidence index</a>
+          <a href="/status">Service status</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Research</span>
           <a href="/gauntlet">Gauntlet</a>
           <a href="/agents#methodology">Methodology</a>
-          <a href="/showcase">Product Tour</a>
+          <a href="/showcase">Product tour</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Policy</span>
-          <a href="/trust">Trust &amp; Security</a>
+          <a href="/trust">Trust &amp; security</a>
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>
-          <a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
         </div>
       </nav>
     </footer>
-    <script src="/app.js?v=5c7f3a4c" defer></script>
+    <script src="/app.js?v=0abdbc0f" defer></script>
   </body>
 </html>

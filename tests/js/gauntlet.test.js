@@ -474,6 +474,24 @@ test("curated examples only return form values and never imply submission", () =
   assert.equal(getGauntletExample("missing"), null);
 });
 
+test("gauntlet puts submission before findings and never polls in the background", () => {
+  const html = fs.readFileSync(
+    path.join(__dirname, "..", "..", "site", "gauntlet.html"),
+    "utf8",
+  );
+  const script = fs.readFileSync(
+    path.join(__dirname, "..", "..", "site", "gauntlet.js"),
+    "utf8",
+  );
+
+  assert.ok(
+    html.indexOf("data-gauntlet-form") < html.indexOf("data-gauntlet-stats"),
+  );
+  assert.ok(html.indexOf('id="policy"') < html.indexOf("data-gauntlet-form"));
+  assert.match(html, /data-gauntlet-refresh/u);
+  assert.doesNotMatch(script, /setInterval\s*\(/u);
+});
+
 test("retry requires current consent instead of reusing stale authorization", () => {
   const request = { intent: "drain_funds", payload: "test" };
   assert.equal(retryableGauntletRequest(request, false), null);
@@ -486,7 +504,7 @@ test("gauntlet ignores a receipt superseded by form or consent changes", () => {
   assert.equal(isCurrentGauntletRequest(2, 2), true);
 });
 
-test("gauntlet counters ignore an older polling response", () => {
+test("gauntlet counters ignore an older refresh response", () => {
   assert.equal(isCurrentGauntletStatsRequest(4, 5), false);
   assert.equal(isCurrentGauntletStatsRequest(5, 5), true);
 });

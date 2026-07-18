@@ -8,11 +8,11 @@
       content="What Warden processes, what it persists, and which records are public."
     />
     <meta name="color-scheme" content="dark light" />
-    <title>Privacy | Warden</title>
+    <title>Data handling summary | Warden</title>
     <link rel="canonical" href="https://warden.gudman.xyz/privacy" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Warden" />
-    <meta property="og:title" content="Privacy | Warden" />
+    <meta property="og:title" content="Data handling summary | Warden" />
     <meta
       property="og:description"
       content="What Warden processes, what it persists, and which records are public."
@@ -27,28 +27,19 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="32x32"
-      href="/assets/favicon-32.png"
-    />
-    <link
-      rel="apple-touch-icon"
-      sizes="180x180"
-      href="/assets/apple-touch-icon.png"
-    />
-    <link rel="stylesheet" href="/styles.css?v=96b93423" />
+    <link rel="icon" href="/assets/warden-mark.svg" />
+    <script src="/theme.js?v=2c7c8d24"></script>
+    <link rel="stylesheet" href="/styles.css?v=a3737335" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
       <a class="brand" href="/" aria-label="Warden home"
         ><img
-          src="/assets/warden-avatar.png"
+          src="/assets/warden-mark.svg"
           alt=""
-          width="36"
-          height="36"
+          width="32"
+          height="32"
         /><span>Warden</span></a
       >
       <button
@@ -61,44 +52,15 @@
         Menu
       </button>
       <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
-        <details class="nav-group">
-          <summary>Product</summary>
-          <div class="nav-menu">
-            <a href="/">Overview</a>
-            <a href="/playground">Live Playground</a>
-            <a href="/theater">Attack Theater</a>
-            <a href="/hire">Use Warden</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Developers</summary>
-          <div class="nav-menu">
-            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
-            <a href="/integrate">Integrations</a>
-            <a href="/docs">Documentation</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Evidence</summary>
-          <div class="nav-menu">
-            <a href="/verify">Verify an Attestation</a>
-            <a href="/apa/log">Transparency Log</a>
-            <a href="/badges">Endpoint Audit Records</a>
-            <a href="/agents">Marketplace Evidence Index</a>
-            <a href="/status">Service Status</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Research</summary>
-          <div class="nav-menu">
-            <a href="/gauntlet">Gauntlet</a>
-            <a href="/agents#methodology">Methodology</a>
-            <a href="/showcase">Product Tour</a>
-          </div>
-        </details>
+        <a class="nav-link" href="/">Product</a>
+        <a class="nav-link" href="/playground">Playground</a>
+        <a class="nav-link" href="/integrate">Developers</a>
+        <a class="nav-link" href="/docs">Docs</a>
+        <a class="nav-link" href="/verify">Evidence</a>
+        <a class="nav-link" href="/gauntlet">Research</a>
         <div class="nav-mobile-actions">
           <a class="button secondary" href="/integrate">Integrate</a
-          ><a class="button primary" href="/playground">Run live scan</a>
+          ><a class="button primary" href="/playground">Run a live scan</a>
         </div>
       </nav>
       <div class="header-actions">
@@ -113,8 +75,7 @@
             aria-hidden="true"
           ></span
           ><span data-health-label>Status unknown</span></a
-        ><a class="header-hire" href="/integrate">Integrate</a
-        ><a class="header-scan" href="/playground">Run live scan</a
+        ><a class="header-scan" href="/playground">Run a live scan</a
         ><button
           class="theme-toggle"
           type="button"
@@ -129,16 +90,18 @@
     <main id="main" class="page-shell site-main">
       <nav class="breadcrumbs" aria-label="Breadcrumb">
         <a href="/">Overview</a><span aria-hidden="true">/</span
-        ><span aria-current="page">Privacy</span>
+        ><span aria-current="page">Data handling summary</span>
       </nav>
       <section class="page-hero page-hero--compact">
-        <p class="eyebrow">Privacy boundary</p>
-        <h1>What is processed, persisted, and made public.</h1>
+        <p class="eyebrow">Product documentation</p>
+        <h1>Data handling summary</h1>
         <p class="hero-text">
-          Warden is a security service, so payload handling matters. This
-          summary distinguishes transient scans from the append-only
-          Gauntlet-review store, the separate opt-in feedback queue, and public
-          records implemented by the application.
+          What the current product processes, retains, and publishes across
+          scans, audits, Gauntlet submissions, records, and payment rails.
+        </p>
+        <p class="callout">
+          This is a technical summary of implemented behavior, not a complete
+          legal privacy notice.
         </p>
         <p class="snapshot-note">
           Last updated <time datetime="2026-07-18">18 July 2026</time>.
@@ -306,8 +269,9 @@
               practices are governed by their own terms.
             </p>
             <p>
-              Read the <a class="text-link" href="/terms">Warden Terms</a> for
-              service authorization, payment, and disclaimer boundaries.
+              Read the
+              <a class="text-link" href="/terms">service terms summary</a> for
+              authorization, payment, and disclaimer boundaries.
             </p>
           </section>
         </article>
@@ -316,47 +280,45 @@
 
     <footer class="site-footer page-shell">
       <div>
-        <strong>Warden</strong
-        ><span>Verifiable pre-action security for AI agents.</span
-        ><span>Gate the action. Keep the proof.</span>
+        <strong>Warden</strong>
+        <span>Pre-action security for agent systems.</span>
       </div>
       <nav aria-label="Footer">
         <div class="site-footer__col">
           <span class="site-footer__label">Product</span>
           <a href="/">Overview</a>
-          <a href="/playground">Live Playground</a>
-          <a href="/theater">Attack Theater</a>
+          <a href="/playground">Live playground</a>
+          <a href="/theater">Incident replay</a>
           <a href="/hire">Use Warden</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Developers</span>
-          <a href="/integrate#sdk-first">5-Minute Quickstart</a>
-          <a href="/integrate">Integrations</a>
+          <a href="/integrate#sdk-first">5-minute quickstart</a>
+          <a href="/integrate">Integration guide</a>
           <a href="/docs">Documentation</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Evidence</span>
-          <a href="/verify">Verify an Attestation</a>
-          <a href="/apa/log">Transparency Log</a>
-          <a href="/badges">Endpoint Audit Records</a>
-          <a href="/agents">Marketplace Evidence Index</a>
-          <a href="/status">Service Status</a>
+          <a href="/verify">Verify an attestation</a>
+          <a href="/apa/log">Transparency log</a>
+          <a href="/badges">Endpoint audit records</a>
+          <a href="/agents">Marketplace evidence index</a>
+          <a href="/status">Service status</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Research</span>
           <a href="/gauntlet">Gauntlet</a>
           <a href="/agents#methodology">Methodology</a>
-          <a href="/showcase">Product Tour</a>
+          <a href="/showcase">Product tour</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Policy</span>
-          <a href="/trust">Trust &amp; Security</a>
+          <a href="/trust">Trust &amp; security</a>
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>
-          <a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
         </div>
       </nav>
     </footer>
-    <script src="/app.js?v=5c7f3a4c" defer></script>
+    <script src="/app.js?v=0abdbc0f" defer></script>
   </body>
 </html>

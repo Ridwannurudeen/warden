@@ -53,7 +53,7 @@ test("incident console starts closed until an explicit run", () => {
   });
   assert.equal(
     incidentPresentation(state).outcome,
-    "DRAIN BLOCKED — NO ACTION ACCEPTED",
+    "Transfer withheld",
   );
   assert.equal(incidentPresentation(state).verdict, "BLOCK");
   assert.equal(incidentPresentation(state).sourceState, "illustrative");
@@ -72,7 +72,7 @@ test("matching BLOCK verdicts prove the downstream action was withheld", () => {
   assert.equal(accepted.receipt.invoked, false);
   assert.equal(accepted.receipt.received_payload, null);
   assert.equal(state.phase, "withheld");
-  assert.equal(incidentPresentation(state).outcome, "WITHHELD");
+  assert.equal(incidentPresentation(state).outcome, "Transfer withheld");
   assert.equal(incidentPresentation(state).sourceState, "live");
   assert.match(incidentPresentation(state).evidence, /not returned/i);
 });
@@ -149,7 +149,7 @@ test("mismatched or malformed evidence never accepts an action", () => {
   });
   assert.equal(state.phase, "error");
   assert.equal(state.outcome, "NO ACTION ACCEPTED");
-  assert.equal(incidentPresentation(state).outcome, "NO ACTION ACCEPTED");
+  assert.equal(incidentPresentation(state).outcome, "Action not released");
 });
 
 test("errors, retry, and reset preserve the closed gate deterministically", async () => {

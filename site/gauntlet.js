@@ -194,13 +194,13 @@
       };
     }
     return {
-      heading: "Attack path detected before action",
+      heading: "Declared path detected",
       kind: "detected",
       label: data.verdict,
       message:
         data.verdict === "BLOCK"
-          ? "Warden stopped the declared attack at the action boundary. This submission is not a bypass candidate."
-          : "Warden produced detector evidence and sanitized the payload before action. This submission is not a bypass candidate.",
+          ? "Warden returned BLOCK for the declared attack. This submission is not a bypass candidate."
+          : "Warden returned a transformed payload with detector evidence. This submission is not a bypass candidate.",
       receipt,
     };
   }
@@ -399,9 +399,7 @@
   }
 
   const status = document.querySelector("[data-gauntlet-status]");
-  const resultSource = document.querySelector(
-    "[data-gauntlet-result-source]",
-  );
+  const resultSource = document.querySelector("[data-gauntlet-result-source]");
   const result = document.querySelector("[data-gauntlet-result]");
   const errorPanel = document.querySelector("[data-gauntlet-error]");
   const errorMessage = document.querySelector("[data-gauntlet-error-message]");
@@ -419,11 +417,10 @@
   const submitButton = form.querySelector('button[type="submit"]');
   const statsPanel = document.querySelector("[data-gauntlet-stats]");
   const statsStatus = document.querySelector("[data-gauntlet-stats-status]");
-  const statsRetry = document.querySelector("[data-gauntlet-stats-retry]");
+  const findingsRefresh = document.querySelector("[data-gauntlet-refresh]");
   const zeroState = document.querySelector("[data-gauntlet-zero]");
   const breakerBoard = document.querySelector("[data-breaker-board]");
   const breakerStatus = document.querySelector("[data-breaker-status]");
-  const breakerRetry = document.querySelector("[data-breaker-retry]");
   const breakerEmpty = document.querySelector("[data-breaker-empty]");
   const breakerList = document.querySelector("[data-breaker-list]");
   const breakerCertificate = document.querySelector(
@@ -470,7 +467,6 @@
   async function loadStats() {
     const requestId = ++statsRequestId;
     statsPanel.setAttribute("aria-busy", "true");
-    statsRetry.hidden = true;
     setSourceStamp(
       statsStatus,
       "unknown",
@@ -499,7 +495,6 @@
         "degraded",
         `${formatScanError(error)} No counter value is presented as current.`,
       );
-      statsRetry.hidden = false;
     } finally {
       if (isCurrentGauntletStatsRequest(requestId, statsRequestId)) {
         statsPanel.setAttribute("aria-busy", "false");
@@ -544,7 +539,7 @@
       const heading = document.createElement("h3");
       const evidence = document.createElement("dl");
       const verify = document.createElement("a");
-      card.className = "service-card";
+      card.className = "breaker-card";
       card.dataset.breakerRow = "";
       eyebrow.className = "eyebrow";
       eyebrow.textContent = "WARDEN BREAKER";
@@ -591,7 +586,6 @@
   async function loadBreakers() {
     const requestId = ++breakerRequestId;
     breakerBoard.setAttribute("aria-busy", "true");
-    breakerRetry.hidden = true;
     setSourceStamp(
       breakerStatus,
       "unknown",
@@ -616,7 +610,6 @@
         "degraded",
         `${formatScanError(error)} No certificate row is presented as current.`,
       );
-      breakerRetry.hidden = false;
     } finally {
       if (requestId === breakerRequestId) {
         breakerBoard.setAttribute("aria-busy", "false");
@@ -701,7 +694,7 @@
     setBusy(true);
     errorPanel.hidden = true;
     result.hidden = true;
-    setStatus("Running the real Warden fast-path scan...", "loading");
+    setStatus("Submitting to Warden...", "loading");
     setSourceStamp(
       resultSource,
       "unknown",
@@ -716,7 +709,7 @@
         return;
       }
       renderReceipt(data);
-      setStatus("Challenge complete. Review the receipt state.", "success");
+      setStatus("Response received. Review the receipt.", "success");
       await Promise.all([loadStats(), loadBreakers()]);
     } catch (error) {
       if (!isCurrentGauntletRequest(requestId, submissionRequestId)) {
@@ -751,7 +744,7 @@
       setFieldError(addressError, form.elements.expected_addresses);
       setFieldError(payloadError, form.elements.payload);
       setStatus(
-        "Example loaded without submitting. Review it, confirm authorization, then run the live Gauntlet.",
+        "Example loaded. Review it and confirm authorization before submitting.",
       );
       form.elements.payload.focus();
     });
@@ -829,7 +822,7 @@
       errorPanel.hidden = true;
       result.hidden = true;
       lastRequest = null;
-      setStatus("Ready for an authorized challenge.");
+      setStatus("Ready for an authorized submission.");
       setSourceStamp(
         resultSource,
         "unknown",
@@ -850,19 +843,16 @@
       consent.focus();
     }
   });
-  statsRetry.addEventListener("click", () => {
+  findingsRefresh.addEventListener("click", async () => {
+    findingsRefresh.disabled = true;
     root.WardenUI?.focusStatusTarget(statsStatus);
-    loadStats();
-  });
-  breakerRetry.addEventListener("click", () => {
-    root.WardenUI?.focusStatusTarget(breakerStatus);
-    loadBreakers();
+    try {
+      await Promise.all([loadStats(), loadBreakers()]);
+    } finally {
+      findingsRefresh.disabled = false;
+    }
   });
 
   loadStats();
   loadBreakers();
-  root.setInterval(() => {
-    loadStats();
-    loadBreakers();
-  }, 60000);
 })(typeof globalThis === "undefined" ? this : globalThis);

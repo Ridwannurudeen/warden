@@ -572,7 +572,7 @@ def test_renderer_escapes_content_handles_zero_services_and_verifies_badge(tmp_p
     assert summary.audited_count == 1
     assert "<script>alert" not in agent_html
     assert "&lt;script&gt;alert" in agent_html
-    assert "Verified audit badge" in agent_html
+    assert "Linked signed endpoint audit record" in agent_html
     assert f"/badges/{badge['audit_id']}" in agent_html
     assert "No services listed" in agent_html
     assert "<span>Sold at snapshot</span>" in agent_html
@@ -585,6 +585,94 @@ def test_renderer_escapes_content_handles_zero_services_and_verifies_badge(tmp_p
     )
     assert 'src="http' not in agent_html
     assert 'rel="canonical" href="https://warden.gudman.xyz/agents/3808"' in agent_html
+
+
+def test_renderer_uses_native_service_disclosures_without_equal_weight_cards(tmp_path):
+    services = [
+        MarketplaceService.model_validate(
+            {
+                "serviceId": "101",
+                "serviceName": "Payload scan",
+                "serviceDescription": "Inspect one public payload.",
+                "serviceType": "A2MCP",
+                "endpoint": "https://example.org/scan",
+                "feeAmount": 0.01,
+            }
+        ),
+        MarketplaceService.model_validate(
+            {
+                "serviceId": "102",
+                "serviceName": "审计服务",
+                "serviceDescription": "检查公开端点。",
+                "serviceType": "A2A",
+                "endpoint": "https://example.org/audit",
+                "feeAmount": 1,
+            }
+        ),
+    ]
+    indexed_agents = [
+        IndexedAgent(
+            agent=_agent(agentId="3808", services=services),
+            verdict="ALLOW",
+            risk_level="NONE",
+            threat_classes=[],
+            fields_scanned=2,
+            rationale="No injection patterns were detected.",
+        ),
+        IndexedAgent(
+            agent=_agent(agentId="3809", services=services[:1]),
+            verdict="ALLOW",
+            risk_level="NONE",
+            threat_classes=[],
+            fields_scanned=1,
+            rationale="No injection patterns were detected.",
+        ),
+    ]
+
+    render_marketplace(indexed_agents, tmp_path, coverage=_coverage(sampled=2))
+
+    multiple_html = (tmp_path / "3808.html").read_text(encoding="utf-8")
+    single_html = (tmp_path / "3809.html").read_text(encoding="utf-8")
+    assert 'class="marketplace-service-list"' in multiple_html
+    assert multiple_html.count('<details class="marketplace-service">') == 2
+    assert '<details class="marketplace-service" open>' not in multiple_html
+    assert single_html.count('<details class="marketplace-service" open>') == 1
+    assert "service-card" not in multiple_html
+    assert "service-grid" not in multiple_html
+    for value in (
+        "Service #101",
+        "Payload scan",
+        "A2MCP",
+        "0.01",
+        "https://example.org/scan",
+        "Inspect one public payload.",
+    ):
+        assert value in multiple_html
+    assert '<strong lang="zh">审计服务</strong>' in multiple_html
+    assert '<p class="marketplace-service__description" lang="zh">' in multiple_html
+
+
+def test_renderer_uses_one_neutral_ledger_for_missing_linked_evidence(tmp_path):
+    indexed = IndexedAgent(
+        agent=_agent(),
+        verdict="ALLOW",
+        risk_level="NONE",
+        threat_classes=[],
+        fields_scanned=1,
+        rationale="No injection patterns were detected.",
+    )
+
+    render_marketplace([indexed], tmp_path, coverage=_coverage(sampled=1))
+
+    agent_html = (tmp_path / "3808.html").read_text(encoding="utf-8")
+    assert agent_html.count('class="data-list linked-evidence-ledger"') == 1
+    assert "<div><dt>Warden decision</dt><dd>ALLOW</dd></div>" in agent_html
+    assert "No linked endpoint audit record in this dated build." in agent_html
+    assert "No linked APA guard proof in this dated build." in agent_html
+    assert "Independent audit" not in agent_html
+    assert "<h2>Audit status</h2>" not in agent_html
+    assert "<h2>Guard-proof status</h2>" not in agent_html
+    assert "status-label--pending" not in agent_html
 
 
 @pytest.mark.parametrize(
@@ -608,7 +696,7 @@ def test_renderer_ignores_malformed_avatar_urls(tmp_path, profile_picture):
     assert "View marketplace avatar" not in agent_html
 
 
-def test_renderer_marks_unclassified_multilingual_listing_text_as_undetermined(tmp_path):
+def test_renderer_identifies_supported_multilingual_listing_scripts(tmp_path):
     indexed = IndexedAgent(
         agent=_agent(name="安全代理", profileDescription="公开服务说明"),
         verdict="ALLOW",
@@ -622,9 +710,11 @@ def test_renderer_marks_unclassified_multilingual_listing_text_as_undetermined(t
 
     agent_html = (tmp_path / "3808.html").read_text(encoding="utf-8")
     index_html = (tmp_path / "index.html").read_text(encoding="utf-8")
-    assert '<h1 lang="und">安全代理</h1>' in agent_html
-    assert '<p class="hero-text" lang="und">公开服务说明</p>' in agent_html
-    assert '<strong lang="und">安全代理</strong>' in index_html
+    assert '<h1 lang="zh">安全代理</h1>' in agent_html
+    assert '<p class="hero-text" lang="zh">公开服务说明</p>' in agent_html
+    assert '<strong lang="zh">安全代理</strong>' in index_html
+    assert 'lang="und"' not in agent_html
+    assert 'lang="und"' not in index_html
 
 
 def test_renderer_does_not_attach_tampered_badge(tmp_path, monkeypatch):
@@ -654,7 +744,9 @@ def test_renderer_does_not_attach_tampered_badge(tmp_path, monkeypatch):
         badge_records={"3808": [badge]},
     )
 
-    assert "No linked Warden audit" in (tmp_path / "3808.html").read_text(encoding="utf-8")
+    assert "No linked endpoint audit record in this dated build." in (
+        tmp_path / "3808.html"
+    ).read_text(encoding="utf-8")
 
 
 def test_marketplace_index_renders_search_filters_sorting_and_separate_evidence_states(
@@ -712,7 +804,6 @@ def test_marketplace_index_renders_search_filters_sorting_and_separate_evidence_
         "data-agent-category",
         "data-agent-match",
         "data-agent-audit",
-        "data-agent-apa",
         "data-agent-sort",
         "data-agent-reset",
         "data-agent-controls",
@@ -743,19 +834,78 @@ def test_marketplace_index_renders_search_filters_sorting_and_separate_evidence_
     assert "<span>Buyer review at 2026-07-13 snapshot</span>" in index_html
     assert "What this does not mean" in index_html
     assert 'id="methodology"' in index_html
-    assert "Linked signed audit" in index_html
+    assert "Linked signed endpoint audit record" in index_html
+    assert ">APA guard proof<select" not in index_html
+    assert "No linked APA guard proof" not in index_html
     assert "Configure an authorized endpoint audit" in index_html
     assert 'href="/hire"' in index_html
     assert 'aria-label="Open public listing-text record' not in index_html
     assert (
         'aria-label="Agent: Signal Agent; Agent ID: 7; Category: SECURITY, '
         "SOFTWARE_SERVICES; Sold: 12; Public listing text: Public-text pattern "
-        "match; Verdict: SANITIZE; Endpoint audit: Linked signed audit; APA "
-        "attestation: No linked APA guard proof; Buyer "
+        "match; Endpoint audit record: Linked signed endpoint audit record; Buyer "
         'review average: 4.5 / 5"'
     ) in index_html
+    assert (
+        '<span data-label="Public text"><strong>Public-text pattern match</strong></span>'
+        in index_html
+    )
+    assert "Verdict:" not in index_html
+    for raw_decision in ("ALLOW", "SANITIZE", "BLOCK"):
+        assert raw_decision not in index_html
     assert '<span class="sr-only">Agent: </span>' not in index_html
     assert '<script src="/agents.js" defer></script>' in index_html
+
+
+def test_marketplace_index_puts_controls_first_and_limits_server_rows(tmp_path):
+    indexed_agents = [
+        IndexedAgent(
+            agent=_agent(
+                agentId=str(agent_id),
+                name=f"Agent {agent_id}",
+                soldCount=agent_id,
+                categoryCode=["RESEARCH"] if agent_id == 1 else ["SOFTWARE_SERVICES"],
+            ),
+            verdict="SANITIZE" if agent_id == 1 else "ALLOW",
+            risk_level="MEDIUM" if agent_id == 1 else "NONE",
+            threat_classes=["TOOL_HIJACK"] if agent_id == 1 else [],
+            fields_scanned=1,
+            rationale=(
+                "Public listing text contains a tool-shaped pattern."
+                if agent_id == 1
+                else "No injection patterns were detected."
+            ),
+        )
+        for agent_id in range(1, 61)
+    ]
+
+    render_marketplace(
+        indexed_agents,
+        tmp_path,
+        coverage=_coverage(sampled=len(indexed_agents)),
+    )
+    index_html = (tmp_path / "index.html").read_text(encoding="utf-8")
+    index_data = json.loads((tmp_path / "index-data.json").read_text(encoding="utf-8"))
+
+    assert index_html.count("data-agent-row") == 50
+    assert len([path for path in tmp_path.glob("*.html") if path.stem.isdecimal()]) == 60
+    assert index_data["schemaVersion"] == 1
+    assert index_data["capturedAt"] == "2026-07-13T15:30:00Z"
+    assert index_data["sampled"] == 60
+    assert len(index_data["records"]) == 60
+    signal_record = next(record for record in index_data["records"] if record["agentId"] == "1")
+    assert signal_record["match"] == "signal"
+    assert signal_record["verdict"] == "SANITIZE"
+    assert signal_record["threatClasses"] == ["TOOL_HIJACK"]
+    assert 'data-agent-id="1"' not in index_html
+    assert '<option value="RESEARCH">RESEARCH</option>' in index_html
+    assert "First 50 of 60 snapshot records" in index_html
+    assert "data-agent-index-retry hidden" in index_html
+    assert index_html.index("data-agent-controls") < index_html.index('id="methodology"')
+    assert ">Endpoint audit<select" not in index_html
+    assert ">APA guard proof<select" not in index_html
+    assert "No linked endpoint audit record" not in index_html
+    assert "No linked APA guard proof" not in index_html
 
 
 def test_renderer_distinguishes_complete_and_degraded_capture_coverage(tmp_path):
@@ -882,7 +1032,9 @@ async def test_build_index_attaches_badge_for_unique_marketplace_service_host(
         "matchedCount": 0,
         "auditedCount": 1,
     }
-    assert "Verified audit badge" in (output / "3808.html").read_text(encoding="utf-8")
+    assert "Linked signed endpoint audit record" in (output / "3808.html").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_atomic_json_write_preserves_existing_file_when_replace_fails(tmp_path, monkeypatch):
@@ -1310,15 +1462,15 @@ def test_renderer_keeps_apa_guard_proof_separate_from_audit_and_certification(tm
     index_html = (tmp_path / "index.html").read_text(encoding="utf-8")
 
     assert summary.audited_count == 0
-    assert "No linked Warden audit" in agent_html
-    assert "Linked signed APA guard proof; open record for current status" in agent_html
+    assert "No linked endpoint audit record in this dated build." in agent_html
+    assert "Linked signed APA guard proof" in agent_html
     assert f"/apa/attestation/{record['attestation_id']}" in agent_html
     assert "not an endpoint audit or security certification" in agent_html
-    assert "Linked signed APA guard proof; open record for current status" in index_html
+    assert "Linked signed APA guard proof" in index_html
     assert 'data-apa="attested"' in index_html
     assert "APA guard proof: active" not in index_html
     assert 'data-audit="audited"' not in index_html
-    assert "Verified audit badge" not in agent_html
+    assert "Linked signed endpoint audit record" not in agent_html
 
 
 @pytest.mark.asyncio
@@ -1402,4 +1554,4 @@ async def test_build_index_links_a_valid_sqlite_apa_record_without_counting_an_a
     agent_html = (output / "3808.html").read_text(encoding="utf-8")
     assert summary["auditedCount"] == 0
     assert f"/apa/attestation/{record['attestation_id']}" in agent_html
-    assert "Linked signed APA guard proof; open record for current status" in agent_html
+    assert "Linked signed APA guard proof" in agent_html

@@ -13,65 +13,63 @@ function page(name) {
 
 const shellPages = ["hire", "integrate", "privacy", "terms"];
 const canonicalLinks = [
-  ["/", "Overview"],
-  ["/playground", "Live Playground"],
-  ["/theater", "Attack Theater"],
-  ["/hire", "Use Warden"],
-  ["/integrate#sdk-first", "5-Minute Quickstart"],
-  ["/integrate", "Integrations"],
-  ["/docs", "Documentation"],
-  ["/verify", "Verify an Attestation"],
-  ["/apa/log", "Transparency Log"],
-  ["/badges", "Endpoint Audit Records"],
-  ["/agents", "Marketplace Evidence Index"],
-  ["/status", "Service Status"],
-  ["/gauntlet", "Gauntlet"],
-  ["/agents#methodology", "Methodology"],
-  ["/showcase", "Product Tour"],
+  ["/", "Product"],
+  ["/playground", "Playground"],
+  ["/integrate", "Developers"],
+  ["/docs", "Docs"],
+  ["/verify", "Evidence"],
+  ["/gauntlet", "Research"],
 ];
 
 test("commerce, developer, and legal routes use the canonical site shell", () => {
   for (const name of shellPages) {
     const html = page(name);
 
-    for (const group of ["Product", "Developers", "Evidence", "Research"]) {
-      assert.match(html, new RegExp(`<summary>${group}</summary>`), name);
-    }
+    const navigation = html.match(
+      /<nav class="site-nav"[^>]*>([\s\S]*?)<\/nav>/,
+    );
+    assert.ok(navigation, name);
+    assert.doesNotMatch(navigation[1], /nav-group|<summary>/, name);
     for (const [href, label] of canonicalLinks) {
       const escapedHref = href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       assert.match(
-        html,
-        new RegExp(`<a href="${escapedHref}"[^>]*>${label}</a>`),
+        navigation[1],
+        new RegExp(
+          `<a class="nav-link" href="${escapedHref}"[^>]*>${label}</a>`,
+        ),
         `${name}: ${label}`,
       );
     }
 
+    assert.match(html, /src="\/assets\/warden-mark\.svg"/, name);
     assert.match(html, /aria-label="Service status: unknown"/, name);
     assert.match(html, /data-health-label>Status unknown</, name);
+    assert.doesNotMatch(html, /class="header-hire"/, name);
     assert.match(
       html,
-      /class="header-hire" href="\/integrate">Integrate</,
-      name,
-    );
-    assert.match(
-      html,
-      /class="header-scan" href="\/playground">Run live scan</,
+      /class="header-scan" href="\/playground">Run a live scan</,
       name,
     );
     assert.match(html, /site-footer__label">Policy</, name);
-    assert.match(html, /href="\/trust">Trust &amp; Security<\/a>/, name);
+    assert.match(html, /href="\/trust">Trust &amp; security<\/a>/, name);
     assert.match(html, /href="\/privacy">Privacy<\/a>/, name);
     assert.match(html, /href="\/terms">Terms<\/a>/, name);
-    assert.match(
-      html,
-      /href="https:\/\/www\.okx\.ai\/" rel="noreferrer">Agent #3808<\/a>/,
-      name,
-    );
     assert.doesNotMatch(
       html,
       />\s*(?:Loading(?:[^<]*)?|Checking(?:[^<]*)?|--|—)\s*</i,
       name,
     );
+  }
+  assert.match(
+    page("hire"),
+    /<a class="nav-link" href="\/" aria-current="page">Product<\/a>/,
+  );
+  assert.match(
+    page("integrate"),
+    /<a class="nav-link" href="\/integrate" aria-current="page">Developers<\/a>/,
+  );
+  for (const name of ["privacy", "terms"]) {
+    assert.doesNotMatch(page(name), /class="nav-link"[^>]*aria-current/, name);
   }
 });
 
@@ -92,12 +90,12 @@ test("every static route uses the canonical footer brand contract", () => {
     );
 
     assert.ok(footer, name);
-    assert.match(
-      footer[1],
-      /Verifiable pre-action security for AI agents\./,
+    assert.match(footer[1], /Pre-action security for agent systems\./, name);
+    assert.equal(
+      (footer[1].split("<nav", 1)[0].match(/<span>/g) || []).length,
+      1,
       name,
     );
-    assert.match(footer[1], /Gate the action\. Keep the proof\./, name);
     assert.doesNotMatch(footer[1], /immune system of the agent economy/i, name);
   }
 });
@@ -106,8 +104,11 @@ test("Use Warden exposes four explicit operator boundaries and a persistent summ
   const html = page("hire");
 
   assert.match(html, /<title>Use Warden \| Warden<\/title>/);
-  assert.match(html, /<h1>Use Warden\.<\/h1>/);
+  assert.match(html, /<h1>Choose a Warden service<\/h1>/);
   assert.match(html, /data-purchase-summary/);
+  assert.ok(
+    html.indexOf("data-hire-service") < html.indexOf('class="readiness-panel"'),
+  );
   for (const hook of [
     "data-summary-job",
     "data-summary-reviewer",
@@ -138,6 +139,11 @@ test("Integrations starts with an exact five-minute path and documents every sup
   const html = page("integrate");
 
   assert.match(html, /id="sdk-first"/);
+  assert.match(html, /Recommended: local Python guard/);
+  assert.match(
+    html,
+    /<summary>Hosted Python and TypeScript SDK modes<\/summary>/,
+  );
   assert.match(html, /data-five-minute-path/);
   for (const marker of ["0–1 min", "1–2 min", "2–4 min", "4–5 min"]) {
     assert.match(html, new RegExp(marker), marker);
@@ -176,6 +182,11 @@ test("Integrations starts with an exact five-minute path and documents every sup
 test("legal routes are dated, deep-linkable, cross-linked, and print-semantic", () => {
   const privacy = page("privacy");
   const terms = page("terms");
+
+  assert.match(privacy, /<title>Data handling summary \| Warden<\/title>/);
+  assert.match(privacy, /not a complete\s+legal privacy notice/);
+  assert.match(terms, /<title>Service terms summary \| Warden<\/title>/);
+  assert.match(terms, /not a complete\s+legal contract/);
 
   for (const [name, html, peerHref] of [
     ["privacy", privacy, "/terms"],

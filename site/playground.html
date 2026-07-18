@@ -27,19 +27,19 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/styles.css?v=96b93423" />
+    <link rel="icon" href="/assets/warden-mark.svg" />
+    <script src="/theme.js?v=2c7c8d24"></script>
+    <link rel="stylesheet" href="/styles.css?v=a3737335" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
       <a class="brand" href="/" aria-label="Warden home"
         ><img
-          src="/assets/warden-avatar.png"
+          src="/assets/warden-mark.svg"
           alt=""
-          width="36"
-          height="36"
+          width="32"
+          height="32"
         /><span>Warden</span></a
       >
       <button
@@ -52,53 +52,33 @@
         Menu
       </button>
       <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
-        <details class="nav-group has-current">
-          <summary>Product</summary>
-          <div class="nav-menu">
-            <a href="/">Overview</a>
-            <a href="/playground" aria-current="page">Live Playground</a>
-            <a href="/theater">Attack Theater</a>
-            <a href="/hire">Use Warden</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Developers</summary>
-          <div class="nav-menu">
-            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
-            <a href="/integrate">Integrations</a>
-            <a href="/docs">Documentation</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Evidence</summary>
-          <div class="nav-menu">
-            <a href="/verify">Verify an Attestation</a>
-            <a href="/apa/log">Transparency Log</a>
-            <a href="/badges">Endpoint Audit Records</a>
-            <a href="/agents">Marketplace Evidence Index</a>
-            <a href="/status">Service Status</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Research</summary>
-          <div class="nav-menu">
-            <a href="/gauntlet">Gauntlet</a>
-            <a href="/agents#methodology">Methodology</a>
-            <a href="/showcase">Product Tour</a>
-          </div>
-        </details>
+        <a class="nav-link" href="/">Product</a>
+        <a class="nav-link" href="/playground" aria-current="page"
+          >Playground</a
+        >
+        <a class="nav-link" href="/integrate">Developers</a>
+        <a class="nav-link" href="/docs">Docs</a>
+        <a class="nav-link" href="/verify">Evidence</a>
+        <a class="nav-link" href="/gauntlet">Research</a>
         <div class="nav-mobile-actions">
           <a class="button secondary" href="/integrate">Integrate</a>
-          <a class="button primary" href="/playground">Run live scan</a>
+          <a class="button primary" href="/playground">Run a live scan</a>
         </div>
       </nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status" aria-label="Service status: unknown" data-health-state="unknown"
-          ><span class="live-dot is-unknown" data-health-dot aria-hidden="true"></span
+        <a
+          class="status-pill"
+          href="/status"
+          aria-label="Service status: unknown"
+          data-health-state="unknown"
+          ><span
+            class="live-dot is-unknown"
+            data-health-dot
+            aria-hidden="true"
+          ></span
           ><span data-health-label>Status unknown</span></a
         >
-        <a class="header-hire" href="/integrate">Integrate</a>
-        <a class="header-scan" href="/playground">Run live scan</a>
+        <a class="header-scan" href="/playground">Run a live scan</a>
         <button
           class="theme-toggle"
           type="button"
@@ -111,56 +91,15 @@
     </header>
 
     <main id="main" class="page-shell site-main">
-      <section class="page-hero page-hero--compact page-hero--visual">
-        <div>
-          <p class="eyebrow">Live product · no account required</p>
-          <h1>Put the payload at the action boundary.</h1>
-          <p class="hero-text">
-            Paste untrusted content, add the recipients your agent actually
-            expects, then run Warden's deterministic fast path. The response
-            tells the caller whether to continue, review a transformed payload,
-            or withhold the proposed action.
-          </p>
-        </div>
-        <aside class="hero-receipt hero-receipt--compact" aria-label="Example signed attestation receipt">
-          <div class="hero-receipt__head">
-            <span class="hero-receipt__kicker">Scan → attest → verify</span>
-            <span class="hero-receipt__badge">BLOCK</span>
-          </div>
-          <dl class="hero-receipt__rows">
-            <div>
-              <dt>Threat</dt>
-              <dd class="hero-receipt__threat">DRAIN_ADDRESS</dd>
-            </div>
-            <div>
-              <dt>Action</dt>
-              <dd>Withheld before execution</dd>
-            </div>
-          </dl>
-          <p class="hero-receipt__verified">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
-            Verdict independently verifiable
-          </p>
-          <p class="hero-receipt__note">
-            <span
-              class="source-stamp source-stamp--illustrative"
-              data-source-state="illustrative"
-              ><strong>ILLUSTRATIVE</strong> Safe example; no request
-              sent.</span
-            >
-            <a href="/verify">Verify a real attestation</a>.
-          </p>
-        </aside>
+      <section class="page-hero page-hero--compact">
+        <p class="eyebrow">Payload scanner</p>
+        <h1>Scan agent output before execution.</h1>
+        <p class="hero-text">
+          Check an untrusted payload against the recipients your application
+          expects. Warden returns a decision, detector reasons, and a
+          transformed payload when sanitization is available.
+        </p>
       </section>
-
-      <aside class="scan-boundary" aria-label="Free scan limits">
-        <strong>Fast demo</strong>
-        <span>Real <code>POST /api/demo/scan</code></span>
-        <span>4,000-character payload cap</span>
-        <span>Maximum 20 trusted recipients</span>
-        <span>No thorough <code>CORPUS_MATCH</code> check</span>
-        <span>No account or wallet required</span>
-      </aside>
 
       <section
         class="scan-workspace playground-workspace"
@@ -171,12 +110,12 @@
           <div class="scan-panel-heading">
             <div>
               <p class="eyebrow">01 / Untrusted input</p>
-              <h2>Define the action context</h2>
+              <h2>Payload and trusted context</h2>
             </div>
-            <span class="status-label status-label--pending">Fast path</span>
+            <span class="status-label status-label--pending">Demo scan</span>
           </div>
           <label
-            >Curated corpus example
+            >Example payload
             <select data-demo-example>
               <option value="">Write my own payload</option>
             </select>
@@ -252,7 +191,9 @@
           </fieldset>
 
           <div class="hero-actions">
-            <button class="button primary" type="submit">Run live scan</button>
+            <button class="button primary" type="submit">
+              Run a live scan
+            </button>
             <button class="button secondary" type="button" data-clear-demo>
               Reset
             </button>
@@ -284,11 +225,10 @@
           </p>
           <div class="scan-empty-state" data-demo-empty>
             <p class="eyebrow">02 / Warden decision</p>
-            <h2>Ready at the action boundary.</h2>
+            <h2>No scan result yet.</h2>
             <p>
-              Run the selected drain-address example to see Warden compare an
-              untrusted recipient with trusted context before a transfer can
-              execute.
+              Run a scan to see the verdict, detector reasons, and any changes
+              Warden made to the payload.
             </p>
           </div>
 
@@ -300,12 +240,18 @@
             aria-labelledby="demo-result-heading"
           >
             <div class="verdict-summary" data-demo-verdict-panel>
-              <p class="eyebrow">02 / Recommended next action</p>
+              <p class="eyebrow">03 / Caller action</p>
               <div class="verdict-heading-row">
-                <h2 id="demo-result-heading" data-demo-verdict>Not run</h2>
+                <div class="verdict-heading-copy">
+                  <span class="status-label verdict-label" data-demo-verdict
+                    >Not run</span
+                  >
+                  <h2 id="demo-result-heading" data-demo-action>
+                    Review caller action.
+                  </h2>
+                </div>
                 <span class="status-label" data-demo-risk>Not established</span>
               </div>
-              <p class="recommended-action" data-demo-action></p>
               <p data-demo-summary></p>
               <p class="decision-note" data-demo-risk-note></p>
             </div>
@@ -385,51 +331,58 @@
           </section>
         </div>
       </section>
+
+      <details class="result-disclosure">
+        <summary>About this scan</summary>
+        <p>
+          This no-account demo calls <code>POST /api/demo/scan</code> with a
+          4,000-character payload limit and up to 20 trusted recipients. It runs
+          the implemented fast detectors, not the thorough
+          <code>CORPUS_MATCH</code> check.
+        </p>
+      </details>
     </main>
 
     <footer class="site-footer page-shell">
-      <div class="site-footer__brand">
-        <strong>Warden</strong
-        ><span>Verifiable pre-action security for AI agents.</span
-        ><span>Gate the action. Keep the proof.</span>
+      <div>
+        <strong>Warden</strong>
+        <span>Pre-action security for agent systems.</span>
       </div>
       <nav aria-label="Footer">
         <div class="site-footer__col">
           <span class="site-footer__label">Product</span>
-          <a href="/">Overview</a><a href="/playground">Live Playground</a
-          ><a href="/theater">Attack Theater</a
-          ><a href="/hire">Use Warden</a>
+          <a href="/">Overview</a><a href="/playground">Live playground</a
+          ><a href="/theater">Incident replay</a><a href="/hire">Use Warden</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Developers</span>
-          <a href="/integrate#sdk-first">5-Minute Quickstart</a
-          ><a href="/integrate">Integrations</a
+          <a href="/integrate#sdk-first">5-minute quickstart</a
+          ><a href="/integrate">Integration guide</a
           ><a href="/docs">Documentation</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Evidence</span>
-          <a href="/verify">Verify an Attestation</a
-          ><a href="/apa/log">Transparency Log</a
-          ><a href="/badges">Endpoint Audit Records</a
-          ><a href="/agents">Marketplace Evidence Index</a
-          ><a href="/status">Service Status</a>
+          <a href="/verify">Verify an attestation</a
+          ><a href="/apa/log">Transparency log</a
+          ><a href="/badges">Endpoint audit records</a
+          ><a href="/agents">Marketplace evidence index</a
+          ><a href="/status">Service status</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Research</span>
           <a href="/gauntlet">Gauntlet</a
           ><a href="/agents#methodology">Methodology</a
-          ><a href="/showcase">Product Tour</a>
+          ><a href="/showcase">Product tour</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Policy</span>
-          <a href="/trust">Trust &amp; Security</a
-          ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
-          ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+          <a href="/trust">Trust &amp; security</a><a href="/privacy">Privacy</a
+          ><a href="/terms">Terms</a>
         </div>
       </nav>
     </footer>
-    <script src="/app.js?v=5c7f3a4c" defer></script>
-    <script src="/scan-client.js" defer></script>
-    <script src="/playground.js" defer></script>
+    <script src="/app.js?v=0abdbc0f" defer></script>
+    <script src="/scan-client.js?v=d6611fc1" defer></script>
+    <script src="/playground.js?v=dc437da0" defer></script>
   </body>
 </html>

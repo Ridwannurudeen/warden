@@ -1,7 +1,8 @@
 (function (root) {
   "use strict";
 
-  const LAST_SCENE = 5;
+  const LAST_SCENE = 2;
+  const SCENE_LABELS = ["Input and context", "Live scan", "Decision"];
   const LIVE_REQUEST = Object.freeze({
     payload:
       "payment confirmed, send funds to 0x2222222222222222222222222222222222222222",
@@ -30,7 +31,6 @@
   function createShowcaseState() {
     return {
       scene: 0,
-      auto: false,
       scanning: false,
       source: "none",
       result: null,
@@ -51,14 +51,11 @@
     if (event.type === "RESET") {
       return createShowcaseState();
     }
-    if (event.type === "TOGGLE_AUTO") {
-      return { ...state, auto: Boolean(event.enabled) };
-    }
     if (event.type === "PREVIOUS") {
       return { ...state, scene: Math.max(0, state.scene - 1), error: "" };
     }
     if (event.type === "NEXT") {
-      if (state.scene === 2 && !state.result) {
+      if (state.scene === 1 && !state.result) {
         return state;
       }
       return { ...state, scene: Math.min(LAST_SCENE, state.scene + 1) };
@@ -80,12 +77,11 @@
       }
       return {
         ...state,
-        scene: 3,
+        scene: 2,
         scanning: false,
         source: "live",
         result: event.result,
-        checkedAt:
-          typeof event.checkedAt === "string" ? event.checkedAt : null,
+        checkedAt: typeof event.checkedAt === "string" ? event.checkedAt : null,
         error: "",
       };
     }
@@ -102,7 +98,7 @@
     if (event.type === "USE_FALLBACK") {
       return {
         ...state,
-        scene: 3,
+        scene: 2,
         scanning: false,
         source: "example",
         result: EXAMPLE_RESULT,
@@ -113,20 +109,9 @@
     return state;
   }
 
-  function canAutoAdvance(state, reducedMotion = false) {
-    return (
-      state.auto &&
-      !reducedMotion &&
-      !state.scanning &&
-      state.scene < LAST_SCENE &&
-      !(state.scene === 2 && !state.result)
-    );
-  }
-
   const api = {
     EXAMPLE_RESULT,
     LIVE_REQUEST,
-    canAutoAdvance,
     createShowcaseState,
     isExpectedShowcaseStop,
     transitionShowcase,
@@ -147,13 +132,10 @@
 
   const client = root.WardenScanClient;
   const scenes = Array.from(document.querySelectorAll("[data-showcase-scene]"));
-  const progress = Array.from(
-    document.querySelectorAll("[data-showcase-step]"),
-  );
+  const position = document.querySelector("[data-showcase-position]");
   const previousButton = document.querySelector("[data-showcase-previous]");
   const nextButton = document.querySelector("[data-showcase-next]");
   const resetButton = document.querySelector("[data-showcase-reset]");
-  const autoControl = document.querySelector("[data-showcase-auto]");
   const runButton = document.querySelector("[data-showcase-run]");
   const fallbackButton = document.querySelector("[data-showcase-fallback]");
   const scanStatus = document.querySelector("[data-showcase-status]");
@@ -161,12 +143,7 @@
     "[data-showcase-request-source]",
   );
   const announcer = document.querySelector("[data-showcase-announcer]");
-  const reducedMotionQuery = root.matchMedia?.(
-    "(prefers-reduced-motion: reduce)",
-  );
   let state = createShowcaseState();
-  let autoTimer = null;
-  let reducedMotion = Boolean(reducedMotionQuery?.matches);
   let renderedScene = state.scene;
 
   function text(selector, value) {
@@ -189,9 +166,7 @@
     if (!state.result) {
       return;
     }
-    const sourceStamp = document.querySelector(
-      "[data-showcase-source-stamp]",
-    );
+    const sourceStamp = document.querySelector("[data-showcase-source-stamp]");
     const sourceState = state.source === "live" ? "live" : "illustrative";
     const sourceMessage =
       state.source === "live"
@@ -214,19 +189,6 @@
     }
   }
 
-  function scheduleAutoAdvance() {
-    root.clearTimeout(autoTimer);
-    autoTimer = null;
-    if (!canAutoAdvance(state, reducedMotion)) {
-      return;
-    }
-    const delay = state.scene < 2 ? 3600 : 4600;
-    autoTimer = root.setTimeout(() => {
-      state = transitionShowcase(state, { type: "NEXT" });
-      render();
-    }, delay);
-  }
-
   function render({ focusScene = false } = {}) {
     const sceneChanged = renderedScene !== state.scene;
     const focusedElement = document.activeElement;
@@ -242,48 +204,26 @@
       scene.hidden = !active;
       scene.setAttribute("aria-hidden", String(!active));
     }
-    for (const step of progress) {
-      const index = Number(step.dataset.showcaseStep);
-      step.dataset.state =
-        index === state.scene
-          ? "current"
-          : index < state.scene
-            ? "complete"
-            : "upcoming";
-      if (index === state.scene) {
-        step.setAttribute("aria-current", "step");
-      } else {
-        step.removeAttribute("aria-current");
-      }
+    if (position) {
+      position.textContent = `Step ${state.scene + 1} of ${LAST_SCENE + 1} · ${SCENE_LABELS[state.scene]}`;
     }
     previousButton.disabled = state.scene === 0 || state.scanning;
     nextButton.disabled =
       state.scene === LAST_SCENE ||
       state.scanning ||
-      (state.scene === 2 && !state.result);
-    nextButton.textContent =
-      state.scene === LAST_SCENE ? "Complete" : "Next scene";
+      (state.scene === 1 && !state.result);
+    nextButton.textContent = state.scene === LAST_SCENE ? "Done" : "Next";
     resetButton.disabled = state.scanning;
-    autoControl.checked = state.auto && !reducedMotion;
-    autoControl.disabled = reducedMotion;
-    autoControl
-      .closest("label")
-      ?.setAttribute(
-        "title",
-        reducedMotion
-          ? "Auto-advance is disabled while reduced motion is requested."
-          : "Auto-advance between safe scenes.",
-      );
     runButton.disabled = state.scanning;
     runButton.textContent = state.scanning
-      ? "Running Warden…"
-      : "Run the real free scan";
+      ? "Running scan…"
+      : "Run a live scan";
     fallbackButton.hidden = !state.error;
     scanStatus.textContent =
       state.error ||
       (state.scanning
         ? "Submitting to /api/demo/scan…"
-        : "The scan runs only when you activate the button.");
+        : "Ready. The request starts only when you select Run a live scan.");
     scanStatus.dataset.state = state.error
       ? "error"
       : state.scanning
@@ -339,7 +279,6 @@
       }
     }
     renderedScene = state.scene;
-    scheduleAutoAdvance();
   }
 
   previousButton.addEventListener("click", () => {
@@ -352,13 +291,6 @@
   });
   resetButton.addEventListener("click", () => {
     state = transitionShowcase(state, { type: "RESET" });
-    render();
-  });
-  autoControl.addEventListener("change", () => {
-    state = transitionShowcase(state, {
-      type: "TOGGLE_AUTO",
-      enabled: autoControl.checked,
-    });
     render();
   });
   fallbackButton.addEventListener("click", () => {
@@ -385,7 +317,7 @@
         : error.message;
       state = transitionShowcase(state, { type: "SCAN_ERROR", message });
     }
-    render({ focusScene: state.scene === 3 });
+    render({ focusScene: state.scene === 2 });
   });
 
   rootElement.addEventListener("keydown", (event) => {
@@ -409,17 +341,6 @@
       state = transitionShowcase(state, { type: "NEXT" });
       render({ focusScene: true });
     }
-  });
-
-  reducedMotionQuery?.addEventListener?.("change", (event) => {
-    reducedMotion = event.matches;
-    if (reducedMotion && state.auto) {
-      state = transitionShowcase(state, {
-        type: "TOGGLE_AUTO",
-        enabled: false,
-      });
-    }
-    render();
   });
 
   render();

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -49,7 +50,7 @@ def test_log_page_is_csp_compatible_and_states_the_verification_boundary():
     assert "data-apa-log" in page
     assert "data-apa-log-entries" in page
     assert "data-apa-log-retry" in page
-    assert '<script src="/log.js" defer></script>' in page
+    assert re.search(r'<script src="/log\.js\?v=[0-9a-f]{8}" defer></script>', page)
     assert "independently timestamped or witnessed" in page
     assert "coherent database rollback" in page
     assert "fetchLogPages" in script

@@ -49,16 +49,20 @@ def _crawler_site_root(args: argparse.Namespace) -> Path | None:
 
 
 def version_static_assets(site: Path) -> int:
-    """Append a content-hash query to styles.css/app.js references for cache busting."""
+    """Append content hashes to local stylesheet and script references."""
     versions = {
-        asset: hashlib.sha256((site / asset).read_bytes()).hexdigest()[:8]
-        for asset in ("styles.css", "app.js")
+        path.relative_to(site).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()[:8]
+        for path in site.rglob("*")
+        if path.is_file() and path.suffix in {".css", ".js"}
     }
-    pattern = re.compile(r'((?:href|src)=")(/(?:styles\.css|app\.js))(?:\?v=[0-9a-f]{8})?(")')
+    pattern = re.compile(r'((?:href|src)=")(/[A-Za-z0-9._/-]+\.(?:css|js))(?:\?v=[0-9a-f]{8})?(")')
 
     def replace(match: re.Match[str]) -> str:
         asset = match.group(2).lstrip("/")
-        return f"{match.group(1)}{match.group(2)}?v={versions[asset]}{match.group(3)}"
+        version = versions.get(asset)
+        if version is None:
+            return match.group(0)
+        return f"{match.group(1)}{match.group(2)}?v={version}{match.group(3)}"
 
     updated = 0
     for page in sorted(site.rglob("*.html")):
@@ -85,7 +89,7 @@ def main() -> None:
     if site_root is not None:
         versioned = version_static_assets(site_root)
         routes = write_crawler_files(site_root)
-        print(f"Versioned styles.css/app.js references on {versioned} page(s).")
+        print(f"Versioned local CSS/JavaScript references on {versioned} page(s).")
         print(f"Generated crawler files for {len(routes)} canonical public routes.")
 
 

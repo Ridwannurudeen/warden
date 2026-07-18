@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import re
 import sys
 import time
 import urllib.error
@@ -433,9 +434,13 @@ def test_verify_page_is_csp_clean_and_exposes_the_independent_crypto_boundary():
     assert "data-apa-verify-result" in page
     assert "data-breaker-verify-result" in page
     assert "data-breaker-log-state" in page
-    assert '<script src="/log.js" defer></script>' in page
-    assert '<script src="/verify.js" defer></script>' in page
-    assert page.index('<script src="/log.js"') < page.index('<script src="/verify.js"')
+    log_script = re.search(r'<script src="/log\.js\?v=[0-9a-f]{8}" defer></script>', page)
+    verify_script = re.search(
+        r'<script src="/verify\.js\?v=[0-9a-f]{8}" defer></script>', page
+    )
+    assert log_script
+    assert verify_script
+    assert log_script.start() < verify_script.start()
     assert "WebCrypto Ed25519" in page
     assert "crypto.subtle" in script
     assert "/api/demo/gauntlet/breakers/" in script

@@ -181,9 +181,9 @@
   function incidentPresentation(state) {
     if (state.phase === "withheld") {
       return {
-        outcome: "WITHHELD",
+        outcome: "Transfer withheld",
         status:
-          "Both live checks agree: Warden blocked the payment redirection and the demo action was not invoked.",
+          "The live scanner returned BLOCK and the downstream payment handler was not invoked.",
         verdict: state.result.verdict,
         threat: state.result.threatClasses.join(", "),
         receipt: "invoked=false; received_payload=null",
@@ -197,9 +197,9 @@
     }
     if (state.phase === "transformed") {
       return {
-        outcome: "SAFE TRANSFORMED",
+        outcome: "Payload transformed",
         status:
-          "Both live checks agree: Warden transformed the payload and the demo action received exactly that safe payload.",
+          "The live scanner returned SANITIZE and the downstream handler received the transformed payload.",
         verdict: state.result.verdict,
         threat: state.result.threatClasses.join(", "),
         receipt: "invoked=true; transformed payload matched",
@@ -213,9 +213,9 @@
     }
     if (state.phase === "running") {
       return {
-        outcome: "NO ACTION ACCEPTED",
+        outcome: "Checking request",
         status:
-          "Running the fixed incident through the live scan and downstream action gate.",
+          "Checking the payload and downstream execution receipt.",
         verdict: "Awaiting both live responses",
         threat: "DRAIN_ADDRESS expected",
         receipt: "Not accepted",
@@ -228,8 +228,8 @@
     }
     if (state.phase === "error") {
       return {
-        outcome: "NO ACTION ACCEPTED",
-        status: `${state.error} No action was accepted.`,
+        outcome: "Action not released",
+        status: `${state.error} The downstream action remains closed.`,
         verdict: "No verified verdict",
         threat: "DRAIN_ADDRESS expected",
         receipt: "Not accepted",
@@ -241,13 +241,12 @@
       };
     }
     return {
-      outcome: "DRAIN BLOCKED — NO ACTION ACCEPTED",
+      outcome: "Transfer withheld",
       status:
-        "Warden's verdict for this payload: BLOCK. The drain instruction was withheld before execution. Run the live incident to reproduce it against the live APIs.",
+        "Example result. Run the live check to establish the current scanner verdict and execution state.",
       verdict: "BLOCK",
-      threat:
-        "DRAIN_ADDRESS — 0x2222222222222222222222222222222222222222 detected",
-      receipt: "Action withheld — invoked=false, nothing delivered",
+      threat: "DRAIN_ADDRESS · untrusted recipient detected",
+      receipt: "Not invoked",
       sanitized: "Not delivered",
       sourceState: "illustrative",
       checkedAt: "Not run",

@@ -30,28 +30,19 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="32x32"
-      href="/assets/favicon-32.png"
-    />
-    <link
-      rel="apple-touch-icon"
-      sizes="180x180"
-      href="/assets/apple-touch-icon.png"
-    />
-    <link rel="stylesheet" href="/styles.css?v=96b93423" />
+    <link rel="icon" href="/assets/warden-mark.svg" />
+    <script src="/theme.js?v=2c7c8d24"></script>
+    <link rel="stylesheet" href="/styles.css?v=a3737335" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
       <a class="brand" href="/" aria-label="Warden home"
         ><img
-          src="/assets/warden-avatar.png"
+          src="/assets/warden-mark.svg"
           alt=""
-          width="36"
-          height="36"
+          width="32"
+          height="32"
         /><span>Warden</span></a
       >
       <button
@@ -64,53 +55,31 @@
         Menu
       </button>
       <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
-        <details class="nav-group">
-          <summary>Product</summary>
-          <div class="nav-menu">
-            <a href="/">Overview</a>
-            <a href="/playground">Live Playground</a>
-            <a href="/theater">Attack Theater</a>
-            <a href="/hire">Use Warden</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Developers</summary>
-          <div class="nav-menu">
-            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
-            <a href="/integrate">Integrations</a>
-            <a href="/docs">Documentation</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Evidence</summary>
-          <div class="nav-menu">
-            <a href="/verify">Verify an Attestation</a>
-            <a href="/apa/log">Transparency Log</a>
-            <a href="/badges">Endpoint Audit Records</a>
-            <a href="/agents">Marketplace Evidence Index</a>
-            <a href="/status">Service Status</a>
-          </div>
-        </details>
-        <details class="nav-group has-current">
-          <summary>Research</summary>
-          <div class="nav-menu">
-            <a href="/gauntlet" aria-current="page">Gauntlet</a>
-            <a href="/agents#methodology">Methodology</a>
-            <a href="/showcase">Product Tour</a>
-          </div>
-        </details>
+        <a class="nav-link" href="/">Product</a>
+        <a class="nav-link" href="/playground">Playground</a>
+        <a class="nav-link" href="/integrate">Developers</a>
+        <a class="nav-link" href="/docs">Docs</a>
+        <a class="nav-link" href="/verify">Evidence</a>
+        <a class="nav-link" href="/gauntlet" aria-current="page">Research</a>
         <div class="nav-mobile-actions">
           <a class="button secondary" href="/integrate">Integrate</a>
-          <a class="button primary" href="/playground">Run live scan</a>
+          <a class="button primary" href="/playground">Run a live scan</a>
         </div>
       </nav>
       <div class="header-actions">
-        <a class="status-pill" href="/status" aria-label="Service status: unknown" data-health-state="unknown"
-          ><span class="live-dot is-unknown" data-health-dot aria-hidden="true"></span
+        <a
+          class="status-pill"
+          href="/status"
+          aria-label="Service status: unknown"
+          data-health-state="unknown"
+          ><span
+            class="live-dot is-unknown"
+            data-health-dot
+            aria-hidden="true"
+          ></span
           ><span data-health-label>Status unknown</span></a
         >
-        <a class="header-hire" href="/integrate">Integrate</a>
-        <a class="header-scan" href="/playground">Run live scan</a>
+        <a class="header-scan" href="/playground">Run a live scan</a>
         <button
           class="theme-toggle"
           type="button"
@@ -124,30 +93,271 @@
 
     <main id="main" class="page-shell site-main">
       <section class="page-hero page-hero--compact">
-        <p class="eyebrow">Authorized adversarial research</p>
-        <h1>Warden signs its own defeats.</h1>
+        <p class="eyebrow">Authorized security research</p>
+        <h1>Submit a bypass test.</h1>
         <p class="hero-text">
-          Only human-confirmed, reproducible bypasses become signed WARDEN
-          BREAKER certificates and held-out regression cases.
+          Test Warden's public fast path with content you are permitted to
+          share. Submissions that return ALLOW are reviewed privately before any
+          bypass is confirmed.
         </p>
         <p class="section-copy">
-          Submit an authorized adversarial payload to Warden's live
-          deterministic fast path. An ALLOW is only a private candidate until a
-          human reproduces and confirms the miss.
+          Only a reproducible, human-confirmed miss receives a signed WARDEN
+          BREAKER certificate and enters the held-out regression set.
         </p>
-        <p
-          class="source-stamp source-stamp--illustrative"
-          data-source-state="illustrative"
+      </section>
+
+      <section
+        class="feature-panel challenge-form-panel"
+        aria-labelledby="challenge-title"
+      >
+        <div class="section-heading">
+          <p class="eyebrow">Research submission</p>
+          <h2 id="challenge-title">Test a declared attack.</h2>
+          <p class="section-copy">
+            Choose a safe example or supply your own authorized payload. Nothing
+            is sent until you submit the form.
+          </p>
+        </div>
+
+        <aside class="inline-notice" id="policy" aria-labelledby="policy-title">
+          <h3 id="policy-title">Submission policy</h3>
+          <p>
+            Use only authorized, non-sensitive content. Pending claims retain
+            the raw payload, context, declared intent, and optional finder
+            handle privately for human review. Detected attempts retain hashes
+            and verdict metadata only.
+          </p>
+          <p>
+            No reward or bounty is promised. An ALLOW result is not a confirmed
+            bypass. If confirmed, a certificate may publish a redacted payload
+            digest and consented finder handle; the raw payload is not
+            published.
+          </p>
+        </aside>
+
+        <details class="result-disclosure">
+          <summary>Load a safe example</summary>
+          <div class="gauntlet-example-grid" aria-label="Safe payload examples">
+            <button
+              class="gauntlet-example"
+              type="button"
+              data-gauntlet-example="drain"
+            >
+              <span class="reason-code">DRAIN_ADDRESS</span
+              ><strong>Recipient change</strong
+              ><small>Trusted-recipient mismatch</small>
+            </button>
+            <button
+              class="gauntlet-example"
+              type="button"
+              data-gauntlet-example="tool"
+            >
+              <span class="reason-code">TOOL_HIJACK</span
+              ><strong>Transfer-shaped call</strong
+              ><small>Tool invocation pattern</small>
+            </button>
+            <button
+              class="gauntlet-example"
+              type="button"
+              data-gauntlet-example="prompt"
+            >
+              <span class="reason-code">PROMPT_INJECTION</span
+              ><strong>Instruction replacement</strong
+              ><small>Prompt injection pattern</small>
+            </button>
+          </div>
+        </details>
+
+        <form data-gauntlet-form novalidate>
+          <div class="form-grid">
+            <label
+              >Attack intent<select name="intent" required>
+                <option value="drain_funds">Redirect or drain funds</option>
+                <option value="hijack_tool_call">Hijack a tool call</option>
+                <option value="exfiltrate_secret">Exfiltrate a secret</option>
+                <option value="override_instructions">
+                  Override instructions
+                </option>
+                <option value="malicious_link">Smuggle a malicious link</option>
+                <option value="other">Other adversarial intent</option>
+              </select></label
+            >
+            <label
+              >Finder credit (optional)<input
+                name="finder"
+                maxlength="128"
+                autocomplete="off"
+                aria-describedby="gauntlet-public-credit-disclosure gauntlet-public-credit-error"
+                placeholder="Handle or display name"
+            /></label>
+          </div>
+
+          <label class="confirmation"
+            ><input
+              name="public_credit_consent"
+              type="checkbox"
+              aria-describedby="gauntlet-public-credit-disclosure gauntlet-public-credit-error"
+              data-gauntlet-public-credit-consent
+            />
+            If a bypass is confirmed, I consent to publish the normalized
+            visible form of the finder handle above.</label
+          >
+          <p class="field-hint" id="gauntlet-public-credit-disclosure">
+            Leave the handle blank for anonymous review. Finder handles are
+            self-asserted credits, not authenticated identities.
+          </p>
+          <p
+            class="field-error"
+            id="gauntlet-public-credit-error"
+            data-gauntlet-public-credit-error
+            role="alert"
+            hidden
+          ></p>
+
+          <label
+            >Expected payment addresses (optional)<input
+              name="expected_addresses"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              aria-describedby="gauntlet-address-hint gauntlet-address-error"
+              placeholder="Comma-separated EVM or Solana recipients"
+          /></label>
+          <p class="field-hint" id="gauntlet-address-hint">
+            EVM addresses are normalized and duplicates are removed.
+          </p>
+          <p
+            class="field-error"
+            id="gauntlet-address-error"
+            data-gauntlet-address-error
+            role="alert"
+            hidden
+          ></p>
+
+          <label
+            >Adversarial payload<textarea
+              name="payload"
+              rows="10"
+              maxlength="4000"
+              required
+              spellcheck="false"
+              aria-describedby="gauntlet-payload-error"
+              placeholder="Paste the exact untrusted payload to inspect"
+            ></textarea>
+          </label>
+          <p
+            class="field-error"
+            id="gauntlet-payload-error"
+            data-gauntlet-payload-error
+            role="alert"
+            hidden
+          ></p>
+
+          <label class="confirmation"
+            ><input
+              name="consent"
+              type="checkbox"
+              required
+              data-gauntlet-consent
+            />
+            I am authorized to submit this content and confirm that it contains
+            no secrets or personal data.</label
+          >
+          <p
+            class="field-error"
+            data-gauntlet-consent-error
+            role="alert"
+            hidden
+          ></p>
+
+          <div class="hero-actions">
+            <button class="button primary" type="submit">Submit test</button
+            ><button class="button secondary" type="reset">Reset</button>
+          </div>
+          <p class="scan-status" data-gauntlet-status aria-live="polite">
+            Ready for an authorized submission.
+          </p>
+          <p
+            class="source-stamp source-stamp--unknown"
+            data-gauntlet-result-source
+            data-source-state="unknown"
+            aria-live="polite"
+          >
+            <strong>UNKNOWN</strong> No response has been accepted.
+          </p>
+          <div class="scan-error" data-gauntlet-error role="alert" hidden>
+            <p data-gauntlet-error-message></p>
+            <button class="button secondary" type="button" data-gauntlet-retry>
+              Retry submission
+            </button>
+            <p class="field-hint">
+              Retry sends the request again. Pending ALLOW candidates are
+              deduplicated by the server.
+            </p>
+          </div>
+        </form>
+      </section>
+
+      <section
+        class="console-card gauntlet-receipt"
+        data-gauntlet-result
+        hidden
+        aria-live="polite"
+        aria-labelledby="gauntlet-result-heading"
+      >
+        <div class="receipt-heading">
+          <div>
+            <p class="eyebrow">Submission receipt</p>
+            <h2 id="gauntlet-result-heading" data-gauntlet-heading>
+              Warden result
+            </h2>
+          </div>
+          <span class="status-label" data-gauntlet-state>No result</span>
+        </div>
+        <p class="recommended-action" data-gauntlet-message></p>
+        <dl class="data-list receipt-data">
+          <div>
+            <dt>Decision</dt>
+            <dd data-gauntlet-verdict>Not returned</dd>
+          </div>
+          <div>
+            <dt>Risk</dt>
+            <dd data-gauntlet-risk>Not returned</dd>
+          </div>
+          <div>
+            <dt>Reason codes</dt>
+            <dd data-gauntlet-reasons>Not returned</dd>
+          </div>
+          <div>
+            <dt>Claim ID</dt>
+            <dd><code data-gauntlet-claim-id>Not applicable</code></dd>
+          </div>
+          <div>
+            <dt>Received</dt>
+            <dd data-gauntlet-checked-at>Not run</dd>
+          </div>
+        </dl>
+        <pre><code id="gauntlet-receipt-json" data-gauntlet-receipt-json>{}</code></pre>
+        <button
+          class="copy-button"
+          type="button"
+          data-copy-target="gauntlet-receipt-json"
         >
-          <strong>ILLUSTRATIVE</strong> The form and policy are visible without
-          submitting any content.
+          Copy receipt
+        </button>
+        <p class="privacy-note">
+          The copied receipt excludes payload, finder credit, and trusted
+          context. This page does not create a public share URL.
         </p>
+        <details class="result-disclosure">
+          <summary>Full API response</summary>
+          <pre><code data-gauntlet-json>{}</code></pre>
+        </details>
       </section>
 
       <section aria-labelledby="stats-title">
         <div class="section-heading">
-          <p class="eyebrow">Live counters</p>
-          <h2 id="stats-title">Gauntlet evidence, not example traffic.</h2>
+          <h2 id="stats-title">Research activity</h2>
           <p
             class="source-stamp source-stamp--unknown"
             data-gauntlet-stats-status
@@ -185,16 +395,10 @@
           </div>
         </section>
         <p class="empty-state gauntlet-zero" data-gauntlet-zero hidden>
-          No confirmed bypasses yet. Challenge the live fast path with a
-          declared attack.
+          No confirmed bypasses have been published.
         </p>
-        <button
-          class="button secondary"
-          type="button"
-          data-gauntlet-stats-retry
-          hidden
-        >
-          Retry live counters
+        <button class="button secondary" type="button" data-gauntlet-refresh>
+          Refresh findings
         </button>
       </section>
 
@@ -205,17 +409,13 @@
         data-breaker-board
       >
         <div class="section-heading">
-          <p class="eyebrow">WARDEN BREAKER board</p>
-          <h2 id="breaker-board-title">Human-confirmed defeats only.</h2>
+          <h2 id="breaker-board-title">Signed bypass certificates</h2>
           <p class="section-copy">
-            Each listed finder has a signed certificate, a redacted reproducer
-            digest, and a position in Warden's public transparency chain. A
-            pending claim never appears here. This board shows up to the 50 most
-            recent certificates; the transparency chain remains the complete
-            public record. Board rows are discovery data; open Verify to check
-            the signature, chain inclusion, and signed checkpoint independently.
-            Finder handles are self-asserted credits, not authenticated
-            identities.
+            This board shows up to the 50 most recent human-confirmed
+            certificates. The transparency chain remains the complete public
+            record. Open a certificate to verify its signature, chain inclusion,
+            and checkpoint. Finder handles are self-asserted credits, not
+            authenticated identities.
           </p>
           <p
             class="source-stamp source-stamp--unknown"
@@ -244,7 +444,6 @@
         >
           <div class="receipt-heading">
             <div>
-              <p class="eyebrow">Latest signed evidence</p>
               <h3 id="breaker-certificate-title">WARDEN BREAKER certificate</h3>
             </div>
             <span class="status-label status-label--allow">ISSUED</span>
@@ -279,49 +478,12 @@
             >Verify signed certificate</a
           >
         </article>
-        <button
-          class="button secondary"
-          type="button"
-          data-breaker-retry
-          hidden
-        >
-          Retry certificate board
-        </button>
-      </section>
-
-      <section class="challenge-flow" aria-labelledby="mechanics-title">
-        <div class="section-heading">
-          <p class="eyebrow">Challenge mechanics</p>
-          <h2 id="mechanics-title">One submission, three evidence steps.</h2>
-        </div>
-        <ol class="challenge-steps">
-          <li>
-            <span class="num">01</span>
-            <h3>Declare intent</h3>
-            <p>State what the payload is trying to make an agent do.</p>
-          </li>
-          <li>
-            <span class="num">02</span>
-            <h3>Run the fast path</h3>
-            <p>
-              Warden returns the same structured decision used at an action
-              boundary.
-            </p>
-          </li>
-          <li>
-            <span class="num">03</span>
-            <h3>Review candidates</h3>
-            <p>Only a human-confirmed, reproducible miss becomes a bypass.</p>
-          </li>
-        </ol>
       </section>
 
       <section class="feature-panel" aria-labelledby="review-states-title">
         <div class="section-heading">
-          <p class="eyebrow">Review-state contract</p>
-          <h2 id="review-states-title">
-            An ALLOW candidate is not a confirmed bypass.
-          </h2>
+          <p class="eyebrow">Review states</p>
+          <h2 id="review-states-title">How submissions are classified.</h2>
         </div>
         <dl class="data-list">
           <div>
@@ -361,335 +523,48 @@
           </div>
         </dl>
       </section>
-
-      <aside
-        class="challenge-policy"
-        id="policy"
-        aria-labelledby="policy-title"
-      >
-        <p class="eyebrow">Before you submit</p>
-        <h2 id="policy-title">Use only content you are authorized to share.</h2>
-        <ul>
-          <li>
-            Do not submit private keys, seed phrases, credentials, personal
-            data, or unlawful content.
-          </li>
-          <li>
-            Pending claims retain the raw payload, context, declared intent, and
-            optional finder handle for private human review; only an ALLOW
-            candidate can create one.
-          </li>
-          <li>
-            Detected attempts retain hashes and verdict metadata only. Duplicate
-            candidates reference the existing claim without retaining another
-            raw payload.
-          </li>
-          <li>
-            No reward or bounty is promised. An ALLOW is not automatically a
-            confirmed bypass.
-          </li>
-          <li>
-            A human-confirmed bypass is appended to the held-out evaluation set,
-            not the scanner's training corpus. The public status page reports
-            the next recorded benchmark run.
-          </li>
-          <li>
-            The raw submitted payload is not published. A confirmed certificate
-            exposes only the reviewer-approved redacted reproducer's payload
-            digest and a consented finder handle, or Anonymous.
-          </li>
-        </ul>
-      </aside>
-
-      <section aria-labelledby="examples-title">
-        <div class="section-heading">
-          <p class="eyebrow">Curated controls</p>
-          <h2 id="examples-title">Load a safe regression example.</h2>
-          <p class="section-copy">
-            These buttons only populate the form. They do not call the API or
-            change live Gauntlet counts until you explicitly submit.
-          </p>
-        </div>
-        <div class="gauntlet-example-grid">
-          <button
-            class="gauntlet-example"
-            type="button"
-            data-gauntlet-example="drain"
-          >
-            <span class="reason-code">DRAIN_ADDRESS</span
-            ><strong>Redirect settlement</strong
-            ><small>Trusted-recipient mismatch case</small>
-          </button>
-          <button
-            class="gauntlet-example"
-            type="button"
-            data-gauntlet-example="tool"
-          >
-            <span class="reason-code">TOOL_HIJACK</span
-            ><strong>Imitate a transfer call</strong
-            ><small>Transfer-shaped tool-call case</small>
-          </button>
-          <button
-            class="gauntlet-example"
-            type="button"
-            data-gauntlet-example="prompt"
-          >
-            <span class="reason-code">PROMPT_INJECTION</span
-            ><strong>Replace instructions</strong
-            ><small>Instruction-replacement case</small>
-          </button>
-        </div>
-      </section>
-
-      <section
-        class="feature-panel challenge-form-panel"
-        aria-labelledby="challenge-title"
-      >
-        <p class="eyebrow">Your challenge</p>
-        <h2 id="challenge-title">Test a declared attack</h2>
-        <form data-gauntlet-form novalidate>
-          <label class="confirmation"
-            ><input
-              name="consent"
-              type="checkbox"
-              required
-              data-gauntlet-consent
-            />
-            I am authorized to submit this content, understand the retention
-            policy above, and confirm that it contains no secrets or personal
-            data.</label
-          >
-          <p
-            class="field-error"
-            data-gauntlet-consent-error
-            role="alert"
-            hidden
-          ></p>
-          <div class="form-grid">
-            <label
-              >Attack intent<select name="intent" required>
-                <option value="drain_funds">Redirect or drain funds</option>
-                <option value="hijack_tool_call">Hijack a tool call</option>
-                <option value="exfiltrate_secret">Exfiltrate a secret</option>
-                <option value="override_instructions">
-                  Override instructions
-                </option>
-                <option value="malicious_link">Smuggle a malicious link</option>
-                <option value="other">Other adversarial intent</option>
-              </select></label
-            >
-            <label
-              >Finder credit (optional; self-asserted)<input
-                name="finder"
-                maxlength="128"
-                autocomplete="off"
-                aria-describedby="gauntlet-public-credit-disclosure gauntlet-public-credit-error"
-                placeholder="Handle or display name"
-            /></label>
-          </div>
-          <label class="confirmation"
-            ><input
-              name="public_credit_consent"
-              type="checkbox"
-              aria-describedby="gauntlet-public-credit-disclosure gauntlet-public-credit-error"
-              data-gauntlet-public-credit-consent
-            />
-            If I supply a finder handle, I consent to publish its normalized
-            visible form on a human-confirmed BREAKER certificate and public
-            leaderboard.</label
-          >
-          <p class="field-hint" id="gauntlet-public-credit-disclosure">
-            Leave the finder field blank for anonymous review. This public
-            credit consent is separate from authorization to submit the payload.
-            Warden removes invisible formatting and rejects non-visible
-            characters before publication. It does not authenticate ownership
-            of the supplied handle.
-          </p>
-          <p
-            class="field-error"
-            id="gauntlet-public-credit-error"
-            data-gauntlet-public-credit-error
-            role="alert"
-            hidden
-          ></p>
-          <label
-            >Expected payment addresses (optional)<input
-              name="expected_addresses"
-              autocomplete="off"
-              autocapitalize="off"
-              spellcheck="false"
-              aria-describedby="gauntlet-address-hint gauntlet-address-error"
-              placeholder="Comma-separated EVM or Solana recipients"
-          /></label>
-          <p class="field-hint" id="gauntlet-address-hint">
-            EVM recipients are normalized and duplicate recipients are removed
-            before submission.
-          </p>
-          <p
-            class="field-error"
-            id="gauntlet-address-error"
-            data-gauntlet-address-error
-            role="alert"
-            hidden
-          ></p>
-          <label
-            >Adversarial payload<textarea
-              name="payload"
-              rows="10"
-              maxlength="4000"
-              required
-              spellcheck="false"
-              aria-describedby="gauntlet-payload-error"
-              placeholder="Paste the exact untrusted payload Warden should inspect"
-            ></textarea>
-          </label>
-          <p
-            class="field-error"
-            id="gauntlet-payload-error"
-            data-gauntlet-payload-error
-            role="alert"
-            hidden
-          ></p>
-          <div class="hero-actions">
-            <button class="button primary" type="submit">
-              Run the live Gauntlet</button
-            ><button class="button secondary" type="reset">Reset</button>
-          </div>
-          <p class="scan-status" data-gauntlet-status aria-live="polite">
-            Ready for an authorized challenge.
-          </p>
-          <p
-            class="source-stamp source-stamp--unknown"
-            data-gauntlet-result-source
-            data-source-state="unknown"
-            aria-live="polite"
-          >
-            <strong>UNKNOWN</strong> No challenge response has been accepted.
-          </p>
-          <div class="scan-error" data-gauntlet-error role="alert" hidden>
-            <p data-gauntlet-error-message></p>
-            <button class="button secondary" type="button" data-gauntlet-retry>
-              Retry this submission
-            </button>
-            <p class="field-hint">
-              Retrying explicitly resubmits the attempt. Pending ALLOW
-              candidates are deduplicated by the server.
-            </p>
-          </div>
-        </form>
-      </section>
-
-      <section
-        class="console-card gauntlet-receipt"
-        data-gauntlet-result
-        hidden
-        aria-live="polite"
-        aria-labelledby="gauntlet-result-heading"
-      >
-        <div class="receipt-heading">
-          <div>
-            <p class="eyebrow">Privacy-safe challenge receipt</p>
-            <h2 id="gauntlet-result-heading" data-gauntlet-heading>
-              Warden result
-            </h2>
-          </div>
-          <span class="status-label" data-gauntlet-state>No result</span>
-        </div>
-        <p class="recommended-action" data-gauntlet-message></p>
-        <dl class="data-list receipt-data">
-          <div>
-            <dt>Decision</dt>
-            <dd data-gauntlet-verdict>Not returned</dd>
-          </div>
-          <div>
-            <dt>Risk severity</dt>
-            <dd data-gauntlet-risk>Not returned</dd>
-          </div>
-          <div>
-            <dt>Reason codes</dt>
-            <dd data-gauntlet-reasons>Not returned</dd>
-          </div>
-          <div>
-            <dt>Claim ID</dt>
-            <dd><code data-gauntlet-claim-id>Not applicable</code></dd>
-          </div>
-          <div>
-            <dt>Response received</dt>
-            <dd data-gauntlet-checked-at>Not run</dd>
-          </div>
-        </dl>
-        <pre><code id="gauntlet-receipt-json" data-gauntlet-receipt-json>{}</code></pre>
-        <button
-          class="copy-button"
-          type="button"
-          data-copy-target="gauntlet-receipt-json"
-        >
-          Copy privacy-safe receipt
-        </button>
-        <p class="privacy-note">
-          The copied receipt excludes the payload, finder credit, and trusted
-          context. This page does not create a public share URL.
-        </p>
-        <details class="result-disclosure">
-          <summary>Full machine-readable API response</summary>
-          <pre><code data-gauntlet-json>{}</code></pre>
-        </details>
-      </section>
-
-      <section class="feature-panel">
-        <p class="eyebrow">Confirmation policy</p>
-        <h2>A confirmed bypass becomes a regression case.</h2>
-        <p>
-          Human reviewers reproduce the declared attack, reject mislabeled
-          benign claims, and credit valid finders when a detection fix and
-          corpus regression can land together. Nothing is auto-confirmed.
-        </p>
-      </section>
     </main>
 
     <footer class="site-footer page-shell">
-      <div class="site-footer__brand">
-        <strong>Warden</strong
-        ><span>Verifiable pre-action security for AI agents.</span
-        ><span>Gate the action. Keep the proof.</span>
+      <div>
+        <strong>Warden</strong>
+        <span>Pre-action security for agent systems.</span>
       </div>
       <nav aria-label="Footer">
         <div class="site-footer__col">
           <span class="site-footer__label">Product</span>
-          <a href="/">Overview</a><a href="/playground">Live Playground</a
-          ><a href="/theater">Attack Theater</a
-          ><a href="/hire">Use Warden</a>
+          <a href="/">Overview</a><a href="/playground">Live playground</a
+          ><a href="/theater">Incident replay</a><a href="/hire">Use Warden</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Developers</span>
-          <a href="/integrate#sdk-first">5-Minute Quickstart</a
-          ><a href="/integrate">Integrations</a
+          <a href="/integrate#sdk-first">5-minute quickstart</a
+          ><a href="/integrate">Integration guide</a
           ><a href="/docs">Documentation</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Evidence</span>
-          <a href="/verify">Verify an Attestation</a
-          ><a href="/apa/log">Transparency Log</a
-          ><a href="/badges">Endpoint Audit Records</a
-          ><a href="/agents">Marketplace Evidence Index</a
-          ><a href="/status">Service Status</a>
+          <a href="/verify">Verify an attestation</a
+          ><a href="/apa/log">Transparency log</a
+          ><a href="/badges">Endpoint audit records</a
+          ><a href="/agents">Marketplace evidence index</a
+          ><a href="/status">Service status</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Research</span>
           <a href="/gauntlet">Gauntlet</a
           ><a href="/agents#methodology">Methodology</a
-          ><a href="/showcase">Product Tour</a>
+          ><a href="/showcase">Product tour</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Policy</span>
-          <a href="/trust">Trust &amp; Security</a
-          ><a href="/privacy">Privacy</a><a href="/terms">Terms</a
-          ><a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
+          <a href="/trust">Trust &amp; security</a><a href="/privacy">Privacy</a
+          ><a href="/terms">Terms</a>
         </div>
       </nav>
     </footer>
-    <script src="/app.js?v=5c7f3a4c" defer></script>
-    <script src="/scan-client.js" defer></script>
-    <script src="/gauntlet.js" defer></script>
+    <script src="/app.js?v=0abdbc0f" defer></script>
+    <script src="/scan-client.js?v=d6611fc1" defer></script>
+    <script src="/gauntlet.js?v=d8e88a1a" defer></script>
   </body>
 </html>

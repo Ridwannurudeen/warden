@@ -11,27 +11,27 @@ NAV_GROUPS = (
         "Product",
         (
             ("/", "Overview", "overview"),
-            ("/playground", "Live Playground", "playground"),
-            ("/theater", "Attack Theater", "theater"),
+            ("/playground", "Live playground", "playground"),
+            ("/theater", "Incident replay", "theater"),
             ("/hire", "Use Warden", "hire"),
         ),
     ),
     (
         "Developers",
         (
-            ("/integrate#sdk-first", "5-Minute Quickstart", "integrate-quickstart"),
-            ("/integrate", "Integrations", "integrate"),
+            ("/integrate#sdk-first", "5-minute quickstart", "integrate-quickstart"),
+            ("/integrate", "Integration guide", "integrate"),
             ("/docs", "Documentation", "docs"),
         ),
     ),
     (
         "Evidence",
         (
-            ("/verify", "Verify an Attestation", "verify"),
-            ("/apa/log", "Transparency Log", "apa-log"),
-            ("/badges", "Endpoint Audit Records", "badges"),
-            ("/agents", "Marketplace Evidence Index", "agents"),
-            ("/status", "Service Status", "status"),
+            ("/verify", "Verify an attestation", "verify"),
+            ("/apa/log", "Transparency log", "apa-log"),
+            ("/badges", "Endpoint audit records", "badges"),
+            ("/agents", "Marketplace evidence index", "agents"),
+            ("/status", "Service status", "status"),
         ),
     ),
     (
@@ -39,28 +39,27 @@ NAV_GROUPS = (
         (
             ("/gauntlet", "Gauntlet", "gauntlet"),
             ("/agents#methodology", "Methodology", "agents-methodology"),
-            ("/showcase", "Product Tour", "showcase"),
+            ("/showcase", "Product tour", "showcase"),
         ),
     ),
 )
 
+PRIMARY_NAV = (
+    ("/", "Product", ("overview", "theater", "hire")),
+    ("/playground", "Playground", ("playground",)),
+    ("/integrate", "Developers", ("integrate", "integrate-quickstart")),
+    ("/docs", "Docs", ("docs",)),
+    ("/verify", "Evidence", ("verify", "apa-log", "badges", "agents", "status")),
+    ("/gauntlet", "Research", ("gauntlet", "agents-methodology", "showcase")),
+)
+
 
 def _render_navigation(active: str) -> str:
-    groups = []
-    for group_name, items in NAV_GROUPS:
-        contains_current = any(key == active for _, _, key in items)
-        links = []
-        for href, label, key in items:
-            current = ' aria-current="page"' if key == active else ""
-            links.append(f'<a href="{href}"{current}>{label}</a>')
-        current_class = " has-current" if contains_current else ""
-        groups.append(
-            f'<details class="nav-group{current_class}">'
-            f"<summary>{group_name}</summary>"
-            f'<div class="nav-menu">{"".join(links)}</div>'
-            "</details>"
-        )
-    return "".join(groups)
+    links = []
+    for href, label, active_keys in PRIMARY_NAV:
+        current = ' aria-current="page"' if active in active_keys else ""
+        links.append(f'<a class="nav-link" href="{href}"{current}>{label}</a>')
+    return "".join(links)
 
 
 def page_shell(
@@ -97,10 +96,9 @@ def page_shell(
     footer_groups.append(
         '<div class="site-footer__col">'
         '<span class="site-footer__label">Policy</span>'
-        '<a href="/trust">Trust &amp; Security</a>'
+        '<a href="/trust">Trust &amp; security</a>'
         '<a href="/privacy">Privacy</a>'
         '<a href="/terms">Terms</a>'
-        '<a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>'
         "</div>"
     )
     footer_navigation = "".join(footer_groups)
@@ -121,25 +119,25 @@ def page_shell(
     <meta property="og:image" content="https://warden.gudman.xyz/assets/warden-social-card.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="https://warden.gudman.xyz/assets/warden-social-card.png">
-    <link rel="icon" href="/assets/warden-avatar.png">
+    <link rel="icon" href="/assets/warden-mark.svg">
+    <script src="/theme.js"></script>
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body{class_attribute}>
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
-      <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-avatar.png" alt="" width="36" height="36"><span>Warden</span></a>
+      <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-mark.svg" alt="" width="32" height="32"><span>Warden</span></a>
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
-      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>{_render_navigation(active)}<div class="nav-mobile-actions"><a class="button secondary" href="/integrate">Integrate</a><a class="button primary" href="/playground">Run live scan</a></div></nav>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>{_render_navigation(active)}<div class="nav-mobile-actions"><a class="button secondary" href="/integrate">Integrate</a><a class="button primary" href="/playground">Run a live scan</a></div></nav>
       <div class="header-actions">
         <a class="status-pill" href="/status" aria-label="Service status: unknown" data-health-state="unknown"><span class="live-dot is-unknown" data-health-dot aria-hidden="true"></span><span data-health-label>Status unknown</span></a>
-        <a class="header-hire" href="/integrate">Integrate</a>
-        <a class="header-scan" href="/playground">Run live scan</a>
+        <a class="header-scan" href="/playground">Run a live scan</a>
         <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button>
       </div>
     </header>
     <main id="main" class="page-shell site-main">{body}</main>
     <footer class="site-footer page-shell">
-      <div><strong>Warden</strong><span>Verifiable pre-action security for AI agents.</span><span>Gate the action. Keep the proof.</span></div>
+      <div><strong>Warden</strong><span>Pre-action security for agent systems.</span></div>
       <nav aria-label="Footer">{footer_navigation}</nav>
     </footer>
     {"".join(script_tags)}

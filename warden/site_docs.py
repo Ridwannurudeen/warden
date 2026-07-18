@@ -12,7 +12,7 @@ from warden.core.verdict import ReasonCode
 from warden.site_render import page_shell
 
 
-DOCS_LAST_UPDATED = "2026-07-17"
+DOCS_LAST_UPDATED = "2026-07-18"
 
 
 @dataclass(frozen=True)
@@ -271,17 +271,16 @@ def _render_index(documents: list[ReasonDocument]) -> str:
     body = f"""
 <section class="page-hero page-hero--compact">
   <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span>Documentation</span></nav>
-  <p class="eyebrow">Detection reference</p>
-  <h1>Build the action boundary, then inspect every decision.</h1>
-  <p class="hero-text">Start with local fail-closed enforcement, learn the ALLOW / SANITIZE / BLOCK contract, and use the reason reference when a detector fires.</p>
+  <h1>Warden documentation</h1>
+  <p class="hero-text">Integrate the guard, handle its three decisions, and look up the exact detector that produced a result.</p>
   <p class="docs-metadata"><span>Documentation version <code>{html.escape(__version__)}</code></span><span>Last updated <time datetime="{DOCS_LAST_UPDATED}">{DOCS_LAST_UPDATED}</time></span></p>
 </section>
 <div class="doc-layout">
   <aside class="doc-nav" aria-label="Documentation sections">
     <a href="#quickstart">Quickstart</a>
+    <a href="#reason-matrix">Reason matrix</a>
     <a href="#concepts">Concepts</a>
     <a href="#decision-contract">Decision contract</a>
-    <a href="#reason-matrix">Reason matrix</a>
     <a href="#integration-patterns">Integration patterns</a>
     <a href="#evidence-apa">Evidence and APA</a>
     <a href="#transparency">Transparency</a>
@@ -293,11 +292,10 @@ def _render_index(documents: list[ReasonDocument]) -> str:
   <article class="prose">
     <nav class="table-of-contents" aria-label="On this page">
       <strong>On this page</strong>
-      <a href="#quickstart">Quickstart</a><a href="#concepts">Concepts</a><a href="#decision-contract">Decision contract</a><a href="#reason-matrix">Reason matrix</a><a href="#integration-patterns">Integration patterns</a><a href="#evidence-apa">Evidence and APA</a><a href="#transparency">Transparency</a><a href="#endpoint-audit">Endpoint audit</a><a href="#limits">Limits</a><a href="#troubleshooting">Troubleshooting</a>
+      <a href="#quickstart">Quickstart</a><a href="#reason-matrix">Reason matrix</a><a href="#concepts">Concepts</a><a href="#decision-contract">Decision contract</a><a href="#integration-patterns">Integration patterns</a><a href="#evidence-apa">Evidence and APA</a><a href="#transparency">Transparency</a><a href="#endpoint-audit">Endpoint audit</a><a href="#limits">Limits</a><a href="#troubleshooting">Troubleshooting</a>
     </nav>
     <section id="quickstart">
-      <p class="eyebrow">5-minute quickstart</p>
-      <h2>Run a local, fail-closed guard <a class="heading-anchor" href="#quickstart" aria-label="Link to quickstart">#</a></h2>
+      <h2>Quickstart <a class="heading-anchor" href="#quickstart" aria-label="Link to quickstart">#</a></h2>
       <p>Install both the repository root and the reference Python client from the same source checkout. The similarly named package on PyPI is unrelated.</p>
       <pre><code>python -m pip install -e . -e sdk/python
 
@@ -307,36 +305,13 @@ safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)
 execute(safe)</code></pre>
       <aside class="callout"><strong>Placement:</strong> call the guard immediately before payment, tool dispatch, link navigation, secret handling, or another consequential action. The caller keeps final authority.</aside>
     </section>
-    <section id="concepts">
-      <p class="eyebrow">Concepts</p>
-      <h2>Separate the verdict from the evidence <a class="heading-anchor" href="#concepts" aria-label="Link to concepts">#</a></h2>
-      <div class="card-grid docs-decision-grid">
-        <article><h3>Action boundary</h3><p>Untrusted output is evaluated before the caller invokes a consequential handler.</p></article>
-        <article><h3>Verdict</h3><p>ALLOW continues under caller policy, SANITIZE returns transformed text for review, and BLOCK withholds the proposed action.</p></article>
-        <article><h3>Evidence</h3><p>Qualifying decisions may produce a signed APA record that can be inspected separately from the live response.</p></article>
-        <article><h3>Proof boundary</h3><p>A valid signature proves integrity under the applicable key. It does not prove universal safety.</p></article>
-      </div>
-    </section>
-    <section id="decision-contract">
-      <p class="eyebrow">Decision model</p>
-      <h2>Read the operational decision before the diagnostic detail <a class="heading-anchor" href="#decision-contract" aria-label="Link to decision contract">#</a></h2>
-      <div class="card-grid docs-decision-grid">
-        <article><h3>Decision</h3><p><strong>ALLOW</strong>, <strong>SANITIZE</strong>, or <strong>BLOCK</strong> tells the integrating agent what to do next.</p></article>
-        <article><h3>Risk</h3><p>The observed severity band comes from the deterministic score and hard gates. It is not the decision itself.</p></article>
-        <article><h3>Reason and threat class</h3><p>A reason code names the detector that fired. The response's threat_classes array deduplicates those reasons.</p></article>
-        <article><h3>Confidence and score</h3><p>Detection confidence and the composite score are evidence used by the decision engine, not probabilities of safety.</p></article>
-        <article><h3>Detector boundary</h3><p>Fast and thorough depth do not run identical checks. CORPUS_MATCH is thorough-only.</p></article>
-      </div>
-      <aside class="callout"><strong>Detected threats start at risk MEDIUM:</strong> a finding that changes or withholds an action is never presented as low severity. Decision answers what to do; risk communicates the calibrated review floor.</aside>
-    </section>
     <section id="reason-matrix">
       <div class="section-heading">
-        <p class="eyebrow">Reason-code matrix</p>
-        <h2>Coverage, context, and intended action</h2>
-        <p class="section-copy">These are observed regression outcomes, not universal guarantees for every payload.</p>
+        <h2>Reason-code matrix</h2>
+        <p class="section-copy">Observed regression outcomes for each implemented reason code. They are not guarantees for every payload.</p>
       </div>
-      <div class="filter-bar docs-filter-bar" aria-label="Reason-code filters">
-        <label>Search reasons<input type="search" data-doc-search autocomplete="off" placeholder="Reason, behavior, context, or action"></label>
+      <div class="filter-bar docs-filter-bar" aria-label="Filter reason codes">
+        <label>Filter reason codes<input type="search" data-doc-search autocomplete="off" placeholder="Code, behavior, context, or action"></label>
         <label>Decision<select data-doc-decision><option value="">All decisions</option><option value="ALLOW">ALLOW</option><option value="SANITIZE">SANITIZE</option><option value="BLOCK">BLOCK</option></select></label>
         <label>Availability<select data-doc-availability><option value="">All paths</option><option value="fast-and-thorough">Fast and thorough</option><option value="thorough-only">Thorough-only signal</option></select></label>
         <button class="button secondary" type="button" data-doc-reset>Clear filters</button>
@@ -344,45 +319,67 @@ execute(safe)</code></pre>
       <p class="snapshot-note" aria-live="polite"><span class="num" data-doc-visible>{len(documents)}</span> reason codes shown</p>
       <div class="reason-matrix" data-doc-results>
         <table>
-          <thead><tr><th scope="col">Reason</th><th scope="col">Fast</th><th scope="col">Thorough</th><th scope="col">Context</th><th scope="col">Intended action</th></tr></thead>
+          <caption>Implemented reason codes and observed regression outcomes</caption>
+          <thead><tr><th scope="col">Reason</th><th scope="col">Fast</th><th scope="col">Thorough</th><th scope="col">Context</th><th scope="col">Caller action</th></tr></thead>
           <tbody>{"".join(rows)}</tbody>
         </table>
       </div>
       <p class="empty-state" data-doc-empty hidden>No reason codes match these filters. Clear a filter to restore the full matrix.</p>
     </section>
+    <section id="concepts">
+      <h2>Core concepts <a class="heading-anchor" href="#concepts" aria-label="Link to concepts">#</a></h2>
+      <div class="docs-reference-table"><table>
+        <caption>Core concepts and their operational meaning</caption>
+        <tbody>
+          <tr><th scope="row">Action boundary</th><td>Warden evaluates untrusted output before the caller invokes a consequential handler.</td></tr>
+          <tr><th scope="row">Decision</th><td>ALLOW continues under caller policy, SANITIZE returns transformed text, and BLOCK withholds the proposed action.</td></tr>
+          <tr><th scope="row">Evidence</th><td>A qualifying decision may produce a signed APA record separate from the live response.</td></tr>
+          <tr><th scope="row">Signature boundary</th><td>A valid signature proves record integrity under the applicable key. It does not prove universal safety.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+    <section id="decision-contract">
+      <h2>Decision model <a class="heading-anchor" href="#decision-contract" aria-label="Link to decision contract">#</a></h2>
+      <div class="docs-reference-table"><table>
+        <caption>Decision response fields and caller guidance</caption>
+        <thead><tr><th scope="col">Field</th><th scope="col">How to use it</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Decision</th><td>ALLOW, SANITIZE, or BLOCK is the operational result.</td></tr>
+          <tr><th scope="row">Risk</th><td>The severity band comes from deterministic scoring and hard gates; it is not the decision.</td></tr>
+          <tr><th scope="row">Reason</th><td>The machine-readable code names the detector that fired. Threat classes deduplicate related reasons.</td></tr>
+          <tr><th scope="row">Confidence and score</th><td>Diagnostic evidence used by the engine, not a probability of safety.</td></tr>
+          <tr><th scope="row">Depth</th><td>Fast and thorough do not run identical checks. CORPUS_MATCH is thorough-only.</td></tr>
+        </tbody>
+      </table></div>
+      <aside class="callout"><strong>Detected threats start at risk MEDIUM:</strong> a finding that changes or withholds an action is never presented as low severity. Decision answers what to do; risk communicates the calibrated review floor.</aside>
+    </section>
     <aside class="callout"><strong>Interpretation:</strong> ALLOW means no implemented detector fired. It is not proof that content is safe, and multiple threat classes can appear in one result.</aside>
     <section id="integration-patterns">
-      <p class="eyebrow">Integration patterns</p>
-      <h2>Choose the boundary your runtime can actually enforce <a class="heading-anchor" href="#integration-patterns" aria-label="Link to integration patterns">#</a></h2>
+      <h2>Integration patterns <a class="heading-anchor" href="#integration-patterns" aria-label="Link to integration patterns">#</a></h2>
       <p>Python supports local in-process enforcement. The source-built TypeScript client calls the hosted endpoint and has no local scanner engine. LangChain and LlamaIndex guards ship with the Python SDK; direct HTTP, x402, OnchainOS, and MCP paths are documented on the integration route.</p>
       <p><a class="button secondary" href="/integrate">Open exact integration contracts</a></p>
     </section>
     <section id="evidence-apa">
-      <p class="eyebrow">Evidence and APA</p>
-      <h2>Verify integrity, freshness, and subject separately <a class="heading-anchor" href="#evidence-apa" aria-label="Link to evidence and APA">#</a></h2>
+      <h2>Evidence and APA <a class="heading-anchor" href="#evidence-apa" aria-label="Link to evidence and APA">#</a></h2>
       <p>An Agent Protection Attestation binds a canonical record to an issuer signature. Local verification can establish whether the bytes match the signature under an applicable key. Freshness, revocation, subject identity, and issuer-key provenance remain separate checks.</p>
       <p><a href="/verify">Verify an attestation</a> · <a href="/spec/APA-SPEC.md">Read APA v0.1</a></p>
     </section>
     <section id="transparency">
-      <p class="eyebrow">Transparency verification</p>
-      <h2>Recompute the chain before relying on its head <a class="heading-anchor" href="#transparency" aria-label="Link to transparency verification">#</a></h2>
+      <h2>Transparency verification <a class="heading-anchor" href="#transparency" aria-label="Link to transparency verification">#</a></h2>
       <p>The public log exposes hash-chained entries and checkpoint state. A continuous unanchored chain detects local inconsistency, but cannot by itself expose a complete, internally consistent rewrite.</p>
       <p><a href="/apa/log">Inspect and recompute the log</a></p>
     </section>
     <section id="endpoint-audit">
-      <p class="eyebrow">Endpoint audit contract</p>
-      <h2>Read dated endpoint evidence as a snapshot <a class="heading-anchor" href="#endpoint-audit" aria-label="Link to endpoint audit contract">#</a></h2>
+      <h2>Endpoint audit contract <a class="heading-anchor" href="#endpoint-audit" aria-label="Link to endpoint audit contract">#</a></h2>
       <p>The endpoint service runs a fixed battery against a public endpoint the caller is authorized to test. Its output is point-in-time evidence, not certification, and does not predict every future response.</p>
       <p><a href="/badges">Review Endpoint Audit Records</a></p>
     </section>
     <section id="limits">
-      <p class="eyebrow">Limits</p>
       <h2>Known patterns are not the full attack space <a class="heading-anchor" href="#limits" aria-label="Link to limits">#</a></h2>
       <ul><li>Fast and thorough depth do not run identical checks.</li><li>Novel phrasing can evade deterministic and corpus-backed coverage.</li><li>Expected-recipient context is required for the strongest recipient-mismatch gate.</li><li>Hosted availability and timeout policy belong in the caller's enforcement design.</li><li>Do not log pasted secrets or private payloads to analytics.</li></ul>
     </section>
     <section id="troubleshooting">
-      <p class="eyebrow">Troubleshooting</p>
-      <h2>Keep an unavailable verifier from becoming an implicit ALLOW <a class="heading-anchor" href="#troubleshooting" aria-label="Link to troubleshooting">#</a></h2>
+      <h2>Troubleshooting <a class="heading-anchor" href="#troubleshooting" aria-label="Link to troubleshooting">#</a></h2>
       <dl class="data-list"><div><dt>Timeout or network error</dt><dd>Fail closed on consequential paths, surface the unavailable state, and retry only under caller policy.</dd></div><div><dt>Malformed response</dt><dd>Reject it as unusable evidence; do not infer a verdict.</dd></div><div><dt>Unexpected ALLOW</dt><dd>Confirm depth, context, payload limits, and the documented detector boundary.</dd></div><div><dt>Invalid signature</dt><dd>Stop using the record and inspect version, issuer key, canonicalization, freshness, and revocation independently.</dd></div></dl>
     </section>
   </article>
@@ -432,8 +429,8 @@ def _render_document(document: ReasonDocument, documents: list[ReasonDocument]) 
     body = f"""
 <section class="page-hero page-hero--compact">
   <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><a href="/docs">Documentation</a><span aria-hidden="true">/</span><span>{html.escape(document.title)}</span></nav>
-  <p class="eyebrow">Reason code</p>
-  <h1>{html.escape(document.reason_code.value)}</h1>
+  <p class="record-kicker">Reason code · <code>{html.escape(document.reason_code.value)}</code></p>
+  <h1>{html.escape(document.title)}</h1>
   <p class="hero-text">{html.escape(document.commerce_impact)}</p>
   <p class="docs-metadata"><span>Documentation version <code>{html.escape(__version__)}</code></span><span>Last updated <time datetime="{DOCS_LAST_UPDATED}">{DOCS_LAST_UPDATED}</time></span></p>
 </section>
@@ -445,19 +442,22 @@ def _render_document(document: ReasonDocument, documents: list[ReasonDocument]) 
       <a href="#corpus-example">Corpus example</a><a href="#observed-contract">Observed contract</a><a href="#detector-behavior">Detector behavior</a><a href="#commerce-impact">Commerce impact</a><a href="#detector-boundary">Detector boundary</a><a href="#integration-guidance">Integration guidance</a>
     </nav>
     <section id="corpus-example">
-      <p class="eyebrow">Corpus case {html.escape(document.example_id)}</p>
       <h2>{example_heading} <a class="heading-anchor" href="#corpus-example" aria-label="Link to corpus example">#</a></h2>
+      <p>Regression case <code>{html.escape(document.example_id)}</code></p>
       <pre><code>{example}</code></pre>{example_notice}
     </section>
     <section id="observed-contract">
       <h2>Observed decision contract <a class="heading-anchor" href="#observed-contract" aria-label="Link to observed decision contract">#</a></h2>
-      <div class="result-grid">
-      <div><span>Machine-readable value</span><strong><code>{html.escape(document.reason_code.value)}</code></strong></div>
-      <div><span>Fast-path result</span><strong>{html.escape(document.fast_result)}</strong></div>
-      <div><span>Thorough result</span><strong>{html.escape(document.thorough_result)}</strong></div>
-      <div><span>Documented risk</span><strong>{html.escape(document.risk_level)}</strong></div>
-      <div><span>Threat classes</span><strong>{html.escape(classes)}</strong></div>
-      </div>
+      <div class="docs-reference-table"><table>
+        <caption>{html.escape(document.reason_code.value)} observed detector contract</caption>
+        <tbody>
+          <tr><th scope="row">Machine-readable value</th><td><strong><code>{html.escape(document.reason_code.value)}</code></strong></td></tr>
+          <tr><th scope="row">Fast-path result</th><td><strong>{html.escape(document.fast_result)}</strong></td></tr>
+          <tr><th scope="row">Thorough result</th><td><strong>{html.escape(document.thorough_result)}</strong></td></tr>
+          <tr><th scope="row">Documented risk</th><td><strong>{html.escape(document.risk_level)}</strong></td></tr>
+          <tr><th scope="row">Threat classes</th><td><strong>{html.escape(classes)}</strong></td></tr>
+        </tbody>
+      </table></div>
     </section>
     <section id="detector-behavior"><h2>What Warden detects <a class="heading-anchor" href="#detector-behavior" aria-label="Link to detector behavior">#</a></h2><p>{html.escape(document.behavior)}</p></section>
     <section id="commerce-impact"><h2>Why it matters in agent commerce <a class="heading-anchor" href="#commerce-impact" aria-label="Link to commerce impact">#</a></h2><p>{html.escape(document.commerce_impact)}</p></section>

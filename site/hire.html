@@ -27,28 +27,19 @@
       name="twitter:image"
       content="https://warden.gudman.xyz/assets/warden-social-card.png"
     />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="32x32"
-      href="/assets/favicon-32.png"
-    />
-    <link
-      rel="apple-touch-icon"
-      sizes="180x180"
-      href="/assets/apple-touch-icon.png"
-    />
-    <link rel="stylesheet" href="/styles.css?v=96b93423" />
+    <link rel="icon" href="/assets/warden-mark.svg" />
+    <script src="/theme.js?v=2c7c8d24"></script>
+    <link rel="stylesheet" href="/styles.css?v=a3737335" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="site-header page-shell">
       <a class="brand" href="/" aria-label="Warden home"
         ><img
-          src="/assets/warden-avatar.png"
+          src="/assets/warden-mark.svg"
           alt=""
-          width="36"
-          height="36"
+          width="32"
+          height="32"
         /><span>Warden</span></a
       >
       <button
@@ -61,44 +52,15 @@
         Menu
       </button>
       <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
-        <details class="nav-group has-current">
-          <summary>Product</summary>
-          <div class="nav-menu">
-            <a href="/">Overview</a>
-            <a href="/playground">Live Playground</a>
-            <a href="/theater">Attack Theater</a>
-            <a href="/hire" aria-current="page">Use Warden</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Developers</summary>
-          <div class="nav-menu">
-            <a href="/integrate#sdk-first">5-Minute Quickstart</a>
-            <a href="/integrate">Integrations</a>
-            <a href="/docs">Documentation</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Evidence</summary>
-          <div class="nav-menu">
-            <a href="/verify">Verify an Attestation</a>
-            <a href="/apa/log">Transparency Log</a>
-            <a href="/badges">Endpoint Audit Records</a>
-            <a href="/agents">Marketplace Evidence Index</a>
-            <a href="/status">Service Status</a>
-          </div>
-        </details>
-        <details class="nav-group">
-          <summary>Research</summary>
-          <div class="nav-menu">
-            <a href="/gauntlet">Gauntlet</a>
-            <a href="/agents#methodology">Methodology</a>
-            <a href="/showcase">Product Tour</a>
-          </div>
-        </details>
+        <a class="nav-link" href="/" aria-current="page">Product</a>
+        <a class="nav-link" href="/playground">Playground</a>
+        <a class="nav-link" href="/integrate">Developers</a>
+        <a class="nav-link" href="/docs">Docs</a>
+        <a class="nav-link" href="/verify">Evidence</a>
+        <a class="nav-link" href="/gauntlet">Research</a>
         <div class="nav-mobile-actions">
           <a class="button secondary" href="/integrate">Integrate</a>
-          <a class="button primary" href="/playground">Run live scan</a>
+          <a class="button primary" href="/playground">Run a live scan</a>
         </div>
       </nav>
       <div class="header-actions">
@@ -114,8 +76,7 @@
           ></span
           ><span data-health-label>Status unknown</span></a
         >
-        <a class="header-hire" href="/integrate">Integrate</a>
-        <a class="header-scan" href="/playground">Run live scan</a>
+        <a class="header-scan" href="/playground">Run a live scan</a>
         <button
           class="theme-toggle"
           type="button"
@@ -129,59 +90,17 @@
 
     <main id="main" class="page-shell site-main">
       <section class="index-hero">
-        <p class="eyebrow">Reviewable operator checkout</p>
-        <h1>Use Warden.</h1>
+        <p class="eyebrow">Marketplace services</p>
+        <h1>Choose a Warden service</h1>
         <p class="hero-text">
-          Follow one four-step task flow: create the job, authorize the current
-          x402 terms, confirm the returned verdict, then leave optional honest
-          feedback. Each boundary stays visible before a command unlocks.
+          Review the service, live price, network, recipient, and wallet
+          boundary before generating a command.
         </p>
         <p class="caveat">
           <strong>Before you begin:</strong> you need an OKX User-role agent
           identity, the authenticated <code>onchainos</code> CLI, and enough
           USDT on X Layer. This page only prepares commands; signing remains
           inside your configured CLI wallet.
-        </p>
-      </section>
-
-      <section class="readiness-panel" aria-labelledby="readiness-title">
-        <div class="section-heading">
-          <p class="eyebrow">Readiness check</p>
-          <h2 id="readiness-title">Confirm the operator boundary first</h2>
-          <p>
-            Every item stays local to this page. Confirm all four before the
-            first command unlocks.
-          </p>
-        </div>
-        <fieldset class="readiness-checklist">
-          <legend>Required operator checks</legend>
-          <label
-            ><input type="checkbox" data-readiness-check /><span
-              >I control the OKX User-role agent identity that will create this
-              task.</span
-            ></label
-          >
-          <label
-            ><input type="checkbox" data-readiness-check /><span
-              >The <code>onchainos</code> CLI is installed and authenticated to
-              that agent.</span
-            ></label
-          >
-          <label
-            ><input type="checkbox" data-readiness-check /><span
-              >My configured X Layer wallet can cover the displayed USDT amount
-              and network fees.</span
-            ></label
-          >
-          <label
-            ><input type="checkbox" data-readiness-check /><span
-              >This request contains no secrets, and I am authorized to test any
-              audit target.</span
-            ></label
-          >
-        </fieldset>
-        <p class="caveat" data-readiness-status aria-live="polite">
-          Four confirmations required.
         </p>
       </section>
 
@@ -382,9 +301,49 @@
         </aside>
       </section>
 
-      <section aria-labelledby="challenge-title">
+      <section class="readiness-panel" aria-labelledby="readiness-title">
         <div class="section-heading">
-          <p class="eyebrow">Live payment terms</p>
+          <h2 id="readiness-title">Confirm the operator boundary</h2>
+          <p>
+            These checks stay local to this page. Confirm all four before the
+            first command unlocks.
+          </p>
+        </div>
+        <fieldset class="readiness-checklist">
+          <legend>Required operator checks</legend>
+          <label
+            ><input type="checkbox" data-readiness-check /><span
+              >I control the OKX User-role agent identity that will create this
+              task.</span
+            ></label
+          >
+          <label
+            ><input type="checkbox" data-readiness-check /><span
+              >The <code>onchainos</code> CLI is installed and authenticated to
+              that agent.</span
+            ></label
+          >
+          <label
+            ><input type="checkbox" data-readiness-check /><span
+              >My configured X Layer wallet can cover the displayed USDT amount
+              and network fees.</span
+            ></label
+          >
+          <label
+            ><input type="checkbox" data-readiness-check /><span
+              >This request contains no secrets, and I am authorized to test any
+              audit target.</span
+            ></label
+          >
+        </fieldset>
+        <p class="caveat" data-readiness-status aria-live="polite">
+          Four confirmations required.
+        </p>
+      </section>
+
+      <details class="methodology-drawer" aria-labelledby="challenge-title">
+        <summary>Current x402 payment terms</summary>
+        <div class="section-heading">
           <h2 id="challenge-title">
             The service's current <code>accepts</code> array
           </h2>
@@ -411,11 +370,10 @@
             Retry current payment terms
           </button>
         </div>
-      </section>
+      </details>
 
       <section aria-labelledby="steps-title">
         <div class="section-heading">
-          <p class="eyebrow">Reviewable checkout</p>
           <h2 id="steps-title">Run these four commands in order</h2>
           <p>
             Step 1 unlocks after readiness and payment-term validation. Paste
@@ -524,15 +482,16 @@
         <p class="caveat" data-copy-status role="status" aria-live="polite">
           No command copied.
         </p>
-        <p class="caveat">
-          <strong>If your task freezes in <code>accepted</code>:</strong> a task
-          created with x402 payment mode may come back with
-          <code>[x402 Replay Failed] HTTP 405</code>. That is OKX's automatic
-          replay failing on their side, not a Warden outage — the endpoint
-          answers a normal <code>task-402-pay</code> call. Nothing was charged.
-          Run step 2 above against a freshly fetched 402 challenge and the task
-          settles.
-        </p>
+        <details class="methodology-drawer">
+          <summary>Recover an accepted task after an HTTP 405 replay</summary>
+          <p>
+            An x402 task may return
+            <code>[x402 Replay Failed] HTTP 405</code> when OKX's automatic
+            replay fails. The endpoint still accepts a normal
+            <code>task-402-pay</code> call and nothing was charged. Re-fetch the
+            402 challenge, then run step 2.
+          </p>
+        </details>
         <p class="caveat">
           <strong>Security boundary:</strong> this website never receives wallet
           credentials or signing material. Inspect every generated command
@@ -543,48 +502,46 @@
 
     <footer class="site-footer page-shell">
       <div>
-        <strong>Warden</strong
-        ><span>Verifiable pre-action security for AI agents.</span
-        ><span>Gate the action. Keep the proof.</span>
+        <strong>Warden</strong>
+        <span>Pre-action security for agent systems.</span>
       </div>
       <nav aria-label="Footer">
         <div class="site-footer__col">
           <span class="site-footer__label">Product</span>
           <a href="/">Overview</a>
-          <a href="/playground">Live Playground</a>
-          <a href="/theater">Attack Theater</a>
+          <a href="/playground">Live playground</a>
+          <a href="/theater">Incident replay</a>
           <a href="/hire">Use Warden</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Developers</span>
-          <a href="/integrate#sdk-first">5-Minute Quickstart</a>
-          <a href="/integrate">Integrations</a>
+          <a href="/integrate#sdk-first">5-minute quickstart</a>
+          <a href="/integrate">Integration guide</a>
           <a href="/docs">Documentation</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Evidence</span>
-          <a href="/verify">Verify an Attestation</a>
-          <a href="/apa/log">Transparency Log</a>
-          <a href="/badges">Endpoint Audit Records</a>
-          <a href="/agents">Marketplace Evidence Index</a>
-          <a href="/status">Service Status</a>
+          <a href="/verify">Verify an attestation</a>
+          <a href="/apa/log">Transparency log</a>
+          <a href="/badges">Endpoint audit records</a>
+          <a href="/agents">Marketplace evidence index</a>
+          <a href="/status">Service status</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Research</span>
           <a href="/gauntlet">Gauntlet</a>
           <a href="/agents#methodology">Methodology</a>
-          <a href="/showcase">Product Tour</a>
+          <a href="/showcase">Product tour</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Policy</span>
-          <a href="/trust">Trust &amp; Security</a>
+          <a href="/trust">Trust &amp; security</a>
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>
-          <a href="https://www.okx.ai/" rel="noreferrer">Agent #3808</a>
         </div>
       </nav>
     </footer>
-    <script src="/app.js?v=5c7f3a4c" defer></script>
-    <script src="/hire.js" defer></script>
+    <script src="/app.js?v=0abdbc0f" defer></script>
+    <script src="/hire.js?v=f6239f39" defer></script>
   </body>
 </html>
