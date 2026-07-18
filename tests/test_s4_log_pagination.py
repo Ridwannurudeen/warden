@@ -66,15 +66,22 @@ def test_log_cursor_pages_bound_serialization_including_default_page(monkeypatch
     }
 
 
-def test_log_and_checkpoint_share_a_separate_bounded_read_bucket(monkeypatch):
+def test_log_checkpoint_and_anchor_share_a_separate_bounded_read_bucket(monkeypatch):
     _seed_log(1)
-    monkeypatch.setenv("WARDEN_APA_LOG_RATE_LIMIT_PER_MIN", "2")
+    monkeypatch.setenv("WARDEN_APA_LOG_RATE_LIMIT_PER_MIN", "3")
     ratelimit._reset_state()
 
     with TestClient(app) as client:
         assert client.get("/apa/log").status_code == 200
         assert client.get("/apa/log/checkpoint").status_code == 200
+        anchor = client.get("/apa/log/anchor")
         exceeded = client.get("/apa/log")
 
+    assert anchor.status_code == 200
+    assert anchor.json() == {
+        "schema_version": 1,
+        "status": "published",
+        "checkpoint": protection_store.read_log_checkpoint(),
+    }
     assert exceeded.status_code == 429
     assert exceeded.headers.get("Retry-After") is not None

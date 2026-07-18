@@ -295,6 +295,14 @@ class HealthResponse(BaseModel):
     version: str
     corpus_size: int
     analyzers: list[str]
+    uptime_seconds: float = Field(ge=0)
+
+
+class RuntimeStatsResponse(BaseModel):
+    uptime_seconds: float = Field(ge=0)
+    scans: int = Field(ge=0)
+    blocks_by_class: dict[str, int]
+    p50_latency_ms: float | None = Field(default=None, ge=0)
 
 
 class ReadinessCheck(BaseModel):

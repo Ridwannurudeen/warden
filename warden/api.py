@@ -16,7 +16,7 @@ from warden.badge_store import get_badge, list_badges
 from warden.badges import verify_badge
 from warden import __version__, protection, protection_store
 from warden.auditor import AgentAuditor
-from warden.core.verdict import ReasonCode
+from warden.core.verdict import ReasonCode, Verdict
 from warden.engine import WardenEngine
 from warden.gauntlet_store import (
     get_confirmed_breaker_ids,
@@ -51,9 +51,11 @@ from warden.models import (
     HealthResponse,
     ReadinessCheck,
     ReadinessResponse,
+    RuntimeStatsResponse,
     ScanRequest,
     ScanResponse,
 )
+from warden.observability import runtime_metrics
 
 MAX_REQUEST_BODY_BYTES = 1_000_000
 MAX_JSON_NESTING_DEPTH = 64
@@ -412,7 +414,7 @@ async def rate_limit_middleware(request: Request, call_next):
     elif path in {"/apa/register", "/apa/revoke"}:
         limit_per_minute = _apa_rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute, scope="apa")
-    elif path in {"/apa/log", "/apa/log/checkpoint"}:
+    elif path in {"/apa/log", "/apa/log/checkpoint", "/apa/log/anchor"}:
         limit_per_minute = _apa_log_rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute, scope="apa-log")
     elif path in {"/scan", "/audit"}:
@@ -496,6 +498,27 @@ _AUDIT_RECOVERY_HINT = (
 )
 
 
+async def _scan_with_observation(
+    payload: str,
+    *,
+    depth: str,
+    context: dict[str, object],
+    allow_paid_semantic: bool = False,
+) -> Verdict:
+    verdict = await engine.scan(
+        payload,
+        depth=depth,
+        context=context,
+        allow_paid_semantic=allow_paid_semantic,
+    )
+    runtime_metrics.record_scan(
+        verdict.verdict,
+        verdict.latency_ms,
+        verdict.threat_classes,
+    )
+    return verdict
+
+
 async def _get_request_fields(request: Request) -> dict[str, object]:
     """Read a paid GET's fields from the query string, or a JSON body if one was sent.
 
@@ -522,7 +545,7 @@ async def _get_request_fields(request: Request) -> dict[str, object]:
 
 @app.post("/scan", response_model=ScanResponse)
 async def scan(req: ScanRequest) -> ScanResponse:
-    verdict = await engine.scan(
+    verdict = await _scan_with_observation(
         req.payload,
         depth=req.depth,
         context=req.context.model_dump(),
@@ -547,7 +570,7 @@ async def scan_get(request: Request) -> ScanResponse:
 
 @app.post("/api/demo/scan", response_model=ScanResponse)
 async def demo_scan(req: DemoScanRequest) -> ScanResponse:
-    verdict = await engine.scan(
+    verdict = await _scan_with_observation(
         req.payload,
         depth="fast",
         context=req.context.model_dump(),
@@ -561,7 +584,7 @@ def _demo_theater_asp_handler(payload: str) -> DemoAspReceipt:
 
 @app.post("/api/demo/theater", response_model=DemoTheaterResponse)
 async def demo_theater(req: DemoScanRequest) -> DemoTheaterResponse:
-    verdict = await engine.scan(
+    verdict = await _scan_with_observation(
         req.payload,
         depth="fast",
         context=req.context.model_dump(),
@@ -582,7 +605,7 @@ async def demo_theater(req: DemoScanRequest) -> DemoTheaterResponse:
 
 @app.post("/api/demo/gauntlet", response_model=GauntletResponse)
 async def gauntlet(req: GauntletRequest) -> GauntletResponse:
-    verdict = await engine.scan(
+    verdict = await _scan_with_observation(
         req.payload,
         depth="fast",
         context=req.context.model_dump(),
@@ -847,6 +870,22 @@ async def apa_log_checkpoint() -> dict[str, object]:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@app.get("/apa/log/anchor")
+async def apa_log_anchor() -> dict[str, object]:
+    try:
+        checkpoint = protection_store.read_log_checkpoint()
+    except (
+        protection_store.LogCheckpointMissing,
+        protection_store.ProtectionStateConflict,
+    ) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {
+        "schema_version": 1,
+        "status": "published",
+        "checkpoint": checkpoint,
+    }
+
+
 @app.post("/apa/revoke")
 async def apa_revoke(req: ApaRevokeRequest) -> dict[str, object]:
     record = protection_store.get_attestation(req.attestation_id)
@@ -907,12 +946,19 @@ async def root() -> dict[str, object]:
 
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
+    metrics = runtime_metrics.snapshot()
     return HealthResponse(
         status="ok",
         version=__version__,
         corpus_size=_corpus_size(),
         analyzers=[analyzer.name for analyzer in engine.registry.get_all()],
+        uptime_seconds=float(metrics["uptime_seconds"]),
     )
+
+
+@app.get("/health/stats", response_model=RuntimeStatsResponse)
+async def health_stats() -> RuntimeStatsResponse:
+    return RuntimeStatsResponse.model_validate(runtime_metrics.snapshot())
 
 
 @app.get("/health/ready", response_model=ReadinessResponse)
