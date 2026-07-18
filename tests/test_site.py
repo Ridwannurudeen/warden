@@ -871,9 +871,10 @@ def test_status_and_marketplace_metadata_are_dated_and_honest():
     marketplace = json.loads(
         (SITE / "data" / "marketplace-summary.json").read_text(encoding="utf-8")
     )
-    corpus_bytes = (ROOT / "corpus" / "attacks.jsonl").read_bytes() + (
-        ROOT / "corpus" / "benign.jsonl"
-    ).read_bytes()
+    corpus_bytes = b"".join(
+        path.read_bytes().replace(b"\r\n", b"\n")
+        for path in (ROOT / "corpus" / "attacks.jsonl", ROOT / "corpus" / "benign.jsonl")
+    )
 
     assert status["agentId"] == "3808"
     assert status["listingStatus"] == "Listed"
