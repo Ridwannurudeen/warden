@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://warden.gudman.xyz/spec/schemas/apa-issuer-v0.1.schema.json",
+  "title": "APA issuer key document v0.1",
+  "type": "object",
+  "properties": {
+    "issuer": { "type": "string", "minLength": 1 },
+    "keys": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "kid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^\\S(?:.*\\S)?$"
+          },
+          "pub": {
+            "type": "string",
+            "pattern": "^ed25519:[A-Za-z0-9_-]{43}$"
+          },
+          "not_after": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": ["kid", "pub", "not_after"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["issuer", "keys"],
+  "additionalProperties": false
+}

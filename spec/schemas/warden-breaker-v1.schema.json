@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://warden.gudman.xyz/spec/schemas/warden-breaker-v1.schema.json",
+  "title": "WARDEN BREAKER certificate v1",
+  "type": "object",
+  "properties": {
+    "spec_version": { "const": "warden-breaker/1" },
+    "predicate_type": {
+      "const": "https://warden.gudman.xyz/spec/gauntlet-breaker/v1"
+    },
+    "certificate_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "issuer": { "const": "warden" },
+    "award": { "const": "WARDEN BREAKER" },
+    "benchmark_case_id": {
+      "type": "string",
+      "pattern": "^gauntlet-[0-9a-f]{16}$"
+    },
+    "threat_class": {
+      "enum": [
+        "PROMPT_INJECTION",
+        "ROLE_OVERRIDE",
+        "WEB3_INJECTION",
+        "HIDDEN_UNICODE",
+        "ENCODING_TRICK",
+        "STATISTICAL_ANOMALY",
+        "CORPUS_MATCH",
+        "DRAIN_ADDRESS",
+        "TOOL_HIJACK",
+        "SECRET_EXFIL",
+        "MALICIOUS_LINK"
+      ]
+    },
+    "payload_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "payload_scope": {
+      "const": "human-reviewed-redacted-reproducer"
+    },
+    "finder": {
+      "anyOf": [
+        { "type": "string", "minLength": 1, "maxLength": 128 },
+        { "type": "null" }
+      ]
+    },
+    "confirmed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "log_seq": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "issuer_sig": {
+      "type": "string",
+      "pattern": "^sig:[A-Za-z0-9_-]{86}$"
+    }
+  },
+  "required": [
+    "spec_version",
+    "predicate_type",
+    "certificate_id",
+    "issuer",
+    "award",
+    "benchmark_case_id",
+    "threat_class",
+    "payload_sha256",
+    "payload_scope",
+    "finder",
+    "confirmed_at",
+    "log_seq",
+    "issuer_sig"
+  ],
+  "additionalProperties": false
+}

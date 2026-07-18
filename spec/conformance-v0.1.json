@@ -1,0 +1,201 @@
+{
+  "profile": "apa/0.1-conformance",
+  "now": 1784000100,
+  "issuer_document": {
+    "issuer": "warden",
+    "keys": [
+      {
+        "kid": "conformance-issuer-v1",
+        "pub": "ed25519:RnbE4q_xPmh0ylVUg2TnMYkcYCO1vh4AceuyZJDE6ow",
+        "not_after": 9007199254740991
+      }
+    ]
+  },
+  "vectors": [
+    {
+      "id": "active-attestation",
+      "schema": "apa-attestation-v0.1.schema.json",
+      "schema_valid": true,
+      "verification": "valid",
+      "value": {
+        "spec_version": "apa/0.1",
+        "predicate_type": "https://warden.gudman.xyz/spec/protection/v1",
+        "attestation_id": "0123456789abcdef0123456789abcdef",
+        "issuer": "warden",
+        "protector": "warden",
+        "endpoint_host": "agent.example",
+        "pub": "ed25519:U9q3DLjEEv3YWqWt1Qp7FIseL9cgs7fWZpbtS1i1wA8",
+        "tier": "guard-live",
+        "status": "active",
+        "scans_24h": 7,
+        "verified_at": 1784000000,
+        "expires_at": 1784003600,
+        "issuer_sig": "sig:Z_3w7MoTDkt4wF1IKzg6EFsmircyLkYJZumg0ro2MR3b9ST128t1dk-Q-00i38cajPejF3x60IyfPIFk-CZVCg"
+      }
+    },
+    {
+      "id": "expired-attestation",
+      "schema": "apa-attestation-v0.1.schema.json",
+      "schema_valid": true,
+      "verification": "expired",
+      "value": {
+        "spec_version": "apa/0.1",
+        "predicate_type": "https://warden.gudman.xyz/spec/protection/v1",
+        "attestation_id": "11111111111111111111111111111111",
+        "issuer": "warden",
+        "protector": "warden",
+        "endpoint_host": "agent.example",
+        "pub": "ed25519:U9q3DLjEEv3YWqWt1Qp7FIseL9cgs7fWZpbtS1i1wA8",
+        "tier": "guard-live",
+        "status": "active",
+        "scans_24h": 7,
+        "verified_at": 1783000000,
+        "expires_at": 1783003600,
+        "issuer_sig": "sig:xxaOw-EhPcxVGgZKcJtt-WOj4Lybltn4uqK1SGDiD08GLYOYl1fGpuayfHABILunlCJ2axlVOPfikBwwYUVIBQ"
+      }
+    },
+    {
+      "id": "revoked-attestation",
+      "schema": "apa-attestation-v0.1.schema.json",
+      "schema_valid": true,
+      "verification": "revoked",
+      "value": {
+        "spec_version": "apa/0.1",
+        "predicate_type": "https://warden.gudman.xyz/spec/protection/v1",
+        "attestation_id": "22222222222222222222222222222222",
+        "issuer": "warden",
+        "protector": "warden",
+        "endpoint_host": "agent.example",
+        "pub": "ed25519:U9q3DLjEEv3YWqWt1Qp7FIseL9cgs7fWZpbtS1i1wA8",
+        "tier": "guard-live",
+        "status": "revoked",
+        "scans_24h": 7,
+        "verified_at": 1784000000,
+        "expires_at": 1784003600,
+        "issuer_sig": "sig:FxMUtsVwpyqA1Nots2Qq-ycxmaRKOkQLDPu4sQC2MIKc72-8QVV1tiDU3vmgCIm-8Sh64Rptz8IFUjDda0QIDQ"
+      }
+    },
+    {
+      "id": "tampered-attestation",
+      "schema": "apa-attestation-v0.1.schema.json",
+      "schema_valid": true,
+      "verification": "invalid-signature",
+      "value": {
+        "spec_version": "apa/0.1",
+        "predicate_type": "https://warden.gudman.xyz/spec/protection/v1",
+        "attestation_id": "0123456789abcdef0123456789abcdef",
+        "issuer": "warden",
+        "protector": "warden",
+        "endpoint_host": "agent.example",
+        "pub": "ed25519:U9q3DLjEEv3YWqWt1Qp7FIseL9cgs7fWZpbtS1i1wA8",
+        "tier": "guard-live",
+        "status": "active",
+        "scans_24h": 8,
+        "verified_at": 1784000000,
+        "expires_at": 1784003600,
+        "issuer_sig": "sig:Z_3w7MoTDkt4wF1IKzg6EFsmircyLkYJZumg0ro2MR3b9ST128t1dk-Q-00i38cajPejF3x60IyfPIFk-CZVCg"
+      }
+    },
+    {
+      "id": "protection-proof",
+      "schema": "apa-protection-proof-v0.1.schema.json",
+      "schema_valid": true,
+      "verification": "valid-proof",
+      "value": {
+        "spec_version": "apa/0.1",
+        "protector": "warden",
+        "endpoint_host": "agent.example",
+        "pub": "ed25519:U9q3DLjEEv3YWqWt1Qp7FIseL9cgs7fWZpbtS1i1wA8",
+        "ts": 1784000000,
+        "nonce": "-LhF58cfMeXUO8sRr3sEsw",
+        "window_s": 86400,
+        "window_start": 1783913600,
+        "scans_served": 7,
+        "sig": "sig:MYL3hpQ6BESH8bnhR7dtRtbh84E6mjbm2wEqk7u8PeCDKP0cCYimHMXUN-8j5rxoaCg4qgwTm-gcdSziCfmxCw"
+      }
+    },
+    {
+      "id": "issuer-document",
+      "schema": "apa-issuer-v0.1.schema.json",
+      "schema_valid": true,
+      "verification": "valid-issuer",
+      "value": {
+        "issuer": "warden",
+        "keys": [
+          {
+            "kid": "conformance-issuer-v1",
+            "pub": "ed25519:RnbE4q_xPmh0ylVUg2TnMYkcYCO1vh4AceuyZJDE6ow",
+            "not_after": 9007199254740991
+          }
+        ]
+      }
+    },
+    {
+      "id": "apa-log-entry",
+      "schema": "apa-log-entry-v0.1.schema.json",
+      "schema_valid": true,
+      "verification": "valid-log-entry",
+      "value": {
+        "seq": 1,
+        "ts": 1784000000,
+        "event": "issued",
+        "attestation_id": "0123456789abcdef0123456789abcdef",
+        "endpoint_host": "agent.example",
+        "status": "active",
+        "record_hash": "55bc00d4e66c2b7e937a8508988c29c1ac68c681e042388a415b8d9f34ddf834",
+        "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "id": "breaker-log-entry",
+      "schema": "apa-log-entry-v0.1.schema.json",
+      "schema_valid": true,
+      "verification": "valid-log-entry",
+      "value": {
+        "seq": 2,
+        "ts": 1784000050,
+        "event": "breaker-confirmed",
+        "record_type": "breaker-certificate",
+        "certificate_id": "abcdef0123456789abcdef0123456789",
+        "benchmark_case_id": "gauntlet-0123456789abcdef",
+        "record_hash": "7b16c1c643ba4051802a0f8ca615fc1a71ea3885da0eb009fc915920abc3f4da",
+        "prev_hash": "dbf7555ebeb602bdb44b3969059eeff27f31eaf19055f92b925452524191d089"
+      }
+    },
+    {
+      "id": "log-checkpoint",
+      "schema": "apa-log-checkpoint-v0.1.schema.json",
+      "schema_valid": true,
+      "verification": "valid-checkpoint",
+      "value": {
+        "spec_version": "apa-log/0.1",
+        "issuer": "warden",
+        "seq": 2,
+        "head_hash": "fb705957613b7318bfdcb4212cd416c369d24ac4417f95919ccafe6f2923f2f5",
+        "issued_at": 1784000060,
+        "issuer_sig": "sig:KGaAJF93sGPAB_6FkAxzYZKGCqzljSpbc5x5VAUm-Lj21Dtu0kZCIUomHjL66V_mlYKh6Lq9DzAoa8mXFUVCAQ"
+      }
+    },
+    {
+      "id": "breaker-certificate",
+      "schema": "warden-breaker-v1.schema.json",
+      "schema_valid": true,
+      "verification": "valid-breaker",
+      "value": {
+        "spec_version": "warden-breaker/1",
+        "predicate_type": "https://warden.gudman.xyz/spec/gauntlet-breaker/v1",
+        "certificate_id": "abcdef0123456789abcdef0123456789",
+        "issuer": "warden",
+        "award": "WARDEN BREAKER",
+        "benchmark_case_id": "gauntlet-0123456789abcdef",
+        "threat_class": "PROMPT_INJECTION",
+        "payload_sha256": "0b099dd2b1430f10ecd313f6f5663935bc8873cfe5d47026a3873b8e109ed7ad",
+        "payload_scope": "human-reviewed-redacted-reproducer",
+        "finder": null,
+        "confirmed_at": 1784000050,
+        "log_seq": 2,
+        "issuer_sig": "sig:qoEi2NmQm67rwxt3QkMocsHLddNX9xzKx1hswV27kKX1q2bn1FZzODm1ZMXVYLm6J8YmvBPORXxQuQCwv28xAQ"
+      }
+    }
+  ]
+}

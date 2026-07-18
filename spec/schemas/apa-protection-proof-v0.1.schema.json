@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://warden.gudman.xyz/spec/schemas/apa-protection-proof-v0.1.schema.json",
+  "title": "APA endpoint Protection Proof v0.1",
+  "type": "object",
+  "properties": {
+    "spec_version": { "const": "apa/0.1" },
+    "protector": { "type": "string", "minLength": 1 },
+    "endpoint_host": { "type": "string", "minLength": 1 },
+    "pub": {
+      "type": "string",
+      "pattern": "^ed25519:[A-Za-z0-9_-]{43}$"
+    },
+    "ts": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "nonce": {
+      "type": "string",
+      "minLength": 22,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "window_s": { "const": 86400 },
+    "window_start": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "scans_served": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        { "type": "null" }
+      ]
+    },
+    "sig": {
+      "type": "string",
+      "pattern": "^sig:[A-Za-z0-9_-]{86}$"
+    }
+  },
+  "required": [
+    "spec_version",
+    "protector",
+    "endpoint_host",
+    "pub",
+    "ts",
+    "nonce",
+    "window_s",
+    "window_start",
+    "scans_served",
+    "sig"
+  ],
+  "additionalProperties": false
+}

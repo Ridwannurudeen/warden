@@ -324,7 +324,8 @@ endpoint (with the endpoint's consent — the proof of consent MUST be included 
 Warden (`warden/protection.py`, `warden/badges.py`, `sdk/python/warden_guard/proof.py`) is the reference
 implementation. The Trust Layer routes and deployment units in this repository are source-ready and are not
 claimed live. The reference verifier is `warden-guard verify`. This document is implementable without reading
-that code.
+that code. Strict JSON Schemas, frozen signed vectors, and the standalone adopter command are published in
+[`spec/CONFORMANCE.md`](CONFORMANCE.md).
 
 ---
 

@@ -39,6 +39,8 @@ jobs:
         run: python -m pip_audit --require-hashes -r requirements.lock --disable-pip
       - name: Verify APA reference implementation
         run: python spec/verify_apa.py --selftest
+      - name: Verify APA conformance vectors
+        run: python spec/run_conformance.py
       - name: Lint Python
         run: ruff check .
       - name: Test Warden
