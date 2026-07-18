@@ -248,7 +248,7 @@ sdk/ts/                 # Source-built hosted TypeScript client and Express-styl
 spec/                   # APA v0.1 wire spec and portable reference verifier
 site/                   # Static product UI and generated public spec/docs
 tests/                  # API, crypto, corpus, site, and integration contracts
-corpus/                 # 92 attack cases and 30 benign false-positive guards
+corpus/                 # 94 attack cases and 30 benign false-positive guards
 scripts/                # Deterministic builders and local preview entry point
 docs/                   # Demo, release, deployment, and screenshot review handoffs
 deploy/                 # Nginx, systemd, and operator-run deployment material

@@ -52,6 +52,50 @@ async def test_audit_url_validation_has_a_deadline(monkeypatch):
         await asyncio.wait_for(auditor.audit("https://example.org/scan"), timeout=0.1)
 
 
+@pytest.mark.asyncio
+async def test_whole_audit_battery_has_a_deadline(monkeypatch):
+    auditor = AgentAuditor()
+
+    async def validate(target_url: str):
+        return "https://93.184.216.34/scan", "example.org", urlparse(target_url)
+
+    async def verify_consent(*args, **kwargs):
+        return True
+
+    async def never_finishes(*args, **kwargs):
+        await asyncio.Event().wait()
+
+    class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+    monkeypatch.setattr(auditor, "_validate_public_http_url", validate)
+    monkeypatch.setattr(auditor, "_verify_target_consent", verify_consent)
+    monkeypatch.setattr(auditor, "_run_battery", never_finishes)
+    monkeypatch.setattr("warden.auditor.httpx.AsyncClient", Client)
+    monkeypatch.setattr("warden.auditor.AUDIT_TOTAL_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(
+        "warden.auditor.issue_badge",
+        lambda **kwargs: pytest.fail("a timed-out audit must not issue a partial badge"),
+    )
+    monkeypatch.setattr(
+        "warden.auditor.record_badge",
+        lambda badge: pytest.fail("a timed-out audit must not record a partial badge"),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="audit timed out; no partial grade or badge was issued",
+    ):
+        await asyncio.wait_for(auditor.audit("https://example.org/scan"), timeout=0.1)
+
+
 @pytest.mark.parametrize(
     ("target_url", "hostname", "expected_authority"),
     [

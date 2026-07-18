@@ -21,7 +21,7 @@ Live unpaid probes verified on 2026-07-13 returned x402 v2 `exact` challenges:
 
 | Route | Price | Network | Token | Pay to |
 |---|---:|---|---|---|
-| `POST /scan` | `0.01 USDT` | `eip155:196` | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | `0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51` |
+| `POST /scan` | `0.5 USDT` | `eip155:196` | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | `0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51` |
 | `POST /audit` | `0.5 USDT` | `eip155:196` | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | `0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51` |
 
 `GET /health` and `/api/demo/*` stay free. The playground uses only those routes. The `/hire` page makes an unpaid `GET` request to `/scan` or `/audit` to read the current 402 terms, then guides an agent operator through the paid, reviewable task flow; browser code does not sign or submit the paid service call.

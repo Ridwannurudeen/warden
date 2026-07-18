@@ -19,22 +19,46 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: python -m pip install -e ".[dev]"
-      - run: python -m pip install -e "sdk/python[dev,langchain,llamaindex]"
+      - name: Install hash-locked Python dependencies
+        run: python -m pip install --require-hashes -r requirements.lock
+      - name: Install local packages without resolving dependencies
+        run: python -m pip install --no-deps --no-build-isolation -e . -e sdk/python
       - run: python scripts/build_site.py
       - run: python scripts/build_index.py
-      - name: Verify distributable wheel and local x402 settlement
-        run: python -m pytest -q tests/test_r4_distribution.py tests/test_r4_x402_settlement.py
-      - run: python spec/verify_apa.py --selftest
-      - run: ruff check .
-      - run: python -m pytest -q
-      - run: python -m pytest -q sdk/python/tests
-      - run: node --test tests/js/*.test.js
-      - run: npm ci
+      - name: Verify clean root-wheel install
+        run: python -m pytest -q tests/test_r4_distribution.py
+      - name: Verify local x402 settlement
+        run: python -m pytest -q tests/test_r4_x402_settlement.py
+      - name: Build Python SDK distributions
+        run: python -m build --no-isolation
+        working-directory: sdk/python
+      - name: Validate Python SDK distributions
+        run: python -m twine check dist/*
+        working-directory: sdk/python
+      - name: Audit hash-locked Python dependencies
+        run: python -m pip_audit --require-hashes -r requirements.lock --disable-pip
+      - name: Verify APA reference implementation
+        run: python spec/verify_apa.py --selftest
+      - name: Lint Python
+        run: ruff check .
+      - name: Test Warden
+        run: python -m pytest -q
+      - name: Test Python SDK
+        run: python -m pytest -q sdk/python/tests
+      - name: Test browser JavaScript
+        run: node --test tests/js/*.test.js
+      - name: Install TypeScript SDK
+        run: npm ci
         working-directory: sdk/ts
-      - run: npm test
+      - name: Audit TypeScript SDK dependencies
+        run: npm audit --audit-level=high
         working-directory: sdk/ts
-      - run: npm run build
+      - name: Test TypeScript SDK
+        run: npm test
         working-directory: sdk/ts
-      - run: npm pack --dry-run
+      - name: Build TypeScript SDK
+        run: npm run build
+        working-directory: sdk/ts
+      - name: Validate TypeScript SDK package
+        run: npm pack --dry-run
         working-directory: sdk/ts

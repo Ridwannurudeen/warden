@@ -26,7 +26,7 @@ The live public product returned HTTP 200 on every major route during the audit.
 returned version `0.1.0`, 122 corpus entries, and four analyzers. The current marketplace snapshot is
 dated `2026-07-13T17:45:35Z` and contains 376 agents, two public-text matches, and zero independently
 audited agents. Live unpaid requests to `/scan` and `/audit` returned x402 v2 `exact` terms on X Layer
-for 0.01 USDT and 0.5 USDT respectively.
+for 0.5 USDT each.
 
 ## What already works
 

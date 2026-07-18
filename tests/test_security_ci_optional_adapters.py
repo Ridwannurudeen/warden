@@ -9,7 +9,11 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_ci_installs_and_runs_optional_python_adapters() -> None:
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
-    assert 'python -m pip install -e "sdk/python[dev,langchain,llamaindex]"' in workflow
+    assert "python -m pip install --require-hashes -r requirements.lock" in workflow
+    assert (
+        "python -m pip install --no-deps --no-build-isolation -e . -e sdk/python"
+        in workflow
+    )
     assert "permissions:\n  contents: read\n" in workflow
     assert "python -m pytest -q sdk/python/tests" in workflow
 

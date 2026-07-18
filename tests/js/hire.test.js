@@ -29,7 +29,7 @@ const services = {
     serviceName: "Payload Security Scan",
     serviceType: "A2MCP",
     endpoint: "https://warden.gudman.xyz/scan",
-    feeAmount: "0.01",
+    feeAmount: "0.5",
     feeTokenAddress: "0x779ded0c9e1022225f8e0630b35a9b54be713736",
     taskTitle: "Warden payload scan",
     taskDescription: "Scan an untrusted agent response with Warden",
