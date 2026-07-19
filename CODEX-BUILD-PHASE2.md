@@ -1,3 +1,9 @@
+> **HISTORICAL / SUPERSEDED IMPLEMENTATION BRIEF**
+>
+> This file is retained as project history, not current product truth. Consult `ROADMAP.md`, the
+> completion addendum in `SECURITY-AUDIT-2026-07.md`, and `REDESIGN_REPORT.md`. Do not execute or
+> deploy from this brief without fresh verification and explicit user approval.
+
 # Warden — Phase 2 Build Brief for Codex (revenue-critical, additive-only)
 
 **You (Codex) build every line. Claude audits each item.** This brief is self-contained. Follow it exactly. No Claude/Anthropic attribution anywhere in code or commits. No `Co-Authored-By`.

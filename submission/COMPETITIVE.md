@@ -1,3 +1,5 @@
+> **Historical / superseded submission draft.** This file contains point-in-time metrics and copy; it is not current product truth. Do not submit, publish, post, or send it without explicit user approval and fresh verification against `ROADMAP.md`, the completion addendum in `SECURITY-AUDIT-2026-07.md`, and `REDESIGN_REPORT.md`.
+
 # Warden — Competitive Audit: SlowMist Agent Security (#2155)
 
 Verified on-platform 2026-07-06 via `agent search` + `agent get-agents` + `service-list` + one benign black-box probe.

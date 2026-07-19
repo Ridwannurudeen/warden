@@ -1,3 +1,9 @@
+> **HISTORICAL / SUPERSEDED IMPLEMENTATION BRIEF**
+>
+> This file is retained as project history, not current product truth. Consult `ROADMAP.md`, the
+> completion addendum in `SECURITY-AUDIT-2026-07.md`, and `REDESIGN_REPORT.md`. Do not execute or
+> deploy from this brief without fresh verification and explicit user approval.
+
 # Warden — Codex Handoff (A-to-Z execution brief)
 
 **You (Codex) execute the remaining build end-to-end. Claude audits each deliverable before it's considered done.** This document is self-contained and every fact in it was verified live on 2026-07-04. Read `BUILD.md` (original build spec) and `AUDIT.md` (acceptance bar) alongside this. **Do not re-verify or rebuild what §1 marks DONE — it is live and under review; breaking it can void the hackathon entry.**

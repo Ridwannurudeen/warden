@@ -1,3 +1,5 @@
+> **Historical / superseded submission draft.** This file contains point-in-time metrics and copy; it is not current product truth. Do not submit, publish, post, or send it without explicit user approval and fresh verification against `ROADMAP.md`, the completion addendum in `SECURITY-AUDIT-2026-07.md`, and `REDESIGN_REPORT.md`.
+
 # Warden — 3-Day Demand Validation Sprint
 
 **Thesis under test:** other #OKXAI entrants will pay for Warden's **runtime payload firewall** (`scan_payload`, 0.01 USDT/call, in-loop). A free one-off endpoint audit is the LEAD-MAGNET/entry hook — not the product being monetized. (Post-competitive-audit correction: SlowMist audits free with a trusted brand, so paid *audits* are a losing pitch; the runtime firewall is the lane they've left empty — see COMPETITIVE.md.)

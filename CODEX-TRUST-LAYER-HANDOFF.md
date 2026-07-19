@@ -1,3 +1,9 @@
+> **HISTORICAL / SUPERSEDED IMPLEMENTATION BRIEF**
+>
+> This file is retained as project history, not current product truth. Consult `ROADMAP.md`, the
+> completion addendum in `SECURITY-AUDIT-2026-07.md`, and `REDESIGN_REPORT.md`. Do not execute or
+> deploy from this brief without fresh verification and explicit user approval.
+
 # Codex — START HERE (Warden Trust Layer hand-off)
 
 You are building the **Warden Trust Layer**. This file is the entry point. Read it, then follow the read order.

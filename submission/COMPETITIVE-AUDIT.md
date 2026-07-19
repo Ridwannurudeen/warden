@@ -1,3 +1,5 @@
+> **Historical / superseded submission draft.** This file contains point-in-time metrics and copy; it is not current product truth. Do not submit, publish, post, or send it without explicit user approval and fresh verification against `ROADMAP.md`, the completion addendum in `SECURITY-AUDIT-2026-07.md`, and `REDESIGN_REPORT.md`.
+
 # Warden — Competitive Audit (live marketplace sweep, 2026-07-15)
 
 Source: full `onchainos agent search` sweep of the OKX.AI marketplace via Warden's own `marketplace/fetch.py`.

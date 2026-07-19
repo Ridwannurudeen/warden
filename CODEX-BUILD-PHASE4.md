@@ -1,3 +1,9 @@
+> **HISTORICAL / SUPERSEDED IMPLEMENTATION BRIEF**
+>
+> This file is retained as project history, not current product truth. Consult `ROADMAP.md`, the
+> completion addendum in `SECURITY-AUDIT-2026-07.md`, and `REDESIGN_REPORT.md`. Do not execute or
+> deploy from this brief without fresh verification and explicit user approval.
+
 # Warden Phase 4 — Codex Build Brief
 
 **Branch:** create `phase4-detection-recall` off `phase3-hardening` (which already has commit `d11e939` — rate-limiter key/eviction fix + SSRF `is_global` fix, 57/57 tests green, not yet deployed; leave that branch/commit alone).
