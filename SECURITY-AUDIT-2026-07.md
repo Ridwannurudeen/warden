@@ -1,5 +1,10 @@
 # Warden Security Audit — July 2026
 
+> **Historical record and current status:** The original audit through **Final disposition** records the
+> reviewed state at `b97ea75` on 2026-07-16 and is preserved as evidence of what was found and tested then.
+> It is not the current completion status. The dated **2026-07-18 completion addendum** at the end of this
+> document supersedes the original deferred-status and closeout tables without rewriting their history.
+
 ## Executive summary
 
 This audit reviewed Warden's local source, tests, generated-site pipeline, Python and TypeScript SDKs, MCP surface, endpoint auditor, x402 wiring, APA trust layer, and persistence boundaries. The remediation range is `962525d..b97ea75` on `fix/scanner-exfil-drain-coverage`; the final runtime commit reviewed here is `b97ea75`.
@@ -285,3 +290,145 @@ The deterministic misses were:
 The audited runtime at `b97ea75` passes the complete offline verification matrix and closes every reproduced Critical implementation defect. The fixed HTTP, scanner, SDK, APA, marketplace, MCP, semantic-response, and partial-audit defects have regression coverage.
 
 Warden is **not ready to present the legacy signed audit badge as endpoint certification**. The recommended next security change is a deliberately versioned audit-evidence v2 that binds the canonical endpoint, battery version/hash, fixed-versus-custom prompt provenance, benign/liveness controls, and issuer key identity. That work must update the frozen contract through an explicit migration rather than hiding changed evidence semantics behind the legacy fields.
+
+---
+
+## Completion addendum — 2026-07-18
+
+Local verification for this addendum was refreshed on 2026-07-18 from
+`feat/post-hackathon-completion`. It covers finite repository work only. It does not upgrade a source-ready
+mechanism into a deployment, independent witness, paid transaction, uptime result, package release, customer
+relationship, or commercial outcome.
+
+### Addendum status vocabulary
+
+| Classification | Meaning |
+|---|---|
+| **FINITE SOURCE BUILT / LOCALLY VERIFIED** | The bounded source change exists and its focused local regression gates pass. |
+| **ACCEPTED DETECTOR LIMITATION** | The measured detection gap remains published and is not disguised as fixed. |
+| **SOURCE READY / EXTERNAL, OPERATOR, OR TIME DEPENDENT** | The repository mechanism is complete, but closure requires an approved deployment, production observation, independent system, credentials, funds, or another party. |
+| **NOT AUTHORIZED / NOT BUILT** | The action or expansion was not authorized and was not represented as completed. |
+
+### Current disposition of D-01 through D-14
+
+This table supersedes the status column in the historical deferred-findings table above. The original
+reproductions remain valid evidence of the `b97ea75` state.
+
+| ID | Current disposition | Current proof and remaining boundary | Classification |
+|---|---|---|---|
+| D-01 | Closed in source | New version-2 audit evidence binds the canonical scheme, host, port, path, query, and battery identity; exact endpoint association is required. `tests/test_security_audit_evidence.py` and marketplace association regressions cover the boundary. Legacy version-1 records remain historical host-scoped receipts. | **FINITE SOURCE BUILT / LOCALLY VERIFIED** |
+| D-02 | Closed in source | The immutable audit battery includes three benign liveness controls. A target that blindly rejects all inputs receives no signed grade or portable record. | **FINITE SOURCE BUILT / LOCALLY VERIFIED** |
+| D-03 | Closed in source | The signed score uses only the fixed battery. Caller prompts are unsigned diagnostics and cannot inflate or dilute the signed grade. | **FINITE SOURCE BUILT / LOCALLY VERIFIED** |
+| D-04 | Closed in source | Endpoint consent is hard by default; soft mode requires an explicit operator override. Shield also requires explicit owner enrollment and still performs endpoint consent. | **FINITE SOURCE BUILT / LOCALLY VERIFIED** |
+| D-05 | Closed in source | Rate limits and verified-payer elevation use shared SQLite state. A forged payment header receives no elevated grant; only a successful response carrying a settlement receipt records the bounded grant. | **FINITE SOURCE BUILT / LOCALLY VERIFIED** |
+| D-06 | Closed in source | The legacy badge registry is bounded to 5,000 records and atomically rewritten under a cross-process lock with file fsync and POSIX directory fsync. A failed replacement preserves the prior complete registry. Malformed-line repair remains a separate residual boundary below. | **FINITE SOURCE BUILT / LOCALLY VERIFIED** |
+| D-07 | Mechanism complete; independent witness open | Signed checkpoints, atomic publication, bounded append-only checkpoint history, prefix verification, and retained-head pinning are implemented and tested. The committed anchor sentinel remains `unpublished`, and no independently controlled off-domain retention or on-chain witness exists. | **SOURCE READY / EXTERNAL, OPERATOR, OR TIME DEPENDENT** |
+| D-08 | Source closure complete; hosted execution open | Root Python dependencies are exact and hash-locked. CI installs with `--require-hashes`, runs `pip-audit`, pins GitHub Actions to immutable commits, checksum-pins TruffleHog, scans full history, audits/builds/packs the TypeScript SDK, and follows `docs/DEPENDENCY_UPDATE_POLICY.md`. The final pushed commit still needs a hosted CI run; local source cannot prove that remote execution. | **SOURCE READY / EXTERNAL, OPERATOR, OR TIME DEPENDENT** |
+| D-09 | Source corrected; deployed challenge stale | Source, tests, fixtures, and documentation bind `/scan` and `/audit` to x402 v2 `exact`, X Layer, 500000 atomic units (0.5 USDT), and EIP-712 `{"name":"USD₮0","version":"1"}`. The documented read-only probe on 2026-07-18 still observed live `{"name":"USDT","version":"1"}`. An approved deploy and read-only reprobe are required before claiming live authorization or settlement correctness. | **SOURCE READY / EXTERNAL, OPERATOR, OR TIME DEPENDENT** |
+| D-10 | Measured limitation retained | The current deterministic held-out result is 87/94 attacks detected (92.55% recall) with 0/45 benign false positives. The seven exact misses are `held-prompt-002`, `held-prompt-003`, `held-role-002`, `held-corpus-002`, `held-drain-002`, `held-secret-002`, and `held-evade-mix-003`. Optional model tiers remain disabled without provider configuration and have no current independent calibration result. | **ACCEPTED DETECTOR LIMITATION** |
+| D-11 | Closed in source | The MCP entrypoint explicitly invokes `mcp.run(transport="stdio")`. No network MCP transport is exposed by this entrypoint. | **FINITE SOURCE BUILT / LOCALLY VERIFIED** |
+| D-12 | Source closure complete; production headers open | Exact configured-origin behavior and wildcard-without-credentials behavior have dedicated CORS regressions. Deployed nginx and application response headers were not reverified after these changes. | **SOURCE READY / EXTERNAL, OPERATOR, OR TIME DEPENDENT** |
+| D-13 | Closed in source | Public documentation and regression contracts use the current 94-case attack set. | **FINITE SOURCE BUILT / LOCALLY VERIFIED** |
+| D-14 | Closed in source | `AgentAuditor.audit()` now encloses the complete audit in a 30-second deadline and converts expiry into an explicit no-partial-grade/no-badge failure. | **FINITE SOURCE BUILT / LOCALLY VERIFIED** |
+
+### Finite security and product mechanisms completed
+
+The post-audit build also completed these bounded source items:
+
+- Python and TypeScript SDKs, local Python enforcement, LangChain and LlamaIndex adapters, MCP stdio, and
+  a fail-closed Warden Gateway;
+- strict x402 challenge validation and caller-owned payment callbacks that permit exactly one paid replay;
+- shared SQLite rate windows, verified-settlement grants, bounded runtime metrics, and anonymous
+  multi-process outbound-probe leases;
+- the owner-enrolled Warden Shield lifecycle with signed renewals, drift states, bounded metadata-only
+  events, and hardened scheduling units;
+- explicit opt-in redacted feedback, bounded retention, cross-process-safe human review, exactly-one dataset
+  promotion, canonical corpus provenance, and k=5-suppressed aggregate threat intelligence;
+- the public ASP Payload Security Standard draft and its machine-readable profile;
+- readiness and unsigned-challenge monitoring, dead-man transition alerts, deterministic monthly summaries,
+  and a policy that distinguishes a readiness objective from an SLA;
+- portable Ed25519 endpoint-audit records bound to the exact subject and immutable battery, including
+  issuance-log binding, expiry, lookup, and revocation;
+- a candidate-only, fail-closed issuer-key rotation orchestrator and rollback runbook;
+- immutable CI action pins, a checksum-pinned full-history secret scan, hash-locked Python dependencies,
+  local and hosted advisory gates, and a reviewed dependency-update policy;
+- a packaged canonical corpus fingerprint; and
+- APA schemas, the portable reference verifier, and the 12-vector conformance pack.
+
+These mechanisms are source capabilities. They do not prove that a production operator enabled them or that
+an external party consumed their outputs.
+
+### Current residual architecture and operating risks
+
+1. **No independent log witness.** The publisher and same-origin public files remain inside Warden's
+   operator boundary. A coherent replacement remains detectable only relative to a history head retained by
+   an independent party or system.
+2. **SQLite is a single-host coordination boundary.** The configured databases coordinate multiple workers
+   and scheduled processes sharing one host and filesystem. They are not a distributed, multi-host rate,
+   lease, metrics, or consensus store.
+3. **Legacy badge identity and key history.** Legacy HMAC audit badges use a 16-hex-character (64-bit)
+   truncated identifier. Collision is theoretical at current volume but the identifier is not suitable as
+   a globally unique security primitive. Legacy records also carry no key identifier or issuer history:
+   rotating the HMAC secret invalidates old records, while retaining a compromised secret preserves
+   forgeability. Portable Ed25519 endpoint-audit evidence is the preferred format.
+4. **Retired APA key grace.** Verifiers select a retired issuer key using the signed `verified_at` cutoff.
+   The one-hour attestation lifetime bounds, but cannot eliminate, forged backdating inside the
+   post-retirement grace window.
+5. **Hosted SDK fail-open modes.** The free hosted Python and TypeScript defaults convert transport or HTTP
+   failure into an `ALLOW` telemetry result. They must not be used as a fail-closed action boundary. Local
+   Python and Gateway enforcement explicitly use fail-closed behavior.
+6. **Production `expected_addresses` item count.** `ScanContext.expected_addresses` has no independent
+   list-length cap, although payload length, structural JSON depth, and the one-megabyte HTTP body bound cap
+   total request size. The demo context has a separate item cap.
+7. **Malformed JSONL history is tolerated, not repaired.** Badge and related readers can skip malformed
+   lines so later records remain available. They do not repair, quarantine, or cryptographically prove the
+   integrity of the damaged historical line.
+8. **Detector and model boundary.** The deterministic benchmark is small and authored, not universal
+   efficacy evidence. Optional semantic and embedding thresholds are uncalibrated, external-provider
+   behavior was not reproduced here, and provider failure preserves the deterministic result.
+9. **Live key and filesystem operation remains untested.** Local tests cover validation, transactions,
+   candidate rotation, and runbook contracts. They do not prove production key provenance, file ownership,
+   permissions, backup handling, or a completed rotation ceremony.
+
+### External and time-dependent work not completed
+
+No deploy, VPS mutation, push of this completion branch, registry package publication, listing submission,
+hackathon submission, social post, funded transaction, paid settlement replay, honeypot funding, payout,
+wallet action, or production key rotation was authorized or performed as part of this completion work.
+
+No complete 30-day monitor window was observed; the committed service-monitor source is explicitly
+`not_running`. Therefore no achieved uptime, historical availability, or SLA is claimed.
+
+No Coinbase, Solana, Google AP2, A2A escrow, evaluator-stake, marketplace-partnership, CertiK-partnership,
+grant, customer-enrollment, subscription, review-volume, or revenue outcome was implemented or claimed.
+Those are external product or business decisions, not deferred security fixes.
+
+### Addendum verification
+
+The following commands and results were reproduced locally while preparing this addendum. The test groups
+overlap and must not be summed as one suite total:
+
+| Gate | Result |
+|---|---|
+| Focused audit, consent, rate, payment, x402, observability, probe, Shield, feedback, standard, reliability, endpoint-audit, rotation, supply-chain, conformance, anchor, and distribution suite | **229 passed, 1 warning** |
+| Legacy badge durability/recovery and verified-payer rate-limit suite | **16 passed, 1 warning** |
+| Python x402 replay, LangChain, LlamaIndex, and Gateway suite | **45 passed** |
+| TypeScript client and x402 replay suite | **70 passed** |
+| `python scripts/benchmark_recall.py --json` | **87/94 attacks detected; 0/45 benign false positives; seven named misses above** |
+| `python spec/verify_apa.py --selftest` | **SELFTEST PASSED** |
+| `python spec/run_conformance.py` | **APA CONFORMANCE PASSED - 12 vectors passed** |
+
+The warning in the two root test groups is the existing Starlette/httpx TestClient deprecation warning. UI
+integration and final whole-tree, browser, accessibility, responsive, performance, and hosted CI results are
+reported separately; this addendum invents none of them.
+
+### Addendum disposition
+
+All fourteen originally deferred items now have an explicit outcome: D-01 through D-06, D-11, D-13, and
+D-14 are closed in finite source; D-07, D-08, D-09, and D-12 have complete source mechanisms but remain
+operator or external verification work; and D-10 remains an honestly published detector limitation.
+
+That is why the earlier audit listed deferred and untested work: some findings required later bounded source
+changes, while others could never be closed by editing a repository alone. The finite source work is now
+built and locally verified. The remaining items are not concealed engineering defects; they are explicitly
+bounded production, independent-witness, elapsed-time, provider, funding, or business outcomes.
