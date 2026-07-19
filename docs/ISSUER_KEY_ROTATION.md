@@ -30,9 +30,9 @@ environment is derived from the private seed without displaying either value. St
 ## 2. Quiesce and back up
 
 Stop the API and both writers before copying state: `warden.service`, `warden-apa-reprobe.timer` and its
-service, plus the Safety Index timer and service. Confirm none is active. Create a root-only backup directory
+service, plus the Marketplace Evidence Index timer and service. Confirm none is active. Create a root-only backup directory
 on `/opt/warden`, then preserve the current application environment, index environment, issuer history,
-Safety Index link target, and `/opt/warden/data/protection.db`. Keep this backup until post-rotation checks and
+Marketplace Evidence Index link target, and `/opt/warden/data/protection.db`. Keep this backup until post-rotation checks and
 the one-hour attestation grace window have passed.
 
 Do not continue unless the backup database is a regular file, non-empty, and opens read-only with SQLite.
@@ -122,14 +122,14 @@ exits non-zero and leaves no publishable candidate. Do not promote after a non-z
 With all readers and writers still stopped, validate the candidate database read-only and confirm there are
 no SQLite sidecars. Install same-filesystem temporary copies of the three candidate configuration files and
 the candidate database beside their final paths. Promote the public history, index environment, application
-environment, and database using atomic renames. Rebuild the Safety Index from the promoted database and
+environment, and database using atomic renames. Rebuild the Marketplace Evidence Index from the promoted database and
 public-only index environment before restarting readers.
 
 Keep an error trap active from the first rename through the post-start checks. The trap must restore all four
-backed-up files and the previous Safety Index link before it restarts the old services. Never mix an old
+backed-up files and the previous Marketplace Evidence Index link before it restarts the old services. Never mix an old
 database with the new signer or a new database with the old signer.
 
-Start the API first and verify local `/health` plus `/.well-known/apa-issuer.json`. Then start the Safety Index
+Start the API first and verify local `/health` plus `/.well-known/apa-issuer.json`. Then start the Marketplace Evidence Index
 timer and the normal APA reprobe timer. Confirm the issuer document's first key matches the prepared public
 index key, the timers are active, and the reprobe journal contains only the count summary. Mark the rotation
 committed only after every check passes. Once the rollback window and one-hour attestation grace period have
@@ -140,7 +140,7 @@ and its finite cutoff.
 
 On any failure before commitment, keep every writer stopped. Restore the backed-up application environment,
 index environment, public history, and protection database with same-filesystem temporary files and atomic
-renames; restore the previous Safety Index link; validate the old issuer document; then restart the API and
+renames; restore the previous Marketplace Evidence Index link; validate the old issuer document; then restart the API and
 timers. Do not delete the failed candidate or backup until the cause is understood, but keep both inaccessible
 to non-operators.
 

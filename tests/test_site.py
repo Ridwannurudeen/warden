@@ -569,7 +569,10 @@ def test_handoff_docs_describe_the_real_theater_and_unchecked_capture_work():
 
     assert "/theater" in demo
     assert "/api/demo/theater" in demo
-    assert "autoplay" in demo.lower()
+    assert "`/theater` starts idle" in demo
+    assert "Run test sequence" in demo
+    assert "There is no autoplay on page load" in demo
+    assert "let autoplay start" not in demo
     assert "fallback" not in demo.lower()
     assert "90 seconds or shorter" in demo
     for route in ("/theater", "/trust", "/verify", "/apa/log"):

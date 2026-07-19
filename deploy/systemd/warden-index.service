@@ -1,5 +1,5 @@
 [Unit]
-Description=Refresh Warden live Safety Index
+Description=Refresh Warden Marketplace Evidence Index
 Requires=warden-index-fetch.service
 After=network-online.target
 After=warden-index-fetch.service
