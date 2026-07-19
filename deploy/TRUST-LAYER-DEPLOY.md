@@ -29,7 +29,77 @@ units, or ports are touched. Do not run `systemctl restart nginx` — reload onl
 
 ---
 
+## Live install reality (verified 2026-07-19) — read before choosing a path
+
+The box (`75.119.153.252`) runs a **minimal** flat install, narrower than the app-upgrade gate below assumes.
+Verify with `ls /etc/systemd/system | grep -i warden` before acting. As of 2026-07-19 the box has ONLY:
+
+- `warden.service` — `User=warden`, `Group=warden`, `WorkingDirectory=/opt/warden`,
+  `ExecStart=/opt/warden/.venv/bin/uvicorn warden.api:app --host 127.0.0.1 --port 8031`,
+  `ReadWritePaths=/opt/warden/data /opt/warden/badges /opt/warden/gauntlet /opt/warden/logs`,
+  `ProtectSystem=strict`, plus a `warden.service.d/privatetmp.conf` drop-in (`PrivateTmp=yes`).
+- `warden-a2a.service` — a separate OKX buyer-agent (#4844) daemon; unrelated to the API.
+
+**NOT installed:** `warden-monitor.{service,timer}`, `warden-anchor-publish.{service,timer}`,
+`warden-apa-reprobe.timer`, and there is **no `/opt/warden/monitor-alert.env`** and no
+`/opt/warden/monitor` or `/opt/warden/anchor` runtime dirs. The "Mandatory flat app-upgrade gate" below
+is therefore **drifted** from this host: run verbatim it fails on the missing `monitor-alert.env` and would
+newly install timer units that were never here. Do not run it as-is against this box.
+
+### Minimal code-only redeploy (the procedure that matches this box)
+
+For an approved change that touches only Python source with **no dependency change, no `protection.db`
+schema change, and no new routes** (e.g. an additive request field), use this. It restarts `warden.service`
+(~10s blip on the paid `/scan` `/audit` routes) and touches nothing else.
+
+Run locally from the repo root after the reviewed commit is on `main` and the tracked worktree is clean:
+
+```bash
+set -euo pipefail
+test -z "$(git status --porcelain --untracked-files=no)"   # no uncommitted tracked changes
+release="$(git rev-parse --verify HEAD)"
+
+# 1. Back up the live source (rollback artifact).
+ssh root@75.119.153.252 'ts=$(date -u +%Y%m%dT%H%M%SZ); cd /opt/warden; tar czf "/root/warden-code.pre-$ts.tgz" warden scripts site deploy pyproject.toml; echo "backup: /root/warden-code.pre-$ts.tgz"'
+
+# 2. Ship reviewed source to a staging dir and confirm the change is present.
+git archive --format=tar HEAD | ssh root@75.119.153.252 'stage=$(mktemp -d /root/warden-stage.XXXXXX); tar -xf - -C "$stage"; test -f "$stage/warden/api.py"; echo "$stage" > /root/warden-stage.last; echo "staged: $stage"'
+
+# 3. Overlay source, FIX PERMS, smoke-test, restart, verify.
+ssh root@75.119.153.252 '
+set -euo pipefail
+stage=$(cat /root/warden-stage.last)
+rsync -a --exclude ".venv/" --exclude ".env" --exclude "data/" --exclude "badges/" \
+  --exclude "gauntlet/" --exclude "logs/" "$stage"/ /opt/warden/
+# CRITICAL: rsync with a trailing-slash source copies the source ROOT dir mode onto /opt/warden.
+# mktemp -d is 0700, which locks the warden user out of its own WorkingDirectory and the service
+# crash-loops with status=200/CHDIR ("Changing to the requested working directory failed").
+# Always reassert 755 on /opt/warden after any rsync/overlay.
+chmod 755 /opt/warden
+chown root:root /opt/warden/pyproject.toml
+chown -R root:root /opt/warden/warden /opt/warden/scripts /opt/warden/site /opt/warden/deploy
+chmod 0644 /opt/warden/pyproject.toml
+chmod -R u=rwX,go=rX /opt/warden/warden /opt/warden/scripts /opt/warden/site /opt/warden/deploy
+/opt/warden/.venv/bin/python -c "import warden.api, warden.auditor; print(\"import-ok\")"
+systemctl reset-failed warden.service || true
+systemctl restart warden.service
+for i in $(seq 1 15); do curl -fsS http://127.0.0.1:8031/health >/dev/null && { echo health-ok; break; }; sleep 1; done
+systemctl is-active warden.service
+rm -rf -- "$stage"; rm -f /root/warden-stage.last
+'
+```
+
+Then run the **Step 5** public verification below. Rollback: stop the service, extract the pre-deploy tarball
+over `/opt/warden`, `chmod 755 /opt/warden`, restart.
+
+---
+
 ## Mandatory flat app-upgrade gate — signed log checkpoint and hardened unit
+
+> **Drift warning (2026-07-19):** the monitor/anchor units and `monitor-alert.env` this gate installs and
+> requires are NOT present on the live box (see "Live install reality" above). Use the minimal code-only
+> redeploy for source-only changes. Run this full gate only when the monitor/anchor lineage is actually being
+> introduced, and reconcile the missing files first.
 
 The numbered Trust Layer steps below remain nginx-only. When an approved deploy also replaces the flat
 application at `/opt/warden`, this gate is mandatory before the new code starts. The app service is the flat
