@@ -92,8 +92,7 @@ def _theme_properties(css: str) -> tuple[dict[str, str], dict[str, str]]:
 
     def declarations(body: str) -> dict[str, str]:
         return {
-            name: value.strip()
-            for name, value in re.findall(r"--([\w-]+)\s*:\s*([^;]+);", body)
+            name: value.strip() for name, value in re.findall(r"--([\w-]+)\s*:\s*([^;]+);", body)
         }
 
     return declarations(light_match.group("body")), declarations(dark_match.group("body"))
@@ -185,8 +184,7 @@ def test_brand_accent_is_visually_distinct_from_sanitize_and_block_in_both_theme
             semantic = _resolve_hex(properties, semantic_name)
             distance = math.dist(accent, semantic)
             assert distance >= 48, (
-                f"{theme} --accent and --{semantic_name} are only "
-                f"{distance:.1f} RGB units apart"
+                f"{theme} --accent and --{semantic_name} are only {distance:.1f} RGB units apart"
             )
 
 
@@ -252,17 +250,14 @@ def test_shared_shell_uses_direct_navigation_and_one_footer_positioning_line():
     assert navigation.group("body").count("<summary>") <= 1
     for href in ("/playground", "/integrate", "/docs"):
         assert f'href="{href}"' in navigation.group("body")
+    assert '<a class="header-integrate" href="/integrate">Integrate</a>' in rendered
 
     footer_positioning = footer.group("body").split("<nav", 1)[0]
     assert footer_positioning.count("<span>") == 1
 
 
 def test_manual_top_level_footers_match_the_canonical_information_architecture():
-    expected = [
-        (href, label)
-        for _, items in NAV_GROUPS
-        for href, label, _ in items
-    ] + [
+    expected = [(href, label) for _, items in NAV_GROUPS for href, label, _ in items] + [
         ("/trust", "Trust &amp; security"),
         ("/privacy", "Privacy"),
         ("/terms", "Terms"),
@@ -292,6 +287,10 @@ def test_manual_scan_ctas_and_compact_labels_use_the_canonical_mature_copy():
         source = (SITE / filename).read_text(encoding="utf-8")
         assert "Run live scan" not in source, filename
         assert source.count("Run a live scan") >= 2, filename
+        assert re.search(
+            r'<a class="header-integrate" href="/integrate">\s*Integrate\s*</a',
+            source,
+        ), filename
 
     css = (SITE / "styles.css").read_text(encoding="utf-8")
     command_stage = re.search(
@@ -335,7 +334,12 @@ def test_product_routes_use_one_claim_model_and_one_step_vocabulary():
     gauntlet = (SITE / "gauntlet.html").read_text(encoding="utf-8")
     css = (SITE / "styles.css").read_text(encoding="utf-8")
 
-    assert '<a class="nav-link" href="/" aria-current="page">Product</a>' in theater
+    assert '<a class="nav-link is-active-section" href="/">Product</a>' in theater
+    assert 'aria-current="page"' not in re.search(
+        r'<nav class="site-nav"[^>]*>(?P<body>.*?)</nav>',
+        theater,
+        re.DOTALL,
+    ).group("body")
     assert 'href="/gauntlet" aria-current="page"' not in theater
     assert "endpoint-key control" not in theater
     assert "guard freshness" not in theater
@@ -361,3 +365,66 @@ def test_product_routes_use_one_claim_model_and_one_step_vocabulary():
     assert '<p class="eyebrow">Findings</p>' not in gauntlet
     assert '<p class="eyebrow">Confirmed findings</p>' not in gauntlet
     assert '<p class="eyebrow">Latest certificate</p>' not in gauntlet
+
+
+def test_section_proxy_navigation_is_visual_without_claiming_the_current_page():
+    proxies = {
+        "theater.html": ("/", "Product"),
+        "hire.html": ("/", "Product"),
+        "showcase.html": ("/gauntlet", "Research"),
+        "badges.html": ("/verify", "Evidence"),
+        "badge.html": ("/verify", "Evidence"),
+        "log.html": ("/verify", "Evidence"),
+        "status.html": ("/verify", "Evidence"),
+    }
+
+    for filename, (href, label) in proxies.items():
+        source = (SITE / filename).read_text(encoding="utf-8")
+        navigation = re.search(
+            r'<nav class="site-nav"[^>]*>(?P<body>.*?)</nav>',
+            source,
+            re.DOTALL,
+        )
+        assert navigation, filename
+        assert (
+            f'<a class="nav-link is-active-section" href="{href}">{label}</a>'
+            in navigation.group("body")
+        ), filename
+        assert 'aria-current="page"' not in navigation.group("body"), filename
+
+    for canonical_path in ("/agents", "/agents/3808"):
+        generated = page_shell(
+            "Marketplace evidence",
+            "Generated marketplace route.",
+            "<section>Content</section>",
+            active="agents",
+            canonical_path=canonical_path,
+        )
+        navigation = re.search(
+            r'<nav class="site-nav"[^>]*>(?P<body>.*?)</nav>',
+            generated,
+            re.DOTALL,
+        )
+        assert navigation
+        assert (
+            '<a class="nav-link is-active-section" href="/verify">Evidence</a>'
+            in navigation.group("body")
+        )
+        assert 'aria-current="page"' not in navigation.group("body")
+
+
+def test_endpoint_audit_lifecycle_uses_the_gold_evidence_ledger():
+    page = (SITE / "badge.html").read_text(encoding="utf-8")
+    css = (SITE / "styles.css").read_text(encoding="utf-8")
+
+    assert 'class="console-card badge-detail"' in page
+    assert page.count('class="badge-evidence"') == 5
+    for selector in (
+        ".badge-detail",
+        ".badge-detail::before",
+        ".badge-detail .badge-evidence-grid",
+        ".badge-detail .badge-evidence",
+        ".badge-detail .badge-evidence:first-child",
+        ".badge-detail .badge-evidence:last-child",
+    ):
+        assert selector in css

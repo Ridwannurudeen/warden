@@ -197,13 +197,14 @@ def test_generated_shell_uses_canonical_information_architecture_and_unknown_sta
         ),
     )
     assert '<details class="nav-group' not in rendered
-    assert '<a class="nav-link" href="/verify" aria-current="page">Evidence</a>' in rendered
-    assert rendered.count('aria-current="page"') == 1
+    assert '<a class="nav-link is-active-section" href="/verify">Evidence</a>' in rendered
+    assert 'aria-current="page"' not in rendered
     assert 'aria-label="Service status: unknown"' in rendered
     assert 'data-health-state="unknown"' in rendered
     assert ">Status unknown</span>" in rendered
     assert "Checking API" not in rendered
     assert 'class="header-hire"' not in rendered
+    assert '<a class="header-integrate" href="/integrate">Integrate</a>' in rendered
     assert '<a class="header-scan" href="/playground">Run a live scan</a>' in rendered
     footer = re.search(
         r'<footer class="site-footer page-shell">(?P<body>.*?)</footer>',
@@ -322,13 +323,19 @@ def test_every_site_shell_links_complete_trust_navigation():
         assert "Warden" in footer.group("body"), path
 
 
-def test_evidence_pages_mark_navigation_and_breadcrumb_context():
-    pages = ("verify.html", "log.html")
+def test_evidence_pages_mark_exact_and_section_navigation_context():
+    verify = (SITE / "verify.html").read_text(encoding="utf-8")
+    log = (SITE / "log.html").read_text(encoding="utf-8")
 
-    for filename in pages:
-        source = (SITE / filename).read_text(encoding="utf-8")
-        assert '<a class="nav-link" href="/verify" aria-current="page">Evidence</a>' in source
-        assert 'class="breadcrumbs"' in source
+    assert '<a class="nav-link" href="/verify" aria-current="page">Evidence</a>' in verify
+    assert '<a class="nav-link is-active-section" href="/verify">Evidence</a>' in log
+    assert 'aria-current="page"' not in re.search(
+        r'<nav class="site-nav"[^>]*>(?P<body>.*?)</nav>',
+        log,
+        re.DOTALL,
+    ).group("body")
+    assert 'class="breadcrumbs"' in verify
+    assert 'class="breadcrumbs"' in log
 
     trust = (SITE / "trust.html").read_text(encoding="utf-8")
     assert 'aria-current="page">Trust' in trust
@@ -367,7 +374,7 @@ def test_top_nav_is_curated_and_utility_pages_live_in_footer():
         assert navigation, filename
         assert '<details class="nav-group' not in navigation.group("body")
         hrefs = re.findall(
-            r'<a class="nav-link" href="([^"]+)"',
+            r'<a class="nav-link(?: is-active-section)?" href="([^"]+)"',
             navigation.group("body"),
         )
         assert hrefs == curated_hrefs, (filename, hrefs)
@@ -808,7 +815,7 @@ def test_primary_navigation_controls_meet_the_touch_target_floor():
     assert "min-height: 44px" in nav_link.group("body")
     header_override = re.search(
         r"\.status-pill,\s*\.theme-toggle,\s*\.nav-toggle,\s*"
-        r"\.nav-close,\s*\.header-scan\s*\{(?P<body>[^}]*)\}",
+        r"\.nav-close,\s*\.header-integrate,\s*\.header-scan\s*\{(?P<body>[^}]*)\}",
         css,
         re.DOTALL,
     )

@@ -39,7 +39,7 @@ test("evidence routes use the canonical direct site shell", () => {
     assert.deepEqual(
       [
         ...navigation[1].matchAll(
-          /<a class="nav-link" href="([^"]+)"[^>]*>([^<]+)<\/a>/g,
+          /<a class="nav-link(?: is-active-section)?" href="([^"]+)"[^>]*>([^<]+)<\/a>/g,
         ),
       ].map((entry) => [entry[1], entry[2]]),
       expectedLinks,
@@ -48,6 +48,10 @@ test("evidence routes use the canonical direct site shell", () => {
     assert.match(html, /src="\/assets\/warden-mark\.svg"/, name);
     assert.match(html, />Status unknown</);
     assert.match(html, /href="\/integrate">Integrate</);
+    assert.match(
+      html,
+      /class="header-integrate" href="\/integrate">Integrate</,
+    );
     assert.match(html, /href="\/playground">Run a live scan</);
     assert.doesNotMatch(html, /class="header-hire"/, name);
     assert.match(
@@ -61,16 +65,19 @@ test("evidence routes use the canonical direct site shell", () => {
       `${name}: policy footer`,
     );
   }
-  for (const name of [
-    "badges.html",
-    "badge.html",
-    "verify.html",
-    "log.html",
-    "status.html",
-  ]) {
+  assert.match(
+    page("verify.html"),
+    /<a class="nav-link" href="\/verify" aria-current="page">Evidence<\/a>/,
+  );
+  for (const name of ["badges.html", "badge.html", "log.html", "status.html"]) {
     assert.match(
       page(name),
-      /<a class="nav-link" href="\/verify" aria-current="page">Evidence<\/a>/,
+      /<a class="nav-link is-active-section" href="\/verify">Evidence<\/a>/,
+      name,
+    );
+    assert.doesNotMatch(
+      page(name).match(/<nav class="site-nav"[^>]*>([\s\S]*?)<\/nav>/)[1],
+      /aria-current="page"/,
       name,
     );
   }

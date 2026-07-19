@@ -729,10 +729,12 @@ def _render_index_page(
     # reported total; that is normal upstream noise, not a degraded fetch. Reserve DEGRADED
     # for a genuinely incomplete crawl (<99% captured) or disagreeing counts (sampled>expected).
     # The coverage note always states the exact sampled/expected/dropped figures either way.
+    complete_response = coverage.sampled == coverage.expected and coverage.dropped == 0
     captured_ratio = coverage.sampled / coverage.expected if coverage.expected else 0.0
     source_state = (
         "DATED"
-        if coverage.sampled <= coverage.expected and captured_ratio >= MARKETPLACE_COMPLETE_RATIO
+        if complete_response
+        or (coverage.sampled <= coverage.expected and captured_ratio >= MARKETPLACE_COMPLETE_RATIO)
         else "DEGRADED"
     )
     audit_control = (

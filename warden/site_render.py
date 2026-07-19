@@ -54,11 +54,16 @@ PRIMARY_NAV = (
 )
 
 
-def _render_navigation(active: str) -> str:
+def _render_navigation(active: str, canonical_path: str) -> str:
     links = []
     for href, label, active_keys in PRIMARY_NAV:
-        current = ' aria-current="page"' if active in active_keys else ""
-        links.append(f'<a class="nav-link" href="{href}"{current}>{label}</a>')
+        classes = ["nav-link"]
+        current = ""
+        if canonical_path == href:
+            current = ' aria-current="page"'
+        elif active in active_keys:
+            classes.append("is-active-section")
+        links.append(f'<a class="{" ".join(classes)}" href="{href}"{current}>{label}</a>')
     return "".join(links)
 
 
@@ -128,9 +133,10 @@ def page_shell(
     <header class="site-header page-shell">
       <a class="brand" href="/" aria-label="Warden home"><img src="/assets/warden-mark.svg" alt="" width="32" height="32"><span>Warden</span></a>
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>Menu</button>
-      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>{_render_navigation(active)}<div class="nav-mobile-actions"><a class="button secondary" href="/integrate">Integrate</a><a class="button primary" href="/playground">Run a live scan</a></div></nav>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>{_render_navigation(active, canonical)}<div class="nav-mobile-actions"><a class="button secondary" href="/integrate">Integrate</a><a class="button primary" href="/playground">Run a live scan</a></div></nav>
       <div class="header-actions">
         <a class="status-pill" href="/status" aria-label="Service status: unknown" data-health-state="unknown"><span class="live-dot is-unknown" data-health-dot aria-hidden="true"></span><span data-health-label>Status unknown</span></a>
+        <a class="header-integrate" href="/integrate">Integrate</a>
         <a class="header-scan" href="/playground">Run a live scan</a>
         <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button>
       </div>

@@ -35,7 +35,7 @@ test("commerce, developer, and legal routes use the canonical site shell", () =>
       assert.match(
         navigation[1],
         new RegExp(
-          `<a class="nav-link" href="${escapedHref}"[^>]*>${label}</a>`,
+          `<a class="nav-link(?: is-active-section)?" href="${escapedHref}"[^>]*>${label}</a>`,
         ),
         `${name}: ${label}`,
       );
@@ -45,6 +45,11 @@ test("commerce, developer, and legal routes use the canonical site shell", () =>
     assert.match(html, /aria-label="Service status: unknown"/, name);
     assert.match(html, /data-health-label>Status unknown</, name);
     assert.doesNotMatch(html, /class="header-hire"/, name);
+    assert.match(
+      html,
+      /class="header-integrate" href="\/integrate">Integrate</,
+      name,
+    );
     assert.match(
       html,
       /class="header-scan" href="\/playground">Run a live scan</,
@@ -62,7 +67,11 @@ test("commerce, developer, and legal routes use the canonical site shell", () =>
   }
   assert.match(
     page("hire"),
-    /<a class="nav-link" href="\/" aria-current="page">Product<\/a>/,
+    /<a class="nav-link is-active-section" href="\/">Product<\/a>/,
+  );
+  assert.doesNotMatch(
+    page("hire").match(/<nav class="site-nav"[^>]*>([\s\S]*?)<\/nav>/)[1],
+    /aria-current="page"/,
   );
   assert.match(
     page("integrate"),
