@@ -1,3 +1,5 @@
+> **Historical / superseded planning artifact.** This early post-hackathon plan preserves point-in-time assumptions and is not current product truth. Do not use its metrics, blockers, product names, or implementation directions without fresh verification. Current scope and completion status live in `ROADMAP.md`, the completion addendum in `SECURITY-AUDIT-2026-07.md`, and `REDESIGN_REPORT.md`.
+
 # Warden — Reliable Product Plan (post-hackathon)
 
 The honest premise: Warden's *plumbing* is already strong (verifiable APA attestations, Ed25519 +

@@ -1,3 +1,5 @@
+> **Historical / superseded planning artifact.** This score-oriented build brief preserves point-in-time launch assumptions and is not current product truth. Do not use its metrics, positioning, statuses, or implementation instructions without fresh verification. Current scope and completion status live in `ROADMAP.md`, the completion addendum in `SECURITY-AUDIT-2026-07.md`, and `REDESIGN_REPORT.md`.
+
 # Post-hackathon build — prioritized by SCORE IMPACT (build now)
 
 Goal: lift award readiness before the deadline. Ordered so the biggest, safest score-movers ship first.
