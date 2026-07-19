@@ -1,660 +1,327 @@
-# Warden production UI/UX maturity report
+# Warden redesign report
 
-- Date: 2026-07-18
-- Repository: `C:\Users\gudma\OneDrive\Desktop\GITHUB-FILES\warden`
-- Branch: `fix/scanner-exfil-drain-coverage`
-- Verified HEAD: `3e96a8b3075066f67afd3ad1ebecd9c18641515a`
+Date: 2026-07-18
 
-## Executive outcome
+Branch: `feat/post-hackathon-completion`
 
-Warden's public website has been rebuilt from a collection of visually competing experiments into one restrained product system.
+Scope: local production source and generated site; no deployment, publication, payment, or VPS change
 
-The central story is now:
+## Outcome
 
-`untrusted agent output -> Warden boundary -> ALLOW / SANITIZE / BLOCK -> caller policy -> consequential action`
+Warden now presents one mature product: a security boundary placed immediately before an AI agent performs
+a consequential action.
 
-The homepage leads with:
+The final message is:
 
-> A security boundary for agent actions.
+> Verifiable pre-action security for AI agents.
 
-The former oversized BLOCK presentation is gone. Verdicts now appear as compact operational states: BLOCK and ALLOW render at 50 by 30 CSS pixels in the verified homepage layout, while SANITIZE expands only enough to fit its label. Verdict color is reserved for meaning rather than used as a decorative brand effect.
+The website no longer leads with the “immune system” metaphor, an oversized BLOCK panel, or a wall of
+equal-weight experiments. The homepage establishes the action boundary, the three verdicts, the caller's
+authority, and the evidence that remains after an action is withheld or transformed.
 
-The writing was reduced, bounded, and aligned to the implemented product. Marketing, live tools, documentation, evidence, research, commerce, marketplace data, and legal pages now use one information architecture, shell, tone, and evidence model.
+The implementation preserves Warden's actual contracts. It does not convert `ALLOW` into a safety
+guarantee, endpoint audit records into certification, public listing text into a maliciousness judgment, or
+source-ready mechanisms into live production claims.
 
-This work remains local and uncommitted. It was not deployed, pushed, published, submitted, or used to access the VPS.
+## Scope and routes audited
 
-## Scope audited
+The generated site contains 910 HTML pages: 28 canonical public routes (including the documentation index,
+11 reason-code references, and the marketplace index) plus 882 generated marketplace detail records.
 
-The audit covered the static-site architecture, shared renderer, styling and JavaScript, FastAPI preview behavior, generated documentation, marketplace generation, live demo contracts, evidence surfaces, SDK integration claims, CSP/security headers, dynamic-data fallbacks, tests, build scripts, SEO output, and responsive behavior.
+Canonical routes:
 
-Public route families audited:
+- Product: `/`, `/playground`, `/theater`, `/showcase`, `/gauntlet`, `/hire`
+- Developers: `/integrate`, `/docs`, and 11 `/docs/{reason-code}` pages
+- Evidence: `/verify`, `/apa/log`, `/badges`, `/badge`, `/trust`, `/status`
+- Marketplace: `/agents` and generated `/agents/{id}` records
+- Legal: `/privacy`, `/terms`
 
-- `/`
-- `/playground`
-- `/theater`
-- `/showcase`
-- `/gauntlet`
-- `/hire`
-- `/docs`
-- `/docs/{reason-code}`
-- `/integrate`
-- `/badges`
-- `/badges/{audit-id}`
-- `/verify`
-- `/apa/log`
-- `/trust`
-- `/status`
-- `/agents`
-- `/agents/{agent-id}`
-- `/privacy`
-- `/terms`
+`/log` remains a static compatibility page. `/apa/log` is the canonical application route: JSON by default
+and HTML only when the client explicitly accepts `text/html`.
 
-The generated tree contains 758 HTML pages:
+The final local build and route contracts were audited from source and generated output. A new interactive
+browser walkthrough of the final commit was not completed because this session exposed no browser backend.
+No live deployment is claimed.
 
-- 15 top-level product pages
-- 12 documentation pages
-- 1 marketplace index
-- 730 marketplace detail pages
+## Main problems found
 
-The final static audit found:
-
-- 758 unique titles
-- 758 unique canonical URLs
-- Exactly one description, `main#main`, and H1 per page
-- 1,701 element IDs with no duplicates
-- 25,433 internal links checked, including 2,454 fragment links, with no missing target
-- 2,298 local CSS/JavaScript references across 17 assets, all carrying current SHA-256 fingerprints
-- `theme.js` before `styles.css` on every page
-- 28 stable canonical routes in the sitemap
-- Exact expected `robots.txt` output
-
-## Problems found in the previous experience
-
-- The homepage gave too many experiments equal visual weight and did not establish a single product hierarchy.
-- The large BLOCK panel made one verdict look like the product instead of one state within a decision system.
-- Repeated slogans, proof claims, cards, decorative effects, and long caveats made the copy feel generated rather than edited.
-- The palette mixed brand emphasis and danger states, so red, amber, glow, and accent treatments competed for attention.
-- Navigation exposed internal product naming such as Hire, Showcase, Safety Index, and audit badges without enough context.
-- Marketing, live tools, evidence pages, marketplace records, documentation, and legal pages looked like separate products.
-- Dynamic data could leave ambiguous loading, checking, zero, or unavailable states.
-- ALLOW, signature validity, endpoint audit results, and public marketplace text could be read more broadly than their evidence justified.
-- Mobile navigation, dense evidence metadata, tables, and marketplace rows needed stronger reflow and touch behavior.
-- The previous theme path could apply persisted state after CSS and risk a visible theme transition.
-- Documentation tables lacked captions, mobile status became color-only, and several control/error colors missed the intended contrast thresholds.
+1. The site used generic, inflated positioning that obscured the concrete action-boundary product.
+2. The homepage's large BLOCK treatment made one example look like the entire product.
+3. Navigation gave experiments, commercial flows, evidence, and core product surfaces similar weight.
+4. Copy repeated concepts and caveats in a way that felt generated rather than editorially controlled.
+5. Marketplace signals, endpoint audits, APA attestations, service health, and illustrative examples were
+   visually close enough to be misread as the same kind of proof.
+6. Dynamic areas could begin with ambiguous placeholders or stale values.
+7. Manual and generated routes did not consistently share navigation semantics, provenance labels, spacing,
+   responsive behavior, and evidence styling.
+8. Documentation and old handoff files retained obsolete names, metrics, autoplay directions, and product
+   metaphors after the product had changed.
 
 ## Final information architecture
 
-### Header
+| Group | Primary destinations | User outcome |
+| --- | --- | --- |
+| Product | Overview, Playground, Attack Theater, Use Warden | Understand the boundary, run it, and choose a service |
+| Developers | Integrate, Documentation | Place Warden immediately before execution and handle all three verdicts |
+| Evidence | Verify, Transparency Log, Endpoint Audit Records, Marketplace Evidence Index, Status | Inspect signatures, chain state, dated records, and service evidence |
+| Research | Gauntlet, Product Tour | Reproduce the product story or submit an authorized adversarial candidate |
 
-- Product
-- Playground
-- Developers
-- Docs
-- Evidence
-- Research
+The desktop header keeps a persistent **Integrate** action and **Run a live scan** CTA. The mobile shell uses
+an accessible menu with the same destinations. Section proxies receive visual section styling without
+incorrectly claiming `aria-current="page"`; only exact canonical destinations receive that attribute.
 
-Persistent actions:
+Three journeys are explicit:
 
-- Run a live scan
-- Integrate
-- Service status
-- Theme control
+- Security evaluator: understand the boundary → run an incident → inspect proof → use Warden
+- Developer: understand the decision contract → choose an integration → test the execution branch
+- Auditor or researcher: inspect methodology → verify a record → inspect chain and dated evidence
 
-### Footer
+## Design concept
 
-Product:
+The final register is “editorial cryptography meets an operational incident room”: quiet, high-consequence,
+and inspectable.
 
-- Overview
-- Live Playground
-- Incident Replay
-- Use Warden
+The visual system uses:
 
-Developers:
-
-- 5-minute quickstart
-- Integration guide
-- Documentation
-
-Evidence:
-
-- Verify an attestation
-- Transparency log
-- Endpoint audit records
-- Marketplace Evidence Index
-- Service status
-
-Research:
-
-- Gauntlet
-- Methodology
-- Product Tour
-
-Policy:
-
-- Trust and security
-- Privacy
-- Terms
-
-This creates three direct visitor paths:
-
-- Evaluator: understand the boundary -> run a controlled incident -> inspect proof
-- Developer: understand the contract -> integrate -> handle the three decisions
-- Auditor or researcher: inspect methodology -> verify a record -> inspect chain and dated evidence
-
-## Design direction
-
-The final direction is a quiet security control plane: editorial structure with operational precision.
-
-It deliberately removes:
-
-- Gradients
-- Glow systems
-- Particles and decorative motion
-- Scroll-reveal effects
-- Fake terminals
-- Autoplay demonstrations
-- Generic security imagery
-- Repetitive card walls
-- Constant verdict-color decoration
-
-The sticky header retains one restrained background blur. No other glass-effect system remains.
+- a warm gold action-boundary signal rather than generic cybersecurity cyan;
+- obsidian and parchment surfaces;
+- compact technical labels and tabular numerals;
+- restrained borders, two-to-three radius levels, and limited elevation;
+- semantic verdict colors that remain distinct from the brand accent; and
+- product records, hashes, timestamps, and real source data instead of decorative dashboard mockups.
 
 ### Core tokens
 
-Light theme:
+| Token | Light | Dark |
+| --- | --- | --- |
+| Surface | `#fffdf8` | `#14110b` |
+| Raised surface | `#ffffff` | `#1b1710` |
+| Soft surface | `#f2ecdf` | `#211c13` |
+| Text | `#141109` | `#f6f0e1` |
+| Border | `#e0d7c5` | `#2c2619` |
+| Strong border | `#c9bda2` | `#463f2c` |
+| Brand accent | `#b88a2a` | `#d7aa49` |
+| ALLOW | `#287a57` | `#59b98a` |
+| SANITIZE | `#9a6412` | `#e5852a` |
+| BLOCK | `#b64045` | `#ef6f5b` |
 
-- Background: `#f4f6f7`
-- Surface: `#ffffff`
-- Primary text: `#17212b`
-- Brand accent: `#356f86`
-- Control border: `#7a8b95`
+Radii are 4, 7, and 10 pixels. The primary content width is 1,180 pixels.
 
-Dark theme:
+### Shared patterns
 
-- Background: `#0b1015`
-- Surface: `#111820`
-- Primary text: `#edf2f6`
-- Brand accent: `#68adc1`
-- Control border: `#677887`
+The site renderer and shared CSS/JavaScript now provide consistent:
 
-Semantic verdicts:
+- global shell, direct navigation, mobile navigation, status, theme, breadcrumbs, and footer;
+- buttons, form fields, tabs, copy controls, code blocks, notices, and async panels;
+- verdict and reason states;
+- `LIVE`, `DATED`, `ILLUSTRATIVE`, `DEGRADED`, and `UNKNOWN` source stamps;
+- evidence boundaries, signed-record layouts, signature and chain states;
+- action-boundary diagrams, compact incident receipts, and raw-evidence disclosure;
+- marketplace filters, desktop rows, mobile cards, empty results, and detail records; and
+- loading, timeout, rate-limit, malformed-response, unavailable, retry, and reset states.
 
-- ALLOW: restrained green
-- SANITIZE: restrained amber
-- BLOCK: restrained red
-
-The verdict always includes text and shape, not color alone.
-
-Typography:
-
-- Local Plus Jakarta Sans for interface and editorial text
-- Cascadia/system monospace stack for code, hashes, timestamps, and reason codes
-- Tabular numerals for evidence and metrics
-
-Geometry:
-
-- Radius levels: 4, 7, and 10 pixels
-- 1-pixel control borders
-- 44-pixel practical minimum for primary interactive targets
-- 12-column desktop composition with focused reading widths
-
-### Shared component patterns
-
-- Canonical page shell
-- Direct desktop navigation
-- Full-viewport mobile navigation with focus containment and restoration
-- SourceStamp
-- Verdict and risk labels
-- Evidence boundaries
-- Action-boundary diagrams
-- Signed receipt and verification readouts
-- Chain status and tamper demonstration
-- Breadcrumbs
-- Documentation navigation and table of contents
-- Responsive table shells and mobile result cards
-- Copy controls with live feedback
-- Empty, error, degraded, retry, and reset states
-
-## Copy and positioning
-
-The homepage no longer leads with an unsupported superlative or a long technical paragraph.
-
-Primary positioning:
-
-> Warden inspects untrusted agent output before it reaches payments, tools, links, or secrets. It returns a policy verdict and an inspectable record.
-
-Canonical CTAs:
-
-- Product: Run a live scan
-- Developer: Integrate in 5 minutes
-- Evidence: Verify an attestation
-- Commercial: Use Warden
-
-Removed or avoided:
-
-- Provable safety
-- No trust required
-- Unsupported first-in-the-world claims
-- Universal safety language for ALLOW
-- Certification language for endpoint audit records
-- Malicious, safe, or secure labels inferred from marketplace text
-- Invented logos, testimonials, awards, uptime, usage, or customer proof
-
-Implemented boundaries:
-
-- ALLOW means no implemented detector fired; it is not a safety guarantee.
-- A valid signature proves record integrity under the applicable key; it is not endpoint safety.
-- Endpoint audit records are point-in-time evidence, not certification.
-- Public-text pattern matches do not establish malicious intent.
-- The caller retains final authority.
-- A demo verdict does not prove that every external execution path is gated.
-
-## Route implementation
+## Route outcomes
 
 ### Homepage
 
-- Rebuilt around the action boundary rather than a feature-card wall.
-- Replaced the oversized BLOCK display with a compact example request and decision trace.
-- Reduced the page to six focused narrative sections.
-- Preserved an explicitly activated live incident console.
-- Preserved local signature, chain, and one-byte tamper verification.
-- Presents supported integration paths and currently sourced services without invented package commands or metrics.
-- Uses real product content and bounded source states.
+The homepage uses a short product sequence:
 
-### Playground
+1. concise pre-action security message and two primary journeys;
+2. compact illustrative action receipt;
+3. one explicitly activated live incident;
+4. placement and decision-contract explanation;
+5. verification, integration, and service paths.
 
-- Responsive scan workspace with curated attacks and custom payload input.
-- Removable, validated expected-recipient context.
-- Decision, risk, reason code, detected span, transformed output, latency, source state, and raw JSON remain distinct.
-- Explicit empty, invalid, oversized, rate-limit, timeout, unavailable, malformed-response, retry, and reset states.
-- ALLOW copy remains bounded.
-- Browser QA confirmed a real local BLOCK / DRAIN_ADDRESS result with no page overflow.
+The BLOCK example is now one compact outcome inside a wider boundary story. No production request runs on
+page load.
 
-### Incident Replay
+### Playground and Theater
 
-- Three controlled cases: prompt injection, recipient drain, and secret exfiltration.
-- No request occurs before explicit activation.
-- Verdict and downstream demo-handler receipt must agree before a case counts as neutralized.
-- Unexpected or unavailable results pause honestly.
-- Replay and reset are deterministic.
-- The local browser run completed all three cases and displayed validated handler receipts.
+The Playground is a two-panel scan workspace with curated attack classes, trusted-recipient context,
+verdict-first output, exact sanitization differences, raw JSON, and bounded error states.
 
-### Product Tour
+Attack Theater starts idle and sends no request until **Run test sequence** is selected. After activation,
+the three controlled cases continue only while their verdict, reason, and downstream receipt agree. Errors
+stop visibly. Reduced-motion users advance cases manually.
 
-- Reduced to a compact three-step recipient-change tour.
-- Uses one explicit live scan action.
-- Makes the no-wallet and no-downstream-system boundary visible.
-- The final scene separates scanner response from caller-side enforcement.
-- Keyboard navigation and predictable reset behavior are covered.
+### Product Tour, Gauntlet, and Use Warden
 
-### Gauntlet
+Product Tour is a guided explanation rather than a duplicated homepage. Gauntlet separates private
+candidate submission, human review, confirmed bypasses, public finder consent, signed WARDEN BREAKER
+certificates, and the transparency log.
 
-- Submission is placed before public findings.
-- Authorization, storage, privacy, and public-finder consent are separate.
-- Candidate, duplicate, detected, confirmed, and unavailable states do not expose private payloads.
-- Confirmed results link only to validated same-origin certificate and verification material.
-- No cash bounty is implied.
-- No submission was made during QA.
+The `/hire` URL is preserved, but the interface is **Use Warden**. Its staged flow keeps service selection,
+request input, cost, signing responsibility, payment, execution, completion, and review boundaries visible.
+Generated commands quote untrusted input and remain locked until their prerequisites are established.
 
-### Use Warden
+### Documentation and integrations
 
-- Keeps the `/hire` route while presenting a clearer commercial label.
-- Four-step review path with persistent order summary.
-- Service, endpoint or payload, cost, network, asset, recipient, signing responsibility, and command stages remain separate.
-- Generated shell commands quote untrusted values and unlock only after their evidence gate.
-- Payment and wallet signing remain outside the browser.
+Documentation has a persistent desktop index, mobile access, on-page navigation, deep links, copyable code,
+and the complete machine-readable reason vocabulary.
 
-### Integrations and documentation
+Integrations lead with source installation and actual supported paths: Python, TypeScript, direct HTTP,
+raw x402, OnchainOS, FastMCP stdio, LangChain, and LlamaIndex. Paid SDK handling validates the pinned
+challenge and permits exactly one caller-authorized replay. No package registry availability is invented.
 
-- Five-minute source-install path for the repository clients.
-- Exact placement immediately before consequential execution.
-- Python, TypeScript, direct HTTP/x402, MCP, OnchainOS, LangChain, and LlamaIndex claims remain tied to implemented repository surfaces.
-- Fail-open, fail-closed, timeout, retry, logging, privacy, secret, and wallet boundaries are explicit.
-- Documentation includes 11 generated reason-code pages.
-- Every one of the 14 documentation tables now has a visible caption.
+### Evidence, status, and marketplace
 
-### Evidence
+Verifier, transparency log, Endpoint Audit Records, Trust, and Status distinguish signature validity,
+freshness, revocation, chain continuity, issuer provenance, point-in-time audit evidence, current
+reachability, and dated product evidence.
 
-- Endpoint audit records explicitly state point-in-time evidence, not certification.
-- The verifier separates parsing, issuer resolution, signature, freshness, subject, revocation, and proof boundary.
-- The transparency page explains the chain before raw hashes and exposes local recomputation and tampering.
-- The trust page separates local enforcement, signed APA evidence, public transparency, and dated context.
-- Status separates current reachability from objectives, benchmark evidence, marketplace freshness, and historical uptime.
-- No historical uptime chart is invented.
+The Marketplace Evidence Index never labels an agent safe, unsafe, or malicious from public text. It
+separates pattern matches, no implemented match, no public text, linked audit evidence, unavailable records,
+and partial discovery.
 
-### Marketplace Evidence Index
+Privacy and Terms are explicitly dated service summaries in the shared visual system, not a claim of
+independent legal review.
 
-- Uses neutral evidence language rather than a safety ranking.
-- Initial HTML contains 50 useful rows; explicit hydration loads all 730 records and expands in bounded windows.
-- Search and filters operate over the complete snapshot after hydration.
-- Index rows omit raw scanner verdict badges.
-- Each of 730 detail pages contains one linked-evidence ledger.
-- All 1,755 source services have matching rendered disclosures.
-- Script-detectable Han and Hangul content is tagged for assistive pronunciation; no `lang="und"` remains.
+## Copy and positioning changes
 
-### Legal
+- “The immune system of the agent economy” → “Verifiable pre-action security for AI agents”
+- “Safety Map” and “Safety Index” → “Marketplace Evidence Index”
+- “Hire” → “Use Warden” in the interface while preserving the route
+- “Showcase” → “Product Tour” in navigation while preserving the route
+- “No trust required” → local signature verification with explicit key-provenance and freshness limits
+- “Provable safety” style claims → verifiable enforcement, inspectable evidence, and bounded proof
+- Theater autoplay language → explicit activation and honest stopped states
 
-- Privacy and Terms share the product shell.
-- Both use readable widths, dated metadata, deep links, table of contents, cross-links, and print rules.
+Archived implementation briefs and submission drafts now carry visible superseded notices so their old copy
+and metrics cannot be mistaken for current product truth.
 
 ## Dynamic data and provenance
 
-SourceStamp supports:
+Every important dynamic claim has a state, source boundary, and timestamp or explicit unavailable result.
+The site does not turn an unavailable fetch into zero or success.
 
-- `LIVE`
-- `DATED`
-- `ILLUSTRATIVE`
-- `DEGRADED`
-- `UNKNOWN`
+Committed evidence at completion:
 
-Every remote block uses a stable loading footprint, timeout, retry or reset where applicable, a check timestamp, and an explicit unavailable state. The UI does not turn a failed request into zero or success.
+| Source | Current committed state |
+| --- | --- |
+| Marketplace snapshot | `DEGRADED`: 882 sampled, 885 expected, 3 dropped, 5 public-text signals, 0 linked audits; captured `2026-07-18T18:35:07Z` |
+| Held-out benchmark | `DATED`: 87/94 attacks detected, 0/45 benign false positives; measured `2026-07-17T17:36:22Z` |
+| Service monitor | `UNKNOWN`: `not_running`; no historical uptime claim |
+| Independent APA anchor | `UNKNOWN`: `unpublished`; no independent-witness claim |
 
-Current marketplace evidence:
-
-- Captured: `2026-07-16T02:47:26Z`
-- Sampled: 730
-- Expected discovery total: 752
-- Missing or degraded: 22
-- Public-text signals: 3
-- Linked signed endpoint audits: 0
-
-The marketplace is therefore displayed as degraded and dated, not current or complete.
-
-Current held-out evaluation:
-
-- Measured: `2026-07-17T17:36:22Z`
-- Attack cases: 94
-- Detected: 87
-- Recall: 92.55%
-- Benign cases: 45
-- False positives: 0
-- Semantic layer: disabled for this measurement
-
-The site reads these values from versioned data. They are not duplicated as mutable marketing constants.
+An exact `0/0/0` marketplace response is treated as a complete dated empty result. Inconsistent or
+incomplete counts remain degraded.
 
 ## Accessibility
 
-Implemented and verified:
+Implemented and source-tested:
 
-- Skip link and landmark structure
-- One H1 per generated page
-- Visible focus treatment
-- Keyboard-operable navigation, tabs, tour, replay controls, and recipient chips
-- Escape-to-close and focus restoration for mobile navigation
-- Programmatic labels, descriptions, errors, and status announcements
-- Text and shape in addition to semantic color
-- 44-pixel mobile brand, status, theme, and primary controls
-- Reduced-motion styles and no autoplay
-- Static equivalents for causal narratives
-- Responsive tables and mobile marketplace cards
-- Visible documentation captions
-- No page-level horizontal overflow in the sampled layouts
-- Theme controls announce their action
-- Mobile status shows `UP`, `OFF`, or `?` in addition to its dot
+- skip link and landmark structure;
+- exact-page navigation semantics;
+- visible focus and keyboard-operable mobile navigation, tabs, copy controls, and product flows;
+- focus cycling/restoration contracts for the mobile menu;
+- text labels in addition to semantic color;
+- source-tested text and control contrast in both themes;
+- 44-pixel primary navigation and touch-control floors;
+- reduced-motion CSS and manual Theater progression;
+- live-region messaging for changing status;
+- labels, descriptions, table headers, diagram alternatives, and raw-record disclosure;
+- long-token wrapping and responsive marketplace cards for narrow layouts; and
+- pre-CSS theme initialization to prevent a theme flash.
 
-Contrast regressions corrected:
-
-- Secondary control borders now exceed 3:1 against adjacent surfaces in both themes.
-- Error and removed-diff text now exceed 4.5:1 against their applicable backgrounds.
-- Verdict label foregrounds were corrected for their semantic backgrounds.
-
-Generated language audit:
-
-- 758 `lang="en"` page roots
-- 1,740 script-detectable `lang="zh"` passages
-- 4 `lang="ko"` passages
-- 0 `lang="und"` passages
-
-Current marketplace data does not provide authoritative locale metadata. Script-only classification cannot reliably distinguish every ambiguous Han-only or Latin-language passage, so the renderer does not invent more specific tags where the source cannot support them.
-
-Manual browser checks covered keyboard focus in the mobile menu, Escape restoration, live status labeling, both themes, explicit demo activation, focus after marketplace expansion, and representative error/degraded states.
-
-No claim of formal WCAG 2.2 conformance is made because an automated axe pass, a real screen-reader walkthrough, and a formal 200% zoom audit were not completed.
+No formal WCAG 2.2 AA conformance claim is made. Axe, a real screen-reader walkthrough, interactive
+keyboard/zoom review, and formal 200% zoom testing were not completed because no browser backend was
+available in this session.
 
 ## Performance and technical quality
 
-- Static-first multi-page architecture retained.
-- No trackers, external fonts, video, WebGL, chart framework, or animation library added.
-- No gradient or particle system remains.
-- No demo request is triggered by page load or viewport entry.
-- Theme initialization is a 466-byte external script placed before CSS, preventing a persisted-theme flash without weakening CSP.
-- Marketing and documentation remain usable without a successful remote data request.
-- Local assets are fingerprinted from their actual SHA-256 content.
-- Browser QA found no external page assets on the sampled routes.
+The site remains dependency-free HTML, CSS, and JavaScript with self-hosted assets and a self-only resource
+policy. There is no frontend framework, runtime package bundle, tracker, autoplay video, WebGL scene, or
+third-party font request.
 
-Final unminified asset sizes:
+Static facts for the final generated site:
 
-- `site/styles.css`: 61,332 bytes
-- `site/app.js`: 31,337 bytes
-- `site/theme.js`: 466 bytes
-- `site/agents.js`: 28,026 bytes
-- Top-level route JavaScript combined: 335,030 bytes; pages load only their relevant modules
-- Social preview PNG: 54,111 bytes
+- 910 HTML pages;
+- one 72,246-byte shared stylesheet;
+- 16 top-level JavaScript files totaling 365,535 bytes uncompressed;
+- 154,167 bytes of referenced homepage JavaScript uncompressed; and
+- content-hashed local CSS/JavaScript URLs.
 
-Current key fingerprints:
+Static generation is idempotent: `build_index.py` followed by `build_site.py`, repeated in the same tree,
+produced an identical site diff hash.
 
-- `theme.js`: `2c7c8d24`
-- `styles.css`: `a3737335`
-- `app.js`: `0abdbc0f`
-- `agents.js`: `6f9c9326`
-
-Lighthouse was not run. The CLI is not installed in this workspace, and no performance, LCP, CLS, INP, or accessibility score is claimed.
+Lighthouse and Core Web Vitals were not measured. No Performance, Accessibility, Best Practices, SEO, LCP,
+CLS, or INP score is claimed.
 
 ## Security-sensitive decisions
 
-- Scanner, detector, cryptographic, key-history, transparency, payment-settlement, wallet-signing, and frozen HTTP field contracts were not changed to simplify the UI.
-- Browser demos reject malformed, contradictory, unavailable, or incomplete evidence.
-- A successful incident requires agreement between the verdict and demo-handler receipt.
-- User-controlled marketplace and certificate values are written with text nodes rather than HTML parsing.
-- Generated shell arguments are validated and quoted.
-- CSP remains strict; no inline scripts or event handlers were introduced.
-- Marketplace signals remain non-diagnostic.
-- Gauntlet payloads remain private unless separately authorized for publication.
-- Payment signing stays outside Warden and the browser.
-- The frozen paid request/response contract regression remains green.
+- Scanner, payment, signing, wallet, evidence, and API contracts were not weakened for presentation.
+- No page executes a payment, task, review, live incident, or adversarial request merely because it loads.
+- User-controlled values are rendered through text-safe paths; marketplace hydration does not use HTML
+  parsing sinks.
+- Generated shell commands keep untrusted values inside one quoted argument.
+- The site loads same-origin resources under the existing CSP and does not add analytics.
+- Local verification does not send a pasted record back to Warden.
+- Endpoint audits require authorization and remain point-in-time evidence, not certification.
+- Gauntlet candidates remain private until human confirmation and explicit public-credit consent.
 
-The separate security record is `SECURITY-AUDIT-2026-07.md`.
+## Verification results
 
-The historical D-01 through D-14 register is not 14 currently deferred findings. Current disposition at this HEAD:
+| Gate | Result |
+| --- | --- |
+| Complete root Python suite | 1,297 passed, 1 skipped, 1 existing Starlette/httpx deprecation warning |
+| Complete frontend state suite | 189 passed |
+| Ruff | Passed |
+| Python SDK | 147 passed |
+| TypeScript SDK | 81 passed; build, audit, and dry-run package passed |
+| Detector, scanner, verdict, and Shield focused suite | 262 passed |
+| UI, site, and marketplace focused suite | 109 passed |
+| Package, standard, audit-data, and supply-chain focused suite | 72 passed |
+| Python dependency integrity | `pip check` clean; `pip-audit` found no known vulnerabilities |
+| Root distributions | Wheel and source distribution built; Twine checks passed |
+| Held-out benchmark | 87/94 recall (92.55%); 0/45 false positives |
+| APA reference and conformance | Self-test passed; all 12 vectors passed |
+| Static generation | Completed twice with identical output |
+| Social preview | Regenerated from the gold SVG and verified at 1,200 × 630 |
 
-- D-01 through D-06: fixed
-- D-10: accepted detector limitation
-- D-07, D-08, D-09, D-11, D-12, D-13, and D-14: deferred
+The checksum-pinned TruffleHog workflow contract passes. A final full-history binary scan is recorded
+separately from this report after the final documentation commit.
 
-The seven actionable deferred items are:
+## Screenshots and browser QA
 
-1. Publish and monitor an independent APA checkpoint.
-2. Add a reviewed Python hash lock and CI vulnerability scanning.
-3. Reconcile the live `/scan` price with dated documentation and fixtures after read-only live verification.
-4. Pin MCP transport explicitly before any network exposure.
-5. Add dedicated CORS configuration regressions and verify deployed headers during an approved live audit.
-6. Correct the README's 92-versus-94 corpus inventory.
-7. Add a whole-audit deadline without weakening the no-partial-badge rule.
+Historical before-redesign baselines:
 
-The accepted limit is seven held-out detector misses at 92.55% recall and zero measured false positives. Improving recall must preserve the held-out and false-positive discipline.
+- `docs/screenshots/warden-landing-desktop.png`
+- `docs/screenshots/warden-landing-mobile.png`
 
-These residuals do not invalidate the local website redesign. They prevent describing the entire security programme as fully remediated or exploit-proof.
+They predate the current interface and are not presented as current screenshots.
 
-## Browser QA
-
-Representative viewport checks:
-
-- 1440 by 1000: homepage and trust architecture
-- 1280 by 900: homepage
-- 1024 by 900: Marketplace Evidence Index
-- 768 by 900: Incident Replay
-- 390 by 844: service status
-- 360 by 800: homepage, Playground, Product Tour, documentation, integrations, and marketplace details
-
-Verified browser behavior:
-
-- No page-level horizontal overflow on sampled routes
-- Compact verdict labels
-- Persisted light/dark theme across navigation
-- Full-viewport mobile menu
-- Focus moves into the menu and returns to its trigger
-- Mobile service status includes visible text
-- Live Playground returned a validated BLOCK / DRAIN_ADDRESS result
-- Product Tour advanced only after an explicit scan
-- Incident Replay completed only after three validated handler receipts
-- Verifier reported the signed bundled sample as archival/stale rather than current
-- Transparency and commercial surfaces showed explicit degraded states when local preview dependencies were unavailable
-- Marketplace initial SSR count was 50 and full snapshot count was 730
-- No raw ALLOW, SANITIZE, or BLOCK label appeared in marketplace index rows
-- No JavaScript exception or hydration warning was observed
-
-The browser console recorded two expected local-preview network failures:
-
-- `503` for the unavailable local transparency checkpoint
-- `400` for the unpaid local `/scan` terms probe
-
-Both produced explicit degraded UI rather than false success.
-
-Final browser-session screenshot artifacts:
-
-- `warden-home-final-1440.png`
-- `warden-home-final-1280.png`
-- `warden-theater-final-768.png`
-- `warden-status-final-390.png`
-- `warden-home-final-360.png`
-
-They are browser-session artifacts, not files checked into the repository.
-
-No valid baseline screenshot set was captured before the inherited redesign work began, so this report does not claim a controlled pixel-level before/after comparison.
-
-## Build and test results
-
-Current working-tree verification passed on base HEAD `3e96a8b3075066f67afd3ad1ebecd9c18641515a`:
-
-- `python scripts/build_index.py`
-  - 730 agents indexed
-  - 3 public-text matches
-  - 0 independently audited
-- `python scripts/build_site.py`
-  - 11 reason-code pages
-  - Documentation index
-  - Public APA specification
-  - Fingerprinted local assets
-  - 28 canonical crawler routes
-- `python -m pytest -q`
-  - 835 passed
-  - 1 skipped because POSIX mode bits are unavailable on Windows
-  - 1 existing Starlette/httpx TestClient deprecation warning
-- `node --test tests/js/*.test.js`
-  - 175 passed
-- `python -m pytest -q sdk/python/tests`
-  - 95 passed
-- `npm test` in `sdk/ts`
-  - 31 passed across 3 files
-- `npm run build` in `sdk/ts`
-  - passed
-- `npm pack --dry-run` in `sdk/ts`
-  - passed
-  - 18 files
-  - 14.6 kB package estimate
-- `python scripts/benchmark_recall.py`
-  - 87 of 94 attacks detected
-  - 92.55% recall
-  - 0 of 45 benign cases changed
-- `python spec/verify_apa.py --selftest`
-  - genuine record accepted
-  - tampered record rejected
-  - wrong issuer key rejected
-- `python -m ruff check .`
-  - passed
-- `python -m pip check`
-  - no broken requirements
-- `python -m compileall -q warden scripts`
-  - passed
-- `git diff --check`
-  - passed
-
-Independent generated-tree audit:
-
-- 758 pages
-- 758 unique titles and canonicals
-- No duplicate IDs
-- No broken internal links or fragments
-- No stale asset fingerprints
-- 14 documentation tables and 14 captions
-- 730 snapshot records, JSON records, and detail pages in exact parity
-- 50 matching initial marketplace rows
-- 1 linked-evidence ledger per detail page
-- No pending-state classes or raw verdict badges in index rows
-- 1,755 source services and rendered disclosures in exact parity
+No current after-redesign screenshot was accepted. Browser discovery returned no available browser, so the
+final interactive viewport matrix at 1440, 1280, 1024, 768, 390, and 360 pixels, console/network inspection,
+theme walkthrough, keyboard walkthrough, and current screenshot capture remain unexecuted.
 
 ## Remaining limitations
 
-1. Lighthouse, axe, a real screen-reader walkthrough, and formal 200% zoom testing remain unmeasured.
-2. No controlled baseline screenshot set exists.
-3. The bundled public attestation is validly signed but archival/expired.
-4. The public external transparency anchor remains unpublished.
-5. Marketplace discovery is partial and dated: 730 of an expected 752, with 22 missing and no linked signed endpoint audits.
-6. Endpoint audits remain point-in-time fixed-battery evidence, not certification.
-7. No genuine historical uptime series exists.
-8. Local preview could not establish live x402 terms or a transparency checkpoint.
-9. No production deployment, VPS smoke test, live paid call, wallet signature, or on-chain action was performed.
-10. The seven deferred security items and one accepted detector limit remain as described above.
+### Measured product limits
 
-## Important changed files
+- Seven held-out attacks remain undetected: `held-prompt-002`, `held-prompt-003`, `held-role-002`,
+  `held-corpus-002`, `held-drain-002`, `held-secret-002`, and `held-evade-mix-003`.
+- Optional semantic and embedding tiers remain uncalibrated without provider configuration.
+- Marketplace discovery is partial by 3 records and has no linked endpoint audit.
+- The monitor is not running and the independent anchor is unpublished.
 
-Shared system:
+### External, operator, or time-dependent work
 
-- `warden/site_render.py`
-- `scripts/build_site.py`
-- `site/theme.js`
-- `site/styles.css`
-- `site/app.js`
-- `site/assets/warden-mark.svg`
-- `site/assets/warden-social-card.svg`
-- `site/assets/warden-social-card.png`
+- approved deployment and production smoke/rollback verification;
+- production x402 domain correction and read-only reprobe;
+- deployed CORS, nginx, systemd, filesystem, and key verification;
+- hosted CI on the final pushed commit;
+- an independently controlled anchor witness;
+- a complete 30-day monitor window;
+- registry publication of either SDK;
+- real Shield enrollment, alert delivery, and recurring observation; and
+- a production issuer-key rotation ceremony.
 
-Homepage and product:
+### Unexecuted local QA
 
-- `site/index.html`
-- `site/incident-console.js`
-- `site/playground.html`
-- `site/playground.js`
-- `site/theater.html`
-- `site/theater.js`
-- `site/showcase.html`
-- `site/showcase.js`
-- `site/gauntlet.html`
-- `site/gauntlet.js`
-- Removed `site/home-examples.js`
+- interactive browser, viewport, console, keyboard, zoom, and theme walkthrough;
+- axe and real screen-reader testing;
+- current after-redesign screenshots; and
+- Lighthouse and Core Web Vitals measurement.
 
-Commerce, developer, and legal:
-
-- `site/hire.html`
-- `site/integrate.html`
-- `warden/site_docs.py`
-- `site/privacy.html`
-- `site/terms.html`
-
-Evidence and operations:
-
-- `site/badges.html`
-- `site/badge.html`
-- `site/verify.html`
-- `site/verify.js`
-- `site/log.html`
-- `site/trust.html`
-- `site/status.html`
-- `warden/marketplace/render.py`
-- `site/agents.js`
-
-Regression coverage:
-
-- `tests/test_mature_ui_contract.py`
-- `tests/test_marketplace.py`
-- `tests/test_redesign_contract.py`
-- `tests/test_site.py`
-- `tests/test_preview.py`
-- `tests/test_sitemap.py`
-- Route-specific suites under `tests/js`
-
-## Final disposition
-
-The local website redesign is complete and verified. It now presents Warden as a mature pre-action security product rather than a collection of experiments, while preserving the security and evidence boundaries implemented by the repository.
-
-The result is ready for human review and an explicitly authorized deployment workflow. It has not been committed, pushed, or deployed.
+No deployment, push, package publication, form submission, social post, funded transaction, wallet action,
+or VPS mutation was performed.
