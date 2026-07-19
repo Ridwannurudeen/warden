@@ -54,10 +54,22 @@ async def audit_agent(
         Field(max_length=MAX_SAMPLE_PROMPTS),
     ]
     | None = None,
+    input_field: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=64,
+            description="JSON body key the target expects the untrusted text under (default 'payload').",
+        ),
+    ] = "payload",
 ) -> dict[str, object]:
     """Run the Warden fixed attack battery against an HTTP agent endpoint."""
     request = AuditRequest.model_validate(
-        {"target_url": target_url, "sample_prompts": sample_prompts or []}
+        {
+            "target_url": target_url,
+            "sample_prompts": sample_prompts or [],
+            "input_field": input_field,
+        }
     )
     parsed_target = urlparse(request.target_url)
     if parsed_target.scheme not in {"http", "https"}:
@@ -70,6 +82,7 @@ async def audit_agent(
     response: AuditResponse = await auditor.audit(
         request.target_url,
         request.sample_prompts,
+        request.input_field,
     )
     return response.model_dump()
 

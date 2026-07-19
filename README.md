@@ -308,6 +308,28 @@ an availability claim.
 | `GET`  | `/badge/{audit_id}`                           | Legacy HMAC audit badge record                                  |
 | `GET`  | `/api/badges`                                 | Legacy public audit-badge registry                              |
 
+### Consenting to an audit
+
+`/audit` fires an active attack battery, so with `WARDEN_REQUIRE_CONSENT=true` (the default) the
+target must explicitly opt in. Warden performs a consent `GET` against
+`https://<target-host>/.well-known/warden-consent` on the same IP-pinned origin it audits, and only
+proceeds when that path returns `200` with one of:
+
+- plain-text body `warden-audit-allowed`, or
+- JSON `true`, `"warden-audit-allowed"`, `{"consent": true}`, `{"consent": "warden-audit-allowed"}`,
+  or `{"status": "warden-audit-allowed"}`.
+
+**Vercel- (and other static-edge-) hosted targets:** these platforms return `404` for unknown paths,
+so an un-consented deployment is correctly refused a signed grade — this is the gate working, not a
+bug. To make a Vercel deployment auditable, commit `public/.well-known/warden-consent` containing the
+single line `warden-audit-allowed`; Vercel serves `public/` at the domain root, so the file lands at
+`/.well-known/warden-consent`. The pinned-IP + SNI probe path itself works against Vercel's edge
+unchanged (the domain TLS certificate still validates), so consent is the only setup step.
+
+If the target expects the untrusted input under a JSON key other than `payload`, pass
+`input_field` on the `/audit` request (e.g. `{"target_url": "...", "input_field": "message"}`) so the
+battery probes the field the target actually reads.
+
 ## Explicit feedback and aggregate threat intelligence
 
 Scans do not create feedback implicitly. `POST /api/feedback` is a separate, rate-limited action that accepts

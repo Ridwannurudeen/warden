@@ -400,7 +400,9 @@ def test_paid_http_contract_remains_frozen():
         "checks",
         "latency_ms",
     }
-    assert set(AuditRequest.model_fields) == {"target_url", "sample_prompts"}
+    # input_field is additive and optional (defaults to "payload"); existing
+    # callers that send only target_url are unaffected. Response envelope frozen.
+    assert set(AuditRequest.model_fields) == {"target_url", "sample_prompts", "input_field"}
     assert set(AuditResponse.model_fields) == {
         "score",
         "grade",

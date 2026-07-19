@@ -34,8 +34,10 @@ class _Stream:
 class _Client:
     def __init__(self, response: _Response):
         self._response = response
+        self.last_kwargs: dict | None = None
 
     def stream(self, *args, **kwargs):
+        self.last_kwargs = kwargs
         return _Stream(self._response)
 
 
@@ -115,3 +117,21 @@ def test_oversized_json_integer_is_inconclusive():
 
 def test_invalid_utf8_response_is_inconclusive():
     assert _outcome(200, b'{"verdict":"blo\xffck"}') is AuditOutcome.INCONCLUSIVE
+
+
+def test_probe_defaults_to_payload_field():
+    auditor = AgentAuditor()
+    client = _Client(_Response(200, '{"verdict":"block"}'))
+    asyncio.run(auditor._target_outcome(client, "http://x", "x", "atk", sni_hostname="x"))
+    assert client.last_kwargs["json"] == {"payload": "atk"}
+
+
+def test_probe_honors_configured_input_field():
+    auditor = AgentAuditor()
+    client = _Client(_Response(200, '{"verdict":"block"}'))
+    asyncio.run(
+        auditor._target_outcome(
+            client, "http://x", "x", "atk", sni_hostname="x", input_field="message"
+        )
+    )
+    assert client.last_kwargs["json"] == {"message": "atk"}

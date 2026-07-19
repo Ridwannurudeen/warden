@@ -239,6 +239,10 @@ _AUDIT_INPUT = {
                 "items": {"type": "string"},
                 "description": "Optional extra attack payloads to include",
             },
+            "input_field": {
+                "type": "string",
+                "description": "JSON body key the target expects the untrusted text under (default 'payload')",
+            },
         },
         "required": ["target_url"],
     },
@@ -783,7 +787,7 @@ async def demo_examples() -> list[DemoExample]:
 @app.post("/audit", response_model=AuditResponse)
 async def audit(req: AuditRequest) -> AuditResponse:
     try:
-        return await auditor.audit(req.target_url, req.sample_prompts)
+        return await auditor.audit(req.target_url, req.sample_prompts, req.input_field)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

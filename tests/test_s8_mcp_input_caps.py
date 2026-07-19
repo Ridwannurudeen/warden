@@ -49,7 +49,7 @@ async def test_audit_agent_rejects_invalid_target_before_auditor(monkeypatch, ta
     called = False
 
     class RecordingAuditor:
-        async def audit(self, target_url, sample_prompts):
+        async def audit(self, target_url, sample_prompts, input_field="payload"):
             nonlocal called
             called = True
             raise AssertionError("invalid targets must not reach the auditor")
@@ -67,7 +67,7 @@ async def test_audit_agent_applies_request_caps_before_auditor(monkeypatch):
     calls: list[tuple[str, list[str]]] = []
 
     class RecordingAuditor:
-        async def audit(self, target_url, sample_prompts):
+        async def audit(self, target_url, sample_prompts, input_field="payload"):
             calls.append((target_url, sample_prompts))
             return AuditResponse(
                 score=100,
