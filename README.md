@@ -1,7 +1,7 @@
 <div align="center">
   <img src="site/assets/warden-avatar.png" alt="Warden shield mark" width="96" height="96">
   <h1>Warden</h1>
-  <p><strong>The immune system of the agent economy.</strong></p>
+  <p><strong>Verifiable pre-action security for AI agents.</strong></p>
   <p>
     Warden enforces deterministic <code>ALLOW</code>, <code>SANITIZE</code>, or <code>BLOCK</code>
     decisions before an autonomous agent acts, then publishes an open cryptographic attestation of
@@ -42,14 +42,14 @@ without turning that evidence into a permanent safety seal.
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | **Local enforcement**            | Runs `WardenEngine` in the caller's process and returns safe text or raises on `BLOCK`.                                            | No claim that deterministic detectors understand every possible attack.       |
 | **Agent Protection Attestation** | Binds an endpoint host to an Ed25519 key, `guard-live` state, and a signed rolling 24-hour count or an explicit unavailable state. | A valid attestation does not prove every request traversed the guard.         |
-| **Safety Map**                   | Separates discovered marketplace listings, public-text matches, and completed audits in a dated public fabric.                     | A listing-text match is not evidence that an endpoint is compromised or safe. |
+| **Marketplace Evidence Index**  | Separates discovered marketplace listings, public-text matches, and completed audits in a dated public record.                    | A listing-text match is not evidence that an endpoint is compromised or safe. |
 
 The wire format, canonical JSON, signatures, freshness, nonce, status, and transparency-log rules are in
 [`spec/APA-SPEC.md`](spec/APA-SPEC.md). The portable reference verifier is
 [`spec/verify_apa.py`](spec/verify_apa.py).
 
-The Safety Index uses a schema-v2 capture contract: `sampled` is the number of unique validated agent IDs
-stored, `expected` is the highest result total reported for that discovery query, and `dropped` is
+The Marketplace Evidence Index uses a schema-v2 capture contract: `sampled` is the number of unique validated
+agent IDs stored, `expected` is the highest result total reported for that discovery query, and `dropped` is
 `max(expected - sampled, 0)`. The committed seed and live refresh default to query `a`. Equality means the
 discovery response is complete for that query, not that every marketplace listing was discovered; every
 mismatch is rendered as partial/degraded without assigning a cause.
@@ -60,9 +60,11 @@ timer are source-ready but are not deployed or claimed active.
 
 ## See it in action
 
-[Attack Theater](site/theater.html) sends prompt injection, a drain-address swap, and secret exfiltration
-through the Warden-owned demo-agent gate in one auto-playing pass. It counts a neutralization only after the
-API response proves the expected verdict, threat class, and downstream delivery state; errors stop visibly.
+[Attack Theater](site/theater.html) starts idle and sends no request until the visitor explicitly selects
+**Run test sequence**. It then sends prompt injection, a drain-address swap, and secret exfiltration through
+the Warden-owned demo-agent gate, advancing automatically only after that activation and only when reduced
+motion is not requested. It counts a neutralization only after the API response proves the expected verdict,
+threat class, and downstream delivery state; pause, reset, reduced-motion, and errors remain explicit.
 The additive `POST /api/demo/theater` route leaves `/api/demo/scan` unchanged: BLOCK never invokes the
 no-side-effect demo ASP handler, SANITIZE delivers only the sanitized payload, and ALLOW delivers the original.
 
@@ -118,8 +120,8 @@ Local mode has no hosted quota or network dependency. `guard()` returns the orig
 ### Run the full local surface
 
 ```bash
-python scripts/build_site.py
 python scripts/build_index.py
+python scripts/build_site.py
 python -m pytest -q
 python -m uvicorn scripts.preview_site:app --host 127.0.0.1 --port 8031
 ```
@@ -139,6 +141,37 @@ result = WardenClient().scan(untrusted_text)
 That path is best-effort telemetry, not enforcement: the current default is 20 requests per minute per
 IP, forced `fast` depth, and truncation at 4,000 characters. Hosted latency includes network round-trip
 time. Use local mode with `fail_open=False` for an enforcement boundary.
+
+### Source-built integration surfaces
+
+The integration code is complete in this repository, but neither SDK distribution is claimed published:
+
+| Surface | Implemented contract |
+| --- | --- |
+| [Python SDK](sdk/python/README.md) | Sync and async clients, local fail-closed enforcement, hosted scanning, ASGI middleware, a decorator, LangChain and LlamaIndex adapters, APA proof utilities, and the standalone `warden-gateway` reverse proxy. |
+| [TypeScript SDK](sdk/ts/README.md) | A typed hosted client and Express-style middleware with a zero-dependency emitted runtime. It does not contain the local scanner engine. |
+| [FastMCP server](warden/mcp_server.py) | Local stdio tools named `scan_payload` and `audit_agent`, started from a trusted checkout with `python -m warden.mcp_server`. |
+| [Direct integrations](site/integrate.html) | Source-backed direct HTTP, OnchainOS, raw x402, Python, TypeScript, MCP, LangChain, and LlamaIndex placement and decision-handling examples. |
+
+The Python and TypeScript clients do not create a wallet or authorize spending. Their paid flow is enabled
+only by an explicitly injected caller-owned payment handler. After validating Warden's pinned x402 v2
+resource and payment terms, a client reuses the exact serialized endpoint and request body and sends
+`PAYMENT-SIGNATURE` on one replay only. A second 402, challenge drift, redirect, malformed receipt, or replay
+failure stops without another payment attempt and never falls through to fail-open behavior.
+
+### Open interoperability assets
+
+The source tree includes the complete reviewable contracts:
+
+| Asset | Repository source | Generated public path |
+| --- | --- | --- |
+| ASP Payload Security Standard | [`spec/ASP-PAYLOAD-SECURITY-STANDARD.md`](spec/ASP-PAYLOAD-SECURITY-STANDARD.md) | `/spec/ASP-PAYLOAD-SECURITY-STANDARD.md` |
+| Machine-readable ASP profile | [`spec/payload-security-profile-v0.1.json`](spec/payload-security-profile-v0.1.json) | `/spec/payload-security-profile-v0.1.json` |
+| APA conformance guide | [`spec/CONFORMANCE.md`](spec/CONFORMANCE.md) | `/spec/CONFORMANCE.md` |
+| Immutable endpoint-audit battery | [`audit/warden-core-http-2026-07.json`](audit/warden-core-http-2026-07.json) | `/audit/warden-core-http-2026-07.json` |
+
+`python scripts/build_site.py` copies these reviewed assets into the static site. The generated paths are
+source-ready; re-check the live host after an explicitly approved deployment before claiming they are live.
 
 ## Architecture
 
@@ -253,7 +286,7 @@ an availability claim.
 
 | Method | Path                                          | Purpose                                                         |
 | ------ | --------------------------------------------- | --------------------------------------------------------------- |
-| `GET`  | `/theater`                                    | Auto-playing, real-response Attack Theater                      |
+| `GET`  | `/theater`                                    | Explicitly activated, real-response Attack Theater              |
 | `GET`  | `/trust`                                      | Trust Layer pillars and honest APA embed template               |
 | `GET`  | `/verify`                                     | Browser APA attestation verifier                                |
 | `GET`  | `/spec/APA-SPEC.md`                           | Byte-identical public APA specification                         |
@@ -270,7 +303,7 @@ an availability claim.
 | `GET`  | `/apa/attestation/{attestation_id}`           | Attestation JSON and effective status                           |
 | `GET`  | `/apa/attestation/{attestation_id}/badge.svg` | No-store SVG rendering the true current status                  |
 | `GET`  | `/apa/audit/{audit_id}`                       | Signed endpoint-audit record, log binding, and lifecycle        |
-| `GET`  | `/apa/log`                                    | HTML for browsers; hash-chained JSON entries for API clients    |
+| `GET`  | `/apa/log`                                    | JSON by default; HTML when the client explicitly accepts it     |
 | `POST` | `/apa/revoke`                                 | Key-signed attestation revocation                               |
 | `GET`  | `/badge/{audit_id}`                           | Legacy HMAC audit badge record                                  |
 | `GET`  | `/api/badges`                                 | Legacy public audit-badge registry                              |
@@ -379,8 +412,8 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
 python -m pytest -q                         # full Python and static-site contract suite
 node --test tests/js/*.test.js              # frontend state and interaction contracts
 python -m ruff check .                       # Python lint gate
-python scripts/build_site.py                 # regenerate reason docs and public APA spec
 python scripts/build_index.py                # rebuild from the committed marketplace snapshot
+python scripts/build_site.py                 # regenerate reason docs and public specs last
 python -m pytest -q tests/test_refresh_safety_index.py tests/test_deploy_index.py
 python spec/verify_apa.py --selftest          # portable crypto oracle
 (cd sdk/ts && npm ci && npm test && npm run build)  # source TypeScript SDK gates

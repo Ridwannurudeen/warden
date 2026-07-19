@@ -583,7 +583,10 @@ def test_handoff_docs_describe_the_real_theater_and_unchecked_capture_work():
 def test_readme_leads_with_the_trust_layer_and_exact_quickstart_contracts():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert "The immune system of the agent economy" in readme
+    assert "Verifiable pre-action security for AI agents" in readme
+    assert "The immune system of the agent economy" not in readme
+    assert "Safety Map" not in readme
+    assert "auto-playing pass" not in readme
     assert "python -m pip install -e . -e sdk/python" in readme
     assert "safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)" in readme
     assert "best-effort telemetry, not enforcement" in readme

@@ -519,7 +519,7 @@ activate_release() {
   systemctl list-timers warden-index.timer warden-apa-reprobe.timer --all || return
 }
 
-systemd-analyze calendar '*-*-* 00/6:00:00 UTC'
+systemd-analyze calendar '*-*-* *:00/30:00 UTC'
 systemd-analyze calendar '*-*-* *:00/15:00 UTC'
 if ! activate_release; then
   rollback_release
@@ -786,9 +786,10 @@ systemctl start warden-index.timer warden-apa-reprobe.timer
 rotation_committed=1
 ```
 
-If the block exits before `rotation_committed=1`, its trap restores all three prior files, the previous Safety
-Index link, the old signer, and both timers. After a successful rotation, retain the old public key in history
-according to the bounded grace and historical-verification policy; no historical private key is retained.
+If the block exits before `rotation_committed=1`, its trap restores all three prior files, the previous
+Marketplace Evidence Index link, the old signer, and both timers. After a successful rotation, retain the old
+public key in history according to the bounded grace and historical-verification policy; no historical
+private key is retained.
 
 ## Nginx Shape
 
@@ -823,7 +824,7 @@ override exists only for an explicitly configured local development environment.
 
 This keeps the FastAPI root JSON stub untouched while making the public root a multi-page static site.
 
-## Live Safety Index Timer
+## Marketplace Evidence Index Timer
 
 `deploy/systemd/warden-index-fetch.service` is a secretless `warden-fetch` oneshot. It alone runs the
 read-only `onchainos agent search` and atomically replaces `/opt/warden-snapshot/agents-v1.jsonl`; its unit has

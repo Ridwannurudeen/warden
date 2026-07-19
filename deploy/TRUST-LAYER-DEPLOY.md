@@ -4,6 +4,12 @@
 upgrade must also follow the mandatory gate below, which installs the reviewed `warden.service`,
 `warden-monitor.{service,timer}`, and `warden-anchor-publish.{service,timer}` from `/opt/warden`.
 The two paths are intentionally separate; never install scheduled units during an nginx-only change.
+Warden Shield is a separate, owner-enrolled opt-in lifecycle with its own service and daily timer; this
+runbook does not install or enable it.
+
+**Log route boundary:** `/log` is the flat static compatibility page served from
+`/opt/warden-site/log.html`. `/apa/log` is the canonical FastAPI route: it returns JSON by default and returns
+the app copy of `site/log.html` only when the request explicitly accepts `text/html`.
 
 **Why only nginx:** the 2026-07-16 outage happened because the previous `deploy/nginx-warden.conf` pointed at a
 blue-green layout (`/opt/warden-site/current`, `/opt/warden-index/current`) that does not exist on this host.
@@ -242,8 +248,8 @@ ssh root@75.119.153.252 '
 set -euo pipefail
 systemctl is-active warden.service                                   # -> active
 ss -tlnp | grep -q "127.0.0.1:8031"                                  # backend listening
-test -f /opt/warden/site/log.html                                    # required by GET /apa/log html branch
-                                                                     #   (warden/api.py:43 APA_LOG_PAGE = <app>/site/log.html)
+test -f /opt/warden/site/log.html                                    # required by GET /apa/log HTML branch
+test -f /opt/warden-site/log.html                                   # required by static GET /log
 test -f /opt/warden-site/index.html
 test -f /opt/warden-site/agents/index.html
 test -f /opt/warden-site/agents/3808.html
@@ -326,7 +332,7 @@ Run locally:
 set -euo pipefail
 base=https://warden.gudman.xyz
 
-# 5a. Every static page -> 200
+# 5a. Static pages and the /log compatibility page -> 200
 for p in / /playground /hire /docs /status /badges /agents /agents/3808 /gauntlet /showcase /theater /verify /log /integrate /privacy /terms; do
   code=$(curl -s -o /dev/null -w '%{http_code}' "$base$p")
   echo "$p -> $code"; test "$code" = 200
@@ -340,7 +346,8 @@ done; done
 curl -s -X POST -H 'content-type: application/json' -d '{"payload":"hi"}' "$base/scan" | grep -q '"outputSchema"'   # additive schema present
 onchainos agent x402-check --endpoint "$base/scan" --body '{"payload":"hi"}'                                        # -> valid:true
 
-# 5c. APA routes (the fix under test)
+# 5c. APA routes (the fix under test). /apa/log is canonical: JSON by default,
+#     HTML only when the request explicitly accepts text/html.
 curl -fsS "$base/.well-known/apa-issuer.json" | grep -q '"issuer"'                        # 200 JSON
 curl -fsS "$base/apa/log" | grep -q '"entries"'                                           # JSON branch
 curl -fsS -H 'Accept: text/html' "$base/apa/log" | grep -qi '<html'                       # HTML branch (site/log.html)
@@ -393,9 +400,16 @@ delete files added by the new deploy; that is acceptable for restoring service.)
 restore the four scheduled-unit files and their prior enablement from the recorded unit backup by following
 **Scheduled-unit rollback and restoration** above. Do not re-enable either timer against rolled-back code.
 
-## What this deploy explicitly does NOT do
+## What the numbered nginx-only procedure does NOT do
 
-- No `warden.service` restart (app already runs the verified Trust Layer code).
-- No changes to `/opt/warden`, `/opt/warden-site`, `/opt/warden/.env`, or any other project's footprint.
-- No blue-green migration: `/opt/warden-index`, `current/` symlinks, `warden-fetch`, and the index/reprobe
-  timers remain future work per `deploy/DEPLOY.md`.
+- It does not replace or restart `warden.service`, and it does not establish that the installed app matches
+  the current reviewed source. An approved application upgrade must use the mandatory flat app-upgrade gate
+  above before the new code starts.
+- It does not change `/opt/warden`, `/opt/warden-site`, `/opt/warden/.env`, or any other project's footprint.
+  The monitor and anchor timers are installed only by the separate flat app-upgrade gate.
+- It does not install the versioned-release Marketplace Evidence Index stack (`/opt/warden-index`,
+  `current/` symlinks, or the `warden-fetch` identity). That migration remains governed by
+  `deploy/DEPLOY.md`. An already installed APA re-probe timer is preserved and restarted by the flat
+  app-upgrade gate; it is not installed by the numbered nginx steps.
+- It does not install or enable Warden Shield. That owner-enrolled lifecycle remains a separate opt-in
+  procedure documented in `docs/SHIELD_LIFECYCLE.md`.
