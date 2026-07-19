@@ -236,8 +236,8 @@ def test_production_service_requires_the_paywall_and_docs_pin_the_origin() -> No
     assert "deploy and read-only reprobe" in normalized_docs_lower
     assert "The live payment gate is verified" not in payment_docs
     for path in (
-        ROOT / "CODEX-BUILD-PHASE5.md",
-        ROOT / "CODEX-KICKOFF-PHASE5.md",
+        ROOT / "docs" / "build-history" / "CODEX-BUILD-PHASE5.md",
+        ROOT / "docs" / "build-history" / "CODEX-KICKOFF-PHASE5.md",
         ROOT / "submission" / "PHASE5-VERIFICATION.md",
     ):
         archived = " ".join(path.read_text(encoding="utf-8").split())
