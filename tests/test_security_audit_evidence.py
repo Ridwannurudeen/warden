@@ -19,7 +19,9 @@ def _stub_auditor(monkeypatch, auditor, attacks, outcome_for):
     async def consent(*args):
         return True
 
-    async def target_outcome(_client, _connect, _authority, payload, *, sni_hostname):
+    async def target_outcome(
+        _client, _connect, _authority, payload, *, sni_hostname, input_field="payload"
+    ):
         return outcome_for(payload)
 
     monkeypatch.setenv("WARDEN_BADGE_SECRET", "audit-evidence-test-secret")

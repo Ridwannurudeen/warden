@@ -132,9 +132,7 @@ def _load_audit_battery() -> tuple[tuple[dict[str, str], ...], tuple[str, ...]]:
             raise RuntimeError("endpoint-audit battery contains an invalid or duplicate probe")
         probe_ids.add(probe_id)
         probe_payloads.add(payload)
-        validated_probes.append(
-            {"id": probe_id, "category": category, "payload": payload}
-        )
+        validated_probes.append({"id": probe_id, "category": category, "payload": payload})
 
     benign_payloads: list[str] = []
     benign_ids: set[str] = set()
@@ -168,16 +166,22 @@ class AgentAuditor:
     """Posts Warden corpus attacks to an HTTP target and grades blocking behavior."""
 
     async def audit(
-        self, target_url: str, sample_prompts: list[str] | None = None
+        self,
+        target_url: str,
+        sample_prompts: list[str] | None = None,
+        input_field: str = "payload",
     ) -> AuditResponse:
         try:
             async with asyncio.timeout(AUDIT_TOTAL_TIMEOUT_SECONDS):
-                return await self._audit(target_url, sample_prompts)
+                return await self._audit(target_url, sample_prompts, input_field)
         except TimeoutError as exc:
             raise ValueError("audit timed out; no partial grade or badge was issued") from exc
 
     async def _audit(
-        self, target_url: str, sample_prompts: list[str] | None = None
+        self,
+        target_url: str,
+        sample_prompts: list[str] | None = None,
+        input_field: str = "payload",
     ) -> AuditResponse:
         try:
             async with asyncio.timeout(AUDIT_TIMEOUT_SECONDS):
@@ -204,7 +208,7 @@ class AgentAuditor:
                 client, host_header, parsed_target, connect_url
             )
             fixed_results, fixed_outcomes = await self._run_battery(
-                client, connect_url, host_authority, host_header, fixed_attacks
+                client, connect_url, host_authority, host_header, fixed_attacks, input_field
             )
             benign_outcomes = [
                 await self._target_outcome(
@@ -213,11 +217,12 @@ class AgentAuditor:
                     host_authority,
                     control,
                     sni_hostname=host_header,
+                    input_field=input_field,
                 )
                 for control in BENIGN_CONTROLS
             ]
             caller_results, _ = await self._run_battery(
-                client, connect_url, host_authority, host_header, caller_attacks
+                client, connect_url, host_authority, host_header, caller_attacks, input_field
             )
 
         results = [*fixed_results, *caller_results]
@@ -231,18 +236,12 @@ class AgentAuditor:
         benign_blocked = sum(outcome is AuditOutcome.BLOCKED for outcome in benign_outcomes)
         # Every control must complete without being blocked. A partial pass is not
         # enough evidence to distinguish selective enforcement from blind rejection.
-        liveness_passed = (
-            benign_inconclusive == 0
-            and benign_conclusive > 0
-            and benign_blocked == 0
-        )
+        liveness_passed = benign_inconclusive == 0 and benign_conclusive > 0 and benign_blocked == 0
         if conclusive_count:
             score = round((blocked_count / conclusive_count) * 100, 2)
             provisional_grade = self._grade(score)
             grade = (
-                provisional_grade
-                if not inconclusive_count and liveness_passed
-                else "INCONCLUSIVE"
+                provisional_grade if not inconclusive_count and liveness_passed else "INCONCLUSIVE"
             )
             missed = sorted({result.attack_class for result in fixed_results if not result.blocked})
             recommendations = (
@@ -336,6 +335,7 @@ class AgentAuditor:
         host_authority: str,
         host_header: str,
         attacks: list[dict[str, object]],
+        input_field: str = "payload",
     ) -> tuple[list[AuditResult], list[AuditOutcome]]:
         results: list[AuditResult] = []
         outcomes: list[AuditOutcome] = []
@@ -346,6 +346,7 @@ class AgentAuditor:
                 host_authority,
                 str(attack["payload"]),
                 sni_hostname=host_header,
+                input_field=input_field,
             )
             outcomes.append(outcome)
             if outcome is not AuditOutcome.INCONCLUSIVE:
@@ -397,12 +398,13 @@ class AgentAuditor:
         payload: str,
         *,
         sni_hostname: str,
+        input_field: str = "payload",
     ) -> AuditOutcome:
         try:
             async with client.stream(
                 "POST",
                 connect_url,
-                json={"payload": payload},
+                json={input_field: payload},
                 headers={"Host": host_authority},
                 extensions={"sni_hostname": sni_hostname},
             ) as response:
@@ -542,8 +544,7 @@ class AgentAuditor:
         }
         return not (
             explicitly_disabled
-            and os.getenv("WARDEN_ENVIRONMENT", "production").strip().lower()
-            == "development"
+            and os.getenv("WARDEN_ENVIRONMENT", "production").strip().lower() == "development"
         )
 
     async def _verify_target_consent(
