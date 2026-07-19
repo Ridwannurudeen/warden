@@ -37,16 +37,83 @@ jobs:
           printf 'TRUFFLEHOG_BIN=%s\n' "$binary_dir/trufflehog" >> "$GITHUB_ENV"
       - name: Scan full current history for secrets
         shell: bash
+        env:
+          TRUFFLEHOG_ALLOWED_DETECTOR: "URI"
+          TRUFFLEHOG_ALLOWED_COMMIT: "fea29c05936fde91e227f6a08aee49b7f613d37c"
+          TRUFFLEHOG_ALLOWED_FILE: "tests/test_reliability_operations.py"
+          TRUFFLEHOG_ALLOWED_LINE: "422"
         run: |
           set -euo pipefail
+          findings="$RUNNER_TEMP/trufflehog-findings.jsonl"
+          scan_stderr="$RUNNER_TEMP/trufflehog-scan.stderr"
+          set +e
           "$TRUFFLEHOG_BIN" git "file://${GITHUB_WORKSPACE}" \
             --branch HEAD \
             --fail \
             --fail-on-scan-errors \
             --no-update \
-            --github-actions \
+            --json \
             --results=verified,unknown \
-            --exclude-globs=benchmark/held_out_benign.jsonl,sdk/python/tests/test_ph5_reverse_proxy.py,tests/test_apa_browser_verifier.py
+            --exclude-globs=benchmark/held_out_benign.jsonl,sdk/python/tests/test_ph5_reverse_proxy.py,tests/test_apa_browser_verifier.py \
+            >"$findings" 2>"$scan_stderr"
+          scan_status=$?
+          set -e
+          if [ "$scan_status" -ne 0 ] && [ "$scan_status" -ne 183 ]; then
+            stderr_lines="$(wc -l <"$scan_stderr" | tr -d ' ')"
+            printf 'TruffleHog scan failed with status %s (%s diagnostic lines withheld).\n' \
+              "$scan_status" "$stderr_lines" >&2
+            exit "$scan_status"
+          fi
+          python - "$findings" <<'PY'
+          import json
+          import os
+          import sys
+
+          allowed_finding = (
+              os.environ["TRUFFLEHOG_ALLOWED_DETECTOR"],
+              os.environ["TRUFFLEHOG_ALLOWED_COMMIT"],
+              os.environ["TRUFFLEHOG_ALLOWED_FILE"],
+              os.environ["TRUFFLEHOG_ALLOWED_LINE"],
+          )
+          known_finding_count = 0
+          unexpected_findings = []
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              for line in handle:
+                  if not line.strip():
+                      continue
+                  record = json.loads(line)
+                  git = record.get("SourceMetadata", {}).get("Data", {}).get("Git", {})
+                  fingerprint = (
+                      str(record.get("DetectorName", "")),
+                      str(git.get("commit", "")),
+                      str(git.get("file", "")),
+                      str(git.get("line", "")),
+                  )
+                  if fingerprint == allowed_finding:
+                      known_finding_count += 1
+                  else:
+                      unexpected_findings.append(
+                          {
+                              "detector": fingerprint[0],
+                              "commit": fingerprint[1],
+                              "file": fingerprint[2],
+                              "line": fingerprint[3],
+                              "verified": bool(record.get("Verified")),
+                          }
+                      )
+
+          if known_finding_count != 1:
+              print(
+                  "Expected exactly one immutable synthetic finding; "
+                  f"observed {known_finding_count}.",
+                  file=sys.stderr,
+              )
+          for finding in unexpected_findings:
+              print(json.dumps(finding, sort_keys=True), file=sys.stderr)
+          if known_finding_count != 1 or unexpected_findings:
+              raise SystemExit(1)
+          print("TruffleHog full-history scan passed with one immutable synthetic fixture.")
+          PY
   test:
     runs-on: ubuntu-latest
     steps:

@@ -16,6 +16,12 @@ PINNED_ACTIONS = {
 }
 TRUFFLEHOG_VERSION = "3.95.9"
 TRUFFLEHOG_LINUX_AMD64_SHA256 = "f6d1106b85107d79527ed7a5b98b592beadd8b770dc3c9e8c1ad99e1b2cf127e"
+TRUFFLEHOG_ALLOWED_SYNTHETIC_FINDING = {
+    "detector": "URI",
+    "commit": "fea29c05936fde91e227f6a08aee49b7f613d37c",
+    "file": "tests/test_reliability_operations.py",
+    "line": "422",
+}
 
 
 def test_every_github_action_is_pinned_to_the_verified_immutable_commit() -> None:
@@ -60,7 +66,8 @@ def test_secret_scan_is_read_only_has_full_history_and_fails_on_detected_credent
     assert "--results=verified,unknown" in secret_job
     assert "--fail-on-scan-errors" in secret_job
     assert "--no-update" in secret_job
-    assert "--github-actions" in secret_job
+    assert "--json" in secret_job
+    assert "--github-actions" not in secret_job
     excluded = re.search(r"--exclude-globs=([^\s]+)", secret_job)
     assert excluded is not None
     assert set(excluded.group(1).split(",")) == {
@@ -68,6 +75,14 @@ def test_secret_scan_is_read_only_has_full_history_and_fails_on_detected_credent
         "sdk/python/tests/test_ph5_reverse_proxy.py",
         "tests/test_apa_browser_verifier.py",
     }
+    for key, value in TRUFFLEHOG_ALLOWED_SYNTHETIC_FINDING.items():
+        env_name = f"TRUFFLEHOG_ALLOWED_{key.upper()}"
+        assert f'{env_name}: "{value}"' in secret_job
+    assert 'if [ "$scan_status" -ne 0 ] && [ "$scan_status" -ne 183 ]' in secret_job
+    assert "known_finding_count != 1" in secret_job
+    assert "unexpected_findings" in secret_job
+    assert '"Raw"' not in secret_job
+    assert '"RawV2"' not in secret_job
     assert workflow.count("permissions:") == 1
     assert not re.search(r"^\s+[a-z-]+:\s+write$", workflow, re.MULTILINE)
     assert "write-all" not in workflow
