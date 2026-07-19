@@ -27,3 +27,4 @@ data/*.key
 data/*.db
 data/protection.db
 .warden/
+.claude/worktrees/
