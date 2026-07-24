@@ -120,6 +120,7 @@
     expectedAddresses,
     consent,
     publicCreditConsent,
+    trainingUseConsent,
   }) {
     if (consent !== true) {
       throw new Error(
@@ -161,6 +162,9 @@
       }
       request.finder = normalizedFinder;
       request.public_credit_consent = true;
+    }
+    if (trainingUseConsent === true) {
+      request.training_use_consent = true;
     }
     return request;
   }
@@ -408,6 +412,9 @@
   const consentError = document.querySelector("[data-gauntlet-consent-error]");
   const publicCreditConsent = document.querySelector(
     "[data-gauntlet-public-credit-consent]",
+  );
+  const trainingUseConsent = document.querySelector(
+    "[data-gauntlet-training-use-consent]",
   );
   const publicCreditError = document.querySelector(
     "[data-gauntlet-public-credit-error]",
@@ -767,6 +774,7 @@
       setPublicCreditError();
     }
   });
+  trainingUseConsent.addEventListener("change", () => supersedeSubmission());
   form.elements.expected_addresses.addEventListener("input", () => {
     supersedeSubmission();
     setFieldError(addressError, form.elements.expected_addresses);
@@ -786,6 +794,7 @@
         expectedAddresses: formData.get("expected_addresses"),
         consent: consent.checked,
         publicCreditConsent: publicCreditConsent.checked,
+        trainingUseConsent: trainingUseConsent.checked,
       });
       setConsentError();
       setPublicCreditError();

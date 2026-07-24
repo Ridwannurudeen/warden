@@ -205,7 +205,7 @@ test("legal routes are dated, deep-linkable, cross-linked, and print-semantic", 
     assert.match(html, /data-print-document/, name);
     assert.match(
       html,
-      /<time datetime="2026-07-18">18 July 2026<\/time>/,
+      /<time datetime="2026-07-24">24 July 2026<\/time>/,
       name,
     );
     assert.match(html, /class="doc-nav legal-nav"[^>]*aria-label=/, name);

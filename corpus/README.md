@@ -23,7 +23,10 @@ Rows promoted from an external dataset additionally carry:
 - `license_url`: revision-pinned primary license source.
 
 `corpus/license-manifest.json` is the deterministic per-case projection of this metadata. The
-manifest points recipients to the root `THIRD-PARTY-NOTICES` file.
+manifest keeps allowlisted third-party cases in `cases`, points recipients to the root
+`THIRD-PARTY-NOTICES` file, and records separately consented first-party Gauntlet rows in
+`first_party_cases`. First-party rows cite their WARDEN BREAKER certificate, held-out case, consent
+digest, rights basis, and second-review time; they are not treated as allowlisted third-party data.
 
 External ingestion is deliberately offline and human-gated. Prepare a JSONL mapping with
 `source_path`, `source_record_id`, and `payload`; attack mappings must also contain `category` and

@@ -123,6 +123,7 @@ class GauntletRequest(BaseModel):
     context: DemoScanContext = Field(default_factory=DemoScanContext)
     finder: str | None = Field(default=None, max_length=128)
     public_credit_consent: bool = Field(default=False, strict=True)
+    training_use_consent: bool = Field(default=False, strict=True)
 
     @field_validator("intent")
     @classmethod

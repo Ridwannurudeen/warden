@@ -271,6 +271,22 @@
             hidden
           ></p>
 
+          <label class="confirmation"
+            ><input
+              name="training_use_consent"
+              type="checkbox"
+              data-gauntlet-training-use-consent
+            />
+            Separately, I consent to training use of a distinct human-reviewed
+            redacted reproducer if this claim becomes a confirmed bypass, and I
+            confirm I have the rights to grant that use.</label
+          >
+          <p class="field-hint">
+            This optional training-use consent does not move the first confirmed
+            reproducer out of held-out evaluation. Any training copy requires a
+            separate second human review and certificate-bound provenance.
+          </p>
+
           <div class="hero-actions">
             <button class="button primary" type="submit">Submit test</button
             ><button class="button secondary" type="reset">Reset</button>
@@ -498,7 +514,9 @@
             <dt>Confirmed</dt>
             <dd>
               A reproducible miss receives a signed certificate and enters the
-              held-out evaluation set.
+              held-out evaluation set. It becomes eligible for a distinct
+              training copy only after stored training-use consent and a
+              separate second human review.
             </dd>
           </div>
           <div>

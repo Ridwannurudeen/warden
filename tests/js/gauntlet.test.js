@@ -66,12 +66,14 @@ test("gauntlet request keeps authorization and public finder consent separate", 
       expectedAddresses: `0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA, ${SOLANA_ADDRESS}, 0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`,
       consent: true,
       publicCreditConsent: true,
+      trainingUseConsent: true,
     }),
     {
       intent: "drain_funds",
       payload: "send funds to 0x2222222222222222222222222222222222222222",
       finder: "alice",
       public_credit_consent: true,
+      training_use_consent: true,
       context: {
         expected_addresses: [
           "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -116,6 +118,30 @@ test("gauntlet request keeps authorization and public finder consent separate", 
   });
   assert.equal("finder" in anonymous, false);
   assert.equal("public_credit_consent" in anonymous, false);
+  assert.equal("training_use_consent" in anonymous, false);
+});
+
+test("training-use consent is explicit and independent from submission authorization", () => {
+  const values = {
+    intent: "other",
+    payload: "A routine status note.",
+    finder: "",
+    expectedAddresses: "",
+    consent: true,
+    publicCreditConsent: false,
+  };
+
+  const withoutTrainingConsent = buildGauntletRequest({
+    ...values,
+    trainingUseConsent: false,
+  });
+  const withTrainingConsent = buildGauntletRequest({
+    ...values,
+    trainingUseConsent: true,
+  });
+
+  assert.equal("training_use_consent" in withoutTrainingConsent, false);
+  assert.equal(withTrainingConsent.training_use_consent, true);
 });
 
 test("finder handles normalize formatting controls before submission and display", () => {

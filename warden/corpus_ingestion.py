@@ -7,6 +7,7 @@ import json
 import os
 import re
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from typing import Literal
 from urllib.parse import quote
@@ -46,6 +47,17 @@ _PROVENANCE_KEYS = {
     "license_spdx",
     "license_url",
 }
+_FIRST_PARTY_GAUNTLET_KEYS = {
+    "source",
+    "source_certificate_id",
+    "source_benchmark_case_id",
+    "rights_basis",
+    "training_consent_sha256",
+    "training_reviewed_at",
+}
+_CERTIFICATE_ID_RE = re.compile(r"[0-9a-f]{32}")
+_BENCHMARK_CASE_ID_RE = re.compile(r"gauntlet-[0-9a-f]{16}")
+_UTC_TIMESTAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 TrainingDataset = Literal["attacks", "benign"]
 
 
@@ -321,17 +333,61 @@ def build_license_manifest(
     allowlist_path: Path = DEFAULT_ALLOWLIST_PATH,
     training_attacks_path: Path = DEFAULT_TRAINING_ATTACKS_PATH,
     training_benign_path: Path = DEFAULT_TRAINING_BENIGN_PATH,
+    entries_by_dataset: Mapping[str, list[dict[str, object]]] | None = None,
 ) -> dict[str, object]:
     sources = load_source_allowlist(allowlist_path)
     cases: list[dict[str, object]] = []
+    first_party_cases: list[dict[str, object]] = []
     seen_ids: set[str] = set()
     for dataset, path in (
         ("training-attacks", training_attacks_path),
         ("training-benign", training_benign_path),
     ):
-        for entry in _load_corpus_jsonl(path):
+        entries = (
+            entries_by_dataset[dataset]
+            if entries_by_dataset is not None
+            else _load_corpus_jsonl(path)
+        )
+        for entry in entries:
             present_provenance = _PROVENANCE_KEYS.intersection(entry)
+            present_first_party = _FIRST_PARTY_GAUNTLET_KEYS.intersection(entry)
+            if present_provenance and present_first_party:
+                raise ValueError("corpus row mixes third-party and first-party provenance")
             if not present_provenance:
+                if not present_first_party:
+                    continue
+                if present_first_party != _FIRST_PARTY_GAUNTLET_KEYS:
+                    raise ValueError("first-party corpus row has incomplete provenance metadata")
+                case_id = entry.get("id")
+                payload = entry.get("payload")
+                if (
+                    not isinstance(case_id, str)
+                    or case_id in seen_ids
+                    or not isinstance(payload, str)
+                    or dataset != "training-attacks"
+                    or entry["source"] != "human-reviewed-gauntlet-training"
+                    or _CERTIFICATE_ID_RE.fullmatch(str(entry["source_certificate_id"])) is None
+                    or _BENCHMARK_CASE_ID_RE.fullmatch(str(entry["source_benchmark_case_id"]))
+                    is None
+                    or entry["rights_basis"] != "submitter-training-use-consent"
+                    or _SHA256_RE.fullmatch(str(entry["training_consent_sha256"])) is None
+                    or _UTC_TIMESTAMP_RE.fullmatch(str(entry["training_reviewed_at"])) is None
+                ):
+                    raise ValueError("first-party corpus row has invalid provenance metadata")
+                seen_ids.add(case_id)
+                first_party_cases.append(
+                    {
+                        "case_id": case_id,
+                        "dataset": dataset,
+                        "payload_sha256": hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+                        "source": entry["source"],
+                        "certificate_id": entry["source_certificate_id"],
+                        "benchmark_case_id": entry["source_benchmark_case_id"],
+                        "rights_basis": entry["rights_basis"],
+                        "training_consent_sha256": entry["training_consent_sha256"],
+                        "training_reviewed_at": entry["training_reviewed_at"],
+                    }
+                )
                 continue
             if present_provenance != _PROVENANCE_KEYS:
                 raise ValueError("third-party corpus row has incomplete provenance metadata")
@@ -384,11 +440,19 @@ def build_license_manifest(
                 }
             )
     cases.sort(key=lambda item: str(item["case_id"]))
+    first_party_cases.sort(key=lambda item: str(item["case_id"]))
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "notice_file": "THIRD-PARTY-NOTICES",
         "cases": cases,
+        "first_party_cases": first_party_cases,
     }
+
+
+def license_manifest_bytes(manifest: dict[str, object]) -> bytes:
+    return (json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
 
 
 def write_license_manifest(manifest: dict[str, object], path: Path) -> None:
@@ -396,9 +460,9 @@ def write_license_manifest(manifest: dict[str, object], path: Path) -> None:
         raise ValueError("license manifest target must not be a symlink")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
-    serialized = json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    serialized = license_manifest_bytes(manifest)
     try:
-        with temporary.open("x", encoding="utf-8", newline="\n") as handle:
+        with temporary.open("xb") as handle:
             handle.write(serialized)
             handle.flush()
             os.fsync(handle.fileno())

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from threading import Lock
@@ -15,6 +15,10 @@ from warden.scanner.normalize import fold_unicode
 
 _LOCK = Lock()
 TrainingDataset = Literal["attacks", "benign"]
+DatasetArtifactsBuilder = Callable[
+    [Mapping[str, list[dict[str, object]]], Mapping[str, bytes]],
+    Mapping[Path, bytes],
+]
 
 
 def canonical_dataset_payload(value: object) -> str:
@@ -71,20 +75,49 @@ def _load_jsonl(path: Path) -> list[dict[str, object]]:
     return entries
 
 
-def _atomic_write_jsonl(path: Path, entries: list[dict[str, object]]) -> None:
-    if path.exists() and path.is_symlink():
-        raise ValueError("dataset promotion target must not be a symlink")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+def _serialize_jsonl(entries: list[dict[str, object]]) -> bytes:
+    return b"".join(
+        json.dumps(entry, ensure_ascii=False, sort_keys=True).encode("utf-8") + b"\n"
+        for entry in entries
+    )
+
+
+def _restore_file(path: Path, original: bytes | None) -> None:
+    if original is None:
+        path.unlink(missing_ok=True)
+        return
+    with path.open("wb") as handle:
+        handle.write(original)
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def _atomic_replace_files(replacements: Mapping[Path, bytes]) -> None:
+    originals: dict[Path, bytes | None] = {}
+    temporaries: dict[Path, Path] = {}
+    replaced: list[Path] = []
     try:
-        with temporary.open("x", encoding="utf-8", newline="\n") as handle:
-            for entry in entries:
-                handle.write(json.dumps(entry, ensure_ascii=False, sort_keys=True) + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
+        for path, content in replacements.items():
+            if path.exists() and path.is_symlink():
+                raise ValueError("dataset promotion target must not be a symlink")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            originals[path] = path.read_bytes() if path.exists() else None
+            temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+            with temporary.open("xb") as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            temporaries[path] = temporary
+        for path, temporary in temporaries.items():
+            os.replace(temporary, path)
+            replaced.append(path)
+    except BaseException:
+        for path in reversed(replaced):
+            _restore_file(path, originals[path])
+        raise
     finally:
-        temporary.unlink(missing_ok=True)
+        for temporary in temporaries.values():
+            temporary.unlink(missing_ok=True)
 
 
 def promote_reviewed_training_batch(
@@ -96,6 +129,7 @@ def promote_reviewed_training_batch(
     training_benign_path: Path,
     held_out_attacks_path: Path,
     held_out_benign_path: Path,
+    artifact_builder: DatasetArtifactsBuilder | None = None,
 ) -> int:
     """Atomically append one reviewed batch to exactly one training dataset."""
     if reviewer_approved is not True:
@@ -168,9 +202,30 @@ def promote_reviewed_training_batch(
             occupied_payloads[normalized] = target_name
             additions.append(entry)
 
-        if additions:
-            _atomic_write_jsonl(
-                target_path,
-                [*entries_by_dataset[target_name], *additions],
+        prospective_entries = {
+            name: list(existing_entries) for name, existing_entries in entries_by_dataset.items()
+        }
+        prospective_entries[target_name].extend(additions)
+        dataset_bytes = {
+            name: (
+                _serialize_jsonl(prospective_entries[name])
+                if name == target_name and additions
+                else path.read_bytes()
+                if path.exists()
+                else b""
             )
+            for name, path in paths.items()
+        }
+        replacements: dict[Path, bytes] = {}
+        if additions:
+            replacements[target_path] = dataset_bytes[target_name]
+        if artifact_builder is not None:
+            for path, content in artifact_builder(prospective_entries, dataset_bytes).items():
+                if path in paths.values():
+                    raise ValueError("promotion artifact must not replace another dataset")
+                if not isinstance(content, bytes):
+                    raise ValueError("promotion artifact content must be bytes")
+                replacements[path] = content
+        if replacements:
+            _atomic_replace_files(replacements)
         return len(additions)

@@ -154,9 +154,10 @@ def test_notices_cover_every_allowlisted_source_and_committed_manifest_is_curren
     committed = json.loads((ROOT / "corpus" / "license-manifest.json").read_text(encoding="utf-8"))
     assert committed == build_license_manifest()
     assert committed == {
-        "schema_version": 1,
+        "schema_version": 2,
         "notice_file": "THIRD-PARTY-NOTICES",
         "cases": [],
+        "first_party_cases": [],
     }
 
 

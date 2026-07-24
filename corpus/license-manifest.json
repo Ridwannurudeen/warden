@@ -1,5 +1,6 @@
 {
-  "schema_version": 1,
+  "cases": [],
+  "first_party_cases": [],
   "notice_file": "THIRD-PARTY-NOTICES",
-  "cases": []
+  "schema_version": 2
 }
