@@ -53,6 +53,7 @@ dev = [
 [project.scripts]
 warden-guard = "warden_guard.cli:main"
 warden-gateway = "warden_guard.gateway:main"
+warden-selftest = "warden_guard.selftest:main"
 
 [tool.setuptools.packages.find]
 include = ["warden_guard*"]

@@ -187,6 +187,19 @@ warden-guard verify https://api.example.com                # verify a live heart
 warden-guard verify attestation.json --issuer-pub ed25519:...  # offline attestation verify
 ```
 
+### Hardening Pack self-test
+
+The SDK installs a separate `warden-selftest` command for exercising verified Hardening Pack
+vectors with the local fail-closed engine. Its report contains totals, per-class counts, and
+payload-free failure identifiers only. It does not issue a grade, badge, or certification, and
+local execution does not send vector payloads to Warden's hosted or paid routes.
+
+The signed Hardening Pack schema, issuer-history verifier, status lookup, and public pack URL
+contract are not present in this source revision. Until that contract is merged and wired into
+the command, `warden-selftest PACK.json` intentionally rejects every input as unverified. The
+runner boundary is available in `warden_guard.selftest.run_verified_pack` for the signed-pack
+verifier integration; callers must not construct `VerifiedHardeningPack` from unsigned JSON.
+
 ## Protected hosted route
 
 `WardenClient(paid=True)` selects the x402-gated `/scan` endpoint. With no

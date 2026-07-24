@@ -39,6 +39,32 @@ exact allowlisted files, rejects Git LFS pointer files and local source modifica
 candidate batch against both training files, both held-out files, and the built-in injection list,
 and atomically promotes into exactly one training dataset.
 
+## Deterministic adversarial variants
+
+Build an offline evaluation pack from `corpus/attacks.jsonl`:
+
+```text
+python scripts/build_variant_pack.py build/adversarial-variants.json
+```
+
+The generator applies only bounded transformations already reversed by
+`warden/scanner/normalize.py`: base64, hex, percent encoding, HTML entities, `\xNN` escapes,
+casing, whitespace, homoglyphs, and nested encoded JSON containers. Every emitted row records its
+training source ID, ordered transform chain, source/license metadata, and payload hash.
+
+Both held-out files are exclusion sets only. Their rows and metadata are never copied into the
+pack. The command also rejects training/held-out separation violations and drops generated rows
+that overlap either training file, either held-out file, the built-in injection list, or another
+scanner-normalized variant. It performs no network or model calls.
+
+A CI job can prove byte stability without committing generated output:
+
+```bash
+python scripts/build_variant_pack.py "$RUNNER_TEMP/variants-a.json"
+python scripts/build_variant_pack.py "$RUNNER_TEMP/variants-b.json"
+cmp "$RUNNER_TEMP/variants-a.json" "$RUNNER_TEMP/variants-b.json"
+```
+
 Provenance labels:
 - `shieldbot-pattern`: cases derived from the copied ShieldBot prompt-injection patterns.
 - `owasp-llm01-pattern`: prompt-injection and data-exfiltration phrasing from public LLM01 prompt-injection taxonomies.
