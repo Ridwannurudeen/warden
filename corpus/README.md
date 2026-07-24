@@ -53,12 +53,17 @@ python scripts/build_variant_pack.py build/adversarial-variants.json
 The generator applies only bounded transformations already reversed by
 `warden/scanner/normalize.py`: base64, hex, percent encoding, HTML entities, `\xNN` escapes,
 casing, whitespace, homoglyphs, and nested encoded JSON containers. Every emitted row records its
-training source ID, ordered transform chain, source/license metadata, and payload hash.
+training source ID, ordered transform chain, source/license metadata, source `context` and `depth`
+when present, and payload hash. A variant passes evaluation when the observed verdict is not
+`ALLOW` and contains every required source threat class; the source's exact verdict is not copied
+because an encoding can legitimately change `SANITIZE` to `BLOCK` or vice versa.
 
 Both held-out files are exclusion sets only. Their rows and metadata are never copied into the
-pack. The command also rejects training/held-out separation violations and drops generated rows
-that overlap either training file, either held-out file, the built-in injection list, or another
-scanner-normalized variant. It performs no network or model calls.
+pack. The command requires Warden's canonical four dataset paths and uses Warden's canonical
+training-corpus fingerprint. It rejects any training/held-out overlap across canonicalized
+`derive_candidates` closures. Generated rows are deduplicated by exact scanner-equivalence set and
+are dropped when they overlap held-out rows or the built-in injection list. It performs no network
+or model calls.
 
 A CI job can prove byte stability without committing generated output:
 

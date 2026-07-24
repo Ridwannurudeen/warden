@@ -11,7 +11,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from warden.adversarial_variants import build_variant_pack, write_variant_pack  # noqa: E402
+from warden.adversarial_variants import (  # noqa: E402
+    HELD_OUT_ATTACKS_PATH,
+    HELD_OUT_BENIGN_PATH,
+    TRAINING_ATTACKS_PATH,
+    TRAINING_BENIGN_PATH,
+    build_variant_pack,
+    write_variant_pack,
+)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -25,22 +32,26 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--training-attacks",
         type=Path,
-        default=ROOT / "corpus" / "attacks.jsonl",
+        default=TRAINING_ATTACKS_PATH,
+        help="Canonical corpus/attacks.jsonl path.",
     )
     parser.add_argument(
         "--training-benign",
         type=Path,
-        default=ROOT / "corpus" / "benign.jsonl",
+        default=TRAINING_BENIGN_PATH,
+        help="Canonical corpus/benign.jsonl path.",
     )
     parser.add_argument(
         "--held-out-attacks",
         type=Path,
-        default=ROOT / "benchmark" / "held_out_attacks.jsonl",
+        default=HELD_OUT_ATTACKS_PATH,
+        help="Canonical benchmark/held_out_attacks.jsonl exclusion path.",
     )
     parser.add_argument(
         "--held-out-benign",
         type=Path,
-        default=ROOT / "benchmark" / "held_out_benign.jsonl",
+        default=HELD_OUT_BENIGN_PATH,
+        help="Canonical benchmark/held_out_benign.jsonl exclusion path.",
     )
     return parser.parse_args(argv)
 
