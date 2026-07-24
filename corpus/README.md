@@ -44,34 +44,91 @@ and atomically promotes into exactly one training dataset.
 
 ## Deterministic adversarial variants
 
-Build an offline evaluation pack from `corpus/attacks.jsonl`:
+Build offline per-threat-class evaluation packs from `corpus/attacks.jsonl`:
 
 ```text
-python scripts/build_variant_pack.py build/adversarial-variants.json
+python scripts/build_variant_packs.py build/adversarial-variants
 ```
 
-The generator applies only bounded transformations already reversed by
-`warden/scanner/normalize.py`: base64, hex, percent encoding, HTML entities, `\xNN` escapes,
-casing, whitespace, homoglyphs, and nested encoded JSON containers. Every emitted row records its
-training source ID, ordered transform chain, source/license metadata, source `context` and `depth`
-when present, and payload hash. A variant passes evaluation when the observed verdict is not
-`ALLOW` and contains every required source threat class; the source's exact verdict is not copied
-because an encoding can legitimately change `SANITIZE` to `BLOCK` or vice versa.
+The command writes one pack per `ReasonCode` (`PROMPT_INJECTION.json` … `MALICIOUS_LINK.json`)
+plus an `index.json` listing every class, its file, its variant count, its contributing training
+case IDs, and the SHA-256 of the exact bytes written. Every class file exists on every run, so a
+class with no variants is an explicit empty pack rather than a missing file. Each variant carries
+its `threat_class`, training source ID, ordered transform chain, source/license metadata, source
+`context` and `depth` when present, and payload hash. A variant passes evaluation when the
+observed verdict is not `ALLOW` and contains every required source threat class; the source's
+exact verdict is not copied because an encoding can legitimately change `SANITIZE` to `BLOCK` or
+vice versa.
 
-Both held-out files are exclusion sets only. Their rows and metadata are never copied into the
-pack. The command requires Warden's canonical four dataset paths and uses Warden's canonical
+Both held-out files are exclusion sets only. Their rows and metadata are never copied into a pack.
+The command requires Warden's canonical four dataset paths and uses Warden's canonical
 training-corpus fingerprint. It rejects any training/held-out overlap across canonicalized
-`derive_candidates` closures. Generated rows are deduplicated by exact scanner-equivalence set and
-are dropped when they overlap held-out rows or the built-in injection list. It performs no network
-or model calls.
+`derive_candidates` closures. It performs no network or model calls.
 
-A CI job can prove byte stability without committing generated output:
+### Transforms and what actually ships
 
-```bash
-python scripts/build_variant_pack.py "$RUNNER_TEMP/variants-a.json"
-python scripts/build_variant_pack.py "$RUNNER_TEMP/variants-b.json"
-cmp "$RUNNER_TEMP/variants-a.json" "$RUNNER_TEMP/variants-b.json"
+The generator applies nine transform chains, all of them bounded transformations already reversed
+by `warden/scanner/normalize.py`:
+
+| Transform chain | Distinct in output |
+| --- | --- |
+| `encoding:base64` | yes |
+| `encoding:hex` | yes |
+| `encoding:percent` | yes |
+| `encoding:html-entities` | yes |
+| `encoding:x-escape` | yes |
+| `case:swap` + `encoding:base64` | yes |
+| `whitespace:expand` + `encoding:base64` | yes, except when the source contains no space |
+| `unicode:homoglyph` + `encoding:base64` | yes |
+| `nesting:json` + `encoding:base64` (twice) | yes |
+
+Deduplication is by the variant's own canonicalized payload, because the engine scans the raw
+payload as well as every derived candidate — two encodings of the same source are different
+scanner inputs and exercise different decoder branches. `whitespace:expand` is the one chain that
+can collapse: expanding spaces in a source that has none reproduces the plain `encoding:base64`
+payload exactly, and the duplicate is dropped.
+
+Two further exclusions reduce what ships, and both are deliberate:
+
+- **Sources that are built-in injections.** 16 of the 94 training attacks (all eight
+  `CORPUS_MATCH` rows, `role-009`–`role-012`, `web3-004`, `web3-006`, `encoding-004`,
+  `encoding-005`) are scanner-equivalent to an entry in `KNOWN_INJECTIONS`, so every variant of
+  them is dropped by the built-in-injection guard. `CORPUS_MATCH` therefore ships as an empty
+  pack.
+- **Encodings the Decoder Wall will not reverse.** `web3-003` and `drain-005` are short and
+  digit-heavy, so their single-layer encodings fail `normalize._is_plausible_text` and never
+  decode back to the source. The generator refuses to emit a variant whose decoded closure does
+  not contain its own training source, so those two contribute only their nested-JSON variant.
+
+At the current corpus that yields **675 variants from 78 of the 94 training attacks**: 75 each for
+the five single-layer encodings, 76 each for `case:swap` and `unicode:homoglyph`, 77 for the
+nested-JSON chain, and 71 for `whitespace:expand`.
+
+### Consuming the packs
+
+```text
+python scripts/evaluate_variant_packs.py build/adversarial-variants
 ```
+
+The consumer verifies each pack file against its `index.json` digest, then runs the deterministic
+detector over every variant and reports per-class detection. It is a **separate evaluation
+surface**: it never reads, writes, or re-records the published held-out benchmark
+(`scripts/benchmark_recall.py`), and it exits 0 whatever the numbers are, so nothing about it can
+pressure the published 87/94 recall figure. Variants are derived from training rows, so their
+results are robustness evidence, not held-out generalization evidence.
+
+### CI command
+
+```text
+python scripts/verify_variant_packs.py
+```
+
+This regenerates every class pack twice into a temporary directory, requires the two runs to be
+byte-identical, checks the index digests and class partitioning, and independently re-derives
+training/held-out separation from the written packs: no held-out case ID appears in any pack, no
+variant payload matches or is scanner-equivalent to a held-out row, every variant decodes back to
+its named training source, and every payload digest matches its payload. It writes nothing outside
+the temporary directory and exits non-zero on any failure.
 
 Provenance labels:
 - `shieldbot-pattern`: cases derived from the copied ShieldBot prompt-injection patterns.

@@ -97,8 +97,20 @@ scanner state.
 
 ## Local smoke test
 
-Start a disposable upstream on port `8000`, launch the gateway with the Docker or systemd command,
-and send a known-safe UTF-8 body through `127.0.0.1:8787`. Confirm the upstream receives it. Then
-send a known blocked payload and confirm the client receives HTTP 403 while the upstream records no
-request. Stop the gateway during a slow allowed request and confirm that request completes, new
-requests receive HTTP 503, and `/healthz` reports HTTP 503 until shutdown completes.
+`scripts/smoke_gateway.sh` is the executable gate. It builds the image from
+`deploy/Dockerfile.gateway`, runs the gateway in front of a disposable upstream on an isolated
+Docker network, and exits non-zero unless a benign body reaches the upstream with HTTP 200, a
+drain-address body is refused with HTTP 403 without reaching the upstream, `/healthz` returns HTTP
+200, and `/metrics` returns HTTP 200 with no payload or secret content. It removes the containers,
+network, volume, and image it created:
+
+```bash
+sh scripts/smoke_gateway.sh
+```
+
+It needs a working Docker daemon and a free `127.0.0.1:8788`. Run it on any Docker-enabled runner
+before an upgrade and after a Dockerfile or proxy change.
+
+The script does not cover graceful shutdown. Verify that by hand: stop the gateway during a slow
+allowed request and confirm that request completes, new requests receive HTTP 503, and `/healthz`
+reports HTTP 503 until shutdown completes.

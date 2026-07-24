@@ -15,11 +15,19 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi.testclient import TestClient
 
-from warden import api, audit_attestations, shield
+from warden import (
+    api,
+    audit_attestations,
+    audit_findings,
+    hardening,
+    protection_store,
+    shield,
+)
 from warden.badges import b64u_encode
 
 NOW = 1_900_000_000
 TARGET_URL = "https://agent.example.com/scan"
+DELIVERY_URL = "https://owner.example.com/warden-shield"
 BATTERY_ID = "warden-core-http"
 BATTERY_VERSION = "2026-07"
 BATTERY_SHA256 = "7e18f89d7249fe97e007f37dc91839492cfb7a40af4d7b660309645c0fe33f3f"
@@ -57,6 +65,31 @@ class _FailingNotifier:
         raise httpx.ConnectError("operator webhook unavailable")
 
 
+class _RecordingNotifier:
+    """Capture exactly what an owner-controlled channel would receive."""
+
+    def __init__(self, *, failures: int = 0) -> None:
+        self.remaining_failures = failures
+        self.payloads: list[dict[str, object]] = []
+
+    async def notify(self, event: object) -> None:
+        self.payloads.append(shield.alert_payload(event))
+        if self.remaining_failures:
+            self.remaining_failures -= 1
+            raise httpx.ConnectError("operator webhook unavailable")
+
+
+class _CountingPublisher:
+    """Issue real signed packs while counting how often issuance was attempted."""
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def __call__(self, findings: dict[str, object]) -> dict[str, object]:
+        self.calls.append(str(findings["audit_id"]))
+        return hardening.publish_pack(findings)
+
+
 def _hold_state_lock(path: str, acquired: object, release: object) -> None:
     with shield._exclusive_state_lock(Path(path)):
         acquired.set()
@@ -70,13 +103,15 @@ def _observe_state_lock(path: str, acquired: object) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _issuer(monkeypatch):
+def _issuer(tmp_path, monkeypatch):
     key = Ed25519PrivateKey.generate()
     monkeypatch.setenv(
         "WARDEN_ISSUER_KEY",
         b64u_encode(key.private_bytes_raw(), "ed25519-seed"),
     )
     monkeypatch.delenv("WARDEN_ISSUER_HISTORY", raising=False)
+    monkeypatch.setenv("WARDEN_PROTECTION_DB", str(tmp_path / "protection.db"))
+    monkeypatch.setattr(audit_findings, "_STORE_PATH", tmp_path / "findings.jsonl")
 
 
 def _target(
@@ -88,8 +123,9 @@ def _target(
     battery_id: str = BATTERY_ID,
     battery_version: str = BATTERY_VERSION,
     battery_sha256: str = BATTERY_SHA256,
+    delivery_url: str | None = None,
 ) -> dict[str, object]:
-    return {
+    enrollment: dict[str, object] = {
         "target_id": "example-production",
         "owner_id": "example-owner",
         "owner_enrolled": owner_enrolled,
@@ -102,6 +138,26 @@ def _target(
             "sha256": battery_sha256,
         },
     }
+    if delivery_url is not None:
+        enrollment["delivery"] = {"webhook_url": delivery_url}
+    return enrollment
+
+
+def _findings(
+    audit_id: str,
+    *,
+    blocked: int = 0,
+    total: int = 1,
+    attack_class: str = "SECRET_EXFIL",
+) -> dict[str, object]:
+    return audit_findings.record_findings(
+        audit_id=audit_id,
+        target_host="agent.example.com",
+        findings=[{"attack_class": attack_class, "total": total, "blocked": blocked}],
+        battery_id=BATTERY_ID,
+        battery_version=BATTERY_VERSION,
+        observed_on="2030-03-17",
+    )
 
 
 def _write_config(path: Path, targets: list[dict[str, object]] | None = None) -> Path:
@@ -282,7 +338,7 @@ async def test_same_battery_score_drift_is_unchanged_regressed_then_improved(tmp
     assert shield.service_exit_code(summaries[2]) == 1
     assert shield.service_exit_code(summaries[3]) == 0
 
-    lineage = shield.get_certification_lineage(
+    lineage = shield.get_audit_evidence_lineage(
         state,
         "example-production",
         evidence_resolver=evidence.__getitem__,
@@ -393,7 +449,7 @@ async def test_failed_inconclusive_and_stale_audits_never_renew_prior_evidence(t
     assert evidence_calls == [initial_id, stale_id]
     assert [summary["inconclusive"] for summary in summaries] == [0, 1, 1, 1]
 
-    lineage = shield.get_certification_lineage(
+    lineage = shield.get_audit_evidence_lineage(
         state,
         "example-production",
         evidence_resolver=evidence.__getitem__,
@@ -525,7 +581,7 @@ async def test_changed_enrollment_requires_a_revision_and_starts_a_new_baseline(
     assert target_state["last_conclusive_at"] == NOW + 1
 
     evidence = {initial_id: initial_evidence, next_id: next_evidence}
-    lineage = shield.get_certification_lineage(
+    lineage = shield.get_audit_evidence_lineage(
         state,
         "example-production",
         evidence_resolver=evidence.__getitem__,
@@ -581,7 +637,7 @@ async def test_lineage_verifies_retired_issuer_key_history(tmp_path, monkeypatch
         now=NOW,
     )
 
-    lineage = shield.get_certification_lineage(
+    lineage = shield.get_audit_evidence_lineage(
         state,
         "example-production",
         evidence_resolver=lambda _audit_id: evidence,
@@ -592,7 +648,7 @@ async def test_lineage_verifies_retired_issuer_key_history(tmp_path, monkeypatch
 
     monkeypatch.delenv("WARDEN_ISSUER_HISTORY")
     with pytest.raises(ValueError, match="failed issuer verification"):
-        shield.get_certification_lineage(
+        shield.get_audit_evidence_lineage(
             state,
             "example-production",
             evidence_resolver=lambda _audit_id: evidence,
@@ -617,7 +673,7 @@ async def test_legacy_lineage_event_is_read_without_guessing_its_revision(tmp_pa
     del lifecycle["events"][0]["enrollment_revision"]
     state.write_text(json.dumps(lifecycle), encoding="utf-8")
 
-    lineage = shield.get_certification_lineage(
+    lineage = shield.get_audit_evidence_lineage(
         state,
         "example-production",
         evidence_resolver=lambda _audit_id: evidence,
@@ -762,6 +818,12 @@ async def test_https_notifier_sends_only_bounded_event_metadata():
         "expires_at": NOW + audit_attestations.ATTESTATION_TTL_SECONDS,
     }
     observed = {**previous, "audit_id": "0000000000000002", "blocked": 16, "score": 80.0}
+    hardening_state = {
+        "status": "issued",
+        "pack_id": "a" * 64,
+        "audit_id": "0000000000000002",
+        "addressed_classes": ["SECRET_EXFIL"],
+    }
     event = shield._event(
         target_id="example-production",
         enrollment_revision=1,
@@ -770,6 +832,7 @@ async def test_https_notifier_sends_only_bounded_event_metadata():
         occurred_at=NOW + 86_400,
         previous=previous,
         observed=observed,
+        hardening_state=hardening_state,
     )
     captured: dict[str, object] = {}
 
@@ -798,7 +861,9 @@ async def test_https_notifier_sends_only_bounded_event_metadata():
         "previous_evidence",
         "observed_evidence",
         "action",
+        "hardening",
     }
+    assert body["hardening"] == hardening_state
     for forbidden in ("target_url", "owner_id", "payload", "signature", "recommendations"):
         assert forbidden not in serialized
 
@@ -869,3 +934,453 @@ def test_default_evidence_resolution_reuses_badge_to_portable_publication_path(m
         ("publish", badge),
         ("read", (audit_id, shield.audit_attestations.verify_audit_attestation)),
     ]
+
+
+@pytest.mark.asyncio
+async def test_regressed_conclusive_audit_issues_a_signed_pack_bound_to_the_event(tmp_path):
+    config = _write_config(tmp_path / "targets.json")
+    state = tmp_path / "state.json"
+    initial_id = "0000000000000001"
+    regressed_id = "0000000000000002"
+    _findings(initial_id, blocked=1)
+    _findings(regressed_id, blocked=0)
+    auditor = _QueuedAuditor([_response(initial_id), _response(regressed_id)])
+    evidence = {
+        initial_id: _evidence(initial_id, blocked=18, issued_at=NOW),
+        regressed_id: _evidence(regressed_id, blocked=15, issued_at=NOW + 86_400),
+    }
+    publisher = _CountingPublisher()
+
+    await shield.run_due_audits(
+        config,
+        state,
+        auditor=auditor,
+        evidence_resolver=evidence.__getitem__,
+        pack_publisher=publisher,
+        now=NOW,
+    )
+    summary = await shield.run_due_audits(
+        config,
+        state,
+        auditor=auditor,
+        evidence_resolver=evidence.__getitem__,
+        pack_publisher=publisher,
+        now=NOW + 86_400,
+    )
+
+    events = _state(state)["events"]
+    assert publisher.calls == [regressed_id]
+    assert summary["regressed"] == 1
+    assert summary["hardening_packs_issued"] == 1
+    assert summary["hardening_failures"] == 0
+    assert events[0]["hardening"]["status"] == "not_applicable"
+    hardening_block = events[-1]["hardening"]
+    assert hardening_block["status"] == "issued"
+    assert hardening_block["audit_id"] == regressed_id
+    assert hardening_block["addressed_classes"] == ["SECRET_EXFIL"]
+
+    pack = protection_store.get_hardening_pack_with_evidence(
+        str(hardening_block["pack_id"]),
+        record_validator=hardening.verify_pack,
+    )
+    assert pack is not None
+    assert hardening.verify_pack(pack)
+    assert pack["audit_id"] == regressed_id
+    assert pack["target_host"] == "agent.example.com"
+
+
+@pytest.mark.asyncio
+async def test_missed_classes_issue_a_pack_when_drift_is_not_a_regression(tmp_path):
+    config = _write_config(tmp_path / "targets.json")
+    state = tmp_path / "state.json"
+    audit_id = "0000000000000001"
+    _findings(audit_id, blocked=0)
+    publisher = _CountingPublisher()
+
+    summary = await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(audit_id)]),
+        evidence_resolver=lambda _audit_id: _evidence(audit_id, blocked=18, issued_at=NOW),
+        pack_publisher=publisher,
+        now=NOW,
+    )
+
+    event = _state(state)["events"][-1]
+    assert summary["initial"] == 1
+    assert summary["hardening_packs_issued"] == 1
+    assert publisher.calls == [audit_id]
+    assert event["comparison"] == "initial"
+    assert event["hardening"]["status"] == "issued"
+    assert event["hardening"]["addressed_classes"] == ["SECRET_EXFIL"]
+
+
+@pytest.mark.asyncio
+async def test_fully_blocking_conclusive_audit_issues_no_pack(tmp_path):
+    config = _write_config(tmp_path / "targets.json")
+    state = tmp_path / "state.json"
+    audit_id = "0000000000000001"
+    _findings(audit_id, blocked=1)
+    publisher = _CountingPublisher()
+
+    summary = await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(audit_id)]),
+        evidence_resolver=lambda _audit_id: _evidence(audit_id, blocked=20, issued_at=NOW),
+        pack_publisher=publisher,
+        now=NOW,
+    )
+
+    event = _state(state)["events"][-1]
+    assert publisher.calls == []
+    assert summary["hardening_packs_issued"] == 0
+    assert event["hardening"] == {
+        "status": "not_applicable",
+        "pack_id": None,
+        "audit_id": audit_id,
+        "addressed_classes": [],
+    }
+    assert event["notification"] == "not_applicable"
+
+
+@pytest.mark.parametrize(
+    "inconclusive_cause",
+    ["audit_failed", "audit_inconclusive", "evidence_stale", "battery_changed"],
+)
+@pytest.mark.asyncio
+async def test_inconclusive_audit_never_issues_a_hardening_pack(tmp_path, inconclusive_cause):
+    config = _write_config(tmp_path / "targets.json")
+    state = tmp_path / "state.json"
+    audit_id = "0000000000000002"
+    _findings(audit_id, blocked=0)
+    publisher = _CountingPublisher()
+    stale_at = NOW - (40 * 24 * 60 * 60)
+    responses = {
+        "audit_failed": ValueError("consent unavailable"),
+        "audit_inconclusive": _response("0000000000000000", grade="INCONCLUSIVE"),
+        "evidence_stale": _response(audit_id),
+        "battery_changed": _response(audit_id),
+    }
+    evidence = {
+        "evidence_stale": _evidence(audit_id, blocked=18, issued_at=stale_at),
+        "battery_changed": _evidence(
+            audit_id,
+            blocked=18,
+            issued_at=NOW,
+            battery_version="2026-08",
+            battery_sha256="b" * 64,
+        ),
+    }
+
+    summary = await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([responses[inconclusive_cause]]),
+        evidence_resolver=lambda _audit_id: evidence[inconclusive_cause],
+        pack_publisher=publisher,
+        now=NOW,
+    )
+
+    event = _state(state)["events"][-1]
+    assert publisher.calls == []
+    assert summary["inconclusive"] == 1
+    assert summary["hardening_packs_issued"] == 0
+    assert event["reason"] == inconclusive_cause
+    assert event["hardening"] == {
+        "status": "not_applicable",
+        "pack_id": None,
+        "audit_id": None,
+        "addressed_classes": [],
+    }
+    assert protection_store.read_log() == []
+
+
+@pytest.mark.asyncio
+async def test_repeating_one_shield_observation_does_not_double_issue_a_pack(tmp_path):
+    config = _write_config(tmp_path / "targets.json", [_target(interval_hours=24)])
+    state = tmp_path / "state.json"
+    audit_id = "0000000000000001"
+    _findings(audit_id, blocked=0)
+    evidence = _evidence(audit_id, blocked=18, issued_at=NOW)
+    publisher = _CountingPublisher()
+
+    first = await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(audit_id)]),
+        evidence_resolver=lambda _audit_id: evidence,
+        pack_publisher=publisher,
+        now=NOW,
+    )
+    second = await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(audit_id)]),
+        evidence_resolver=lambda _audit_id: evidence,
+        pack_publisher=publisher,
+        now=NOW + (24 * 60 * 60),
+    )
+
+    events = _state(state)["events"]
+    pack_ids = [event["hardening"]["pack_id"] for event in events]
+    assert publisher.calls == [audit_id, audit_id]
+    assert first["hardening_packs_issued"] == 1
+    assert second["hardening_packs_issued"] == 1
+    assert len(set(pack_ids)) == 1
+    assert [entry["event"] for entry in protection_store.read_log()] == ["hardening-pack-issued"]
+
+
+@pytest.mark.asyncio
+async def test_new_enrollment_revision_issues_a_pack_for_the_new_baseline(tmp_path):
+    config = _write_config(tmp_path / "targets.json")
+    state = tmp_path / "state.json"
+    initial_id = "0000000000000001"
+    next_id = "0000000000000002"
+    changed_hash = "c" * 64
+    _findings(initial_id, blocked=1)
+    _findings(next_id, blocked=0)
+    publisher = _CountingPublisher()
+
+    await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(initial_id)]),
+        evidence_resolver=lambda _audit_id: _evidence(initial_id, blocked=18, issued_at=NOW),
+        pack_publisher=publisher,
+        now=NOW,
+    )
+    _write_config(
+        config,
+        [_target(revision=2, battery_version="2026-08", battery_sha256=changed_hash)],
+    )
+    summary = await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(next_id)]),
+        evidence_resolver=lambda _audit_id: _evidence(
+            next_id,
+            blocked=20,
+            issued_at=NOW + 1,
+            battery_version="2026-08",
+            battery_sha256=changed_hash,
+        ),
+        pack_publisher=publisher,
+        now=NOW + 1,
+    )
+
+    event = _state(state)["events"][-1]
+    assert summary["initial"] == 1
+    assert publisher.calls == [next_id]
+    assert event["enrollment_revision"] == 2
+    assert event["hardening"]["status"] == "issued"
+    assert event["hardening"]["audit_id"] == next_id
+
+
+@pytest.mark.asyncio
+async def test_owner_enrolled_delivery_channel_receives_the_pack_reference(tmp_path):
+    config = _write_config(
+        tmp_path / "targets.json",
+        [_target(delivery_url=DELIVERY_URL)],
+    )
+    state = tmp_path / "state.json"
+    audit_id = "0000000000000001"
+    _findings(audit_id, blocked=0)
+    notifier = _RecordingNotifier()
+    created: list[str] = []
+
+    def factory(url: str) -> object:
+        created.append(url)
+        return notifier
+
+    summary = await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(audit_id)]),
+        evidence_resolver=lambda _audit_id: _evidence(audit_id, blocked=18, issued_at=NOW),
+        notifier_factory=factory,
+        now=NOW,
+    )
+
+    event = _state(state)["events"][-1]
+    payload = notifier.payloads[0]
+    serialized = json.dumps(payload)
+    assert created == [DELIVERY_URL]
+    assert summary["notifications_delivered"] == 1
+    assert event["notification"] == "delivered"
+    assert payload["hardening"] == event["hardening"]
+    assert payload["event_id"] == event["event_id"]
+    for forbidden in ("target_url", "owner_id", "payload", "webhook_url", "issuer_sig"):
+        assert forbidden not in serialized
+
+
+def test_enrollment_delivery_channel_is_bound_to_the_enrollment_revision(tmp_path):
+    config = _write_config(
+        tmp_path / "targets.json",
+        [_target(delivery_url=DELIVERY_URL)],
+    )
+    without_delivery = _write_config(tmp_path / "plain.json")
+
+    delivered = shield.load_shield_config(config)
+    plain = shield.load_shield_config(without_delivery)
+
+    assert delivered[0].delivery_url == DELIVERY_URL
+    assert plain[0].delivery_url is None
+    assert delivered[0].enrollment_sha256 != plain[0].enrollment_sha256
+
+    _write_config(config, [_target(delivery_url="http://owner.example.com/warden-shield")])
+    with pytest.raises(ValueError, match="must be HTTPS"):
+        shield.load_shield_config(config)
+
+
+@pytest.mark.asyncio
+async def test_pack_delivery_failure_is_persisted_after_bounded_retries(tmp_path):
+    config = _write_config(
+        tmp_path / "targets.json",
+        [_target(delivery_url=DELIVERY_URL)],
+    )
+    state = tmp_path / "state.json"
+    audit_id = "0000000000000001"
+    _findings(audit_id, blocked=0)
+    notifier = _RecordingNotifier(failures=shield.MAX_NOTIFICATION_ATTEMPTS)
+
+    summary = await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(audit_id)]),
+        evidence_resolver=lambda _audit_id: _evidence(audit_id, blocked=18, issued_at=NOW),
+        notifier_factory=lambda _url: notifier,
+        now=NOW,
+    )
+
+    event = _state(state)["events"][-1]
+    assert len(notifier.payloads) == shield.MAX_NOTIFICATION_ATTEMPTS
+    assert summary["notification_failures"] == 1
+    assert summary["notifications_delivered"] == 0
+    assert shield.service_exit_code(summary) == 1
+    assert event["notification"] == "failed"
+    assert event["hardening"]["status"] == "issued"
+
+
+@pytest.mark.asyncio
+async def test_pack_delivery_retries_a_transient_failure_within_one_run(tmp_path):
+    config = _write_config(
+        tmp_path / "targets.json",
+        [_target(delivery_url=DELIVERY_URL)],
+    )
+    state = tmp_path / "state.json"
+    audit_id = "0000000000000001"
+    _findings(audit_id, blocked=0)
+    notifier = _RecordingNotifier(failures=1)
+
+    summary = await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(audit_id)]),
+        evidence_resolver=lambda _audit_id: _evidence(audit_id, blocked=18, issued_at=NOW),
+        notifier_factory=lambda _url: notifier,
+        now=NOW,
+    )
+
+    payloads = notifier.payloads
+    assert len(payloads) == 2
+    assert payloads[0]["event_id"] == payloads[1]["event_id"]
+    assert summary["notifications_delivered"] == 1
+    assert summary["notification_failures"] == 0
+    assert shield.service_exit_code(summary) == 0
+    assert _state(state)["events"][-1]["notification"] == "delivered"
+
+
+@pytest.mark.asyncio
+async def test_pack_issuance_failure_is_surfaced_and_never_fabricates_evidence(tmp_path):
+    config = _write_config(tmp_path / "targets.json")
+    state = tmp_path / "state.json"
+    audit_id = "0000000000000001"
+    _findings(audit_id, blocked=0)
+
+    def failing_publisher(_findings_record: dict[str, object]) -> dict[str, object]:
+        raise protection_store.ProtectionStateConflict("transparency log is unavailable")
+
+    summary = await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(audit_id)]),
+        evidence_resolver=lambda _audit_id: _evidence(audit_id, blocked=18, issued_at=NOW),
+        pack_publisher=failing_publisher,
+        now=NOW,
+    )
+
+    event = _state(state)["events"][-1]
+    assert summary["hardening_failures"] == 1
+    assert summary["hardening_packs_issued"] == 0
+    assert shield.service_exit_code(summary) == 1
+    assert event["comparison"] == "initial"
+    assert event["hardening"] == {
+        "status": "issue_failed",
+        "pack_id": None,
+        "audit_id": audit_id,
+        "addressed_classes": [],
+    }
+    assert "transparency log is unavailable" not in json.dumps(event)
+
+
+@pytest.mark.asyncio
+async def test_missing_retained_findings_are_recorded_without_issuing_a_pack(tmp_path):
+    config = _write_config(tmp_path / "targets.json")
+    state = tmp_path / "state.json"
+    audit_id = "0000000000000001"
+    publisher = _CountingPublisher()
+
+    summary = await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(audit_id)]),
+        evidence_resolver=lambda _audit_id: _evidence(audit_id, blocked=18, issued_at=NOW),
+        pack_publisher=publisher,
+        now=NOW,
+    )
+
+    event = _state(state)["events"][-1]
+    assert publisher.calls == []
+    assert summary["hardening_packs_issued"] == 0
+    assert summary["hardening_failures"] == 0
+    assert event["hardening"]["status"] == "findings_unavailable"
+    assert event["notification"] == "not_applicable"
+
+
+def test_retained_pack_references_keep_the_state_file_within_its_read_bound():
+    baseline = {
+        "audit_id": "0" * 16,
+        "battery_id": BATTERY_ID,
+        "battery_version": BATTERY_VERSION,
+        "battery_sha256": BATTERY_SHA256,
+        "blocked": 18,
+        "total": 20,
+        "score": 90.0,
+        "observed_on": "2030-03-17",
+        "issued_at": NOW,
+        "expires_at": NOW + audit_attestations.ATTESTATION_TTL_SECONDS,
+    }
+    widest = shield._event(
+        target_id="t" * 64,
+        enrollment_revision=2_147_483_647,
+        comparison="regressed",
+        reason="same_battery_score_decreased",
+        occurred_at=NOW,
+        previous=baseline,
+        observed={**baseline, "audit_id": "1" * 16},
+        hardening_state={
+            "status": "issued",
+            "pack_id": "b" * 64,
+            "audit_id": "1" * 16,
+            "addressed_classes": sorted(hardening.CLASS_GUIDANCE),
+        },
+    )
+    document = {
+        "schema_version": 1,
+        "targets": {},
+        "events": [widest] * shield.MAX_EVENTS,
+    }
+
+    assert shield._valid_event(widest)
+    assert len(json.dumps(document, ensure_ascii=False, indent=2).encode()) < shield.MAX_STATE_BYTES

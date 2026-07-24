@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import httpx
@@ -9,11 +13,13 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from warden_guard.apa import b64u_encode, canonical, sign_document
-from warden_guard.client import ScanResult
+from warden_guard.client import ScanResult, WardenError
 from warden_guard.selftest import (
+    MAX_PACK_BYTES,
     MAX_SAFE_INTEGER,
     SelfTestVector,
     VerifiedHardeningPack,
+    _endpoint_scanner,
     main,
     run_verified_pack,
     verify_evidence_bundle,
@@ -365,10 +371,13 @@ def test_cli_fetches_only_the_canonical_pack_url_without_redirects(
 
     client = httpx.Client(transport=httpx.MockTransport(handler))
     try:
-        assert main(
-            [f"https://warden.gudman.xyz/apa/hardening/{pack_id}"],
-            client=client,
-        ) == 0
+        assert (
+            main(
+                [f"https://warden.gudman.xyz/apa/hardening/{pack_id}"],
+                client=client,
+            )
+            == 0
+        )
     finally:
         client.close()
 
@@ -387,3 +396,202 @@ def test_local_loader_rejects_duplicate_json_keys(
 
     assert main([str(path)]) == 2
     assert "duplicate key" in capsys.readouterr().err
+
+
+Responder = Callable[[str, dict[str, object]], tuple[int, dict[str, str], bytes]]
+
+
+def _endpoint_body(verdict: str, threat_classes: list[str]) -> bytes:
+    return json.dumps(
+        {
+            "verdict": verdict,
+            "risk_level": "HIGH" if verdict != "ALLOW" else "NONE",
+            "threat_classes": threat_classes,
+            "detections": [],
+            "sanitized_payload": "",
+            "recommendation": "private endpoint recommendation",
+            "checks": {},
+            "latency_ms": 1.0,
+        }
+    ).encode("utf-8")
+
+
+@contextmanager
+def _endpoint(responder: Responder) -> Iterator[tuple[str, list[tuple[str, dict[str, object]]]]]:
+    received: list[tuple[str, dict[str, object]]] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_POST(self) -> None:
+            raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            body = json.loads(raw.decode("utf-8"))
+            received.append((self.path, body))
+            status, headers, response = responder(self.path, body)
+            self.send_response(status)
+            for name, value in headers.items():
+                self.send_header(name, value)
+            self.send_header("Content-Length", str(len(response)))
+            self.end_headers()
+            try:
+                self.wfile.write(response)
+            except OSError:
+                return
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}", received
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "scanner.example/scan",
+        "ftp://scanner.example/scan",
+        "file:///etc/warden/scan",
+        "https://operator@scanner.example/scan",
+        "https://scanner.example/scan#fragment",
+    ],
+)
+def test_endpoint_scanner_rejects_non_http_urls(endpoint: str) -> None:
+    with pytest.raises(ValueError, match="explicit HTTP or HTTPS URL"):
+        _endpoint_scanner(endpoint, timeout_seconds=5.0)
+
+
+def test_endpoint_scanner_reports_classes_without_retaining_payloads_or_responses(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    address = "0x" + "9" * 40
+    pack = VerifiedHardeningPack(
+        pack_id="pack-endpoint",
+        vectors=(
+            SelfTestVector(
+                vector_id="vector-1",
+                attack_class="PROMPT_INJECTION",
+                payload="private endpoint injection vector",
+                expected_verdict="SANITIZE",
+            ),
+            SelfTestVector(
+                vector_id="vector-2",
+                attack_class="DRAIN_ADDRESS",
+                payload="private endpoint drain vector",
+                expected_verdict="BLOCK",
+                depth="thorough",
+                expected_addresses=(address,),
+            ),
+        ),
+    )
+    path = tmp_path / "signed-pack.json"
+    path.write_text('{"opaque": "signed-envelope"}', encoding="utf-8")
+
+    def responder(
+        path_: str,
+        body: dict[str, object],
+    ) -> tuple[int, dict[str, str], bytes]:
+        if "injection" in str(body["payload"]):
+            return (
+                200,
+                {"Content-Type": "application/json"},
+                _endpoint_body(
+                    "SANITIZE",
+                    ["PROMPT_INJECTION"],
+                ),
+            )
+        return (
+            200,
+            {"Content-Type": "application/json"},
+            _endpoint_body(
+                "BLOCK",
+                ["DRAIN_ADDRESS"],
+            ),
+        )
+
+    with _endpoint(responder) as (base_url, received):
+        assert (
+            main(
+                [str(path), "--endpoint", f"{base_url}/scan"],
+                verifier=lambda document, *, source: pack,
+            )
+            == 0
+        )
+
+    assert received == [
+        ("/scan", {"payload": "private endpoint injection vector", "depth": "fast"}),
+        (
+            "/scan",
+            {
+                "payload": "private endpoint drain vector",
+                "depth": "thorough",
+                "context": {"expected_addresses": [address]},
+            },
+        ),
+    ]
+    output = capsys.readouterr().out
+    assert json.loads(output)["classes"] == {
+        "DRAIN_ADDRESS": {"total": 1, "passed": 1, "failed": 0},
+        "PROMPT_INJECTION": {"total": 1, "passed": 1, "failed": 0},
+    }
+    assert "private endpoint injection vector" not in output
+    assert "private endpoint drain vector" not in output
+    assert "private endpoint recommendation" not in output
+    assert address not in output
+
+
+def test_endpoint_scanner_rejects_endpoint_failure() -> None:
+    def responder(
+        path: str,
+        body: dict[str, object],
+    ) -> tuple[int, dict[str, str], bytes]:
+        return 503, {"Content-Type": "application/json"}, b'{"detail": "unavailable"}'
+
+    with _endpoint(responder) as (base_url, received):
+        scan = _endpoint_scanner(f"{base_url}/scan", timeout_seconds=10.0)
+
+        with pytest.raises(WardenError, match="endpoint returned HTTP 503"):
+            scan("private failure vector", depth="fast", expected_addresses=[])
+
+    assert len(received) == 1
+
+
+def test_endpoint_scanner_rejects_oversized_responses() -> None:
+    oversized = b'{"padding": "' + b"a" * MAX_PACK_BYTES + b'"}'
+
+    def responder(
+        path: str,
+        body: dict[str, object],
+    ) -> tuple[int, dict[str, str], bytes]:
+        return 200, {"Content-Type": "application/json"}, oversized
+
+    with _endpoint(responder) as (base_url, _received):
+        scan = _endpoint_scanner(f"{base_url}/scan", timeout_seconds=10.0)
+
+        with pytest.raises(WardenError, match="exceeds the size limit"):
+            scan("private oversized vector", depth="fast", expected_addresses=[])
+
+
+def test_endpoint_scanner_does_not_follow_redirects() -> None:
+    def responder(
+        path: str,
+        body: dict[str, object],
+    ) -> tuple[int, dict[str, str], bytes]:
+        if path == "/scan":
+            return 307, {"Location": "/scan-redirected"}, b""
+        return 200, {"Content-Type": "application/json"}, _endpoint_body("ALLOW", [])
+
+    with _endpoint(responder) as (base_url, received):
+        scan = _endpoint_scanner(f"{base_url}/scan", timeout_seconds=10.0)
+
+        with pytest.raises(WardenError, match="endpoint returned HTTP 307"):
+            scan("private redirect vector", depth="fast", expected_addresses=[])
+
+    assert [path for path, _body in received] == ["/scan"]

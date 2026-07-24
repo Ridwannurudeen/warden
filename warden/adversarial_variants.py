@@ -12,6 +12,7 @@ from urllib.parse import quote_from_bytes
 from uuid import uuid4
 
 from warden import feedback_store
+from warden.core.verdict import ReasonCode
 from warden.dataset_promotion import canonical_dataset_payload
 from warden.scanner.normalize import derive_candidates
 from warden.scanner.patterns import KNOWN_INJECTIONS
@@ -25,7 +26,10 @@ MAX_DATASET_BYTES = 10_000_000
 MAX_DATASET_ROWS = 10_000
 MAX_SOURCE_PAYLOAD_LENGTH = 4_000
 SOURCE_DATASET = "corpus/attacks.jsonl"
-GENERATOR_ID = "warden-adversarial-variants/2"
+GENERATOR_ID = "warden-adversarial-variants/3"
+SCHEMA_VERSION = 3
+INDEX_FILENAME = "index.json"
+THREAT_CLASSES = tuple(reason.value for reason in ReasonCode)
 
 _EXTERNAL_PROVENANCE_FIELDS = (
     "source_id",
@@ -66,7 +70,7 @@ _HOMOGLYPHS = str.maketrans(
 )
 
 
-def _load_jsonl(path: Path, *, label: str) -> list[dict[str, object]]:
+def load_dataset_rows(path: Path, *, label: str) -> list[dict[str, object]]:
     if path.is_symlink():
         raise ValueError(f"{label} dataset must not be a symlink")
     if not path.is_file():
@@ -114,7 +118,7 @@ def _validate_training_rows(
     for label, rows in (("training attacks", attacks), ("training benign", benign)):
         for row in rows:
             case_id = str(row["id"])
-            equivalence = _scanner_equivalence(str(row["payload"]))
+            equivalence = scanner_equivalence(str(row["payload"]))
             if case_id in seen_ids:
                 raise ValueError(f"{label} contains a duplicate case id")
             if equivalence in seen_equivalence_sets:
@@ -135,12 +139,13 @@ def _validate_training_rows(
             or not all(isinstance(item, str) and item for item in expected_classes)
         ):
             raise ValueError("training attack must contain category and expected_classes")
+        if category not in THREAT_CLASSES:
+            raise ValueError("training attack category must be a known Warden threat class")
 
 
-def _scanner_equivalence(payload: str) -> frozenset[str]:
+def scanner_equivalence(payload: str) -> frozenset[str]:
     derived = {
-        canonical_dataset_payload(candidate)
-        for candidate, _transform in derive_candidates(payload)
+        canonical_dataset_payload(candidate) for candidate, _transform in derive_candidates(payload)
     }
     return frozenset(derived or {canonical_dataset_payload(payload)})
 
@@ -150,10 +155,10 @@ def _validate_dataset_separation(
     held_out: list[dict[str, object]],
 ) -> None:
     training_equivalence = set().union(
-        *(_scanner_equivalence(str(row["payload"])) for row in training)
+        *(scanner_equivalence(str(row["payload"])) for row in training)
     )
     held_out_equivalence = set().union(
-        *(_scanner_equivalence(str(row["payload"])) for row in held_out)
+        *(scanner_equivalence(str(row["payload"])) for row in held_out)
     )
     if training_equivalence & held_out_equivalence:
         raise ValueError("training and held-out datasets contain scanner-equivalent payloads")
@@ -281,24 +286,23 @@ def _source_metadata(row: dict[str, object]) -> dict[str, object]:
     return metadata
 
 
-def build_variant_pack(
+def _build_variants(
     *,
     training_attacks_path: Path,
     training_benign_path: Path,
     held_out_attacks_path: Path,
     held_out_benign_path: Path,
-) -> dict[str, object]:
-    """Build a stable pack without transforming or copying held-out rows."""
+) -> list[dict[str, object]]:
     _validate_canonical_sources(
         training_attacks_path=training_attacks_path,
         training_benign_path=training_benign_path,
         held_out_attacks_path=held_out_attacks_path,
         held_out_benign_path=held_out_benign_path,
     )
-    training_attacks = _load_jsonl(training_attacks_path, label="training attacks")
-    training_benign = _load_jsonl(training_benign_path, label="training benign")
-    held_out_attacks = _load_jsonl(held_out_attacks_path, label="held-out attacks")
-    held_out_benign = _load_jsonl(held_out_benign_path, label="held-out benign")
+    training_attacks = load_dataset_rows(training_attacks_path, label="training attacks")
+    training_benign = load_dataset_rows(training_benign_path, label="training benign")
+    held_out_attacks = load_dataset_rows(held_out_attacks_path, label="held-out attacks")
+    held_out_benign = load_dataset_rows(held_out_benign_path, label="held-out benign")
     _validate_training_rows(training_attacks, training_benign)
     _validate_dataset_separation(
         [*training_attacks, *training_benign],
@@ -314,20 +318,14 @@ def build_variant_pack(
             *held_out_benign,
         )
     }
-    occupied_canonicals.update(
-        canonical_dataset_payload(payload) for payload in KNOWN_INJECTIONS
-    )
+    occupied_canonicals.update(canonical_dataset_payload(payload) for payload in KNOWN_INJECTIONS)
     held_out_equivalence = set().union(
-        *(
-            _scanner_equivalence(str(row["payload"]))
-            for row in (*held_out_attacks, *held_out_benign)
-        )
+        *(scanner_equivalence(str(row["payload"])) for row in (*held_out_attacks, *held_out_benign))
     )
     known_injection_equivalence = set().union(
-        *(_scanner_equivalence(payload) for payload in KNOWN_INJECTIONS)
+        *(scanner_equivalence(payload) for payload in KNOWN_INJECTIONS)
     )
 
-    generated_equivalence_sets: set[frozenset[str]] = set()
     variants: list[dict[str, object]] = []
     for row in sorted(training_attacks, key=lambda item: str(item["id"])):
         payload = str(row["payload"])
@@ -338,17 +336,16 @@ def build_variant_pack(
             normalized = canonical_dataset_payload(variant_payload)
             if normalized in occupied_canonicals:
                 continue
-            equivalence = _scanner_equivalence(variant_payload)
+            equivalence = scanner_equivalence(variant_payload)
             if source_normalized not in equivalence:
                 continue
             if equivalence & held_out_equivalence:
                 continue
             if equivalence & known_injection_equivalence:
                 continue
-            if equivalence in generated_equivalence_sets:
-                continue
-            generated_equivalence_sets.add(equivalence)
+            occupied_canonicals.add(normalized)
             variant: dict[str, object] = {
+                "threat_class": row["category"],
                 "source_case_id": row["id"],
                 "source_dataset": SOURCE_DATASET,
                 "transform_chain": list(transform_chain),
@@ -367,27 +364,84 @@ def build_variant_pack(
                     variant[field] = row[field]
             variants.append(variant)
 
+    return variants
+
+
+def _pack_header() -> dict[str, object]:
     return {
-        "schema_version": 2,
+        "schema_version": SCHEMA_VERSION,
         "generator": GENERATOR_ID,
         "source": "training-only",
         "corpus_fingerprint": feedback_store.corpus_fingerprint(),
-        "variants": variants,
     }
 
 
-def write_variant_pack(path: Path, pack: dict[str, object]) -> None:
-    """Atomically write one deterministic JSON pack."""
+def build_variant_packs(
+    *,
+    training_attacks_path: Path,
+    training_benign_path: Path,
+    held_out_attacks_path: Path,
+    held_out_benign_path: Path,
+) -> dict[str, dict[str, object]]:
+    """Build one stable pack per threat class without copying held-out rows."""
+    variants = _build_variants(
+        training_attacks_path=training_attacks_path,
+        training_benign_path=training_benign_path,
+        held_out_attacks_path=held_out_attacks_path,
+        held_out_benign_path=held_out_benign_path,
+    )
+    header = _pack_header()
+    return {
+        threat_class: {
+            **header,
+            "threat_class": threat_class,
+            "variants": [row for row in variants if row["threat_class"] == threat_class],
+        }
+        for threat_class in THREAT_CLASSES
+    }
+
+
+def _serialize_pack(pack: dict[str, object]) -> str:
+    return json.dumps(pack, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+
+
+def _write_atomic(path: Path, content: str) -> None:
     if path.exists() and path.is_symlink():
         raise ValueError("variant pack output must not be a symlink")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
     try:
         with temporary.open("x", encoding="utf-8", newline="\n") as handle:
-            json.dump(pack, handle, ensure_ascii=False, indent=2, sort_keys=True)
-            handle.write("\n")
+            handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def write_variant_packs(
+    directory: Path,
+    packs: dict[str, dict[str, object]],
+) -> dict[str, object]:
+    """Atomically write one deterministic pack per threat class plus an index."""
+    classes: list[dict[str, object]] = []
+    total = 0
+    for threat_class in THREAT_CLASSES:
+        pack = packs[threat_class]
+        serialized = _serialize_pack(pack)
+        _write_atomic(directory / f"{threat_class}.json", serialized)
+        rows = pack["variants"]
+        total += len(rows)
+        classes.append(
+            {
+                "threat_class": threat_class,
+                "file": f"{threat_class}.json",
+                "variants": len(rows),
+                "source_case_ids": sorted({str(row["source_case_id"]) for row in rows}),
+                "sha256": f"sha256:{hashlib.sha256(serialized.encode('utf-8')).hexdigest()}",
+            }
+        )
+    index = {**_pack_header(), "classes": classes, "total_variants": total}
+    _write_atomic(directory / INDEX_FILENAME, _serialize_pack(index))
+    return index

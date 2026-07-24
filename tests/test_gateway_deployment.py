@@ -1,5 +1,6 @@
 """Deployment contracts for the productized fail-closed Warden Gateway."""
 
+import subprocess
 from pathlib import Path
 
 
@@ -86,5 +87,41 @@ def test_gateway_runbook_covers_fail_closed_metrics_lifecycle_and_rollback():
         "chmod 0700 /var/lib/warden-gateway",
         "Rollback",
         "Hosted paid mode remains unsupported",
+        "sh scripts/smoke_gateway.sh",
     ):
         assert statement in normalized
+
+
+def test_gateway_smoke_script_is_an_executable_end_to_end_gate():
+    script = (ROOT / "scripts" / "smoke_gateway.sh").read_text(encoding="utf-8")
+    staged = subprocess.run(
+        ["git", "-C", str(ROOT), "ls-files", "--stage", "--", "scripts/smoke_gateway.sh"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+    ).stdout
+
+    assert staged.startswith("100755 ")
+    assert script.startswith("#!/bin/sh\n")
+    assert "set -eu" in script
+    assert "docker build --file deploy/Dockerfile.gateway --tag" in script
+
+    # A benign body reaches the upstream, and the drain-address body never does.
+    assert '[ "$benign_status" = "200" ]' in script
+    assert 'fail "the drain-address request reached the upstream"' in script
+    assert '[ "$blocked_status" = "403" ]' in script
+    assert "UPSTREAM-SAW-BLOCKED-PAYLOAD" in script
+
+    # The internal endpoints answer and stay metadata-only.
+    assert '[ "$health_status" = "200" ]' in script
+    assert '[ "$metrics_status" = "200" ]' in script
+    assert 'for content in "$DRAIN_ADDRESS" "quarterly report" "UPSTREAM-OK"; do' in script
+    assert "/metrics leaked request or response content" in script
+
+    # Every created resource is torn down and any failure exits non-zero.
+    assert "trap cleanup EXIT" in script
+    assert 'docker rm --force "$GATEWAY" "$UPSTREAM"' in script
+    assert 'docker volume rm --force "$VOLUME"' in script
+    assert 'docker network rm "$NETWORK"' in script
+    assert "exit 1" in script

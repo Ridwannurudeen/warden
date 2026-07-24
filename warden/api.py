@@ -1012,7 +1012,7 @@ async def apa_audit_attestation(audit_id: str) -> AuditEvidenceResponse | JSONRe
 )
 def shield_lineage(target_id: str) -> ShieldLineageResponse:
     try:
-        lineage = shield.get_certification_lineage(SHIELD_STATE_PATH, target_id)
+        lineage = shield.get_audit_evidence_lineage(SHIELD_STATE_PATH, target_id)
     except ValueError as exc:
         if str(exc).startswith("target_id must"):
             raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -17,13 +17,14 @@ from uuid import uuid4
 
 import httpx
 
-from warden import audit_attestations, badge_store, protection_store
+from warden import audit_attestations, audit_findings, badge_store, hardening, protection_store
 from warden.auditor import AgentAuditor
 from warden.badges import canonical_target, verify_badge
 
 SCHEMA_VERSION = 1
 MAX_TARGETS = 32
 MAX_EVENTS = 1_000
+MAX_NOTIFICATION_ATTEMPTS = 2
 MAX_CONFIG_BYTES = 128_000
 MAX_STATE_BYTES = 2_000_000
 MIN_INTERVAL_HOURS = 24
@@ -43,7 +44,9 @@ _TARGET_FIELDS = {
     "interval_hours",
     "battery",
 }
+_OPTIONAL_TARGET_FIELDS = {"delivery"}
 _BATTERY_FIELDS = {"id", "version", "sha256"}
+_DELIVERY_FIELDS = {"webhook_url"}
 _STATE_FIELDS = {"schema_version", "targets", "events"}
 _TARGET_STATE_FIELDS = {
     "target_id",
@@ -68,11 +71,10 @@ _BASELINE_FIELDS = {
     "issued_at",
     "expires_at",
 }
-_EVENT_FIELDS = {
+_REQUIRED_EVENT_FIELDS = {
     "schema_version",
     "event_id",
     "target_id",
-    "enrollment_revision",
     "comparison",
     "reason",
     "occurred_at",
@@ -81,7 +83,17 @@ _EVENT_FIELDS = {
     "action",
     "notification",
 }
-_LEGACY_EVENT_FIELDS = _EVENT_FIELDS - {"enrollment_revision"}
+# Both optional fields postdate the first lifecycle events, so a state file
+# written before they existed stays readable instead of failing validation.
+_OPTIONAL_EVENT_FIELDS = {"enrollment_revision", "hardening"}
+_EVENT_FIELDS = _REQUIRED_EVENT_FIELDS | _OPTIONAL_EVENT_FIELDS
+_HARDENING_FIELDS = {"status", "pack_id", "audit_id", "addressed_classes"}
+_HARDENING_STATUSES = {
+    "not_applicable",
+    "findings_unavailable",
+    "issue_failed",
+    "issued",
+}
 _COMPARISONS = {"initial", "unchanged", "improved", "regressed", "inconclusive"}
 _NOTIFICATION_STATES = {
     "not_applicable",
@@ -118,6 +130,7 @@ class ShieldTarget:
     battery_version: str
     battery_sha256: str
     enrollment_sha256: str
+    delivery_url: str | None
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -192,6 +205,34 @@ def _canonical_enrolled_url(value: object) -> str:
     return subject
 
 
+def _https_delivery_url(value: object) -> str:
+    if not isinstance(value, str) or not 1 <= len(value) <= 2_048:
+        raise ValueError("Shield notifier must be a valid HTTPS URL")
+    try:
+        parsed = urlsplit(value)
+        _ = parsed.port
+    except ValueError as exc:
+        raise ValueError("Shield notifier must be a valid HTTPS URL") from exc
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname is None
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.fragment
+    ):
+        raise ValueError("Shield notifier must be HTTPS without credentials or a fragment")
+    return value
+
+
+def _delivery(value: object) -> str | None:
+    """Read the owner's enrolled destination for this target's Shield alerts."""
+    if value is None:
+        return None
+    if not isinstance(value, dict) or set(value) != _DELIVERY_FIELDS:
+        raise ValueError("Shield delivery binding is malformed")
+    return _https_delivery_url(value.get("webhook_url"))
+
+
 def _bounded_identifier(value: object, *, label: str) -> str:
     if (
         not isinstance(value, str)
@@ -246,7 +287,10 @@ def load_shield_config(path: Path) -> tuple[ShieldTarget, ...]:
     target_ids: set[str] = set()
     target_urls: set[str] = set()
     for raw_target in document["targets"]:
-        if not isinstance(raw_target, dict) or set(raw_target) != _TARGET_FIELDS:
+        if (
+            not isinstance(raw_target, dict)
+            or not _TARGET_FIELDS <= set(raw_target) <= _TARGET_FIELDS | _OPTIONAL_TARGET_FIELDS
+        ):
             raise ValueError("Shield target enrollment is malformed")
         if raw_target.get("owner_enrolled") is not True:
             raise ValueError("Shield target requires explicit owner enrollment")
@@ -266,11 +310,12 @@ def load_shield_config(path: Path) -> tuple[ShieldTarget, ...]:
             )
         target_url = _canonical_enrolled_url(raw_target.get("target_url"))
         battery_id, battery_version, battery_sha256 = _battery(raw_target.get("battery"))
+        delivery_url = _delivery(raw_target.get("delivery"))
         if target_id in target_ids or target_url in target_urls:
             raise ValueError("Shield target IDs and URLs must be unique")
         target_ids.add(target_id)
         target_urls.add(target_url)
-        enrollment = {
+        enrollment: dict[str, object] = {
             "target_id": target_id,
             "owner_id": owner_id,
             "owner_enrolled": True,
@@ -283,6 +328,8 @@ def load_shield_config(path: Path) -> tuple[ShieldTarget, ...]:
                 "sha256": battery_sha256,
             },
         }
+        if delivery_url is not None:
+            enrollment["delivery"] = {"webhook_url": delivery_url}
         targets.append(
             ShieldTarget(
                 target_id=target_id,
@@ -294,6 +341,7 @@ def load_shield_config(path: Path) -> tuple[ShieldTarget, ...]:
                 battery_version=battery_version,
                 battery_sha256=battery_sha256,
                 enrollment_sha256=hashlib.sha256(_canonical_json(enrollment)).hexdigest(),
+                delivery_url=delivery_url,
             )
         )
     return tuple(sorted(targets, key=lambda target: target.target_id))
@@ -363,11 +411,36 @@ def _valid_baseline(value: object) -> bool:
     )
 
 
-def _valid_event(value: object) -> bool:
-    if not isinstance(value, dict) or set(value) not in (
-        _EVENT_FIELDS,
-        _LEGACY_EVENT_FIELDS,
+def _is_lower_hex(value: object, length: int) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == length
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _valid_hardening(value: object) -> bool:
+    if not isinstance(value, dict) or set(value) != _HARDENING_FIELDS:
+        return False
+    audit_id = value.get("audit_id")
+    classes = value.get("addressed_classes")
+    # Bounding the names to the implemented threat classes keeps a retained
+    # event's size fixed by the taxonomy rather than by pack content.
+    if (
+        value.get("status") not in _HARDENING_STATUSES
+        or (audit_id is not None and not _is_lower_hex(audit_id, 16))
+        or not isinstance(classes, list)
+        or len(classes) > len(hardening.CLASS_GUIDANCE)
+        or not all(isinstance(name, str) and name in hardening.CLASS_GUIDANCE for name in classes)
     ):
+        return False
+    if value["status"] == "issued":
+        return _is_lower_hex(value.get("pack_id"), 64) and audit_id is not None
+    return value.get("pack_id") is None and not classes
+
+
+def _valid_event(value: object) -> bool:
+    if not isinstance(value, dict) or not _REQUIRED_EVENT_FIELDS <= set(value) <= _EVENT_FIELDS:
         return False
     return (
         value.get("schema_version") == SCHEMA_VERSION
@@ -378,10 +451,7 @@ def _valid_event(value: object) -> bool:
         and 1 <= len(value["target_id"]) <= 64
         and (
             "enrollment_revision" not in value
-            or (
-                type(value.get("enrollment_revision")) is int
-                and value["enrollment_revision"] >= 1
-            )
+            or (type(value.get("enrollment_revision")) is int and value["enrollment_revision"] >= 1)
         )
         and value.get("comparison") in _COMPARISONS
         and isinstance(value.get("reason"), str)
@@ -393,6 +463,7 @@ def _valid_event(value: object) -> bool:
         and isinstance(value.get("action"), str)
         and 1 <= len(value["action"]) <= 256
         and value.get("notification") in _NOTIFICATION_STATES
+        and ("hardening" not in value or _valid_hardening(value["hardening"]))
     )
 
 
@@ -605,6 +676,61 @@ def _action(comparison: str, reason: str) -> str:
     return "Check consent, endpoint availability, and evidence integrity before retrying."
 
 
+def _hardening_state(status: str, *, audit_id: str | None = None) -> dict[str, object]:
+    return {
+        "status": status,
+        "pack_id": None,
+        "audit_id": audit_id,
+        "addressed_classes": [],
+    }
+
+
+def _hardening_outcome(
+    comparison: str,
+    observed: dict[str, object] | None,
+    *,
+    resolve_findings: Callable[[str], dict[str, object] | None],
+    publish_pack: Callable[[Mapping[str, object]], dict[str, object]],
+) -> dict[str, object]:
+    """Issue a signed remediation pack for a conclusive audit that needs one.
+
+    An inconclusive comparison is never a pack trigger: Shield refuses to build
+    remediation on evidence it also refuses to accept as a baseline.
+    """
+    if comparison == "inconclusive" or observed is None:
+        return _hardening_state("not_applicable")
+    audit_id = str(observed["audit_id"])
+    try:
+        findings = resolve_findings(audit_id)
+    except (OSError, RuntimeError, ValueError):
+        findings = None
+    entries = findings.get("findings") if isinstance(findings, dict) else None
+    if not isinstance(entries, list):
+        return _hardening_state("findings_unavailable", audit_id=audit_id)
+    missed = sum(
+        entry["missed"]
+        for entry in entries
+        if isinstance(entry, Mapping) and type(entry.get("missed")) is int
+    )
+    if comparison != "regressed" and missed <= 0:
+        return _hardening_state("not_applicable", audit_id=audit_id)
+
+    try:
+        record = publish_pack(findings)
+    except (OSError, RuntimeError, ValueError):
+        return _hardening_state("issue_failed", audit_id=audit_id)
+    classes = record.get("addressed_classes") if isinstance(record, dict) else None
+    state = {
+        "status": "issued",
+        "pack_id": record.get("pack_id") if isinstance(record, dict) else None,
+        "audit_id": audit_id,
+        "addressed_classes": list(classes) if isinstance(classes, list) else None,
+    }
+    if not _valid_hardening(state) or record.get("audit_id") != audit_id:
+        return _hardening_state("issue_failed", audit_id=audit_id)
+    return state
+
+
 def _event(
     *,
     target_id: str,
@@ -614,6 +740,7 @@ def _event(
     occurred_at: int,
     previous: dict[str, object] | None,
     observed: dict[str, object] | None,
+    hardening_state: dict[str, object],
 ) -> dict[str, object]:
     core = {
         "target_id": target_id,
@@ -624,13 +751,19 @@ def _event(
         "previous_evidence": previous,
         "observed_evidence": observed,
     }
-    alert = comparison in {"regressed", "inconclusive"}
+    alert = comparison in {"regressed", "inconclusive"} or hardening_state["status"] in {
+        "issued",
+        "issue_failed",
+    }
     return {
         "schema_version": SCHEMA_VERSION,
+        # The pack outcome is deliberately outside the hashed core: it is what
+        # happened after the observation, not part of the observation's identity.
         "event_id": hashlib.sha256(_canonical_json(core)).hexdigest()[:32],
         **core,
         "action": _action(comparison, reason),
         "notification": "pending" if alert else "not_applicable",
+        "hardening": hardening_state,
     }
 
 
@@ -663,7 +796,7 @@ def _attestation_matches_observation(
     )
 
 
-def get_certification_lineage(
+def get_audit_evidence_lineage(
     state_path: Path,
     target_id: str,
     *,
@@ -703,9 +836,8 @@ def get_certification_lineage(
         if not isinstance(evidence, dict):
             raise ValueError("Shield lineage evidence is unavailable")
         attestation = evidence.get("attestation")
-        if (
-            not isinstance(attestation, dict)
-            or not audit_attestations.verify_audit_attestation(attestation)
+        if not isinstance(attestation, dict) or not audit_attestations.verify_audit_attestation(
+            attestation
         ):
             raise ValueError("Shield lineage evidence failed issuer verification")
         if not _attestation_matches_observation(attestation, observed):
@@ -756,11 +888,12 @@ def alert_payload(event: Mapping[str, object]) -> dict[str, object]:
         "previous_evidence": event["previous_evidence"],
         "observed_evidence": event["observed_evidence"],
         "action": event["action"],
+        "hardening": event.get("hardening"),
     }
 
 
 class HttpsShieldNotifier:
-    """Deliver bounded Shield drift metadata to one operator HTTPS webhook."""
+    """Deliver bounded Shield drift metadata to one enrolled HTTPS webhook."""
 
     def __init__(
         self,
@@ -768,20 +901,7 @@ class HttpsShieldNotifier:
         *,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        try:
-            parsed = urlsplit(url)
-            _ = parsed.port
-        except ValueError as exc:
-            raise ValueError("Shield notifier must be a valid HTTPS URL") from exc
-        if (
-            parsed.scheme != "https"
-            or parsed.hostname is None
-            or parsed.username is not None
-            or parsed.password is not None
-            or parsed.fragment
-        ):
-            raise ValueError("Shield notifier must be HTTPS without credentials or a fragment")
-        self._url = url
+        self._url = _https_delivery_url(url)
         self._transport = transport
 
     async def notify(self, event: Mapping[str, object]) -> None:
@@ -816,7 +936,20 @@ def _summary(configured: int) -> dict[str, int]:
         "inconclusive": 0,
         "notifications_delivered": 0,
         "notification_failures": 0,
+        "hardening_packs_issued": 0,
+        "hardening_failures": 0,
     }
+
+
+async def _deliver(notifier: ShieldNotifier, event: Mapping[str, object]) -> bool:
+    """Attempt bounded delivery, reusing one idempotency key across attempts."""
+    for _attempt in range(MAX_NOTIFICATION_ATTEMPTS):
+        try:
+            await notifier.notify(event)
+        except (httpx.HTTPError, ValueError):
+            continue
+        return True
+    return False
 
 
 async def run_due_audits(
@@ -825,7 +958,10 @@ async def run_due_audits(
     *,
     auditor: Auditor | None = None,
     evidence_resolver: Callable[[str], dict[str, object]] | None = None,
+    findings_resolver: Callable[[str], dict[str, object] | None] | None = None,
+    pack_publisher: Callable[[Mapping[str, object]], dict[str, object]] | None = None,
     notifier: ShieldNotifier | None = None,
+    notifier_factory: Callable[[str], ShieldNotifier] | None = None,
     now: int | None = None,
 ) -> dict[str, int]:
     """Audit only due enrollments and persist bounded comparison evidence."""
@@ -835,6 +971,9 @@ async def run_due_audits(
     targets = load_shield_config(config_path)
     audit_client = auditor or AgentAuditor()
     resolve_evidence = evidence_resolver or _resolve_published_evidence
+    resolve_findings = findings_resolver or audit_findings.get_findings
+    publish_pack = pack_publisher or hardening.publish_pack
+    build_notifier = notifier_factory or HttpsShieldNotifier
     summary = _summary(len(targets))
 
     with _exclusive_state_lock(state_path):
@@ -926,6 +1065,16 @@ async def run_due_audits(
                 "reason": reason,
                 "baseline": baseline,
             }
+            hardening_state = _hardening_outcome(
+                comparison,
+                observed,
+                resolve_findings=resolve_findings,
+                publish_pack=publish_pack,
+            )
+            if hardening_state["status"] == "issued":
+                summary["hardening_packs_issued"] += 1
+            elif hardening_state["status"] == "issue_failed":
+                summary["hardening_failures"] += 1
             event = _event(
                 target_id=target.target_id,
                 enrollment_revision=target.enrollment_revision,
@@ -934,6 +1083,7 @@ async def run_due_audits(
                 occurred_at=current,
                 previous=previous,
                 observed=observed,
+                hardening_state=hardening_state,
             )
             events.append(event)
             del events[:-MAX_EVENTS]
@@ -941,17 +1091,19 @@ async def run_due_audits(
             _write_state(state_path, state)
 
             if event["notification"] == "pending":
-                if notifier is None:
+                target_notifier = (
+                    build_notifier(target.delivery_url)
+                    if target.delivery_url is not None
+                    else notifier
+                )
+                if target_notifier is None:
                     event["notification"] = "not_configured"
+                elif await _deliver(target_notifier, event):
+                    event["notification"] = "delivered"
+                    summary["notifications_delivered"] += 1
                 else:
-                    try:
-                        await notifier.notify(event)
-                    except (httpx.HTTPError, ValueError):
-                        event["notification"] = "failed"
-                        summary["notification_failures"] += 1
-                    else:
-                        event["notification"] = "delivered"
-                        summary["notifications_delivered"] += 1
+                    event["notification"] = "failed"
+                    summary["notification_failures"] += 1
                 _write_state(state_path, state)
 
         _write_state(state_path, state)
@@ -971,5 +1123,6 @@ def service_exit_code(summary: Mapping[str, int]) -> int:
         if summary.get("regressed", 0)
         or summary.get("inconclusive", 0)
         or summary.get("notification_failures", 0)
+        or summary.get("hardening_failures", 0)
         else 0
     )

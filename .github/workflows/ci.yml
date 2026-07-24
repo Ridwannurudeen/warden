@@ -148,6 +148,8 @@ jobs:
         run: python spec/verify_apa.py --selftest
       - name: Verify APA conformance vectors
         run: python spec/run_conformance.py
+      - name: Verify adversarial variant packs are deterministic and separated
+        run: python scripts/verify_variant_packs.py
       - name: Lint Python
         run: ruff check .
       - name: Test Warden
@@ -171,3 +173,11 @@ jobs:
       - name: Validate TypeScript SDK package
         run: npm pack --dry-run
         working-directory: sdk/ts
+  gateway-container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Build the gateway container and run the fail-closed smoke gate
+        run: sh scripts/smoke_gateway.sh

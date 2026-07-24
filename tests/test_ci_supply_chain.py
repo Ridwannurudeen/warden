@@ -90,7 +90,11 @@ def test_secret_scan_is_read_only_has_full_history_and_fails_on_detected_credent
     assert "pull-requests: write" not in workflow
     assert "security-events: write" not in workflow
     assert "trufflesecurity/trufflehog@" not in workflow
-    assert workflow.count("persist-credentials: false") == 2
+    # Every checkout must drop the credential, so pin the count to the number of
+    # checkouts rather than a literal. A new job that forgets the setting fails here.
+    checkout_count = workflow.count("uses: actions/checkout@")
+    assert checkout_count >= 2
+    assert workflow.count("persist-credentials: false") == checkout_count
 
 
 def test_dependency_updates_require_reviewed_lock_refresh_and_full_gates() -> None:
