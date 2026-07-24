@@ -9,7 +9,7 @@ from pydantic import Field
 from warden.audit_findings import get_findings
 from warden.auditor import AgentAuditor
 from warden.engine import WardenEngine
-from warden.hardening import build_pack
+from warden.hardening import publish_pack
 from warden.models import (
     AuditRequest,
     AuditResponse,
@@ -90,7 +90,7 @@ async def harden_agent(
             "no retained findings for that audit_id; findings exist only for a "
             "conclusive, consented audit that issued signed evidence"
         )
-    return HardenResponse.model_validate(build_pack(findings)).model_dump()
+    return HardenResponse.model_validate(publish_pack(findings)).model_dump()
 
 
 if __name__ == "__main__":

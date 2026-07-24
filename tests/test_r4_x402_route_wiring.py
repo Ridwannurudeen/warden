@@ -7,11 +7,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from warden.badges import b64u_encode
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_real_paid_routes_are_wired_to_local_verification_and_settlement() -> None:
+def test_real_paid_routes_are_wired_to_local_verification_and_settlement(tmp_path) -> None:
     script = r"""
 import socket
 
@@ -202,6 +206,11 @@ assert api._facilitator_http_client.is_closed is True
             "OKX_BASE_URL": "https://web3.okx.com",
             "PAY_TO_ADDRESS": "0x0000000000000000000000000000000000000001",
             "WARDEN_BADGE_SECRET": "local-route-test-badge-secret",
+            "WARDEN_ISSUER_KEY": b64u_encode(
+                Ed25519PrivateKey.generate().private_bytes_raw(),
+                "ed25519-seed",
+            ),
+            "WARDEN_PROTECTION_DB": str(tmp_path / "protection.db"),
             "WARDEN_RATE_LIMIT_PER_MIN": "0",
             "WARDEN_REQUIRE_PAYWALL": "1",
         }

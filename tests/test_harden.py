@@ -8,11 +8,13 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi import HTTPException
 
 from warden import api, audit_findings
 from warden.audit_findings import get_findings, record_findings
 from warden.auditor import AgentAuditor, AuditOutcome
+from warden.badges import b64u_encode
 from warden.core.verdict import ReasonCode
 from warden.hardening import build_pack
 from warden.models import HardenRequest
@@ -23,6 +25,12 @@ ROOT = Path(__file__).resolve().parents[1]
 @pytest.fixture(autouse=True)
 def _isolated_findings_store(tmp_path, monkeypatch):
     monkeypatch.setattr(audit_findings, "_STORE_PATH", tmp_path / "findings.jsonl")
+    issuer_key = Ed25519PrivateKey.generate()
+    monkeypatch.setenv(
+        "WARDEN_ISSUER_KEY",
+        b64u_encode(issuer_key.private_bytes_raw(), "ed25519-seed"),
+    )
+    monkeypatch.setenv("WARDEN_PROTECTION_DB", str(tmp_path / "protection.db"))
 
 
 def _record(

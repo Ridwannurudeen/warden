@@ -60,6 +60,16 @@ AUDIT_LOG_ENTRY_FIELDS = {
     "record_hash",
     "prev_hash",
 }
+HARDENING_LOG_ENTRY_FIELDS = {
+    "seq",
+    "ts",
+    "event",
+    "record_type",
+    "pack_id",
+    "audit_id",
+    "record_hash",
+    "prev_hash",
+}
 
 _LOCK = Lock()
 
@@ -115,6 +125,13 @@ CREATE TABLE IF NOT EXISTS audit_revocations (
     revoked_at INTEGER NOT NULL,
     log_seq INTEGER NOT NULL UNIQUE,
     FOREIGN KEY (audit_id) REFERENCES audit_attestations(audit_id)
+);
+CREATE TABLE IF NOT EXISTS hardening_packs (
+    pack_id TEXT PRIMARY KEY,
+    audit_id TEXT NOT NULL UNIQUE,
+    issued_at INTEGER NOT NULL,
+    log_seq INTEGER NOT NULL UNIQUE,
+    record_json TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS probe_leases (
     lease_id TEXT PRIMARY KEY,
@@ -405,6 +422,14 @@ def _is_valid_log_entry(entry: object) -> bool:
             or not _is_lower_hex(entry.get("audit_id"), 16)
             or not isinstance(entry.get("endpoint_host"), str)
             or not entry["endpoint_host"]
+        ):
+            return False
+    elif record_type == "hardening-pack":
+        if (
+            fields != HARDENING_LOG_ENTRY_FIELDS
+            or entry.get("event") != "hardening-pack-issued"
+            or not _is_lower_hex(entry.get("pack_id"), 64)
+            or not _is_lower_hex(entry.get("audit_id"), 16)
         ):
             return False
     elif record_type is not None:
@@ -1058,6 +1083,156 @@ def get_audit_attestation_with_evidence(
             "status": "revoked",
             "revoked_at": revoked_at,
         }
+
+
+def _hardening_log_entry_matches(
+    entry: dict[str, object],
+    record: dict[str, object],
+    log_seq: int,
+) -> bool:
+    return entry == {
+        "seq": log_seq,
+        "ts": record.get("issued_at"),
+        "event": "hardening-pack-issued",
+        "record_type": "hardening-pack",
+        "pack_id": record.get("pack_id"),
+        "audit_id": record.get("audit_id"),
+        "record_hash": hashlib.sha256(
+            _canonical_json(record).encode("utf-8")
+        ).hexdigest(),
+        "prev_hash": entry.get("prev_hash"),
+    }
+
+
+def commit_hardening_pack(
+    *,
+    pack_id: str,
+    audit_id: str,
+    record_factory: Callable[[int], dict[str, object]],
+    record_validator: Callable[[dict[str, object]], bool],
+) -> dict[str, object]:
+    """Sign, store, and hash-chain one immutable hardening pack atomically."""
+    with _LOCK, _connect() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        existing_row = connection.execute(
+            "SELECT record_json, log_seq, pack_id FROM hardening_packs WHERE audit_id = ?",
+            (audit_id,),
+        ).fetchone()
+        if existing_row is not None:
+            try:
+                existing = json.loads(existing_row[0])
+            except (json.JSONDecodeError, TypeError) as exc:
+                raise ProtectionStateConflict(
+                    "stored hardening pack contains invalid JSON"
+                ) from exc
+            if (
+                not isinstance(existing, dict)
+                or existing.get("audit_id") != audit_id
+                or existing.get("pack_id") != existing_row[2]
+                or not record_validator(existing)
+            ):
+                raise ProtectionStateConflict("stored hardening pack failed verification")
+            _, entries, head_hash = _read_log_head(connection)
+            _read_anchored_checkpoint(connection, len(entries), head_hash)
+            log_seq = existing_row[1]
+            if (
+                type(log_seq) is not int
+                or not 1 <= log_seq <= len(entries)
+                or existing.get("log_seq") != log_seq
+                or not _hardening_log_entry_matches(
+                    entries[log_seq - 1],
+                    existing,
+                    log_seq,
+                )
+            ):
+                raise ProtectionStateConflict(
+                    "stored hardening pack has no matching log entry"
+                )
+            return existing
+
+        next_seq, prev_hash = _next_log_position(connection)
+        record = record_factory(next_seq)
+        if (
+            not isinstance(record, dict)
+            or record.get("pack_id") != pack_id
+            or record.get("audit_id") != audit_id
+            or record.get("log_seq") != next_seq
+            or not record_validator(record)
+        ):
+            raise ValueError("hardening pack failed issuer verification")
+        issued_at = record.get("issued_at")
+        if type(issued_at) is not int:
+            raise ValueError("hardening pack issued_at is invalid")
+        entry = {
+            "seq": next_seq,
+            "ts": issued_at,
+            "event": "hardening-pack-issued",
+            "record_type": "hardening-pack",
+            "pack_id": pack_id,
+            "audit_id": audit_id,
+            "record_hash": hashlib.sha256(
+                _canonical_json(record).encode("utf-8")
+            ).hexdigest(),
+            "prev_hash": prev_hash,
+        }
+        connection.execute(
+            "INSERT INTO hardening_packs "
+            "(pack_id, audit_id, issued_at, log_seq, record_json) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                pack_id,
+                audit_id,
+                issued_at,
+                next_seq,
+                _canonical_json(record),
+            ),
+        )
+        _write_log_entry(connection, entry)
+    return record
+
+
+def get_hardening_pack_with_evidence(
+    pack_id: str,
+    *,
+    record_validator: Callable[[dict[str, object]], bool],
+) -> dict[str, object] | None:
+    """Return a pack only while its signed record and anchored log binding are intact."""
+    with _LOCK, _connect() as connection:
+        row = connection.execute(
+            "SELECT record_json, log_seq FROM hardening_packs WHERE pack_id = ?",
+            (pack_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        try:
+            record = json.loads(row[0])
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise ProtectionStateConflict(
+                "stored hardening pack contains invalid JSON"
+            ) from exc
+        if (
+            not isinstance(record, dict)
+            or record.get("pack_id") != pack_id
+            or not record_validator(record)
+        ):
+            raise ProtectionStateConflict("stored hardening pack failed verification")
+        _, entries, head_hash = _read_log_head(connection)
+        _read_anchored_checkpoint(connection, len(entries), head_hash)
+        log_seq = row[1]
+        if (
+            type(log_seq) is not int
+            or not 1 <= log_seq <= len(entries)
+            or record.get("log_seq") != log_seq
+            or not _hardening_log_entry_matches(
+                entries[log_seq - 1],
+                record,
+                log_seq,
+            )
+        ):
+            raise ProtectionStateConflict(
+                "stored hardening pack has no matching log entry"
+            )
+        return record
 
 
 def commit_registration(

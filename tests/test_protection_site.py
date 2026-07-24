@@ -22,6 +22,7 @@ def test_preview_routes_all_apa_and_issuer_requests_to_the_api(tmp_path, monkeyp
 
     assert _is_api_path("/apa/log") is True
     assert _is_api_path("/apa/attestation/missing") is True
+    assert _is_api_path("/harden") is True
     assert _is_api_path("/.well-known/apa-issuer.json") is True
     assert _is_api_path("/log.js") is False
 
@@ -53,6 +54,7 @@ def test_log_page_is_csp_compatible_and_states_the_verification_boundary():
     assert re.search(r'<script src="/log\.js\?v=[0-9a-f]{8}" defer></script>', page)
     assert "independently timestamped or witnessed" in page
     assert "coherent database rollback" in page
+    assert "hardening-pack issuance" in page
     assert "fetchLogPages" in script
     assert "`/apa/log?cursor=${cursor}&limit=${pageSize}`" in script
     assert 'accept: "application/json"' in script
@@ -67,6 +69,7 @@ def test_nginx_proxies_apa_and_issuer_routes_without_changing_static_fallbacks()
     nginx = (ROOT / "deploy" / "nginx-warden.conf").read_text(encoding="utf-8")
 
     assert "location /apa/" in nginx
+    assert "location = /harden" in nginx
     assert "location = /.well-known/apa-issuer.json" in nginx
     assert nginx.count("proxy_pass http://127.0.0.1:8031;") >= 7
     assert "try_files $uri $uri.html =404;" in nginx

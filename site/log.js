@@ -38,6 +38,16 @@
     "record_hash",
     "prev_hash",
   ]);
+  const HARDENING_LOG_ENTRY_FIELDS = new Set([
+    "seq",
+    "ts",
+    "event",
+    "record_type",
+    "pack_id",
+    "audit_id",
+    "record_hash",
+    "prev_hash",
+  ]);
   const LOG_CHECKPOINT_VERSION = "apa-log/0.1";
 
   function canonicalValue(value) {
@@ -127,6 +137,27 @@
       if (typeof entry.endpoint_host !== "string" || !entry.endpoint_host) {
         throw new Error(
           `Entry ${index + 1} endpoint_host must be a non-empty string`,
+        );
+      }
+    } else if (recordType === "hardening-pack") {
+      expectedFields = HARDENING_LOG_ENTRY_FIELDS;
+      entryType = "hardening-pack";
+      if (entry.event !== "hardening-pack-issued") {
+        throw new Error(
+          `Entry ${index + 1} event must be hardening-pack-issued for hardening evidence`,
+        );
+      }
+      if (typeof entry.pack_id !== "string" || !HEX_HASH.test(entry.pack_id)) {
+        throw new Error(
+          `Entry ${index + 1} pack_id must be 64 lowercase hex characters`,
+        );
+      }
+      if (
+        typeof entry.audit_id !== "string" ||
+        !AUDIT_ID.test(entry.audit_id)
+      ) {
+        throw new Error(
+          `Entry ${index + 1} audit_id must be 16 lowercase hex characters`,
         );
       }
     } else if (Object.prototype.hasOwnProperty.call(entry, "record_type")) {
@@ -1028,6 +1059,15 @@
         createFact("Observed", formatTimestamp(entry.ts), true),
         createFact("Audit ID", entry.audit_id, true),
         createFact("Lifecycle event", entry.event, false),
+        createFact("Record hash", entry.record_hash, true),
+        createFact("Previous hash", entry.prev_hash, true),
+      );
+    } else if (entry.record_type === "hardening-pack") {
+      summary.textContent = `Hardening Pack · audit ${entry.audit_id}`;
+      facts.append(
+        createFact("Observed", formatTimestamp(entry.ts), true),
+        createFact("Pack ID", entry.pack_id, true),
+        createFact("Source audit", entry.audit_id, true),
         createFact("Record hash", entry.record_hash, true),
         createFact("Previous hash", entry.prev_hash, true),
       );

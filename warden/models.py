@@ -415,6 +415,14 @@ class HardenExample(BaseModel):
     id: str
     payload: str
     expected_verdict: str
+    source_id: str
+    source_revision: str | None
+    source_path: str | None
+    source_record_id: str | None
+    source_url: str | None
+    source_file_sha256: str | None = Field(pattern=r"^[0-9a-f]{64}$")
+    license_spdx: list[str]
+    license_url: str | None
 
 
 class HardenRemediation(BaseModel):
@@ -430,6 +438,10 @@ class HardenRemediation(BaseModel):
 
 
 class HardenResponse(BaseModel):
+    spec_version: Literal["warden-hardening-pack/0.1"]
+    predicate_type: Literal["https://warden.gudman.xyz/spec/hardening-pack/v1"]
+    pack_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    issuer: Literal["warden"]
     schema_version: Literal[1]
     audit_id: str = Field(pattern=r"^[0-9a-f]{16}$")
     target_host: str
@@ -440,6 +452,16 @@ class HardenResponse(BaseModel):
     addressed_classes: list[str]
     remediation: list[HardenRemediation]
     integration: dict[str, str]
+    limitations: str
+    message: str
+    issued_at: int = Field(ge=0)
+    log_seq: int = Field(ge=1)
+    issuer_sig: str = Field(pattern=r"^sig:")
+
+
+class HardenEvidenceResponse(BaseModel):
+    pack: HardenResponse | None
+    verified: bool
     limitations: str
 
 

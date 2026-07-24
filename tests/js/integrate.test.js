@@ -61,6 +61,7 @@ test("integration examples take service identifiers, prices, and endpoints from 
     assert.match(combined, new RegExp(`${service.feeAmount} USDT`));
     assert.doesNotMatch(combined, /31669|31670|18954|18955/);
     assert.doesNotMatch(combined, /PRIVATE_KEY|SECRET_KEY|sk_live_/);
+    assert.match(examples.mcp, /scan_payload, audit_agent, and harden_agent/);
   }
 });
 

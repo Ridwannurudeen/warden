@@ -496,7 +496,7 @@ const result = await warden.scan(untrustedText);</code></pre>
           <header>
             <div>
               <p class="eyebrow">MCP / FastMCP stdio</p>
-              <h3>Run the local engine as two tools</h3>
+              <h3>Run the local engine as three tools</h3>
             </div>
             <button
               class="copy-button"
@@ -508,8 +508,10 @@ const result = await warden.scan(untrustedText);</code></pre>
           </header>
           <p>
             From a trusted Warden checkout, local MCP exposes
-            <code>scan_payload</code> and <code>audit_agent</code>. It does not
-            purchase the hosted x402 service.
+            <code>scan_payload</code>, <code>audit_agent</code>, and
+            <code>harden_agent</code>. The hardening tool accepts a completed
+            audit ID and returns its issuer-signed, transparency-logged pack. It
+            does not purchase the hosted x402 service.
           </p>
           <pre><code id="mcp-snippet" data-integration-example="mcp">Local MCP configuration not available.</code></pre>
         </article>
@@ -748,6 +750,6 @@ safe_text = guard(untrusted_text)</code></pre>
       </nav>
     </footer>
     <script src="/app.js?v=e888a292" defer></script>
-    <script src="/integrate.js?v=bd7dccfa" defer></script>
+    <script src="/integrate.js?v=f8ab64c2" defer></script>
   </body>
 </html>

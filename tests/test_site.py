@@ -921,7 +921,9 @@ def test_home_playground_badges_integrations_and_status_are_real_surfaces():
     assert 'rel="canonical" href="https://warden.gudman.xyz/badge"' in badge
     for label in ("OnchainOS", "Raw x402", "Python", "TypeScript", "MCP"):
         assert label in integrate
-    assert "scan_payload" in integrate and "audit_agent" in integrate
+    assert all(
+        tool in integrate for tool in ("scan_payload", "audit_agent", "harden_agent")
+    )
     assert "historical uptime" in status.lower()
     assert "transaction-specific" in status.lower()
 

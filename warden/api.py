@@ -22,6 +22,7 @@ from warden import (
     __version__,
     audit_attestations,
     feedback_store,
+    hardening,
     protection,
     protection_store,
     shield,
@@ -29,7 +30,6 @@ from warden import (
 )
 from warden.audit_findings import get_findings
 from warden.auditor import AgentAuditor
-from warden.hardening import build_pack
 from warden.core.verdict import ReasonCode, Verdict
 from warden.engine import WardenEngine
 from warden.gauntlet_store import (
@@ -66,6 +66,7 @@ from warden.models import (
     GauntletResponse,
     GauntletStats,
     HardenRequest,
+    HardenEvidenceResponse,
     HardenResponse,
     HealthResponse,
     ReadinessCheck,
@@ -271,7 +272,14 @@ _HARDEN_INPUT = {
 }
 _HARDEN_OUTPUT = {
     "type": "json",
-    "example": {"addressed_classes": ["SECRET_EXFIL"], "remediation": []},
+    "example": {
+        "spec_version": "warden-hardening-pack/0.1",
+        "pack_id": "0" * 64,
+        "audit_id": "0123456789abcdef",
+        "addressed_classes": ["SECRET_EXFIL"],
+        "message": "Hardening guidance for 1 missed threat class.",
+        "issuer_sig": "sig:<base64url-ed25519-signature>",
+    },
 }
 
 _PAYMENT_OUTPUT_SCHEMAS = {
@@ -861,7 +869,17 @@ async def harden(req: HardenRequest) -> HardenResponse:
                 "conclusive, consented audit that issued signed evidence."
             ),
         )
-    return HardenResponse.model_validate(build_pack(findings))
+    try:
+        record = hardening.publish_pack(findings)
+    except (
+        protection_store.LogCheckpointMissing,
+        protection_store.ProtectionStateConflict,
+    ) as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Hardening pack evidence is invalid",
+        ) from exc
+    return HardenResponse.model_validate(record)
 
 
 @app.get("/harden", response_model=HardenResponse)
@@ -878,6 +896,40 @@ async def harden_get(request: Request) -> HardenResponse:
             ),
         ) from exc
     return await harden(req)
+
+
+@app.get(
+    "/apa/hardening/{pack_id}",
+    response_model=HardenEvidenceResponse,
+    responses={409: {"model": HardenEvidenceResponse}},
+)
+async def apa_hardening_pack(
+    pack_id: str,
+) -> HardenEvidenceResponse | JSONResponse:
+    try:
+        record = protection_store.get_hardening_pack_with_evidence(
+            pack_id,
+            record_validator=hardening.verify_pack,
+        )
+    except (
+        protection_store.LogCheckpointMissing,
+        protection_store.ProtectionStateConflict,
+    ):
+        return JSONResponse(
+            status_code=409,
+            content={
+                "pack": None,
+                "verified": False,
+                "limitations": hardening.LIMITATIONS,
+            },
+        )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Hardening pack not found")
+    return HardenEvidenceResponse(
+        pack=HardenResponse.model_validate(record),
+        verified=hardening.verify_pack(record),
+        limitations=hardening.LIMITATIONS,
+    )
 
 
 @app.get("/badge/{audit_id}")
