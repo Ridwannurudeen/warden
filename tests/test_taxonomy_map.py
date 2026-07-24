@@ -99,6 +99,26 @@ def test_every_external_taxonomy_cites_a_source_url_and_a_retrieval_date() -> No
     assert TAXONOMIES["OWASP-MCP-2025"]["license"] == "CC BY-NC-SA 4.0"
 
 
+def test_mcp06_title_is_pinned_to_the_current_version_index_and_records_conflict() -> None:
+    taxonomy = TAXONOMIES["OWASP-MCP-2025"]
+
+    assert taxonomy["categories"]["MCP06:2025"] == "Prompt Injection via Contextual Payloads"
+    assert taxonomy["title_resolution"] == {
+        "category_id": "MCP06:2025",
+        "selected_source": "https://owasp.org/www-project-mcp-top-10/",
+        "selected_title": "Prompt Injection via Contextual Payloads",
+        "conflicting_source": (
+            "https://owasp.org/www-project-mcp-top-10/2025/"
+            "MCP06-2025%E2%80%93Intent-Flow-Subversion"
+        ),
+        "conflicting_title": "Intent Flow Subversion",
+        "rule": (
+            "The version index retrieved on 2026-07-24 is the pinned category-title "
+            "authority; the conflicting detail page is recorded but not silently preferred."
+        ),
+    }
+
+
 def test_every_reason_code_has_an_entry() -> None:
     assert set(REASON_CODES) == {reason.value for reason in ReasonCode}
 

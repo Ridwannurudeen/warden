@@ -73,6 +73,14 @@
       "license": "CC BY-NC-SA 4.0",
       "attribution": "Category identifiers and titles are quoted from the OWASP MCP Top 10 project, OWASP Foundation, licensed CC BY-NC-SA 4.0. OWASP does not endorse Warden.",
       "maturity_note": "This project is an OWASP incubator in beta (Phase 3, beta release and pilot testing). Its identifiers may change before final release, so mappings against it are the least stable in this file.",
+      "title_resolution": {
+        "category_id": "MCP06:2025",
+        "selected_source": "https://owasp.org/www-project-mcp-top-10/",
+        "selected_title": "Prompt Injection via Contextual Payloads",
+        "conflicting_source": "https://owasp.org/www-project-mcp-top-10/2025/MCP06-2025%E2%80%93Intent-Flow-Subversion",
+        "conflicting_title": "Intent Flow Subversion",
+        "rule": "The version index retrieved on 2026-07-24 is the pinned category-title authority; the conflicting detail page is recorded but not silently preferred."
+      },
       "id_pattern": "^MCP(0[1-9]|10):2025$",
       "categories": {
         "MCP01:2025": "Token Mismanagement & Secret Exposure",
@@ -80,7 +88,7 @@
         "MCP03:2025": "Tool Poisoning",
         "MCP04:2025": "Software Supply Chain Attacks & Dependency Tampering",
         "MCP05:2025": "Command Injection & Execution",
-        "MCP06:2025": "Intent Flow Subversion",
+        "MCP06:2025": "Prompt Injection via Contextual Payloads",
         "MCP07:2025": "Insufficient Authentication & Authorization",
         "MCP08:2025": "Lack of Audit and Telemetry",
         "MCP09:2025": "Shadow MCP Servers",
@@ -102,7 +110,7 @@
         },
         "OWASP-MCP-2025": {
           "ids": ["MCP06:2025"],
-          "rationale": "MCP06 covers malicious instructions embedded in retrieved context that steer an agent away from the user's original goal."
+          "rationale": "MCP06 covers prompt injection carried by contextual payloads that the model interprets as instructions."
         }
       }
     },
@@ -119,7 +127,7 @@
         },
         "OWASP-MCP-2025": {
           "ids": ["MCP06:2025"],
-          "rationale": "A role override delivered through the context channel is intent-flow subversion."
+          "rationale": "A role override delivered through contextual payloads is prompt injection under MCP06."
         }
       }
     },
@@ -136,7 +144,7 @@
         },
         "OWASP-MCP-2025": {
           "ids": ["MCP06:2025"],
-          "rationale": "Wallet-directed instructions arriving through the context channel subvert the intent flow."
+          "rationale": "Wallet-directed instructions arriving through contextual payloads are prompt injection under MCP06."
         }
       }
     },
@@ -153,7 +161,7 @@
         },
         "OWASP-MCP-2025": {
           "ids": ["MCP06:2025"],
-          "rationale": "Concealed instructions carried in context are intent-flow subversion."
+          "rationale": "Concealed instructions carried in contextual payloads are prompt injection under MCP06."
         }
       }
     },
@@ -170,7 +178,7 @@
         },
         "OWASP-MCP-2025": {
           "ids": ["MCP06:2025"],
-          "rationale": "Encoded instructions delivered through context are intent-flow subversion."
+          "rationale": "Encoded instructions delivered through contextual payloads are prompt injection under MCP06."
         }
       }
     },
@@ -221,7 +229,7 @@
         },
         "OWASP-MCP-2025": {
           "ids": ["MCP06:2025"],
-          "rationale": "A substituted recipient injected through the context channel redirects the agent's intent."
+          "rationale": "A substituted recipient delivered through a contextual payload is prompt injection under MCP06."
         }
       }
     },
@@ -310,7 +318,7 @@
         },
         "OWASP-MCP-2025": {
           "ids": ["MCP06:2025"],
-          "rationale": "Delivered through the context channel this payload subverts the agent's intent flow."
+          "rationale": "Delivered through contextual payloads, this instruction override is prompt injection under MCP06."
         }
       }
     }
