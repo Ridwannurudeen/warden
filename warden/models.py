@@ -411,10 +411,17 @@ class HardenRequest(BaseModel):
     audit_id: str = Field(pattern=r"^[0-9a-f]{16}$")
 
 
+class HardenContext(BaseModel):
+    expected_addresses: list[str] = Field(default_factory=list, max_length=20)
+
+
 class HardenExample(BaseModel):
     id: str
     payload: str
     expected_verdict: str
+    expected_classes: list[str]
+    depth: Depth
+    context: HardenContext
     source_id: str
     source_revision: str | None
     source_path: str | None
@@ -455,13 +462,19 @@ class HardenResponse(BaseModel):
     limitations: str
     message: str
     issued_at: int = Field(ge=0)
+    expires_at: int = Field(ge=0)
     log_seq: int = Field(ge=1)
     issuer_sig: str = Field(pattern=r"^sig:")
 
 
 class HardenEvidenceResponse(BaseModel):
     pack: HardenResponse | None
+    status: Literal["active", "stale", "revoked", "invalid"]
     verified: bool
+    revoked_at: int | None = Field(default=None, ge=0)
+    issuer_document: dict[str, object] | None
+    log_suffix: list[dict[str, object]]
+    checkpoint: dict[str, object] | None
     limitations: str
 
 

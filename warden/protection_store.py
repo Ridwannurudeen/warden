@@ -133,6 +133,12 @@ CREATE TABLE IF NOT EXISTS hardening_packs (
     log_seq INTEGER NOT NULL UNIQUE,
     record_json TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS hardening_revocations (
+    pack_id TEXT PRIMARY KEY,
+    revoked_at INTEGER NOT NULL,
+    log_seq INTEGER NOT NULL UNIQUE,
+    FOREIGN KEY (pack_id) REFERENCES hardening_packs(pack_id)
+);
 CREATE TABLE IF NOT EXISTS probe_leases (
     lease_id TEXT PRIMARY KEY,
     expires_at REAL NOT NULL
@@ -427,7 +433,8 @@ def _is_valid_log_entry(entry: object) -> bool:
     elif record_type == "hardening-pack":
         if (
             fields != HARDENING_LOG_ENTRY_FIELDS
-            or entry.get("event") != "hardening-pack-issued"
+            or entry.get("event")
+            not in {"hardening-pack-issued", "hardening-pack-revoked"}
             or not _is_lower_hex(entry.get("pack_id"), 64)
             or not _is_lower_hex(entry.get("audit_id"), 16)
         ):
@@ -1089,11 +1096,14 @@ def _hardening_log_entry_matches(
     entry: dict[str, object],
     record: dict[str, object],
     log_seq: int,
+    *,
+    event: str = "hardening-pack-issued",
+    timestamp: int | None = None,
 ) -> bool:
     return entry == {
         "seq": log_seq,
-        "ts": record.get("issued_at"),
-        "event": "hardening-pack-issued",
+        "ts": record.get("issued_at") if timestamp is None else timestamp,
+        "event": event,
         "record_type": "hardening-pack",
         "pack_id": record.get("pack_id"),
         "audit_id": record.get("audit_id"),
@@ -1197,6 +1207,93 @@ def get_hardening_pack_with_evidence(
     record_validator: Callable[[dict[str, object]], bool],
 ) -> dict[str, object] | None:
     """Return a pack only while its signed record and anchored log binding are intact."""
+    evidence = get_hardening_pack_evidence(
+        pack_id,
+        record_validator=record_validator,
+    )
+    return None if evidence is None else evidence["pack"]
+
+
+def revoke_hardening_pack(
+    pack_id: str,
+    *,
+    revoked_at: int,
+    record_validator: Callable[[dict[str, object]], bool],
+) -> int:
+    """Append one checkpointed revocation for an immutable hardening pack."""
+    if type(revoked_at) is not int or not 0 <= revoked_at <= MAX_SAFE_UNIX_SECONDS:
+        raise ValueError("hardening pack revocation time is invalid")
+    with _LOCK, _connect() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        row = connection.execute(
+            "SELECT record_json FROM hardening_packs WHERE pack_id = ?",
+            (pack_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError("hardening pack not found")
+        try:
+            record = json.loads(row[0])
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise ProtectionStateConflict(
+                "stored hardening pack contains invalid JSON"
+            ) from exc
+        if not isinstance(record, dict) or not record_validator(record):
+            raise ProtectionStateConflict("stored hardening pack failed verification")
+        if revoked_at < int(record["issued_at"]):
+            raise ValueError("hardening pack revocation cannot predate issuance")
+        existing = connection.execute(
+            "SELECT revoked_at, log_seq FROM hardening_revocations WHERE pack_id = ?",
+            (pack_id,),
+        ).fetchone()
+        if existing is not None:
+            _, entries, head_hash = _read_log_head(connection)
+            _read_anchored_checkpoint(connection, len(entries), head_hash)
+            existing_at, log_seq = existing
+            if (
+                type(existing_at) is not int
+                or type(log_seq) is not int
+                or not 1 <= log_seq <= len(entries)
+                or not _hardening_log_entry_matches(
+                    entries[log_seq - 1],
+                    record,
+                    log_seq,
+                    event="hardening-pack-revoked",
+                    timestamp=existing_at,
+                )
+            ):
+                raise ProtectionStateConflict(
+                    "hardening pack revocation has no matching log entry"
+                )
+            return existing_at
+
+        next_seq, prev_hash = _next_log_position(connection)
+        entry = {
+            "seq": next_seq,
+            "ts": revoked_at,
+            "event": "hardening-pack-revoked",
+            "record_type": "hardening-pack",
+            "pack_id": pack_id,
+            "audit_id": record["audit_id"],
+            "record_hash": hashlib.sha256(
+                _canonical_json(record).encode("utf-8")
+            ).hexdigest(),
+            "prev_hash": prev_hash,
+        }
+        connection.execute(
+            "INSERT INTO hardening_revocations (pack_id, revoked_at, log_seq) "
+            "VALUES (?, ?, ?)",
+            (pack_id, revoked_at, next_seq),
+        )
+        _write_log_entry(connection, entry)
+    return revoked_at
+
+
+def get_hardening_pack_evidence(
+    pack_id: str,
+    *,
+    record_validator: Callable[[dict[str, object]], bool],
+) -> dict[str, object] | None:
+    """Return a pack with its current revocation and signed inclusion evidence."""
     with _LOCK, _connect() as connection:
         row = connection.execute(
             "SELECT record_json, log_seq FROM hardening_packs WHERE pack_id = ?",
@@ -1217,7 +1314,7 @@ def get_hardening_pack_with_evidence(
         ):
             raise ProtectionStateConflict("stored hardening pack failed verification")
         _, entries, head_hash = _read_log_head(connection)
-        _read_anchored_checkpoint(connection, len(entries), head_hash)
+        checkpoint = _read_anchored_checkpoint(connection, len(entries), head_hash)
         log_seq = row[1]
         if (
             type(log_seq) is not int
@@ -1232,7 +1329,35 @@ def get_hardening_pack_with_evidence(
             raise ProtectionStateConflict(
                 "stored hardening pack has no matching log entry"
             )
-        return record
+        revoked = connection.execute(
+            "SELECT revoked_at, log_seq FROM hardening_revocations WHERE pack_id = ?",
+            (pack_id,),
+        ).fetchone()
+        revoked_at: int | None = None
+        if revoked is not None:
+            revoked_at, revoked_seq = revoked
+            if (
+                type(revoked_at) is not int
+                or type(revoked_seq) is not int
+                or not 1 <= revoked_seq <= len(entries)
+                or not _hardening_log_entry_matches(
+                    entries[revoked_seq - 1],
+                    record,
+                    revoked_seq,
+                    event="hardening-pack-revoked",
+                    timestamp=revoked_at,
+                )
+            ):
+                raise ProtectionStateConflict(
+                    "hardening pack revocation has no matching log entry"
+                )
+        return {
+            "pack": record,
+            "status": "revoked" if revoked_at is not None else "active",
+            "revoked_at": revoked_at,
+            "log_suffix": entries[log_seq - 1 :],
+            "checkpoint": checkpoint,
+        }
 
 
 def commit_registration(

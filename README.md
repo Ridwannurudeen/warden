@@ -269,7 +269,7 @@ approved, both production thresholds remain uncalibrated and disabled by default
 | --------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | **APA attestation**         | Ed25519 issuer signature with a published key      | Fresh endpoint-key control, `guard-live` state, signed rolling 24-hour count or explicit unavailable state, and current status | Portable offline verification plus optional live proof refresh                                                          |
 | **Portable endpoint audit** | Ed25519 issuer signature with a published key      | Exact subject, fixed battery identity and hash, conclusive result, consent, liveness, issue and expiry times, and limitations   | `/apa/audit/{audit_id}` verifies the signature, issuance-log binding, current expiry, and any append-only revocation    |
-| **Hardening Pack**          | Ed25519 issuer signature with a published key      | Source audit, corpus fingerprint, deterministic pack ID, remediation content, attribution, issue time, and limitations         | `/apa/hardening/{pack_id}` verifies the signature and immutable issuance-log binding                                   |
+| **Hardening Pack**          | Ed25519 issuer signature with a published key      | Source audit, corpus fingerprint, deterministic pack ID, execution metadata, attribution, signed expiry, and limitations       | `/apa/hardening/{pack_id}` returns issuer history, current status, and a signed-checkpoint log suffix for independent verification |
 | **Legacy audit badge**      | HMAC-SHA256 with server-held `WARDEN_BADGE_SECRET` | Point-in-time, consented endpoint-audit score and battery result                                                               | Server verification through `/badge/{audit_id}` or `/api/badges`; not public-key portable                               |
 
 Every new conclusive, consented audit issues the portable record and appends `audit-issued` to the shared
@@ -282,7 +282,8 @@ A conclusive signed audit can produce one deterministic signed Hardening Pack th
 `POST /harden`, or the local `harden_agent` MCP tool. Repeating the request returns the same immutable
 record. An audit with no misses still produces a signed empty pack with an explicit
 `Nothing to harden` message. Example attacks come only from the training corpus and retain their source
-and license attribution; held-out evaluation cases are never included.
+and license attribution, scan depth, context, and expected classes; held-out evaluation cases are never
+included. Pack revocation is append-only through `scripts/revoke_hardening_pack.py`.
 
 ### Warden Shield lifecycle
 

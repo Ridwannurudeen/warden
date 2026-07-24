@@ -907,7 +907,7 @@ async def apa_hardening_pack(
     pack_id: str,
 ) -> HardenEvidenceResponse | JSONResponse:
     try:
-        record = protection_store.get_hardening_pack_with_evidence(
+        evidence = protection_store.get_hardening_pack_evidence(
             pack_id,
             record_validator=hardening.verify_pack,
         )
@@ -919,15 +919,30 @@ async def apa_hardening_pack(
             status_code=409,
             content={
                 "pack": None,
+                "status": "invalid",
                 "verified": False,
+                "revoked_at": None,
+                "issuer_document": None,
+                "log_suffix": [],
+                "checkpoint": None,
                 "limitations": hardening.LIMITATIONS,
             },
         )
-    if record is None:
+    if evidence is None:
         raise HTTPException(status_code=404, detail="Hardening pack not found")
+    record = evidence["pack"]
+    status = hardening.effective_status(
+        record,
+        revoked=evidence["status"] == "revoked",
+    )
     return HardenEvidenceResponse(
         pack=HardenResponse.model_validate(record),
+        status=status,
         verified=hardening.verify_pack(record),
+        revoked_at=evidence["revoked_at"],
+        issuer_document=protection.issuer_document(),
+        log_suffix=evidence["log_suffix"],
+        checkpoint=evidence["checkpoint"],
         limitations=hardening.LIMITATIONS,
     )
 

@@ -26,6 +26,7 @@ _CORPUS_FINGERPRINT_PATH = Path(__file__).with_name("corpus_fingerprint.txt")
 SCHEMA_VERSION = 1
 SPEC_VERSION = "warden-hardening-pack/0.1"
 PREDICATE_TYPE = "https://warden.gudman.xyz/spec/hardening-pack/v1"
+PACK_TTL_SECONDS = 30 * 24 * 60 * 60
 MAX_EXAMPLES_PER_CLASS = 5
 NOTHING_TO_HARDEN = "Nothing to harden: this audit missed no threat classes."
 PACK_CONTENT_FIELDS = {
@@ -48,6 +49,7 @@ PACK_FIELDS = PACK_CONTENT_FIELDS | {
     "pack_id",
     "issuer",
     "issued_at",
+    "expires_at",
     "log_seq",
     "issuer_sig",
 }
@@ -55,6 +57,9 @@ EXAMPLE_FIELDS = {
     "id",
     "payload",
     "expected_verdict",
+    "expected_classes",
+    "depth",
+    "context",
     "source_id",
     "source_revision",
     "source_path",
@@ -257,6 +262,17 @@ def _training_examples() -> dict[str, list[dict[str, object]]]:
                     "id": case_id,
                     "payload": str(case.get("payload", "")),
                     "expected_verdict": str(case.get("expected_verdict", "")),
+                    "expected_classes": list(case.get("expected_classes", [category])),
+                    "depth": str(case.get("depth", "fast")),
+                    "context": {
+                        "expected_addresses": list(
+                            (
+                                case.get("context")
+                                if isinstance(case.get("context"), dict)
+                                else {}
+                            ).get("expected_addresses", [])
+                        )
+                    },
                     **attribution,
                 }
             )
@@ -351,6 +367,28 @@ def _valid_example(example: object) -> bool:
     ):
         return False
     if not isinstance(example.get("license_spdx"), list) or not example["license_spdx"]:
+        return False
+    if (
+        example.get("depth") not in {"fast", "thorough"}
+        or not isinstance(example.get("expected_classes"), list)
+        or not example["expected_classes"]
+        or not all(
+            isinstance(reason, str) and reason
+            for reason in example["expected_classes"]
+        )
+    ):
+        return False
+    context = example.get("context")
+    if (
+        not isinstance(context, dict)
+        or set(context) != {"expected_addresses"}
+        or not isinstance(context["expected_addresses"], list)
+        or len(context["expected_addresses"]) > 20
+        or not all(
+            isinstance(address, str) and address
+            for address in context["expected_addresses"]
+        )
+    ):
         return False
     if any(
         not isinstance(license_id, str) or not license_id
@@ -453,6 +491,8 @@ def issue_pack(
     if not _valid_content(material):
         raise ValueError("hardening pack content is invalid")
     current = int(time.time()) if issued_at is None else issued_at
+    if current > protection.MAX_SAFE_UNIX_SECONDS - PACK_TTL_SECONDS:
+        raise ValueError("hardening pack issue time is invalid")
     record = {
         "spec_version": SPEC_VERSION,
         "predicate_type": PREDICATE_TYPE,
@@ -460,6 +500,7 @@ def issue_pack(
         "issuer": protection.ISSUER_NAME,
         **material,
         "issued_at": current,
+        "expires_at": current + PACK_TTL_SECONDS,
         "log_seq": log_seq,
     }
     signed = ed25519_sign_record(
@@ -484,12 +525,15 @@ def verify_pack(record: dict[str, object]) -> bool:
         return False
     content = _content_from_record(record)
     issued_at = record.get("issued_at")
+    expires_at = record.get("expires_at")
     log_seq = record.get("log_seq")
     if (
         not _valid_content(content)
         or record.get("pack_id") != pack_id_for_content(content)
         or type(issued_at) is not int
         or not 0 <= issued_at <= protection.MAX_SAFE_UNIX_SECONDS
+        or type(expires_at) is not int
+        or expires_at != issued_at + PACK_TTL_SECONDS
         or type(log_seq) is not int
         or not 1 <= log_seq <= protection.MAX_SAFE_UNIX_SECONDS
     ):
@@ -503,6 +547,22 @@ def verify_pack(record: dict[str, object]) -> bool:
         and ed25519_verify_record(record, str(key["pub"]), "issuer_sig")
         for key in keys
     )
+
+
+def effective_status(
+    record: Mapping[str, object],
+    *,
+    revoked: bool,
+    now: int | None = None,
+) -> str:
+    if not verify_pack(dict(record)):
+        return "invalid"
+    if revoked:
+        return "revoked"
+    current = int(time.time()) if now is None else now
+    if type(current) is not int or current < 0:
+        return "invalid"
+    return "active" if current <= int(record["expires_at"]) else "stale"
 
 
 def record_sha256(record: dict[str, object]) -> str:

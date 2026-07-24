@@ -194,11 +194,21 @@ vectors with the local fail-closed engine. Its report contains totals, per-class
 payload-free failure identifiers only. It does not issue a grade, badge, or certification, and
 local execution does not send vector payloads to Warden's hosted or paid routes.
 
-The signed Hardening Pack schema, issuer-history verifier, status lookup, and public pack URL
-contract are not present in this source revision. Until that contract is merged and wired into
-the command, `warden-selftest PACK.json` intentionally rejects every input as unverified. The
-runner boundary is available in `warden_guard.selftest.run_verified_pack` for the signed-pack
-verifier integration; callers must not construct `VerifiedHardeningPack` from unsigned JSON.
+Download the evidence bundle or pass its canonical public URL:
+
+```bash
+warden-selftest hardening-evidence.json
+warden-selftest https://warden.gudman.xyz/apa/hardening/<pack_id>
+warden-selftest hardening-evidence.json --endpoint http://127.0.0.1:8080/scan
+```
+
+The command independently verifies the strict schema, deterministic pack identifier, Ed25519
+signature against issuer history, signed expiry, current revocation evidence, and inclusion from
+the pack's log entry through the signed checkpoint. Duplicate JSON keys, redirects, environment
+proxies, cross-origin URLs, stale or revoked packs, and mismatched log evidence fail closed. The
+optional endpoint must be explicitly supplied by the caller and return Warden's complete scan
+response contract; otherwise vectors run through local fail-closed enforcement. Empty signed packs
+produce a successful, explicit no-op report.
 
 ## Protected hosted route
 
