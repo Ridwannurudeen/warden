@@ -3,5 +3,7 @@ include THIRD-PARTY-NOTICES
 include corpus/license-manifest.json
 include spec/corpus-source-allowlist-v1.json
 include spec/taxonomy-map-v1.json
+include spec/schemas/model-calibration-capture-v1.schema.json
+include spec/schemas/model-threshold-candidate-v1.schema.json
 include warden/analyzers/bip39_words.txt
 include warden/corpus_fingerprint.txt

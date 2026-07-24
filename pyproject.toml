@@ -34,6 +34,10 @@ include = ["audit", "warden*"]
     "spec/corpus-source-allowlist-v1.json",
     "spec/taxonomy-map-v1.json",
 ]
+"spec/schemas" = [
+    "spec/schemas/model-calibration-capture-v1.schema.json",
+    "spec/schemas/model-threshold-candidate-v1.schema.json",
+]
 
 [project.optional-dependencies]
 dev = [

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://warden.gudman.xyz/spec/schemas/model-threshold-candidate-v1.schema.json",
+  "title": "Warden model threshold candidate v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tier",
+    "dataset_id",
+    "dataset_sha256",
+    "capture_sha256",
+    "provider",
+    "model",
+    "captured_at",
+    "policy",
+    "status",
+    "selected_threshold",
+    "selected_metrics",
+    "sample_counts",
+    "candidates",
+    "production_change",
+    "artifact_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "tier": { "enum": ["embedding", "semantic"] },
+    "dataset_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "dataset_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "capture_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "provider": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "model": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "captured_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "policy": { "const": "maximize recall subject to zero false positives" },
+    "status": { "enum": ["candidate", "no_candidate"] },
+    "selected_threshold": { "type": ["number", "null"], "minimum": -1, "maximum": 1 },
+    "selected_metrics": { "type": ["object", "null"] },
+    "sample_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attack", "benign"],
+      "properties": {
+        "attack": { "type": "integer", "minimum": 1 },
+        "benign": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "candidates": { "type": "array", "minItems": 1 },
+    "production_change": { "const": "requires explicit review; not applied" },
+    "artifact_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

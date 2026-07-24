@@ -92,6 +92,14 @@ accounting only, never model performance. Model-tier runs cannot use `--record` 
 provider-backed held-out evaluation beats the 92.55% baseline with zero benign false positives and an
 independently reviewed public-evidence schema is added.
 
+`scripts/capture_model_calibration.py` accepts only a separate reviewed JSONL dataset outside `benchmark/`
+and `corpus/`. It retains case IDs, labels, scores, review records, and provenance but not payloads.
+`scripts/select_model_threshold.py` performs the threshold sweep offline and emits a hash-bound candidate;
+the candidate states that a production change requires explicit review and does not edit scanner constants.
+The committed JSON schemas are
+`spec/schemas/model-calibration-capture-v1.schema.json` and
+`spec/schemas/model-threshold-candidate-v1.schema.json`.
+
 A semantic-enabled run recorded on 2026-07-16 against the original 28-case set is published separately in
 `history.jsonl`: **71.43% recall (20/28)** with **0.00% false positives
 (0/16)**. That historical measurement predates both the Decoder Wall pre-pass and the expanded evasion set,

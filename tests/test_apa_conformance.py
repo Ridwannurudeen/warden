@@ -29,6 +29,8 @@ def test_every_published_schema_is_valid_draft_2020_12() -> None:
         "apa-log-checkpoint-v0.1.schema.json",
         "apa-log-entry-v0.1.schema.json",
         "apa-protection-proof-v0.1.schema.json",
+        "model-calibration-capture-v1.schema.json",
+        "model-threshold-candidate-v1.schema.json",
         "warden-breaker-v1.schema.json",
     }
 

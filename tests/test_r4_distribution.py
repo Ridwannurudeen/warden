@@ -40,6 +40,7 @@ def _copy_minimal_project(repo_root: Path, project: Path) -> None:
     (project / "spec").mkdir()
     for name in ("corpus-source-allowlist-v1.json", "taxonomy-map-v1.json"):
         shutil.copy2(repo_root / "spec" / name, project / "spec" / name)
+    shutil.copytree(repo_root / "spec" / "schemas", project / "spec" / "schemas")
 
 
 def test_clean_wheel_install_imports_runtime_data(tmp_path: Path) -> None:
@@ -79,6 +80,14 @@ def test_clean_wheel_install_imports_runtime_data(tmp_path: Path) -> None:
             for name in archive.namelist()
         )
         assert any(name.endswith("/spec/taxonomy-map-v1.json") for name in archive.namelist())
+        assert any(
+            name.endswith("/spec/schemas/model-calibration-capture-v1.schema.json")
+            for name in archive.namelist()
+        )
+        assert any(
+            name.endswith("/spec/schemas/model-threshold-candidate-v1.schema.json")
+            for name in archive.namelist()
+        )
 
     target = tmp_path / "site-packages"
     install = _run(
@@ -164,6 +173,14 @@ def test_clean_sdist_contains_endpoint_audit_battery(tmp_path: Path) -> None:
         )
         assert any(
             name.endswith("/spec/taxonomy-map-v1.json") for name in archive.getnames()
+        )
+        assert any(
+            name.endswith("/spec/schemas/model-calibration-capture-v1.schema.json")
+            for name in archive.getnames()
+        )
+        assert any(
+            name.endswith("/spec/schemas/model-threshold-candidate-v1.schema.json")
+            for name in archive.getnames()
         )
 
 

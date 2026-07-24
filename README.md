@@ -244,6 +244,25 @@ only and are not performance evidence.
 `--record` remains deterministic-only, so model-tier output cannot update public history or evaluation data.
 No network model tier is enabled by repository configuration.
 
+The source-ready calibration harness keeps tuning separate from that held-out evaluation. An operator first
+creates an independently reviewed JSONL file with `id`, `label`, `payload`, `source`, and `reviewed_by`, then
+captures provider scores without retaining the payloads:
+
+```bash
+python scripts/capture_model_calibration.py --tier semantic \
+  --dataset C:\review\semantic-calibration.jsonl \
+  --dataset-id independent-semantic-v1 --provider PROVIDER \
+  --captured-at 2026-07-24T12:00:00Z --output semantic-capture.json
+python scripts/select_model_threshold.py semantic-capture.json semantic-candidate.json
+```
+
+The embedding command uses `--tier embedding` and the corresponding documented embedding environment.
+Capture requires the exact enabled provider configuration described above. The selector is offline and
+deterministic: it maximizes attack recall subject to zero calibration false positives, emits every candidate
+confusion matrix, and writes a hash-bound review artifact. It never changes runtime thresholds. Until a real
+independent dataset is reviewed, a provider capture is run, and the resulting candidate is explicitly
+approved, both production thresholds remain uncalibrated and disabled by default.
+
 ### APA and endpoint audit evidence
 
 | Contract                    | Signature                                          | Evidence                                                                                                                       | Verification                                                                                                            |
