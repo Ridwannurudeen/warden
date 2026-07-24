@@ -153,7 +153,7 @@ class DrainAddressAnalyzer(Analyzer):
             and not FORWARD_TRANSFER_INTENT_RE.search(window)
             and not (has_expected and CONTEXTUAL_RECIPIENT_RE.search(window))
         ):
-            return 0.0
+            return 0.60 if has_expected else 0.0
         return 0.95 if has_expected else 0.80
 
     @staticmethod

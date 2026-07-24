@@ -166,12 +166,6 @@ async def test_swapped_solana_recipient_detected_in_multivector_payload(engine):
         assert reason in verdict.threat_classes
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="DrainAddressAnalyzer needs transfer intent within 80 characters of the address, "
-    "so a swapped recipient in a bare record field is missed even when expected_addresses "
-    "is supplied.",
-)
 @pytest.mark.parametrize(
     "payload",
     [
