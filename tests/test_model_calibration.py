@@ -351,3 +351,31 @@ def test_capture_loader_rejects_duplicate_json_keys(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="duplicate"):
         load_capture(path)
+
+
+@pytest.mark.parametrize("reserved_directory", ["benchmark", "corpus", "Corpus", "BENCHMARK"])
+def test_load_rejects_datasets_living_under_training_or_held_out_paths(
+    tmp_path: Path,
+    reserved_directory: str,
+) -> None:
+    # The dataset_id name guard is not enough on its own: an operator can point
+    # --dataset at a well-named file that physically sits inside the training or
+    # held-out trees, which would calibrate thresholds on evaluation data.
+    dataset = tmp_path / reserved_directory / "independent-review.jsonl"
+    dataset.parent.mkdir(parents=True)
+    dataset.write_text(
+        json.dumps(
+            {
+                "id": "attack",
+                "label": "attack",
+                "payload": "untrusted attack",
+                "source": "independent-review",
+                "reviewed_by": "reviewer",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="independent of training and held-out data"):
+        load_calibration_cases(dataset)

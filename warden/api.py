@@ -90,9 +90,7 @@ MAX_JSON_NESTING_DEPTH = 64
 APA_LOG_DEFAULT_PAGE_SIZE = 100
 APA_LOG_MAX_PAGE_SIZE = 500
 APA_LOG_PAGE = Path(__file__).resolve().parents[1] / "site" / "log.html"
-SHIELD_STATE_PATH = Path(
-    os.getenv("WARDEN_SHIELD_STATE", "/opt/warden/data/shield/lifecycle.json")
-)
+SHIELD_STATE_PATH = Path(os.getenv("WARDEN_SHIELD_STATE", "/opt/warden/data/shield/lifecycle.json"))
 
 
 class RequestBodyLimitMiddleware:
@@ -1221,6 +1219,7 @@ async def root() -> dict[str, object]:
         "endpoints": {
             "scan": "POST /scan",
             "audit": "POST /audit",
+            "harden": "POST /harden",
             "health": "GET /health",
             "badge": "GET /badge/{audit_id}",
         },
