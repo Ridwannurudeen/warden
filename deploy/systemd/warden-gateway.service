@@ -1,0 +1,38 @@
+[Unit]
+Description=Warden fail-closed agent gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/warden/current
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=HOME=/var/lib/warden-gateway
+Environment=WARDEN_GUARD_KEY=/var/lib/warden-gateway/guard_key
+Environment=WARDEN_GUARD_STATE=/var/lib/warden-gateway/state.json
+ExecStart=/opt/warden/current/.venv/bin/warden-gateway --upstream http://127.0.0.1:8000 --mode local --listen 127.0.0.1 --port 8787 --graceful-timeout 30
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+User=warden-gateway
+Group=warden-gateway
+UMask=0077
+StateDirectory=warden-gateway
+StateDirectoryMode=0700
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectProc=invisible
+PrivateTmp=true
+PrivateDevices=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadOnlyPaths=/opt/warden/current
+ReadWritePaths=/var/lib/warden-gateway
+
+[Install]
+WantedBy=multi-user.target
