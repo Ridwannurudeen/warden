@@ -2,8 +2,10 @@
 
 ## Status and source
 
-`warden/onchain_attestation.py` builds and signs transactions offline. It has no broadcast function,
-provider URL, funded key, or live transaction. No ERC-8004 feedback was submitted during this build.
+`warden/onchain_attestation.py` builds and signs transactions offline. Its calldata is exercised
+against `ReputationRegistryHarness` on Hardhat's in-process local EVM, including invalid-agent,
+self-feedback, numeric-boundary, and event-evidence checks. It has no broadcast function, provider
+URL, funded key, or live transaction. No ERC-8004 feedback was submitted during this build.
 
 The ABI in `REPUTATION_ABI` comes from the official draft
 [ERC-8004 specification](https://eips.ethereum.org/EIPS/eip-8004):

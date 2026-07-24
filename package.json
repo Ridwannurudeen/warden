@@ -1,0 +1,22 @@
+{
+  "name": "warden-contract-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:contracts": "hardhat compile",
+    "test": "npm run test:js && npm run test:contracts",
+    "test:contracts": "hardhat test nodejs",
+    "test:js": "node --test tests/js/*.test.js"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-node-test-runner": "3.0.17",
+    "@nomicfoundation/hardhat-viem": "3.0.9",
+    "hardhat": "3.11.1",
+    "viem": "2.55.8"
+  },
+  "overrides": {
+    "adm-zip": "0.6.0",
+    "undici": "6.28.0"
+  }
+}

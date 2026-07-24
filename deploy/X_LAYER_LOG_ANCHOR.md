@@ -2,9 +2,10 @@
 
 ## Status and boundary
 
-`contracts/WardenLogAnchor.sol` and `warden/onchain_anchor.py` are source-only. No contract address in
-this repository is live, and the build performed no deployment, RPC call, transaction broadcast, or
-wallet action.
+`contracts/WardenLogAnchor.sol` and `warden/onchain_anchor.py` are source-only deployment artifacts.
+The contract is compiled and exercised only on Hardhat's in-process local EVM. No contract address in
+this repository is live, and the build performed no X Layer deployment, RPC call, transaction
+broadcast, or wallet action.
 
 The contract accepts checkpoint publications only from the immutable constructor `publisher`. Each
 publication records:
@@ -22,18 +23,19 @@ contract never receives or verifies that private signing material.
 Do not deploy until all of these checks pass:
 
 1. Obtain explicit user approval for the deployment, publisher address, and exact reviewed source.
-2. Use an approved Solidity compiler compatible with `pragma solidity ^0.8.24`.
-3. Compile `contracts/WardenLogAnchor.sol` and run compiler-level contract tests in that approved
-   toolchain.
+2. Reproduce `contracts/WardenLogAnchor.build.json` with the exact pinned compiler settings.
+3. Run `npm ci`, `npm run build:contracts`, `npm run test:contracts`, and `npm audit`. The recorded
+   source, creation-bytecode, and pre-link runtime-bytecode hashes must match.
 4. Confirm the destination reports chain ID `196` and is X Layer.
 5. Confirm the constructor publisher is a nonzero address controlled independently of the deployment
    key or covered by the operator's documented recovery procedure.
 6. Record the compiled bytecode hash, constructor argument, deployment block, transaction hash, and
    resulting address before treating any event as Warden evidence.
 
-This checkout has no `solc`, Foundry, Anvil, Hardhat, or Solidity test dependency. The Python suite
-tests the exact ABI, offline transaction construction/signing, and event-chain verification, but it
-does not substitute for compiler-level verification.
+This checkout pins Hardhat and its local-EVM test dependencies in `package-lock.json`. The contract
+suite covers constructor validation, publisher authorization, zero roots, monotonic sequence,
+stored state, emitted events, and calldata emitted by the Python offline transaction builder. The
+Python suite separately covers event-chain gap, rewrite, truncation, and retained-head failures.
 
 After deployment, perform read-only checks before the first publication:
 

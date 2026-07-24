@@ -22,6 +22,9 @@ venv/
 /sdk/python/dist/
 .pytest_cache/
 .ruff_cache/
+node_modules/
+artifacts/
+cache/
 
 # APA runtime artifacts — NEVER commit (issuer private key, sqlite)
 data/*.key
