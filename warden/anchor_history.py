@@ -72,7 +72,8 @@ def _validate_checkpoint_shape(checkpoint: object) -> dict[str, object]:
     return checkpoint
 
 
-def _log_prefix_hashes(entries: Sequence[dict[str, object]]) -> tuple[str, ...]:
+def log_prefix_hashes(entries: Sequence[dict[str, object]]) -> tuple[str, ...]:
+    """Return the canonical SHA-256 head for every contiguous APA log prefix."""
     prefix_hashes = [GENESIS_HISTORY_HASH]
     previous_hash = GENESIS_HISTORY_HASH
     for expected_sequence, entry in enumerate(entries, start=1):
@@ -115,7 +116,7 @@ def validate_anchor_history(
     if document.get("status") not in {"unpublished", "published"}:
         raise AnchorHistoryError("anchor history status is invalid")
 
-    prefix_hashes = _log_prefix_hashes(entries)
+    prefix_hashes = log_prefix_hashes(entries)
     previous_anchor_hash = GENESIS_HISTORY_HASH
     previous_checkpoint_seq = -1
     previous_issued_at = -1
