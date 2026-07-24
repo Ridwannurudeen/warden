@@ -6,8 +6,18 @@ import json
 import re
 from pathlib import Path
 
-from warden.auditor import AUDIT_BATTERY_PATH, AUDIT_BATTERY_SHA256, AUDIT_BATTERY_SIZE
+import pytest
+
+from warden.auditor import (
+    AUDIT_BATTERY_PATH,
+    AUDIT_BATTERY_SHA256,
+    AUDIT_BATTERY_SIZE,
+    AgentAuditor,
+    AuditOutcome,
+)
 from warden.core.verdict import SCANNER_CATEGORY_REASON_CODES, ReasonCode
+from warden.hardening import build_pack
+from warden.taxonomy import mappings_for_probe, mappings_for_reason_code
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,6 +95,8 @@ def test_every_external_taxonomy_cites_a_source_url_and_a_retrieval_date() -> No
         for category_id, title in categories.items():
             assert pattern.match(category_id), f"{name} {category_id}"
             assert title.strip(), f"{name} {category_id}"
+
+    assert TAXONOMIES["OWASP-MCP-2025"]["license"] == "CC BY-NC-SA 4.0"
 
 
 def test_every_reason_code_has_an_entry() -> None:
@@ -193,3 +205,83 @@ def test_wording_never_claims_certification_or_accredited_assessment() -> None:
         lowered = text.lower()
         for phrase in banned:
             assert phrase not in lowered, f"{phrase!r} in {text!r}"
+
+
+def test_runtime_reason_code_mapping_matches_the_versioned_data() -> None:
+    assert mappings_for_reason_code("SECRET_EXFIL") == {
+        "OWASP-ASI-2026": ["ASI01", "ASI03"],
+        "OWASP-LLM-2025": ["LLM02:2025"],
+        "OWASP-MCP-2025": ["MCP01:2025"],
+    }
+    assert mappings_for_reason_code("STATISTICAL_ANOMALY") == {
+        "OWASP-ASI-2026": [],
+        "OWASP-LLM-2025": [],
+        "OWASP-MCP-2025": [],
+    }
+    assert mappings_for_reason_code("CUSTOM") == {}
+
+
+def test_runtime_probe_mapping_honors_the_explicit_override() -> None:
+    assert mappings_for_probe("audit-v1-020", "CORPUS_MATCH") == {
+        "OWASP-ASI-2026": ["ASI01"],
+        "OWASP-LLM-2025": ["LLM01:2025"],
+        "OWASP-MCP-2025": ["MCP06:2025"],
+    }
+    assert mappings_for_probe("custom-001", "CUSTOM") == {}
+
+
+@pytest.mark.asyncio
+async def test_audit_result_surfaces_probe_specific_taxonomy_ids(monkeypatch) -> None:
+    auditor = AgentAuditor()
+
+    async def blocked(*args, **kwargs):
+        return AuditOutcome.BLOCKED
+
+    monkeypatch.setattr(auditor, "_target_outcome", blocked)
+    results, outcomes = await auditor._run_battery(
+        object(),
+        "https://127.0.0.1/scan",
+        "agent.example",
+        "agent.example",
+        [
+            {
+                "id": "audit-v1-020",
+                "category": "CORPUS_MATCH",
+                "payload": "fixed probe",
+            }
+        ],
+    )
+
+    assert outcomes == [AuditOutcome.BLOCKED]
+    assert results[0].probe_id == "audit-v1-020"
+    assert results[0].taxonomy_ids == {
+        "OWASP-ASI-2026": ["ASI01"],
+        "OWASP-LLM-2025": ["LLM01:2025"],
+        "OWASP-MCP-2025": ["MCP06:2025"],
+    }
+
+
+def test_hardening_pack_surfaces_reason_code_taxonomy_ids() -> None:
+    pack = build_pack(
+        {
+            "audit_id": "0123456789abcdef",
+            "target_host": "agent.example",
+            "battery_id": "warden-core-http",
+            "battery_version": "2026-07",
+            "observed_on": "2026-07-24",
+            "findings": [
+                {
+                    "attack_class": "SECRET_EXFIL",
+                    "total": 2,
+                    "blocked": 1,
+                    "missed": 1,
+                }
+            ],
+        }
+    )
+
+    assert pack["remediation"][0]["taxonomy_ids"] == {
+        "OWASP-ASI-2026": ["ASI01", "ASI03"],
+        "OWASP-LLM-2025": ["LLM02:2025"],
+        "OWASP-MCP-2025": ["MCP01:2025"],
+    }

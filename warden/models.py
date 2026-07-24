@@ -304,9 +304,11 @@ class AuditRequest(BaseModel):
 
 
 class AuditResult(BaseModel):
+    probe_id: str | None = None
     attack_class: str
     sent: str
     blocked: bool
+    taxonomy_ids: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class BadgeRecord(BaseModel):
@@ -424,6 +426,7 @@ class HardenRemediation(BaseModel):
     pattern_families: list[str]
     analyzers: list[str]
     example_attacks: list[HardenExample]
+    taxonomy_ids: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class HardenResponse(BaseModel):

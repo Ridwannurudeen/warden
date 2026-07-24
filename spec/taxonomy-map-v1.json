@@ -70,8 +70,8 @@
       "retrieved_on": "2026-07-24",
       "source_url": "https://owasp.org/www-project-mcp-top-10/",
       "document_url": "https://github.com/OWASP/www-project-mcp-top-10/blob/main/index.md",
-      "license": "unstated on the project page",
-      "attribution": "Category identifiers and titles are quoted from the OWASP MCP Top 10 project, OWASP Foundation. OWASP does not endorse Warden.",
+      "license": "CC BY-NC-SA 4.0",
+      "attribution": "Category identifiers and titles are quoted from the OWASP MCP Top 10 project, OWASP Foundation, licensed CC BY-NC-SA 4.0. OWASP does not endorse Warden.",
       "maturity_note": "This project is an OWASP incubator in beta (Phase 3, beta release and pilot testing). Its identifiers may change before final release, so mappings against it are the least stable in this file.",
       "id_pattern": "^MCP(0[1-9]|10):2025$",
       "categories": {

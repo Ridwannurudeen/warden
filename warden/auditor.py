@@ -20,6 +20,7 @@ from warden.audit_findings import record_findings
 from warden.badge_store import record_badge
 from warden.badges import issue_badge
 from warden.models import AuditResponse, AuditResult
+from warden.taxonomy import mappings_for_probe
 
 _ROOT = Path(__file__).resolve().parents[1]
 AUDIT_BATTERY_PATH = _ROOT / "audit" / "warden-core-http-2026-07.json"
@@ -354,11 +355,15 @@ class AgentAuditor:
             )
             outcomes.append(outcome)
             if outcome is not AuditOutcome.INCONCLUSIVE:
+                probe_id = str(attack["id"])
+                attack_class = str(attack["category"])
                 results.append(
                     AuditResult(
-                        attack_class=str(attack["category"]),
+                        probe_id=probe_id,
+                        attack_class=attack_class,
                         sent=str(attack["payload"]),
                         blocked=outcome is AuditOutcome.BLOCKED,
+                        taxonomy_ids=mappings_for_probe(probe_id, attack_class),
                     )
                 )
         return results, outcomes

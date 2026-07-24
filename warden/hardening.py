@@ -11,6 +11,8 @@ import json
 from pathlib import Path
 from typing import Mapping
 
+from warden.taxonomy import mappings_for_reason_code
+
 ROOT = Path(__file__).resolve().parents[1]
 _TRAINING_ATTACKS_PATH = ROOT / "corpus" / "attacks.jsonl"
 _CORPUS_FINGERPRINT_PATH = Path(__file__).with_name("corpus_fingerprint.txt")
@@ -202,6 +204,7 @@ def build_pack(findings_record: Mapping[str, object]) -> dict[str, object]:
                 "pattern_families": list(guidance["pattern_families"]),
                 "analyzers": list(guidance["analyzers"]),
                 "example_attacks": examples.get(attack_class, [])[:MAX_EXAMPLES_PER_CLASS],
+                "taxonomy_ids": mappings_for_reason_code(attack_class),
             }
         )
     remediation.sort(key=lambda entry: str(entry["attack_class"]))
