@@ -1,3 +1,7 @@
 include audit/warden-core-http-2026-07.json
+include THIRD-PARTY-NOTICES
+include corpus/license-manifest.json
+include spec/corpus-source-allowlist-v1.json
+include spec/taxonomy-map-v1.json
 include warden/analyzers/bip39_words.txt
 include warden/corpus_fingerprint.txt

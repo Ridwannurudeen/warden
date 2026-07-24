@@ -27,6 +27,14 @@ include = ["audit", "warden*"]
 "warden" = ["corpus_fingerprint.txt"]
 "warden.analyzers" = ["bip39_words.txt"]
 
+[tool.setuptools.data-files]
+"." = ["THIRD-PARTY-NOTICES"]
+"corpus" = ["corpus/license-manifest.json"]
+"spec" = [
+    "spec/corpus-source-allowlist-v1.json",
+    "spec/taxonomy-map-v1.json",
+]
+
 [project.optional-dependencies]
 dev = [
     "pip-audit==2.10.0",
