@@ -371,6 +371,30 @@ class AuditEvidenceResponse(BaseModel):
     limitations: str
 
 
+class ShieldLineageEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enrollment_revision: int | None = Field(default=None, ge=1)
+    comparison: Literal["initial", "unchanged", "improved", "regressed", "inconclusive"]
+    reason: str
+    occurred_at: int = Field(ge=0)
+    accepted_as_baseline: bool
+    attestation: AuditAttestationRecord
+    status: Literal["active", "stale", "revoked"]
+    verified: Literal[True]
+    revoked_at: int | None = Field(default=None, ge=0)
+
+
+class ShieldLineageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1]
+    target_id: str = Field(min_length=1, max_length=64)
+    entries: list[ShieldLineageEntry]
+    total: int = Field(ge=0)
+    limitations: str
+
+
 class AuditResponse(BaseModel):
     score: float = Field(ge=0, le=100)
     grade: Grade

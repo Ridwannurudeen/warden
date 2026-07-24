@@ -13,8 +13,9 @@ from types import SimpleNamespace
 import httpx
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from fastapi.testclient import TestClient
 
-from warden import audit_attestations, shield
+from warden import api, audit_attestations, shield
 from warden.badges import b64u_encode
 
 NOW = 1_900_000_000
@@ -281,6 +282,23 @@ async def test_same_battery_score_drift_is_unchanged_regressed_then_improved(tmp
     assert shield.service_exit_code(summaries[2]) == 1
     assert shield.service_exit_code(summaries[3]) == 0
 
+    lineage = shield.get_certification_lineage(
+        state,
+        "example-production",
+        evidence_resolver=evidence.__getitem__,
+        now=times[-1],
+    )
+    assert lineage is not None
+    assert [entry["attestation"]["audit_id"] for entry in lineage["entries"]] == ids
+    assert [entry["comparison"] for entry in lineage["entries"]] == [
+        "initial",
+        "unchanged",
+        "regressed",
+        "improved",
+    ]
+    assert [entry["enrollment_revision"] for entry in lineage["entries"]] == [1, 1, 1, 1]
+    assert all(entry["verified"] is True for entry in lineage["entries"])
+
 
 @pytest.mark.asyncio
 async def test_battery_change_is_inconclusive_and_does_not_replace_the_baseline(tmp_path):
@@ -375,6 +393,16 @@ async def test_failed_inconclusive_and_stale_audits_never_renew_prior_evidence(t
     assert evidence_calls == [initial_id, stale_id]
     assert [summary["inconclusive"] for summary in summaries] == [0, 1, 1, 1]
 
+    lineage = shield.get_certification_lineage(
+        state,
+        "example-production",
+        evidence_resolver=evidence.__getitem__,
+        now=stale_run,
+    )
+    assert lineage is not None
+    assert [entry["attestation"]["audit_id"] for entry in lineage["entries"]] == [initial_id]
+    assert lineage["entries"][0]["status"] == "stale"
+
 
 @pytest.mark.parametrize(
     ("failure_stage", "reason"),
@@ -442,15 +470,16 @@ async def test_changed_enrollment_requires_a_revision_and_starts_a_new_baseline(
     next_id = "0000000000000002"
     changed_hash = "c" * 64
 
+    initial_evidence = _evidence(
+        initial_id,
+        blocked=18,
+        issued_at=NOW,
+    )
     await shield.run_due_audits(
         config,
         state,
         auditor=_QueuedAuditor([_response(initial_id)]),
-        evidence_resolver=lambda _audit_id: _evidence(
-            initial_id,
-            blocked=18,
-            issued_at=NOW,
-        ),
+        evidence_resolver=lambda _audit_id: initial_evidence,
         now=NOW,
     )
 
@@ -474,17 +503,18 @@ async def test_changed_enrollment_requires_a_revision_and_starts_a_new_baseline(
             )
         ],
     )
+    next_evidence = _evidence(
+        next_id,
+        blocked=20,
+        issued_at=NOW + 1,
+        battery_version="2026-08",
+        battery_sha256=changed_hash,
+    )
     summary = await shield.run_due_audits(
         config,
         state,
         auditor=_QueuedAuditor([_response(next_id)]),
-        evidence_resolver=lambda _audit_id: _evidence(
-            next_id,
-            blocked=20,
-            issued_at=NOW + 1,
-            battery_version="2026-08",
-            battery_sha256=changed_hash,
-        ),
+        evidence_resolver=lambda _audit_id: next_evidence,
         now=NOW + 1,
     )
 
@@ -493,6 +523,138 @@ async def test_changed_enrollment_requires_a_revision_and_starts_a_new_baseline(
     assert target_state["enrollment_revision"] == 2
     assert target_state["baseline"]["audit_id"] == next_id
     assert target_state["last_conclusive_at"] == NOW + 1
+
+    evidence = {initial_id: initial_evidence, next_id: next_evidence}
+    lineage = shield.get_certification_lineage(
+        state,
+        "example-production",
+        evidence_resolver=evidence.__getitem__,
+        now=NOW + 1,
+    )
+    assert lineage is not None
+    assert [entry["enrollment_revision"] for entry in lineage["entries"]] == [1, 2]
+    assert [entry["comparison"] for entry in lineage["entries"]] == ["initial", "initial"]
+
+
+@pytest.mark.asyncio
+async def test_lineage_verifies_retired_issuer_key_history(tmp_path, monkeypatch):
+    config = _write_config(tmp_path / "targets.json")
+    state = tmp_path / "state.json"
+    audit_id = "0000000000000001"
+    retired_key = Ed25519PrivateKey.generate()
+    monkeypatch.setenv(
+        "WARDEN_ISSUER_KEY",
+        b64u_encode(retired_key.private_bytes_raw(), "ed25519-seed"),
+    )
+    evidence = _evidence(audit_id, blocked=18, issued_at=NOW)
+
+    current_key = Ed25519PrivateKey.generate()
+    monkeypatch.setenv(
+        "WARDEN_ISSUER_KEY",
+        b64u_encode(current_key.private_bytes_raw(), "ed25519-seed"),
+    )
+    history = tmp_path / "issuer-history.json"
+    history.write_text(
+        json.dumps(
+            {
+                "keys": [
+                    {
+                        "kid": "retired-issuer",
+                        "pub": b64u_encode(
+                            retired_key.public_key().public_bytes_raw(),
+                            "ed25519",
+                        ),
+                        "not_after": NOW,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("WARDEN_ISSUER_HISTORY", str(history))
+
+    await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(audit_id)]),
+        evidence_resolver=lambda _audit_id: evidence,
+        now=NOW,
+    )
+
+    lineage = shield.get_certification_lineage(
+        state,
+        "example-production",
+        evidence_resolver=lambda _audit_id: evidence,
+        now=NOW,
+    )
+    assert lineage is not None
+    assert lineage["entries"][0]["verified"] is True
+
+    monkeypatch.delenv("WARDEN_ISSUER_HISTORY")
+    with pytest.raises(ValueError, match="failed issuer verification"):
+        shield.get_certification_lineage(
+            state,
+            "example-production",
+            evidence_resolver=lambda _audit_id: evidence,
+            now=NOW,
+        )
+
+
+@pytest.mark.asyncio
+async def test_legacy_lineage_event_is_read_without_guessing_its_revision(tmp_path):
+    config = _write_config(tmp_path / "targets.json")
+    state = tmp_path / "state.json"
+    audit_id = "0000000000000001"
+    evidence = _evidence(audit_id, blocked=18, issued_at=NOW)
+    await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(audit_id)]),
+        evidence_resolver=lambda _audit_id: evidence,
+        now=NOW,
+    )
+    lifecycle = _state(state)
+    del lifecycle["events"][0]["enrollment_revision"]
+    state.write_text(json.dumps(lifecycle), encoding="utf-8")
+
+    lineage = shield.get_certification_lineage(
+        state,
+        "example-production",
+        evidence_resolver=lambda _audit_id: evidence,
+        now=NOW,
+    )
+
+    assert lineage is not None
+    assert lineage["entries"][0]["enrollment_revision"] is None
+
+
+@pytest.mark.asyncio
+async def test_lineage_route_is_read_only_and_not_a_paid_route(tmp_path, monkeypatch):
+    config = _write_config(tmp_path / "targets.json")
+    state = tmp_path / "state.json"
+    audit_id = "0000000000000001"
+    evidence = _evidence(audit_id, blocked=18, issued_at=NOW)
+    await shield.run_due_audits(
+        config,
+        state,
+        auditor=_QueuedAuditor([_response(audit_id)]),
+        evidence_resolver=lambda _audit_id: evidence,
+        now=NOW,
+    )
+    monkeypatch.setattr(api, "SHIELD_STATE_PATH", state)
+    monkeypatch.setattr(
+        shield.protection_store,
+        "get_audit_attestation_with_evidence",
+        lambda _audit_id, *, record_validator: (
+            evidence if record_validator(evidence["attestation"]) else None
+        ),
+    )
+
+    response = TestClient(api.app).get("/api/shield/example-production/lineage")
+
+    assert response.status_code == 200
+    assert response.json()["entries"][0]["attestation"]["audit_id"] == audit_id
+    assert "GET /api/shield/example-production/lineage" not in getattr(api, "_paid_routes", {})
 
 
 @pytest.mark.asyncio
@@ -602,6 +764,7 @@ async def test_https_notifier_sends_only_bounded_event_metadata():
     observed = {**previous, "audit_id": "0000000000000002", "blocked": 16, "score": 80.0}
     event = shield._event(
         target_id="example-production",
+        enrollment_revision=1,
         comparison="regressed",
         reason="same_battery_score_decreased",
         occurred_at=NOW + 86_400,

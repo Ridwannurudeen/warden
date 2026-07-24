@@ -72,6 +72,7 @@ _EVENT_FIELDS = {
     "schema_version",
     "event_id",
     "target_id",
+    "enrollment_revision",
     "comparison",
     "reason",
     "occurred_at",
@@ -80,6 +81,7 @@ _EVENT_FIELDS = {
     "action",
     "notification",
 }
+_LEGACY_EVENT_FIELDS = _EVENT_FIELDS - {"enrollment_revision"}
 _COMPARISONS = {"initial", "unchanged", "improved", "regressed", "inconclusive"}
 _NOTIFICATION_STATES = {
     "not_applicable",
@@ -88,6 +90,13 @@ _NOTIFICATION_STATES = {
     "delivered",
     "failed",
 }
+LINEAGE_LIMITATIONS = (
+    "This ordered history contains independently verifiable point-in-time endpoint-audit "
+    "attestations observed for one owner-enrolled target across enrollment revisions. It "
+    "is not certification, continuous monitoring, or proof of future behavior. A null "
+    "enrollment_revision identifies a legacy lifecycle event recorded before revision "
+    "binding was added."
+)
 
 
 class Auditor(Protocol):
@@ -355,7 +364,10 @@ def _valid_baseline(value: object) -> bool:
 
 
 def _valid_event(value: object) -> bool:
-    if not isinstance(value, dict) or set(value) != _EVENT_FIELDS:
+    if not isinstance(value, dict) or set(value) not in (
+        _EVENT_FIELDS,
+        _LEGACY_EVENT_FIELDS,
+    ):
         return False
     return (
         value.get("schema_version") == SCHEMA_VERSION
@@ -364,6 +376,13 @@ def _valid_event(value: object) -> bool:
         and all(character in "0123456789abcdef" for character in value["event_id"])
         and isinstance(value.get("target_id"), str)
         and 1 <= len(value["target_id"]) <= 64
+        and (
+            "enrollment_revision" not in value
+            or (
+                type(value.get("enrollment_revision")) is int
+                and value["enrollment_revision"] >= 1
+            )
+        )
         and value.get("comparison") in _COMPARISONS
         and isinstance(value.get("reason"), str)
         and 1 <= len(value["reason"]) <= 64
@@ -589,6 +608,7 @@ def _action(comparison: str, reason: str) -> str:
 def _event(
     *,
     target_id: str,
+    enrollment_revision: int,
     comparison: str,
     reason: str,
     occurred_at: int,
@@ -597,6 +617,7 @@ def _event(
 ) -> dict[str, object]:
     core = {
         "target_id": target_id,
+        "enrollment_revision": enrollment_revision,
         "comparison": comparison,
         "reason": reason,
         "occurred_at": occurred_at,
@@ -610,6 +631,114 @@ def _event(
         **core,
         "action": _action(comparison, reason),
         "notification": "pending" if alert else "not_applicable",
+    }
+
+
+def _read_lineage_evidence(audit_id: str) -> dict[str, object] | None:
+    return protection_store.get_audit_attestation_with_evidence(
+        audit_id,
+        record_validator=audit_attestations.verify_audit_attestation,
+    )
+
+
+def _attestation_matches_observation(
+    attestation: Mapping[str, object],
+    observed: Mapping[str, object],
+) -> bool:
+    blocked = attestation.get("blocked")
+    total = attestation.get("total")
+    if type(blocked) is not int or type(total) is not int or total < 1:
+        return False
+    return (
+        attestation.get("audit_id") == observed.get("audit_id")
+        and attestation.get("battery_id") == observed.get("battery_id")
+        and attestation.get("battery_version") == observed.get("battery_version")
+        and attestation.get("battery_sha256") == observed.get("battery_sha256")
+        and blocked == observed.get("blocked")
+        and total == observed.get("total")
+        and round((blocked / total) * 100, 2) == observed.get("score")
+        and attestation.get("observed_on") == observed.get("observed_on")
+        and attestation.get("issued_at") == observed.get("issued_at")
+        and attestation.get("expires_at") == observed.get("expires_at")
+    )
+
+
+def get_certification_lineage(
+    state_path: Path,
+    target_id: str,
+    *,
+    evidence_resolver: Callable[[str], dict[str, object] | None] | None = None,
+    now: int | None = None,
+) -> dict[str, object] | None:
+    """Return ordered, read-only signed audit history for one Shield enrollment."""
+    bounded_target_id = _bounded_identifier(target_id, label="target_id")
+    current = int(time.time()) if now is None else now
+    if type(current) is not int or current < 0:
+        raise ValueError("Shield current time must be non-negative Unix seconds")
+    resolve_evidence = evidence_resolver or _read_lineage_evidence
+
+    if not state_path.exists():
+        return None
+    with _exclusive_state_lock(state_path):
+        state = _read_state(state_path)
+        states = state["targets"]
+        events = state["events"]
+        assert isinstance(states, dict)
+        assert isinstance(events, list)
+        target_events = [
+            dict(event)
+            for event in events
+            if isinstance(event, dict) and event.get("target_id") == bounded_target_id
+        ]
+        if bounded_target_id not in states and not target_events:
+            return None
+
+    entries: list[dict[str, object]] = []
+    for event in target_events:
+        observed = event.get("observed_evidence")
+        if not isinstance(observed, dict):
+            continue
+        audit_id = str(observed["audit_id"])
+        evidence = resolve_evidence(audit_id)
+        if not isinstance(evidence, dict):
+            raise ValueError("Shield lineage evidence is unavailable")
+        attestation = evidence.get("attestation")
+        if (
+            not isinstance(attestation, dict)
+            or not audit_attestations.verify_audit_attestation(attestation)
+        ):
+            raise ValueError("Shield lineage evidence failed issuer verification")
+        if not _attestation_matches_observation(attestation, observed):
+            raise ValueError("Shield lineage evidence does not match the lifecycle observation")
+        evidence_status = evidence.get("status")
+        if evidence_status not in {"active", "revoked"}:
+            raise ValueError("Shield lineage evidence has an invalid status")
+        status = audit_attestations.effective_status(
+            attestation,
+            revoked=evidence_status == "revoked",
+            now=current,
+        )
+        if status not in {"active", "stale", "revoked"}:
+            raise ValueError("Shield lineage evidence failed status verification")
+        entries.append(
+            {
+                "enrollment_revision": event.get("enrollment_revision"),
+                "comparison": event["comparison"],
+                "reason": event["reason"],
+                "occurred_at": event["occurred_at"],
+                "accepted_as_baseline": event["comparison"] != "inconclusive",
+                "attestation": attestation,
+                "status": status,
+                "verified": True,
+                "revoked_at": evidence.get("revoked_at"),
+            }
+        )
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "target_id": bounded_target_id,
+        "entries": entries,
+        "total": len(entries),
+        "limitations": LINEAGE_LIMITATIONS,
     }
 
 
@@ -799,6 +928,7 @@ async def run_due_audits(
             }
             event = _event(
                 target_id=target.target_id,
+                enrollment_revision=target.enrollment_revision,
                 comparison=comparison,
                 reason=reason,
                 occurred_at=current,

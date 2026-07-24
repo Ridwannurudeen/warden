@@ -24,6 +24,7 @@ from warden import (
     feedback_store,
     protection,
     protection_store,
+    shield,
     threat_intel,
 )
 from warden.audit_findings import get_findings
@@ -72,6 +73,7 @@ from warden.models import (
     RuntimeStatsResponse,
     ScanRequest,
     ScanResponse,
+    ShieldLineageResponse,
     ThreatIntelSummary,
 )
 from warden.observability import runtime_metrics
@@ -87,6 +89,9 @@ MAX_JSON_NESTING_DEPTH = 64
 APA_LOG_DEFAULT_PAGE_SIZE = 100
 APA_LOG_MAX_PAGE_SIZE = 500
 APA_LOG_PAGE = Path(__file__).resolve().parents[1] / "site" / "log.html"
+SHIELD_STATE_PATH = Path(
+    os.getenv("WARDEN_SHIELD_STATE", "/opt/warden/data/shield/lifecycle.json")
+)
 
 
 class RequestBodyLimitMiddleware:
@@ -934,6 +939,29 @@ async def apa_audit_attestation(audit_id: str) -> AuditEvidenceResponse | JSONRe
         revoked_at=evidence["revoked_at"],
         limitations=audit_attestations.LIMITATIONS,
     )
+
+
+@app.get(
+    "/api/shield/{target_id}/lineage",
+    response_model=ShieldLineageResponse,
+)
+def shield_lineage(target_id: str) -> ShieldLineageResponse:
+    try:
+        lineage = shield.get_certification_lineage(SHIELD_STATE_PATH, target_id)
+    except ValueError as exc:
+        if str(exc).startswith("target_id must"):
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=409, detail="Shield lineage evidence is invalid") from exc
+    except (
+        protection_store.LogCheckpointMissing,
+        protection_store.ProtectionStateConflict,
+    ) as exc:
+        raise HTTPException(status_code=409, detail="Shield lineage evidence is invalid") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=503, detail="Shield lineage state is unavailable") from exc
+    if lineage is None:
+        raise HTTPException(status_code=404, detail="Shield lineage not found")
+    return ShieldLineageResponse.model_validate(lineage)
 
 
 @app.get("/.well-known/apa-issuer.json")
