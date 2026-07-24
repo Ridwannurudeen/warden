@@ -124,7 +124,27 @@ class StubAuditor:
 
 
 api.auditor = StubAuditor()
-expected_routes = ["GET /scan", "POST /scan", "GET /audit", "POST /audit"]
+
+# /harden reads retained findings rather than probing a target, so the paid-route
+# wiring check supplies a conclusive record instead of stubbing an auditor.
+api.get_findings = lambda audit_id: {
+    "schema_version": 1,
+    "audit_id": audit_id,
+    "target_host": "agent.example",
+    "battery_id": "warden-core-http",
+    "battery_version": "2026-07",
+    "observed_on": "2026-07-24",
+    "findings": [{"attack_class": "SECRET_EXFIL", "total": 2, "blocked": 1, "missed": 1}],
+}
+
+expected_routes = [
+    "GET /scan",
+    "POST /scan",
+    "GET /audit",
+    "POST /audit",
+    "GET /harden",
+    "POST /harden",
+]
 
 with TestClient(api.app) as client:
     server = CapturingHTTPResourceServer.instances[0]
@@ -146,6 +166,8 @@ with TestClient(api.app) as client:
         ("POST", "/scan", {"json": {"payload": "normal settlement note"}}),
         ("GET", "/audit", {"params": {"target_url": "https://agent.example/scan"}}),
         ("POST", "/audit", {"json": {"target_url": "https://agent.example/scan"}}),
+        ("GET", "/harden", {"params": {"audit_id": "0123456789abcdef"}}),
+        ("POST", "/harden", {"json": {"audit_id": "0123456789abcdef"}}),
     ]
     for method, path, request_kwargs in requests:
         response = client.request(

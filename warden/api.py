@@ -26,7 +26,9 @@ from warden import (
     protection_store,
     threat_intel,
 )
+from warden.audit_findings import get_findings
 from warden.auditor import AgentAuditor
+from warden.hardening import build_pack
 from warden.core.verdict import ReasonCode, Verdict
 from warden.engine import WardenEngine
 from warden.gauntlet_store import (
@@ -62,6 +64,8 @@ from warden.models import (
     GauntletRequest,
     GauntletResponse,
     GauntletStats,
+    HardenRequest,
+    HardenResponse,
     HealthResponse,
     ReadinessCheck,
     ReadinessResponse,
@@ -244,13 +248,35 @@ _AUDIT_INPUT = {
     },
 }
 _AUDIT_OUTPUT = {"type": "json", "example": {"grade": "A", "score": 100}}
+_HARDEN_INPUT = {
+    "type": "http",
+    "method": "POST",
+    "bodyType": "json",
+    "body": {"audit_id": "0123456789abcdef"},
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "audit_id": {
+                "type": "string",
+                "description": "Identifier of a completed Warden endpoint audit",
+            }
+        },
+        "required": ["audit_id"],
+    },
+}
+_HARDEN_OUTPUT = {
+    "type": "json",
+    "example": {"addressed_classes": ["SECRET_EXFIL"], "remediation": []},
+}
 
 _PAYMENT_OUTPUT_SCHEMAS = {
     "/scan": {"input": _SCAN_INPUT, "output": _SCAN_OUTPUT},
     "/audit": {"input": _AUDIT_INPUT, "output": _AUDIT_OUTPUT},
+    "/harden": {"input": _HARDEN_INPUT, "output": _HARDEN_OUTPUT},
 }
 _SCAN_EXTENSIONS = {"bazaar": {"info": _PAYMENT_OUTPUT_SCHEMAS["/scan"]}}
 _AUDIT_EXTENSIONS = {"bazaar": {"info": _PAYMENT_OUTPUT_SCHEMAS["/audit"]}}
+_HARDEN_EXTENSIONS = {"bazaar": {"info": _PAYMENT_OUTPUT_SCHEMAS["/harden"]}}
 
 
 def _rate_limit_per_minute() -> int:
@@ -428,6 +454,12 @@ if os.getenv("OKX_API_KEY"):
         mime_type="application/json",
         extensions=_AUDIT_EXTENSIONS,
     )
+    _harden_route = RouteConfig(
+        accepts=[build_payment_option(_payment_rail)],
+        description="Warden endpoint hardening pack",
+        mime_type="application/json",
+        extensions=_HARDEN_EXTENSIONS,
+    )
     # Challenge unpaid GET as well as POST: OKX's x402-check probes with GET and
     # expects a 402 payment challenge; a POST-only paywall returns 405 and reads
     # as an invalid x402 service. OKX's paid auto-replay also uses GET, so /scan
@@ -438,6 +470,8 @@ if os.getenv("OKX_API_KEY"):
         "GET /scan": _scan_route,
         "POST /audit": _audit_route,
         "GET /audit": _audit_route,
+        "POST /harden": _harden_route,
+        "GET /harden": _harden_route,
     }
     # The installed middleware may consult OKX while building a challenge.
     # Scheduled probes verify only unsigned challenge generation; they do not
@@ -456,7 +490,7 @@ async def rate_limit_middleware(request: Request, call_next):
     carries_payment = bool(
         request.headers.get("payment-signature") or request.headers.get("x-payment")
     )
-    paid_payment_route = carries_payment and path in {"/scan", "/audit"}
+    paid_payment_route = carries_payment and path in {"/scan", "/audit", "/harden"}
     if paid_payment_route and is_verified_payer(request):
         # Only a client that has already completed a verified x402 settlement earns
         # the elevated bucket. A forged/unverified payment header falls through to
@@ -481,7 +515,7 @@ async def rate_limit_middleware(request: Request, call_next):
     elif path in {"/apa/log", "/apa/log/checkpoint", "/apa/log/anchor"}:
         limit_per_minute = _apa_log_rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute, scope="apa-log")
-    elif path in {"/scan", "/audit"}:
+    elif path in {"/scan", "/audit", "/harden"}:
         limit_per_minute = _rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute)
     else:
@@ -558,6 +592,15 @@ _AUDIT_RECOVERY_HINT = (
     "--endpoint https://warden.gudman.xyz/audit --token-symbol USDT --token-amount 0.5 "
     "--accepts '<accepts from the 402>' --body "
     '\'{"target_url":"<your authorized endpoint URL>"}\'` then '
+    "`onchainos agent complete <JOB_ID>`. Guided version: https://warden.gudman.xyz/hire"
+)
+_HARDEN_RECOVERY_HINT = (
+    " Your task froze because OKX's auto-replay sent no body. No charge was made. "
+    "To finish it yourself: fetch the live 402 from this endpoint, then run "
+    "`onchainos agent task-402-pay <JOB_ID> --provider-agent-id 3808 "
+    "--endpoint https://warden.gudman.xyz/harden --token-symbol USDT --token-amount 0.5 "
+    "--accepts '<accepts from the 402>' --body "
+    '\'{"audit_id":"<your completed audit id>"}\'` then '
     "`onchainos agent complete <JOB_ID>`. Guided version: https://warden.gudman.xyz/hire"
 )
 
@@ -800,6 +843,36 @@ async def audit_get(request: Request) -> AuditResponse:
             + _AUDIT_RECOVERY_HINT,
         ) from exc
     return await audit(req)
+
+
+@app.post("/harden", response_model=HardenResponse)
+async def harden(req: HardenRequest) -> HardenResponse:
+    findings = get_findings(req.audit_id)
+    if findings is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No retained findings for that audit_id. Findings exist only for a "
+                "conclusive, consented audit that issued signed evidence."
+            ),
+        )
+    return HardenResponse.model_validate(build_pack(findings))
+
+
+@app.get("/harden", response_model=HardenResponse)
+async def harden_get(request: Request) -> HardenResponse:
+    fields = await _get_request_fields(request)
+    try:
+        req = HardenRequest.model_validate(fields)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Provide the completed audit identifier as an 'audit_id' query "
+                "parameter or JSON body field." + _HARDEN_RECOVERY_HINT
+            ),
+        ) from exc
+    return await harden(req)
 
 
 @app.get("/badge/{audit_id}")

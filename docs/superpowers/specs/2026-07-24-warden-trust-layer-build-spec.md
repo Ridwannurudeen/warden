@@ -448,11 +448,43 @@ survive); flag-off behavior is byte-identical to today; new rails are exercised 
 **Why:** 94 cases is small, and the published held-out recall is 92.55% with seven named misses. There
 is also a **real production miss** worth investigating first (see §6).
 
-[UNVERIFIED — every license below must be confirmed by reading the source repo's LICENSE file before a
-single row is ingested.] Research reports these as MIT/Apache and therefore commercially shippable:
-AgentDojo (629 security cases), InjecAgent (1,054), Microsoft LLMail-Inject (~208K prompts), deepset
-prompt-injections (662), HackAPrompt, and two Lakera Gandalf sets. It reports **BIPIA (CC BY-SA)** and
-**TensorTrust (restrictive)** as **benchmark-only — do not redistribute**.
+[VERIFIED 2026-07-24 — every license below was read at its primary source (repo `LICENSE` file or
+HuggingFace card). This supersedes the earlier unverified summary, which was wrong about BIPIA and
+TensorTrust in both directions.]
+
+**Category A — safe to ship rows in a commercial pack:**
+- **AgentDojo** — MIT, no carve-outs (~629 security cases). Best single source.
+- **InjecAgent** — MIT (note: `LICENCE`, British spelling) — 1,054 cases.
+- **Lakera `gandalf_ignore_instructions`** (1,000 rows) and **`gandalf_summarization`** (140) — MIT.
+- **LLMail-Inject** (Microsoft) — MIT. Ship the unique *labeled* subset, not the 461K raw dump.
+- **BIPIA — `*_attack_*.json` ONLY** (250 Microsoft-authored injection instructions, MIT).
+- **deepset/prompt-injections** (662) — card declares both `apache-2.0` and `cc-by-4.0`; both are
+  permissive. Attribute under **both** simultaneously and ship.
+
+**Category B — internal benchmarking only, never redistribute rows:**
+- **BIPIA `benchmark/table/` and `benchmark/code/`** — CC BY-SA 4.0. **This matters specifically here:**
+  Warden ships under Apache-2.0, and CC BY-SA's ShareAlike is *not* compatible with Apache-2.0.
+  Ingesting one of these rows into `corpus/attacks.jsonl` would force ShareAlike onto a paid pack.
+  BIPIA `qa/` and `abstract/` are not distributed at all and must be regenerated.
+
+**Category C — DO NOT USE:**
+- **TensorTrust** — **unlicensed.** The BSD-2-Clause covers the *code* repo; `tensor-trust-data` has no
+  LICENSE file (confirmed absent in four independent locations). Absent a grant, default copyright
+  applies. This is stronger than "restrictive."
+- **Lakera `gandalf-rct`** — explicit **non-commercial**, **no-redistribution** ("including any
+  excerpts"), plus a clause restricting offensive-security use. It sits one directory from two MIT sets
+  under the same `Lakera/` namespace — an easy and costly accident.
+- **HackAPrompt** — MIT but access-gated *and* explicitly uncurated ("may contain offensive material").
+  Deprioritize: Category A already yields ~3,700 clean cases.
+
+**Required additions to this workstream:**
+- Ingestion uses an **allowlist**, never a denylist — a denylist will eventually miss a subdirectory
+  like `benchmark/table/`.
+- Add an **SPDX guard test**: assert no ingested row carries an SPDX id outside
+  `{MIT, Apache-2.0, CC-BY-4.0}`. That single assertion blocks CC BY-SA, non-commercial, and unlicensed
+  sources at once.
+- Ship a **`THIRD-PARTY-NOTICES`** file with the pack. MIT requires the notice to accompany
+  "substantial portions"; a paid pack of thousands of MIT rows with no notice is a real breach.
 
 **Rules:**
 - **Verify each license individually.** A dataset whose license cannot be confirmed is not ingested.

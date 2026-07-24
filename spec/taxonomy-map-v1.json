@@ -1,0 +1,318 @@
+{
+  "map_id": "warden-taxonomy-map",
+  "schema_version": 1,
+  "version": "v1",
+  "status": "public-draft",
+  "warden_sources": {
+    "reason_codes": "warden/core/verdict.py",
+    "battery_id": "warden-core-http",
+    "battery_version": "2026-07",
+    "battery_sha256": "7e18f89d7249fe97e007f37dc91839492cfb7a40af4d7b660309645c0fe33f3f"
+  },
+  "evidence_statement": "A Warden result may state which published OWASP categories the battery exercised, for example \"tested against OWASP ASI 2026 categories ASI01, ASI02\". That statement describes coverage only. It is not an OWASP assessment, review, or endorsement, it is not certification, and it is not an accredited or Notified-Body assessment. Warden evidence is point-in-time: a blocked probe shows only that the target blocked that probe at that moment.",
+  "coverage_semantics": "A mapped category means at least one Warden detection class or battery probe exercises a technique that falls inside that category's published scope. It does not mean the category is exhaustively tested. An unmapped category is a statement about this map, not a statement that the risk is absent from the subject.",
+  "probe_mapping_rule": "Every battery probe has an entry. A probe entry without its own \"mappings\" resolves to the mappings of its category's reason-code entry. A probe entry that carries \"mappings\" must differ from its category's mappings and must state its own rationale or unmapped_reason for every taxonomy.",
+  "taxonomies": {
+    "OWASP-ASI-2026": {
+      "title": "OWASP Top 10 for Agentic Applications 2026",
+      "publisher": "OWASP Gen AI Security Project - Agentic Security Initiative",
+      "document_version": "2026",
+      "published_on": "2025-12-09",
+      "retrieved_on": "2026-07-24",
+      "source_url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "document_url": "https://genai.owasp.org/download/52117",
+      "announcement_url": "https://genai.owasp.org/2025/12/09/owasp-top-10-for-agentic-applications-the-benchmark-for-agentic-security-in-the-age-of-autonomous-ai/",
+      "license": "CC BY-SA 4.0",
+      "attribution": "Category identifiers and titles are quoted from the OWASP Top 10 for Agentic Applications 2026, OWASP Gen AI Security Project, licensed CC BY-SA 4.0. OWASP does not endorse Warden.",
+      "id_pattern": "^ASI(0[1-9]|10)$",
+      "categories": {
+        "ASI01": "Agent Goal Hijack",
+        "ASI02": "Tool Misuse and Exploitation",
+        "ASI03": "Identity and Privilege Abuse",
+        "ASI04": "Agentic Supply Chain Vulnerabilities",
+        "ASI05": "Unexpected Code Execution (RCE)",
+        "ASI06": "Memory & Context Poisoning",
+        "ASI07": "Insecure Inter-Agent Communication",
+        "ASI08": "Cascading Failures",
+        "ASI09": "Human-Agent Trust Exploitation",
+        "ASI10": "Rogue Agents"
+      }
+    },
+    "OWASP-LLM-2025": {
+      "title": "OWASP Top 10 for LLM Applications 2025",
+      "publisher": "OWASP Gen AI Security Project",
+      "document_version": "2025",
+      "published_on": "2024-11-18",
+      "retrieved_on": "2026-07-24",
+      "source_url": "https://genai.owasp.org/llm-top-10/",
+      "document_url": "https://genai.owasp.org/llmrisk/llm01-prompt-injection/",
+      "license": "CC BY-SA 4.0",
+      "attribution": "Category identifiers and titles are quoted from the OWASP Top 10 for LLM Applications 2025, OWASP Gen AI Security Project. OWASP does not endorse Warden.",
+      "id_pattern": "^LLM(0[1-9]|10):2025$",
+      "categories": {
+        "LLM01:2025": "Prompt Injection",
+        "LLM02:2025": "Sensitive Information Disclosure",
+        "LLM03:2025": "Supply Chain",
+        "LLM04:2025": "Data and Model Poisoning",
+        "LLM05:2025": "Improper Output Handling",
+        "LLM06:2025": "Excessive Agency",
+        "LLM07:2025": "System Prompt Leakage",
+        "LLM08:2025": "Vector and Embedding Weaknesses",
+        "LLM09:2025": "Misinformation",
+        "LLM10:2025": "Unbounded Consumption"
+      }
+    },
+    "OWASP-MCP-2025": {
+      "title": "OWASP MCP Top 10",
+      "publisher": "OWASP Foundation",
+      "document_version": "v0.1 (beta)",
+      "published_on": "2025",
+      "retrieved_on": "2026-07-24",
+      "source_url": "https://owasp.org/www-project-mcp-top-10/",
+      "document_url": "https://github.com/OWASP/www-project-mcp-top-10/blob/main/index.md",
+      "license": "unstated on the project page",
+      "attribution": "Category identifiers and titles are quoted from the OWASP MCP Top 10 project, OWASP Foundation. OWASP does not endorse Warden.",
+      "maturity_note": "This project is an OWASP incubator in beta (Phase 3, beta release and pilot testing). Its identifiers may change before final release, so mappings against it are the least stable in this file.",
+      "id_pattern": "^MCP(0[1-9]|10):2025$",
+      "categories": {
+        "MCP01:2025": "Token Mismanagement & Secret Exposure",
+        "MCP02:2025": "Privilege Escalation via Scope Creep",
+        "MCP03:2025": "Tool Poisoning",
+        "MCP04:2025": "Software Supply Chain Attacks & Dependency Tampering",
+        "MCP05:2025": "Command Injection & Execution",
+        "MCP06:2025": "Intent Flow Subversion",
+        "MCP07:2025": "Insufficient Authentication & Authorization",
+        "MCP08:2025": "Lack of Audit and Telemetry",
+        "MCP09:2025": "Shadow MCP Servers",
+        "MCP10:2025": "Context Injection & Over-Sharing"
+      }
+    }
+  },
+  "reason_codes": {
+    "PROMPT_INJECTION": {
+      "description": "Untrusted input carries instructions that override the caller's original task.",
+      "mappings": {
+        "OWASP-ASI-2026": {
+          "ids": ["ASI01"],
+          "rationale": "ASI01 covers manipulation of an agent's objectives, task selection, or decision pathways through attacker-controlled content, and names indirect prompt injection as its primary vector."
+        },
+        "OWASP-LLM-2025": {
+          "ids": ["LLM01:2025"],
+          "rationale": "Direct instruction override is the defining case of LLM01."
+        },
+        "OWASP-MCP-2025": {
+          "ids": ["MCP06:2025"],
+          "rationale": "MCP06 covers malicious instructions embedded in retrieved context that steer an agent away from the user's original goal."
+        }
+      }
+    },
+    "ROLE_OVERRIDE": {
+      "description": "Input attempts to replace the agent's persona, system role, or operating rules.",
+      "mappings": {
+        "OWASP-ASI-2026": {
+          "ids": ["ASI01"],
+          "rationale": "Replacing the agent's role rewrites its goal and permitted actions, which is the ASI01 failure mode."
+        },
+        "OWASP-LLM-2025": {
+          "ids": ["LLM01:2025"],
+          "rationale": "Persona and system-role override is a prompt-injection technique under LLM01."
+        },
+        "OWASP-MCP-2025": {
+          "ids": ["MCP06:2025"],
+          "rationale": "A role override delivered through the context channel is intent-flow subversion."
+        }
+      }
+    },
+    "WEB3_INJECTION": {
+      "description": "Input targets wallet, key, or transaction handling - seed phrases, approvals, transfers.",
+      "mappings": {
+        "OWASP-ASI-2026": {
+          "ids": ["ASI01", "ASI02"],
+          "rationale": "ASI01 lists a malicious prompt override that manipulates a financial agent into transferring funds to an attacker's account; ASI02 covers the resulting unsafe use of connected signing or transfer tools. No OWASP taxonomy has a blockchain-specific category, so this maps to the generic goal-hijack and tool-misuse categories."
+        },
+        "OWASP-LLM-2025": {
+          "ids": ["LLM01:2025", "LLM06:2025"],
+          "rationale": "The delivery is prompt injection (LLM01); the harm depends on the agent holding transaction authority it should not exercise unattended (LLM06)."
+        },
+        "OWASP-MCP-2025": {
+          "ids": ["MCP06:2025"],
+          "rationale": "Wallet-directed instructions arriving through the context channel subvert the intent flow."
+        }
+      }
+    },
+    "HIDDEN_UNICODE": {
+      "description": "Zero-width, bidirectional, or control characters conceal instructions from human review.",
+      "mappings": {
+        "OWASP-ASI-2026": {
+          "ids": ["ASI01"],
+          "rationale": "ASI01 covers hidden instruction payloads embedded in content the agent processes."
+        },
+        "OWASP-LLM-2025": {
+          "ids": ["LLM01:2025"],
+          "rationale": "LLM01 states that prompt injections need not be human-visible as long as the content is parsed by the model, and lists obfuscated attacks as a technique."
+        },
+        "OWASP-MCP-2025": {
+          "ids": ["MCP06:2025"],
+          "rationale": "Concealed instructions carried in context are intent-flow subversion."
+        }
+      }
+    },
+    "ENCODING_TRICK": {
+      "description": "Instructions are encoded - base64, hex, escapes, homoglyphs - to evade literal matching.",
+      "mappings": {
+        "OWASP-ASI-2026": {
+          "ids": ["ASI01"],
+          "rationale": "Encoded instruction payloads are a delivery form of the goal manipulation ASI01 describes."
+        },
+        "OWASP-LLM-2025": {
+          "ids": ["LLM01:2025"],
+          "rationale": "LLM01 names the multilingual and obfuscated attack, giving base64 encoding of malicious instructions as its example."
+        },
+        "OWASP-MCP-2025": {
+          "ids": ["MCP06:2025"],
+          "rationale": "Encoded instructions delivered through context are intent-flow subversion."
+        }
+      }
+    },
+    "STATISTICAL_ANOMALY": {
+      "description": "The statistical layer scored the payload as anomalous relative to the training corpus.",
+      "mappings": {
+        "OWASP-ASI-2026": {
+          "ids": null,
+          "unmapped_reason": "This is a detection-provenance label for an entropy and similarity signal, not an attack technique. The ASI Top 10 categories are defined by attacker objective and system impact, and an anomaly score alone establishes neither. Mapping it would overstate what the signal proves."
+        },
+        "OWASP-LLM-2025": {
+          "ids": null,
+          "unmapped_reason": "No LLM Top 10 category describes anomalous input statistics. LLM01's adversarial-suffix technique is the nearest neighbour, but it requires attacker intent that an anomaly score does not demonstrate."
+        },
+        "OWASP-MCP-2025": {
+          "ids": null,
+          "unmapped_reason": "The MCP Top 10 addresses protocol, tool, and server weaknesses. It has no category for anomalous payload statistics."
+        }
+      }
+    },
+    "CORPUS_MATCH": {
+      "description": "The payload matched a known attack in Warden's training corpus.",
+      "mappings": {
+        "OWASP-ASI-2026": {
+          "ids": null,
+          "unmapped_reason": "This is a detection-provenance label, not an attack class. The training corpus spans every Warden threat class, so a corpus match can correspond to any of several ASI categories and no single one can be assigned. Probe-level entries carry the technique-specific mapping instead."
+        },
+        "OWASP-LLM-2025": {
+          "ids": null,
+          "unmapped_reason": "Same reason: the label identifies how the detection fired, not which technique the payload used, so no single LLM Top 10 category applies."
+        },
+        "OWASP-MCP-2025": {
+          "ids": null,
+          "unmapped_reason": "Same reason: the label identifies how the detection fired, not which technique the payload used, so no single MCP Top 10 category applies."
+        }
+      }
+    },
+    "DRAIN_ADDRESS": {
+      "description": "The payload substitutes an attacker-controlled recipient address for the expected one.",
+      "mappings": {
+        "OWASP-ASI-2026": {
+          "ids": ["ASI01", "ASI02"],
+          "rationale": "ASI01 gives redirection of a financial agent's payment to an attacker's account as a worked example; ASI02 covers the misuse of the connected transfer tool that carries it out."
+        },
+        "OWASP-LLM-2025": {
+          "ids": ["LLM01:2025", "LLM06:2025"],
+          "rationale": "The substitution is delivered as prompt injection (LLM01) and lands because the agent may execute a transfer without confirmation (LLM06)."
+        },
+        "OWASP-MCP-2025": {
+          "ids": ["MCP06:2025"],
+          "rationale": "A substituted recipient injected through the context channel redirects the agent's intent."
+        }
+      }
+    },
+    "TOOL_HIJACK": {
+      "description": "The payload attempts to invoke, redirect, or re-argument the agent's tools.",
+      "mappings": {
+        "OWASP-ASI-2026": {
+          "ids": ["ASI01", "ASI02"],
+          "rationale": "ASI02 covers an agent using connected tools in unsafe ways and attackers exploiting tool interfaces; ASI01 covers the redirection of the decision path that selects the tool call."
+        },
+        "OWASP-LLM-2025": {
+          "ids": ["LLM01:2025", "LLM06:2025"],
+          "rationale": "The OWASP Agentic mapping matrix aligns ASI02 with LLM06 Excessive Agency; LLM01 covers the injected instruction that triggers the tool call."
+        },
+        "OWASP-MCP-2025": {
+          "ids": ["MCP03:2025"],
+          "rationale": "MCP03 covers adversaries compromising the tools, plugins, or their outputs an agent depends on in order to manipulate its behaviour."
+        }
+      }
+    },
+    "SECRET_EXFIL": {
+      "description": "The payload attempts to extract or transmit API keys, tokens, or other credentials.",
+      "mappings": {
+        "OWASP-ASI-2026": {
+          "ids": ["ASI01", "ASI03"],
+          "rationale": "ASI03 covers abuse of agent identity and privilege, of which credential theft is the enabling step; ASI01 covers the injected instruction that drives the exfiltration."
+        },
+        "OWASP-LLM-2025": {
+          "ids": ["LLM02:2025"],
+          "rationale": "Disclosure of credentials held by or reachable from the model is the core LLM02 case, and the OWASP Agentic mapping matrix aligns ASI03 with LLM02."
+        },
+        "OWASP-MCP-2025": {
+          "ids": ["MCP01:2025"],
+          "rationale": "MCP01 explicitly describes attackers retrieving tokens and secrets through prompt injection, compromised context, or debug traces."
+        }
+      }
+    },
+    "MALICIOUS_LINK": {
+      "description": "The payload supplies a dangerous URI - javascript:, vbscript:, file:, or a hostile destination - as if it were trusted.",
+      "mappings": {
+        "OWASP-ASI-2026": {
+          "ids": ["ASI02", "ASI05"],
+          "rationale": "A script-scheme URI handed to a browsing or rendering tool is the unexpected code execution ASI05 describes; a file: or attacker-hosted URI handed to a fetch tool is the unsafe tool use ASI02 describes."
+        },
+        "OWASP-LLM-2025": {
+          "ids": ["LLM05:2025"],
+          "rationale": "The harm occurs when an unvalidated URI from model-adjacent content is passed to a downstream consumer, which is LLM05; the OWASP Agentic mapping matrix aligns ASI05 with LLM05."
+        },
+        "OWASP-MCP-2025": {
+          "ids": null,
+          "unmapped_reason": "The MCP Top 10 has no category for unsafe URI schemes carried inside scanned content. MCP05 Command Injection & Execution addresses command execution at the MCP server boundary rather than a URI the agent is invited to open, so claiming it would misstate the scope."
+        }
+      }
+    }
+  },
+  "probes": {
+    "audit-v1-001": { "category": "PROMPT_INJECTION" },
+    "audit-v1-002": { "category": "PROMPT_INJECTION" },
+    "audit-v1-003": { "category": "ROLE_OVERRIDE" },
+    "audit-v1-004": { "category": "ROLE_OVERRIDE" },
+    "audit-v1-005": { "category": "WEB3_INJECTION" },
+    "audit-v1-006": { "category": "WEB3_INJECTION" },
+    "audit-v1-007": { "category": "HIDDEN_UNICODE" },
+    "audit-v1-008": { "category": "HIDDEN_UNICODE" },
+    "audit-v1-009": { "category": "ENCODING_TRICK" },
+    "audit-v1-010": { "category": "ENCODING_TRICK" },
+    "audit-v1-011": { "category": "DRAIN_ADDRESS" },
+    "audit-v1-012": { "category": "DRAIN_ADDRESS" },
+    "audit-v1-013": { "category": "TOOL_HIJACK" },
+    "audit-v1-014": { "category": "TOOL_HIJACK" },
+    "audit-v1-015": { "category": "SECRET_EXFIL" },
+    "audit-v1-016": { "category": "SECRET_EXFIL" },
+    "audit-v1-017": { "category": "MALICIOUS_LINK" },
+    "audit-v1-018": { "category": "MALICIOUS_LINK" },
+    "audit-v1-019": { "category": "STATISTICAL_ANOMALY" },
+    "audit-v1-020": {
+      "category": "CORPUS_MATCH",
+      "mappings": {
+        "OWASP-ASI-2026": {
+          "ids": ["ASI01"],
+          "rationale": "The CORPUS_MATCH reason code is unmappable in general, but this specific probe payload is a paraphrased instruction override that redirects the agent's action, which is squarely ASI01."
+        },
+        "OWASP-LLM-2025": {
+          "ids": ["LLM01:2025"],
+          "rationale": "The payload is a rephrased prompt injection, so LLM01 applies to this probe even though the reason code that catches it does not name a technique."
+        },
+        "OWASP-MCP-2025": {
+          "ids": ["MCP06:2025"],
+          "rationale": "Delivered through the context channel this payload subverts the agent's intent flow."
+        }
+      }
+    }
+  }
+}

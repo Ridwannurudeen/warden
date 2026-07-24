@@ -381,6 +381,41 @@ class AuditResponse(BaseModel):
     consent_verified: bool = True
 
 
+class HardenRequest(BaseModel):
+    audit_id: str = Field(pattern=r"^[0-9a-f]{16}$")
+
+
+class HardenExample(BaseModel):
+    id: str
+    payload: str
+    expected_verdict: str
+
+
+class HardenRemediation(BaseModel):
+    attack_class: str
+    missed: int = Field(ge=1)
+    blocked: int = Field(ge=0)
+    total: int = Field(ge=1)
+    summary: str
+    pattern_families: list[str]
+    analyzers: list[str]
+    example_attacks: list[HardenExample]
+
+
+class HardenResponse(BaseModel):
+    schema_version: Literal[1]
+    audit_id: str = Field(pattern=r"^[0-9a-f]{16}$")
+    target_host: str
+    battery_id: str
+    battery_version: str
+    observed_on: str
+    corpus_fingerprint: str
+    addressed_classes: list[str]
+    remediation: list[HardenRemediation]
+    integration: dict[str, str]
+    limitations: str
+
+
 class ApaRegisterRequest(BaseModel):
     endpoint: str = Field(min_length=1, max_length=MAX_TARGET_URL_LENGTH)
 

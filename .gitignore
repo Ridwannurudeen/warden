@@ -7,6 +7,7 @@ badges/
 gauntlet/
 /data/feedback/
 /data/shield/
+/data/audit-findings/
 
 # Generated marketplace pages (rebuild with scripts/build_index.py)
 /site/agents/

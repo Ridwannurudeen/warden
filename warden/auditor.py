@@ -16,6 +16,7 @@ from urllib.parse import ParseResult, urlparse
 import httpx
 
 from warden.apa_url import is_blocked_ip, resolve_host, validate_public_http_url
+from warden.audit_findings import record_findings
 from warden.badge_store import record_badge
 from warden.badges import issue_badge
 from warden.models import AuditResponse, AuditResult
@@ -132,9 +133,7 @@ def _load_audit_battery() -> tuple[tuple[dict[str, str], ...], tuple[str, ...]]:
             raise RuntimeError("endpoint-audit battery contains an invalid or duplicate probe")
         probe_ids.add(probe_id)
         probe_payloads.add(payload)
-        validated_probes.append(
-            {"id": probe_id, "category": category, "payload": payload}
-        )
+        validated_probes.append({"id": probe_id, "category": category, "payload": payload})
 
     benign_payloads: list[str] = []
     benign_ids: set[str] = set()
@@ -231,18 +230,12 @@ class AgentAuditor:
         benign_blocked = sum(outcome is AuditOutcome.BLOCKED for outcome in benign_outcomes)
         # Every control must complete without being blocked. A partial pass is not
         # enough evidence to distinguish selective enforcement from blind rejection.
-        liveness_passed = (
-            benign_inconclusive == 0
-            and benign_conclusive > 0
-            and benign_blocked == 0
-        )
+        liveness_passed = benign_inconclusive == 0 and benign_conclusive > 0 and benign_blocked == 0
         if conclusive_count:
             score = round((blocked_count / conclusive_count) * 100, 2)
             provisional_grade = self._grade(score)
             grade = (
-                provisional_grade
-                if not inconclusive_count and liveness_passed
-                else "INCONCLUSIVE"
+                provisional_grade if not inconclusive_count and liveness_passed else "INCONCLUSIVE"
             )
             missed = sorted({result.attack_class for result in fixed_results if not result.blocked})
             recommendations = (
@@ -290,6 +283,18 @@ class AgentAuditor:
                 ),
             )
             record_badge(badge_record)
+            # Only signed evidence earns retained findings, so a hardening pack can
+            # never be built from an inconclusive or unconsented run. Caller-supplied
+            # prompts stay excluded here for the same prompt-provenance reason they
+            # are excluded from the grade.
+            record_findings(
+                audit_id=str(badge_record["audit_id"]),
+                target_host=host_header,
+                findings=self._class_findings(fixed_results),
+                battery_id=BATTERY_ID,
+                battery_version=BATTERY_VERSION,
+                observed_on=issued_at,
+            )
         elif not conclusive_count:
             badge = (
                 "Warden audit inconclusive (no grade or badge issued): "
@@ -385,6 +390,18 @@ class AgentAuditor:
             "benign_passed": benign_conclusive - benign_blocked,
             "caller_prompts": caller_prompts,
         }
+
+    @staticmethod
+    def _class_findings(results: list[AuditResult]) -> list[dict[str, object]]:
+        counts: dict[str, dict[str, object]] = {}
+        for result in results:
+            entry = counts.setdefault(
+                result.attack_class,
+                {"attack_class": result.attack_class, "total": 0, "blocked": 0},
+            )
+            entry["total"] = int(entry["total"]) + 1
+            entry["blocked"] = int(entry["blocked"]) + int(result.blocked)
+        return list(counts.values())
 
     def _load_representative_attacks(self) -> list[dict[str, object]]:
         return [dict(attack) for attack in _FIXED_ATTACKS]
@@ -542,8 +559,7 @@ class AgentAuditor:
         }
         return not (
             explicitly_disabled
-            and os.getenv("WARDEN_ENVIRONMENT", "production").strip().lower()
-            == "development"
+            and os.getenv("WARDEN_ENVIRONMENT", "production").strip().lower() == "development"
         )
 
     async def _verify_target_consent(

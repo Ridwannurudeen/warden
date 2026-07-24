@@ -6,12 +6,16 @@ from urllib.parse import urlparse
 from fastmcp import FastMCP
 from pydantic import Field
 
+from warden.audit_findings import get_findings
 from warden.auditor import AgentAuditor
 from warden.engine import WardenEngine
+from warden.hardening import build_pack
 from warden.models import (
     AuditRequest,
     AuditResponse,
     Depth,
+    HardenRequest,
+    HardenResponse,
     MAX_PAYLOAD_LENGTH,
     MAX_SAMPLE_PROMPTS,
     MAX_TARGET_URL_LENGTH,
@@ -72,6 +76,21 @@ async def audit_agent(
         request.sample_prompts,
     )
     return response.model_dump()
+
+
+@mcp.tool(output_schema=HardenResponse.model_json_schema())
+async def harden_agent(
+    audit_id: Annotated[str, Field(pattern=r"^[0-9a-f]{16}$")],
+) -> dict[str, object]:
+    """Return a remediation pack for the classes a completed audit left unblocked."""
+    request = HardenRequest.model_validate({"audit_id": audit_id})
+    findings = get_findings(request.audit_id)
+    if findings is None:
+        raise ValueError(
+            "no retained findings for that audit_id; findings exist only for a "
+            "conclusive, consented audit that issued signed evidence"
+        )
+    return HardenResponse.model_validate(build_pack(findings)).model_dump()
 
 
 if __name__ == "__main__":
