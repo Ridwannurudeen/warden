@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { network } from "hardhat";
 import {
@@ -13,16 +14,18 @@ import {
   zeroHash,
 } from "viem";
 
+const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+
 function pythonVector(...args) {
   const result = spawnSync(
     "python",
-    ["tests/fixtures/emit_onchain_vector.py", ...args],
+    [`${ROOT}/tests/fixtures/emit_onchain_vector.py`, ...args],
     {
-      cwd: process.cwd(),
+      cwd: ROOT,
       encoding: "utf8",
       env: {
         ...process.env,
-        PYTHONPATH: process.cwd(),
+        PYTHONPATH: ROOT,
       },
       windowsHide: true,
     },
@@ -42,15 +45,15 @@ describe("WardenLogAnchor", async function () {
 
   it("matches the reviewed compiler record and bytecode hashes", function () {
     const build = JSON.parse(
-      readFileSync("contracts/WardenLogAnchor.build.json", "utf8"),
+      readFileSync(`${ROOT}/contracts/WardenLogAnchor.build.json`, "utf8"),
     );
     const artifact = JSON.parse(
       readFileSync(
-        "artifacts/contracts/WardenLogAnchor.sol/WardenLogAnchor.json",
+        `${ROOT}/contracts/artifacts/src/WardenLogAnchor.sol/WardenLogAnchor.json`,
         "utf8",
       ),
     );
-    const source = readFileSync(build.source);
+    const source = readFileSync(`${ROOT}/${build.source}`);
     const creation = Buffer.from(artifact.bytecode.slice(2), "hex");
     const runtime = Buffer.from(artifact.deployedBytecode.slice(2), "hex");
 

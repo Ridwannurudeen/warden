@@ -4,10 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:contracts": "hardhat compile",
-    "test": "npm run test:js && npm run test:contracts",
-    "test:contracts": "hardhat test nodejs",
-    "test:js": "node --test tests/js/*.test.js"
+    "build": "hardhat compile",
+    "test": "hardhat test nodejs"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-node-test-runner": "3.0.17",

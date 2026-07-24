@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "source": "contracts/WardenLogAnchor.sol",
+  "source": "contracts/src/WardenLogAnchor.sol",
   "source_sha256": "229185d5ba1a29b3637c7a75e01de953a36f8d8fdd241b89d93998c6d9bff82b",
   "compiler": {
     "name": "solc",

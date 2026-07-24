@@ -2,7 +2,8 @@
 
 ## Status and boundary
 
-`contracts/WardenLogAnchor.sol` and `warden/onchain_anchor.py` are source-only deployment artifacts.
+`contracts/src/WardenLogAnchor.sol` and `warden/onchain_anchor.py` are source-only deployment
+artifacts.
 The contract is compiled and exercised only on Hardhat's in-process local EVM. No contract address in
 this repository is live, and the build performed no X Layer deployment, RPC call, transaction
 broadcast, or wallet action.
@@ -24,8 +25,9 @@ Do not deploy until all of these checks pass:
 
 1. Obtain explicit user approval for the deployment, publisher address, and exact reviewed source.
 2. Reproduce `contracts/WardenLogAnchor.build.json` with the exact pinned compiler settings.
-3. Run `npm ci`, `npm run build:contracts`, `npm run test:contracts`, and `npm audit`. The recorded
-   source, creation-bytecode, and pre-link runtime-bytecode hashes must match.
+3. Run `npm --prefix contracts ci`, `npm --prefix contracts run build`,
+   `npm --prefix contracts test`, and `npm --prefix contracts audit`. The recorded source,
+   creation-bytecode, and pre-link runtime-bytecode hashes must match.
 4. Confirm the destination reports chain ID `196` and is X Layer.
 5. Confirm the constructor publisher is a nonzero address controlled independently of the deployment
    key or covered by the operator's documented recovery procedure.

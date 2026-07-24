@@ -22,9 +22,11 @@ export default defineConfig({
     ],
   },
   paths: {
-    sources: "./contracts",
+    artifacts: "./artifacts",
+    cache: "./cache",
+    sources: "./src",
     tests: {
-      nodejs: "./tests/contracts",
+      nodejs: "./test-js",
     },
   },
 });
