@@ -7,6 +7,12 @@ The two paths are intentionally separate; never install scheduled units during a
 Warden Shield is a separate, owner-enrolled opt-in lifecycle with its own service and daily timer; this
 runbook does not install or enable it.
 
+**Two artifacts, not one:** `/opt/warden` is the application; `/opt/warden-site` is the nginx static root
+(`root /opt/warden-site;`). An app-only deploy leaves any new page 404 — `/lineage` did exactly that on
+2026-07-25 until `site/` was overlaid into `/opt/warden-site` too. Back that directory up first, and preserve
+the host-generated `data/marketplace-summary.json` and `data/warden-services.json`, which `build_index.py`
+regenerates on the host and which Step 0 asserts.
+
 **Log route boundary:** `/log` is the flat static compatibility page served from
 `/opt/warden-site/log.html`. `/apa/log` is the canonical FastAPI route: it returns JSON by default and returns
 the app copy of `site/log.html` only when the request explicitly accepts `text/html`.
@@ -95,6 +101,15 @@ chmod -R u=rwX,go=rX /opt/warden/warden /opt/warden/scripts /opt/warden/site /op
 install -d -o warden -g warden -m 0750 \
   /opt/warden/data /opt/warden/badges /opt/warden/gauntlet /opt/warden/logs \
   /opt/warden/monitor /opt/warden/anchor
+
+# nginx aliases /data/service-monitor.json, /data/apa-log-anchor.json and
+# /data/apa-log-anchor-history.json into /opt/warden/monitor and /opt/warden/anchor.
+# nginx runs as www-data, which is not in the warden group, so at 0750 it cannot
+# traverse those directories and all three routes answer 403. Grant traversal only
+# (o+x): the directory still cannot be listed, and every file inside is already
+# public evidence served through those aliases. Verified necessary on 2026-07-25 —
+# without this the three routes regress from 200 to 403.
+chmod o+x /opt/warden/monitor /opt/warden/anchor
 
 runuser -u warden -- env -i HOME=/opt/warden PATH=/opt/warden/.venv/bin:/usr/local/bin:/usr/bin:/bin bash -s <<'WARDEN_MIGRATION'
 set -euo pipefail
