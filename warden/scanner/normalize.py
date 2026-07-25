@@ -34,6 +34,12 @@ MAX_CONTAINER_NODES = 4096
 MIN_DECODED_LENGTH = 8
 MIN_PRINTABLE_RATIO = 0.9
 PLAUSIBLE_TEXT_WINDOW = 64
+# Transit layers — decodings that are not text but are nothing except another
+# encoding — are carried forward for one more hop instead of being scanned.
+# They cost a decode each and never become candidates, so a small global budget
+# is enough to cover published layering (two or three wrappers) while keeping a
+# crafted fan-out from multiplying the pre-pass.
+MAX_TRANSIT_SEGMENTS = 4
 # Four single-character groups is the shortest run that folds. Three would
 # swallow initialisms ("U.S.A.", "F.B.I.") and two would swallow "a.m." and
 # single-letter words, so the floor is what keeps ordinary prose untouched.
@@ -173,6 +179,7 @@ _BASE64_TOKEN = re.compile(r"[A-Za-z0-9+/_-]{16,}={0,2}")
 _HEX_RUN = re.compile(r"(?:0x)?((?:[0-9a-fA-F]{2}){8,})")
 _X_ESCAPES = re.compile(r"(?:\\x[0-9a-fA-F]{2}){4,}")
 _PERCENT_ESCAPE = re.compile(r"%[0-9a-fA-F]{2}")
+_PERCENT_LAYER = re.compile(r"(?:[^%]|%[0-9a-fA-F]{2})+")
 _HTML_ENTITY = re.compile(r"&(?:#\d{2,6};|#x[0-9a-fA-F]{2,6};|[a-zA-Z]{2,10};)")
 _CONTAINER_ENCODING_KEYS = frozenset({"encoding", "codec"})
 _CONTAINER_VALUE_KEYS = frozenset({"blob", "chunks", "content", "data", "payload", "value"})
@@ -208,7 +215,9 @@ def _has_duplicate_semantic_keys(text: str) -> bool:
         json.loads(text, object_pairs_hook=_reject_ambiguous_container_keys)
     except _AmbiguousContainerError:
         return True
-    except (json.JSONDecodeError, RecursionError):
+    except (ValueError, RecursionError):
+        # ValueError covers JSONDecodeError and CPython's int-string digit
+        # limit, which a long run of digits trips inside the JSON scanner.
         return False
     return False
 
@@ -233,6 +242,37 @@ def _is_plausible_text(decoded: str) -> bool:
     return False
 
 
+def _is_encoded_layer(decoded: str) -> bool:
+    """Is ``decoded`` nothing but one more encoding of something else?
+
+    This is the shape of a layered-encoding evasion: each wrapper decodes to a
+    bare encoding of the next, never to text, so every intermediate layer fails
+    the plausibility gate and the chain stops one hop short of the payload.
+    The test is deliberately whole-string — a layer carrying prose *around* an
+    encoded run is already plausible text and travels the ordinary path — so
+    the only thing admitted here is a wrapper with nothing else in it.
+    """
+    stripped = decoded.strip()
+    if len(stripped) < MIN_DECODED_LENGTH:
+        return False
+    if (
+        _HEX_RUN.fullmatch(stripped)
+        or _BASE64_TOKEN.fullmatch(stripped)
+        or _X_ESCAPES.fullmatch(stripped)
+    ):
+        return True
+    return len(_PERCENT_ESCAPE.findall(stripped)) >= 3 and bool(_PERCENT_LAYER.fullmatch(stripped))
+
+
+def _layer_text(decoded: str | None) -> str | None:
+    """Return ``decoded`` when it is a printable, purely-encoded transit layer."""
+    if decoded is None or len(decoded) > MAX_TEXT_SIZE:
+        return None
+    if not _is_printable_text(decoded) or not _is_encoded_layer(decoded):
+        return None
+    return decoded
+
+
 def _decode_bytes(raw: bytes) -> str | None:
     try:
         decoded = raw.decode("utf-8")
@@ -241,6 +281,14 @@ def _decode_bytes(raw: bytes) -> str | None:
     if len(decoded) > MAX_TEXT_SIZE:
         return None
     return decoded if _is_plausible_text(decoded) else None
+
+
+def _decode_layer_bytes(raw: bytes) -> str | None:
+    try:
+        decoded = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    return _layer_text(decoded)
 
 
 def _decode_explicit_bytes(raw: bytes) -> str | None:
@@ -258,16 +306,21 @@ def _is_explicit_text(decoded: str) -> bool:
     return printable / len(decoded) >= MIN_PRINTABLE_RATIO
 
 
-def _base64_decodings(token: str) -> str | None:
+def _base64_bytes(token: str) -> bytes | None:
+    """Decode one base64/base64url token to bytes, or ``None``.
+
+    At most one variant can succeed: ``validate=True`` rejects ``-``/``_`` for
+    the standard alphabet, so a token carrying them only decodes after the
+    substitution, and a token without them makes both variants identical.
+    Returning bytes lets a caller classify the same decode as text or as a
+    transit layer without paying for a second decode.
+    """
     padded = token + "=" * (-len(token) % 4)
     for variant in (padded, padded.replace("-", "+").replace("_", "/")):
         try:
-            raw = base64.b64decode(variant, validate=True)
+            return base64.b64decode(variant, validate=True)
         except (binascii.Error, ValueError):
             continue
-        decoded = _decode_bytes(raw)
-        if decoded is not None:
-            return decoded
     return None
 
 
@@ -367,7 +420,10 @@ def _container_decodings(text: str) -> tuple[list[str], bool]:
         return [], True
     except RecursionError:
         return [], True
-    except json.JSONDecodeError:
+    except ValueError:
+        # JSONDecodeError, plus CPython's int-string digit limit: a payload
+        # that is a long run of digits is not a container, so it is not
+        # opaque either. Letting it escape would crash the pre-pass.
         return [], False
 
     decoded_values: list[str] = []
@@ -434,23 +490,51 @@ def _container_decodings(text: str) -> tuple[list[str], bool]:
     return decoded_values, False
 
 
-def _decoded_segments(text: str) -> tuple[list[str], bool]:
-    """Decode every plausible encoded segment embedded in ``text``."""
+def _decoded_segments(text: str) -> tuple[list[str], list[str], bool]:
+    """Decode the encoded segments embedded in ``text``.
+
+    Returns the plausible-text decodings, the transit layers (decodings that
+    are not text but are themselves nothing but one more encoding, to be
+    unwrapped on the next hop rather than scanned), and whether a declared
+    container could not be inspected safely.
+    """
     segments: list[str] = []
+    transit: list[str] = []
 
     def _add(candidate: str | None) -> bool:
         if candidate and candidate not in segments and candidate != text:
             segments.append(candidate)
         return len(segments) >= MAX_DECODED_SEGMENTS_PER_TEXT
 
+    def _add_transit(candidate: str | None) -> None:
+        """Record a transit layer, softly: a full budget drops it silently.
+
+        Transit layers are never scanned themselves, so dropping one can only
+        lose a detection on a deeper hop. Aborting the segment scan for them
+        would instead cost detections on this hop.
+        """
+        if (
+            candidate
+            and candidate not in transit
+            and candidate != text
+            and len(transit) < MAX_TRANSIT_SEGMENTS
+        ):
+            transit.append(candidate)
+
     container_decodings, ambiguous_container = _container_decodings(text)
     for decoded in container_decodings:
         if _add(decoded):
-            return segments, ambiguous_container
+            return segments, transit, ambiguous_container
 
     for match in _BASE64_TOKEN.finditer(text):
-        if _add(_base64_decodings(match.group())):
-            return segments, ambiguous_container
+        raw = _base64_bytes(match.group())
+        if raw is None:
+            continue
+        decoded = _decode_bytes(raw)
+        if decoded is None:
+            _add_transit(_decode_layer_bytes(raw))
+        elif _add(decoded):
+            return segments, transit, ambiguous_container
 
     for match in _HEX_RUN.finditer(text):
         run = match.group(1)
@@ -458,27 +542,37 @@ def _decoded_segments(text: str) -> tuple[list[str], bool]:
             raw = bytes.fromhex(run)
         except ValueError:
             continue
-        if _add(_decode_bytes(raw)):
-            return segments, ambiguous_container
+        decoded = _decode_bytes(raw)
+        if decoded is None:
+            _add_transit(_decode_layer_bytes(raw))
+        elif _add(decoded):
+            return segments, transit, ambiguous_container
 
     for match in _X_ESCAPES.finditer(text):
         raw = bytes(int(pair, 16) for pair in re.findall(r"\\x([0-9a-fA-F]{2})", match.group()))
-        if _add(_decode_bytes(raw)):
-            return segments, ambiguous_container
+        decoded = _decode_bytes(raw)
+        if decoded is None:
+            _add_transit(_decode_layer_bytes(raw))
+        elif _add(decoded):
+            return segments, transit, ambiguous_container
 
     if len(_PERCENT_ESCAPE.findall(text)) >= 3:
         unquoted = unquote(text, errors="replace")
-        if unquoted != text and len(unquoted) <= MAX_TEXT_SIZE and _is_plausible_text(unquoted):
-            if _add(unquoted):
-                return segments, ambiguous_container
+        if unquoted != text and len(unquoted) <= MAX_TEXT_SIZE:
+            if not _is_plausible_text(unquoted):
+                _add_transit(_layer_text(unquoted))
+            elif _add(unquoted):
+                return segments, transit, ambiguous_container
 
     if _HTML_ENTITY.search(text):
         unescaped = html.unescape(text)
-        if unescaped != text and len(unescaped) <= MAX_TEXT_SIZE and _is_plausible_text(unescaped):
-            if _add(unescaped):
-                return segments, ambiguous_container
+        if unescaped != text and len(unescaped) <= MAX_TEXT_SIZE:
+            if not _is_plausible_text(unescaped):
+                _add_transit(_layer_text(unescaped))
+            elif _add(unescaped):
+                return segments, transit, ambiguous_container
 
-    return segments, ambiguous_container
+    return segments, transit, ambiguous_container
 
 
 def strip_invisibles(text: str) -> str:
@@ -642,6 +736,9 @@ def derive_candidates(text: str) -> list[tuple[str, str]]:
 
     ``transform`` is ``"unicode"`` for fold/strip variants and ``"decoded"``
     for reversed encodings (including layered encodings up to the depth cap).
+    A layer that decodes to another bare encoding rather than to text is
+    carried forward as a transit node — unwrapped on the next hop, never
+    emitted as a candidate, and bounded by its own global budget.
     The original text is included only as a fail-closed marker when semantic
     JSON keys collide or a declared encoding cannot be inspected safely.
     """
@@ -670,10 +767,11 @@ def derive_candidates(text: str) -> list[tuple[str, str]]:
 
     # Breadth-first layered decoding with a strict depth cap.
     frontier = [text] + ([folded] if folded != text else [])
+    transit_seen: set[str] = set()
     for _ in range(MAX_DECODE_DEPTH):
         next_frontier: list[str] = []
         for current in frontier:
-            decoded_segments, ambiguous_container = _decoded_segments(current)
+            decoded_segments, transit_segments, ambiguous_container = _decoded_segments(current)
             if ambiguous_container:
                 transform = (
                     TRANSFORM_AMBIGUOUS_CONTAINER
@@ -690,13 +788,19 @@ def derive_candidates(text: str) -> list[tuple[str, str]]:
                     if not _add(decoded_folded, TRANSFORM_DECODED):
                         return _limit_marker(current)
                 next_frontier.append(decoded)
+            for layer in transit_segments:
+                if len(transit_seen) >= MAX_TRANSIT_SEGMENTS:
+                    break
+                if layer not in transit_seen:
+                    transit_seen.add(layer)
+                    next_frontier.append(layer)
         if not next_frontier:
             break
         frontier = next_frontier
 
     for current in frontier:
-        decoded_segments, unsafe_container = _decoded_segments(current)
-        if decoded_segments or unsafe_container:
+        decoded_segments, transit_segments, unsafe_container = _decoded_segments(current)
+        if decoded_segments or transit_segments or unsafe_container:
             return _limit_marker(current)
 
     _add_obfuscation_folds(candidates, seen, folded)
