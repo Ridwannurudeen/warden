@@ -283,9 +283,9 @@ scp deploy/nginx-warden.conf root@75.119.153.252:/root/warden-nginx.trustlayer.c
 ssh root@75.119.153.252 'diff -u /etc/nginx/sites-available/warden.gudman.xyz.conf /root/warden-nginx.trustlayer.candidate.conf || true'
 ```
 
-**Gate (manual review):** the diff may show only the `location /apa/ { ... }` and
-`location = /.well-known/apa-issuer.json { ... }` proxy blocks (both proxying to
-`http://127.0.0.1:8031`) plus these exact aliases:
+**Gate (manual review):** the diff may show only the `location /apa/ { ... }`,
+`location = /.well-known/apa-issuer.json { ... }` and `location = /harden { ... }` proxy blocks (all
+proxying to `http://127.0.0.1:8031`) plus these exact aliases:
 
 - `/data/service-monitor.json` → `/opt/warden/monitor/service-monitor.json`;
 - `/data/apa-log-anchor.json` → `/opt/warden/anchor/apa-log-anchor.json`;
@@ -293,6 +293,10 @@ ssh root@75.119.153.252 'diff -u /etc/nginx/sites-available/warden.gudman.xyz.co
 
 No `root` change away from `/opt/warden-site`, no `/opt/warden-index`, no `current`, no listen/server_name/ssl
 changes, and no directory-wide alias for runtime state. If anything else appears, STOP and investigate.
+
+`location = /harden` is expected here because the paid hardening route is additive and must reach the app —
+Step 5b below requires public `/harden` to answer 402. `/lineage` must **not** appear as its own block: it is
+a static page served by the existing `location /` catch-all (`try_files $uri $uri.html`).
 
 ## Step 3 — Install + syntax gate (the only mutating step)
 
@@ -333,7 +337,7 @@ set -euo pipefail
 base=https://warden.gudman.xyz
 
 # 5a. Static pages and the /log compatibility page -> 200
-for p in / /playground /hire /docs /status /badges /agents /agents/3808 /gauntlet /showcase /theater /verify /log /integrate /privacy /terms; do
+for p in / /playground /hire /docs /status /badges /agents /agents/3808 /gauntlet /showcase /theater /verify /trust /lineage /log /integrate /privacy /terms; do
   code=$(curl -s -o /dev/null -w '%{http_code}' "$base$p")
   echo "$p -> $code"; test "$code" = 200
 done

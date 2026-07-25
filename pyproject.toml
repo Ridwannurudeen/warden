@@ -10,6 +10,10 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "cryptography>=42",
+    # onchain_attestation/onchain_anchor import these directly. They also arrive
+    # transitively through okxweb3-app-x402[evm], but relying on that would break
+    # both modules at import if the extra ever stopped pulling them.
+    "eth-account==0.13.7",
     "fastapi==0.137.1",
     "fastmcp==3.4.2",
     "httpx==0.28.1",
@@ -17,6 +21,7 @@ dependencies = [
     "okxweb3-app-x402[fastapi,evm]==0.1.0",
     "pydantic==2.13.4",
     "uvicorn==0.49.0",
+    "web3==7.16.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -41,6 +46,9 @@ include = ["audit", "warden*"]
 
 [project.optional-dependencies]
 dev = [
+    # spec/run_conformance.py and the conformance tests import jsonschema; it was
+    # previously only present transitively (via mcp).
+    "jsonschema==4.26.0",
     "pip-audit==2.10.0",
     "pytest==9.0.3",
     "pytest-asyncio==1.3.0",

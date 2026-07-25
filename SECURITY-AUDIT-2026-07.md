@@ -9,7 +9,7 @@
 
 This audit reviewed Warden's local source, tests, generated-site pipeline, Python and TypeScript SDKs, MCP surface, endpoint auditor, x402 wiring, APA trust layer, and persistence boundaries. The remediation range is `962525d..b97ea75` on `fix/scanner-exfil-drain-coverage`; the final runtime commit reviewed here is `b97ea75`.
 
-The work fixed **33 production findings**: **2 Critical, 16 High, 12 Medium, and 3 Low**. Each fix has a regression test. Three additional Low-severity evidence or CI defects were corrected. The frozen `/scan` and `/audit` field sets remain unchanged, and the deterministic held-out benchmark remains 64.29% attack recall with 0.00% false positives.
+The work fixed **33 production findings**: **2 Critical, 16 High, 12 Medium, and 3 Low**. Each fix has a regression test. Three additional Low-severity evidence or CI defects were corrected. The frozen `/scan` and `/audit` field sets remain unchanged, and the deterministic held-out benchmark was 64.29% attack recall with 0.00% false positives **as measured during this audit against the then-current 28-case held-out set**. That set was later expanded; the current published baseline is **87/94 (92.55%) at 0/45 false positives** — see the D-10 row below and `benchmark/README.md`. This paragraph is a dated record, not a present-tense claim.
 
 This is not a claim that Warden is exploit-proof. Three reproduced High-severity limitations remain in the legacy signed-audit badge model: badges do not bind the exact endpoint, the public fixed attack battery can be recognized by a target, and caller-supplied custom prompts can dilute the signed grade. Correcting those issues honestly requires a versioned evidence format with an exact target, battery identity, prompt provenance, and benign/liveness controls. Adding those fields would violate the frozen audit response contract in this remediation. Until that migration is designed and tested, signed audit badges must be treated as historical attack-probe receipts, not certification that an endpoint is generally safe.
 
@@ -234,7 +234,7 @@ All commands below were run locally at `b97ea75` on 2026-07-16.
 | TypeScript SDK suite | `npm test -- --run` from `sdk/ts` | **31 passed** across 3 files |
 | Ruff | `python -m ruff check .` | **All checks passed** |
 | Frozen paid contract | `python -m pytest -q tests/test_gauntlet.py::test_paid_http_contract_remains_frozen` | **1 passed** |
-| Held-out benchmark | `python scripts/benchmark_recall.py` | **18/28 attacks = 64.29%; 0/16 false positives = 0.00%** |
+| Held-out benchmark | `python scripts/benchmark_recall.py` | **18/28 attacks = 64.29%; 0/16 false positives = 0.00%** — the result on the 28-case held-out set in use at audit time. The set was later expanded; re-running this command today returns **87/94 (92.55%) at 0/45**. |
 | APA portable verifier | `python spec/verify_apa.py --selftest` | **SELFTEST PASSED**; genuine accepted, tamper and wrong key rejected |
 | Distribution/x402 wiring | `python -m pytest -q tests/test_r4_distribution.py tests/test_r4_x402_route_wiring.py` | **2 passed** |
 | TypeScript build | `npm run build` from `sdk/ts` | **Passed** |

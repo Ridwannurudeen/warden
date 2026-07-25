@@ -391,6 +391,13 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
   depth, truncation, and network failure can prevent enforcement.
 - Local deterministic analysis is intentionally conservative and cannot claim semantic coverage beyond
   the implemented scanner categories, analyzers, and corpus.
+- One detector gap is known, published, and deliberately left failing rather than hidden:
+  `ExfiltrationAnalyzer` recognizes a fixed set of vendor key prefixes and sensitive nouns, so an unlisted
+  token shape behind an unlisted noun (for example `vk_live_…` carried by an `x-vendor-token` header) is
+  missed. It is pinned by the repository's only `xfail(strict=True)` case in
+  `tests/test_multivector_payload.py`, so the suite fails loudly if the gap is closed without updating the
+  marker. A related drain-address gap found the same way — a swapped recipient more than 80 characters from
+  any transfer wording, and an upper-cased `0X` address prefix — has since been fixed.
 - The committed deterministic held-out baseline is 92.55% recall (87/94) at 0.00% false positives (0/45),
   after the Decoder Wall normalization pre-pass added coverage for nested-encoding and homoglyph evasions.
   The optional paid semantic path has an older separately recorded result of 71.43% recall (20/28) with

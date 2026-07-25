@@ -811,7 +811,11 @@ Issued badges and APA attestations remain runtime state on the VPS. After the se
 - `/docs` serves the generated documentation index and `/docs/{reason_slug}` serves a generated reason-code page.
 - `/badges` serves the registry from `site/badges.html`; `/badges/{audit_id}` serves the verifier from `site/badge.html`.
 - Singular `GET /badge/{audit_id}` remains the FastAPI badge-verification endpoint.
-- `POST /scan`, `POST /audit`, and `GET /health` proxy to `http://127.0.0.1:8031`.
+- `/scan`, `/audit`, and `/harden` proxy to `http://127.0.0.1:8031` on **both GET and POST** — the GET twins
+  exist because OKX's x402 check and its paid auto-replay both use GET, and a POST-only paywall answers 405
+  and freezes the buyer's task. `GET /health` also proxies. `/health/stats` and `/health/ready` are
+  deliberately **not** published (`location = /health` is exact-match); readiness is consumed on localhost by
+  `warden-monitor.service`. Route/conf parity is pinned by `tests/test_r3_deploy_parity.py`.
 - `/api/*` proxies the free demo, Gauntlet, and badge-registry APIs to `http://127.0.0.1:8031`.
 - `/data/marketplace-summary.json` and `/data/warden-services.json` come from the current live-index release. Other `/assets/*`, `/data/*`, and existing static files remain under `/opt/warden-site/current`; missing files return 404.
 
