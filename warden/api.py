@@ -29,6 +29,7 @@ from warden import (
     threat_intel,
 )
 from warden.audit_findings import get_findings
+from warden.variant_audit import run_variant_audit
 from warden.auditor import AgentAuditor
 from warden.core.verdict import ReasonCode, Verdict
 from warden.engine import WardenEngine
@@ -76,6 +77,8 @@ from warden.models import (
     ScanResponse,
     ShieldLineageResponse,
     ThreatIntelSummary,
+    VariantAuditRequest,
+    VariantAuditResponse,
 )
 from warden.observability import runtime_metrics
 from warden.payment import (
@@ -280,14 +283,46 @@ _HARDEN_OUTPUT = {
     },
 }
 
+_VARIANT_AUDIT_INPUT = {
+    "type": "http",
+    "method": "POST",
+    "bodyType": "json",
+    "body": {"target_url": "https://example.com/endpoint"},
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "target_url": {
+                "type": "string",
+                "description": "Consenting endpoint URL to attack-test with adversarial variants",
+            },
+            "threat_classes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Optional subset of Warden threat classes; omit to audit every class",
+            },
+            "max_variants_per_class": {
+                "type": "integer",
+                "description": "Optional per-class variant cap between 1 and 25",
+            },
+        },
+        "required": ["target_url"],
+    },
+}
+_VARIANT_AUDIT_OUTPUT = {
+    "type": "json",
+    "example": {"totals": {"variants_sent": 150, "detection_rate": 98.37}},
+}
+
 _PAYMENT_OUTPUT_SCHEMAS = {
     "/scan": {"input": _SCAN_INPUT, "output": _SCAN_OUTPUT},
     "/audit": {"input": _AUDIT_INPUT, "output": _AUDIT_OUTPUT},
     "/harden": {"input": _HARDEN_INPUT, "output": _HARDEN_OUTPUT},
+    "/variant-audit": {"input": _VARIANT_AUDIT_INPUT, "output": _VARIANT_AUDIT_OUTPUT},
 }
 _SCAN_EXTENSIONS = {"bazaar": {"info": _PAYMENT_OUTPUT_SCHEMAS["/scan"]}}
 _AUDIT_EXTENSIONS = {"bazaar": {"info": _PAYMENT_OUTPUT_SCHEMAS["/audit"]}}
 _HARDEN_EXTENSIONS = {"bazaar": {"info": _PAYMENT_OUTPUT_SCHEMAS["/harden"]}}
+_VARIANT_AUDIT_EXTENSIONS = {"bazaar": {"info": _PAYMENT_OUTPUT_SCHEMAS["/variant-audit"]}}
 
 
 def _rate_limit_per_minute() -> int:
@@ -465,6 +500,12 @@ if os.getenv("OKX_API_KEY"):
         mime_type="application/json",
         extensions=_AUDIT_EXTENSIONS,
     )
+    _variant_audit_route = RouteConfig(
+        accepts=[build_payment_option(_payment_rail)],
+        description="Warden adversarial variant audit",
+        mime_type="application/json",
+        extensions=_VARIANT_AUDIT_EXTENSIONS,
+    )
     _harden_route = RouteConfig(
         accepts=[build_payment_option(_payment_rail)],
         description="Warden endpoint hardening pack",
@@ -482,6 +523,8 @@ if os.getenv("OKX_API_KEY"):
         "POST /audit": _audit_route,
         "GET /audit": _audit_route,
         "POST /harden": _harden_route,
+        "POST /variant-audit": _variant_audit_route,
+        "GET /variant-audit": _variant_audit_route,
         "GET /harden": _harden_route,
     }
     # The installed middleware may consult OKX while building a challenge.
@@ -501,7 +544,12 @@ async def rate_limit_middleware(request: Request, call_next):
     carries_payment = bool(
         request.headers.get("payment-signature") or request.headers.get("x-payment")
     )
-    paid_payment_route = carries_payment and path in {"/scan", "/audit", "/harden"}
+    paid_payment_route = carries_payment and path in {
+        "/scan",
+        "/audit",
+        "/harden",
+        "/variant-audit",
+    }
     if paid_payment_route and is_verified_payer(request):
         # Only a client that has already completed a verified x402 settlement earns
         # the elevated bucket. A forged/unverified payment header falls through to
@@ -526,7 +574,7 @@ async def rate_limit_middleware(request: Request, call_next):
     elif path in {"/apa/log", "/apa/log/checkpoint", "/apa/log/anchor"}:
         limit_per_minute = _apa_log_rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute, scope="apa-log")
-    elif path in {"/scan", "/audit", "/harden"}:
+    elif path in {"/scan", "/audit", "/harden", "/variant-audit"}:
         limit_per_minute = _rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute)
     else:
@@ -605,6 +653,17 @@ _AUDIT_RECOVERY_HINT = (
     '\'{"target_url":"<your authorized endpoint URL>"}\'` then '
     "`onchainos agent complete <JOB_ID>`. Guided version: https://warden.gudman.xyz/hire"
 )
+_VARIANT_AUDIT_RECOVERY_HINT = (
+    " Your task froze because OKX's auto-replay sent no body. No charge was made. "
+    "To finish it yourself: fetch the live 402 from this endpoint, then run "
+    "`onchainos agent task-402-pay <JOB_ID> --provider-agent-id 3808 "
+    "--endpoint https://warden.gudman.xyz/variant-audit --token-symbol USDT --token-amount 0.5 "
+    "--accepts '<accepts from the 402>' --body "
+    '\'{"target_url":"<your consenting endpoint URL>"}\'` then '
+    "`onchainos agent complete <JOB_ID>`. Guided version: https://warden.gudman.xyz/hire"
+)
+
+
 _HARDEN_RECOVERY_HINT = (
     " Your task froze because OKX's auto-replay sent no body. No charge was made. "
     "To finish it yourself: fetch the live 402 from this endpoint, then run "
@@ -854,6 +913,35 @@ async def audit_get(request: Request) -> AuditResponse:
             + _AUDIT_RECOVERY_HINT,
         ) from exc
     return await audit(req)
+
+
+@app.post("/variant-audit", response_model=VariantAuditResponse)
+async def variant_audit(req: VariantAuditRequest) -> VariantAuditResponse:
+    try:
+        report = await run_variant_audit(
+            req.target_url,
+            threat_classes=tuple(req.threat_classes) if req.threat_classes is not None else None,
+            max_variants_per_class=req.max_variants_per_class,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return VariantAuditResponse.model_validate(report)
+
+
+@app.get("/variant-audit", response_model=VariantAuditResponse)
+async def variant_audit_get(request: Request) -> VariantAuditResponse:
+    fields = await _get_request_fields(request)
+    try:
+        req = VariantAuditRequest.model_validate(fields)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Provide the consenting endpoint to attack-test as a 'target_url' query "
+                "parameter or JSON body field." + _VARIANT_AUDIT_RECOVERY_HINT
+            ),
+        ) from exc
+    return await variant_audit(req)
 
 
 @app.post("/harden", response_model=HardenResponse)

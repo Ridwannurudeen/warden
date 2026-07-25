@@ -131,6 +131,40 @@ api.auditor = StubAuditor()
 
 # /harden reads retained findings rather than probing a target, so the paid-route
 # wiring check supplies a conclusive record instead of stubbing an auditor.
+async def _stub_variant_audit(target_url, **kwargs):
+    return {
+        "schema_version": 1,
+        "target_host": "agent.example",
+        "corpus_fingerprint": "sha256:" + "a" * 64,
+        "generator": "warden-adversarial-variants/3",
+        "caps": {
+            "max_variants_per_class": 25,
+            "max_total_variants": 150,
+            "probe_timeout_seconds": 5.0,
+            "total_timeout_seconds": 180.0,
+            "max_response_bytes": 100000,
+        },
+        "per_class": [],
+        "totals": {
+            "threat_classes": 0,
+            "variants_sent": 0,
+            "detected": 0,
+            "missed": 0,
+            "inconclusive": 0,
+            "conclusive": 0,
+            "detection_rate": None,
+        },
+        "consent_verified": True,
+        "limitations": ["local wiring stub"],
+        "report_id": "b" * 64,
+        "issuer": "warden",
+        "issued_at": 1785000000,
+        "issuer_sig": "sig:stub",
+    }
+
+
+api.run_variant_audit = _stub_variant_audit
+
 api.get_findings = lambda audit_id: {
     "schema_version": 1,
     "audit_id": audit_id,
@@ -148,6 +182,8 @@ expected_routes = [
     "POST /audit",
     "GET /harden",
     "POST /harden",
+    "GET /variant-audit",
+    "POST /variant-audit",
 ]
 
 with TestClient(api.app) as client:
@@ -172,6 +208,8 @@ with TestClient(api.app) as client:
         ("POST", "/audit", {"json": {"target_url": "https://agent.example/scan"}}),
         ("GET", "/harden", {"params": {"audit_id": "0123456789abcdef"}}),
         ("POST", "/harden", {"json": {"audit_id": "0123456789abcdef"}}),
+        ("GET", "/variant-audit", {"params": {"target_url": "https://agent.example/scan"}}),
+        ("POST", "/variant-audit", {"json": {"target_url": "https://agent.example/scan"}}),
     ]
     for method, path, request_kwargs in requests:
         response = client.request(

@@ -30,6 +30,7 @@ PROXIED_APP_ROUTES = frozenset(
         "/scan",
         "/audit",
         "/harden",
+        "/variant-audit",
         "/health",
         "/.well-known/apa-issuer.json",
         "/badge/{audit_id}",
@@ -88,7 +89,14 @@ def test_every_app_route_is_either_proxied_or_deliberately_unexposed() -> None:
 def test_nginx_proxies_every_route_marked_public() -> None:
     nginx = (ROOT / "deploy" / "nginx-warden.conf").read_text(encoding="utf-8")
 
-    for exact in ("/scan", "/audit", "/harden", "/health", "/.well-known/apa-issuer.json"):
+    for exact in (
+        "/scan",
+        "/audit",
+        "/harden",
+        "/variant-audit",
+        "/health",
+        "/.well-known/apa-issuer.json",
+    ):
         assert f"location = {exact} {{" in nginx, exact
     # Prefix and regex blocks that cover the remaining public routes.
     assert "location /api/ {" in nginx

@@ -479,6 +479,59 @@ class HardenEvidenceResponse(BaseModel):
     limitations: str
 
 
+class VariantAuditRequest(BaseModel):
+    target_url: str = Field(min_length=1, max_length=MAX_TARGET_URL_LENGTH)
+    # None means every class that has variants. An explicit empty list is rejected by
+    # the engine rather than silently treated as "all".
+    threat_classes: list[str] | None = Field(default=None, max_length=len(ReasonCode))
+    max_variants_per_class: int = Field(default=25, ge=1, le=25)
+
+
+class VariantAuditCaps(BaseModel):
+    max_variants_per_class: int = Field(ge=1)
+    max_total_variants: int = Field(ge=1)
+    probe_timeout_seconds: float = Field(gt=0)
+    total_timeout_seconds: float = Field(gt=0)
+    max_response_bytes: int = Field(ge=1)
+
+
+class VariantAuditClassResult(BaseModel):
+    threat_class: str
+    total: int = Field(ge=0)
+    detected: int = Field(ge=0)
+    missed: int = Field(ge=0)
+    inconclusive: int = Field(ge=0)
+    conclusive: int = Field(ge=0)
+    # None when no probe in the class was conclusive, so a rate would be meaningless.
+    detection_rate: float | None = Field(default=None, ge=0, le=100)
+
+
+class VariantAuditTotals(BaseModel):
+    threat_classes: int = Field(ge=0)
+    variants_sent: int = Field(ge=0)
+    detected: int = Field(ge=0)
+    missed: int = Field(ge=0)
+    inconclusive: int = Field(ge=0)
+    conclusive: int = Field(ge=0)
+    detection_rate: float | None = Field(default=None, ge=0, le=100)
+
+
+class VariantAuditResponse(BaseModel):
+    schema_version: Literal[1]
+    target_host: str
+    corpus_fingerprint: str
+    generator: str
+    caps: VariantAuditCaps
+    per_class: list[VariantAuditClassResult]
+    totals: VariantAuditTotals
+    consent_verified: Literal[True]
+    limitations: list[str]
+    report_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    issuer: Literal["warden"]
+    issued_at: int = Field(ge=0)
+    issuer_sig: str
+
+
 class ApaRegisterRequest(BaseModel):
     endpoint: str = Field(min_length=1, max_length=MAX_TARGET_URL_LENGTH)
 

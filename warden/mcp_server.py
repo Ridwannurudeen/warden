@@ -10,12 +10,15 @@ from warden.audit_findings import get_findings
 from warden.auditor import AgentAuditor
 from warden.engine import WardenEngine
 from warden.hardening import publish_pack
+from warden.variant_audit import run_variant_audit
 from warden.models import (
     AuditRequest,
     AuditResponse,
     Depth,
     HardenRequest,
     HardenResponse,
+    VariantAuditRequest,
+    VariantAuditResponse,
     MAX_PAYLOAD_LENGTH,
     MAX_SAMPLE_PROMPTS,
     MAX_TARGET_URL_LENGTH,
@@ -91,6 +94,30 @@ async def harden_agent(
             "conclusive, consented audit that issued signed evidence"
         )
     return HardenResponse.model_validate(publish_pack(findings)).model_dump()
+
+
+@mcp.tool(output_schema=VariantAuditResponse.model_json_schema())
+async def variant_audit_agent(
+    target_url: Annotated[str, Field(min_length=1, max_length=MAX_TARGET_URL_LENGTH)],
+    threat_classes: list[str] | None = None,
+    max_variants_per_class: Annotated[int, Field(ge=1, le=25)] = 25,
+) -> dict[str, object]:
+    """Attack-test a consenting endpoint with adversarial variants of the training corpus."""
+    request = VariantAuditRequest.model_validate(
+        {
+            "target_url": target_url,
+            "threat_classes": threat_classes,
+            "max_variants_per_class": max_variants_per_class,
+        }
+    )
+    report = await run_variant_audit(
+        request.target_url,
+        threat_classes=(
+            tuple(request.threat_classes) if request.threat_classes is not None else None
+        ),
+        max_variants_per_class=request.max_variants_per_class,
+    )
+    return VariantAuditResponse.model_validate(report).model_dump()
 
 
 if __name__ == "__main__":

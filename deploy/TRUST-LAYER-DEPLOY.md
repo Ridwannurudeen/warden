@@ -313,8 +313,9 @@ ssh root@75.119.153.252 'diff -u /etc/nginx/sites-available/warden.gudman.xyz.co
 ```
 
 **Gate (manual review):** the diff may show only the `location /apa/ { ... }`,
-`location = /.well-known/apa-issuer.json { ... }` and `location = /harden { ... }` proxy blocks (all
-proxying to `http://127.0.0.1:8031`) plus these exact aliases:
+`location = /.well-known/apa-issuer.json { ... }`, `location = /harden { ... }` and
+`location = /variant-audit { ... }` proxy blocks (all proxying to `http://127.0.0.1:8031`) plus these
+exact aliases:
 
 - `/data/service-monitor.json` → `/opt/warden/monitor/service-monitor.json`;
 - `/data/apa-log-anchor.json` → `/opt/warden/anchor/apa-log-anchor.json`;
@@ -323,9 +324,12 @@ proxying to `http://127.0.0.1:8031`) plus these exact aliases:
 No `root` change away from `/opt/warden-site`, no `/opt/warden-index`, no `current`, no listen/server_name/ssl
 changes, and no directory-wide alias for runtime state. If anything else appears, STOP and investigate.
 
-`location = /harden` is expected here because the paid hardening route is additive and must reach the app —
-Step 5b below requires public `/harden` to answer 402. `/lineage` must **not** appear as its own block: it is
-a static page served by the existing `location /` catch-all (`try_files $uri $uri.html`).
+`location = /harden` and `location = /variant-audit` are both expected here because the paid hardening and
+adversarial variant-pack routes are additive and must reach the app — Step 5b below requires public
+`/harden` and `/variant-audit` to answer 402. Both ride the same pinned rail as `/scan` and `/audit`
+(0.5 USDT, `exact`, `eip155:196`); a diff that also changes a price or a rail parameter is out of scope for
+this runbook and must STOP. `/lineage` must **not** appear as its own block: it is a static page served by
+the existing `location /` catch-all (`try_files $uri $uri.html`).
 
 ## Step 3 — Install + syntax gate (the only mutating step)
 
@@ -371,10 +375,12 @@ for p in / /playground /hire /docs /status /badges /agents /agents/3808 /gauntle
   echo "$p -> $code"; test "$code" = 200
 done
 
-# 5b. Frozen paid contract: /scan, /audit and /harden -> 402, GET and POST (DO NOT expect anything else)
-#     The paywall middleware answers before body validation, so the probe body is irrelevant here:
-#     an unpaid request must be 402 and never 400/422 (that would mean the paywall is not engaged).
-for m in GET POST; do for p in /scan /audit /harden; do
+# 5b. Frozen paid contract: /scan, /audit, /harden and /variant-audit -> 402, GET and POST
+#     (DO NOT expect anything else). The paywall middleware answers before body validation, so the
+#     probe body is irrelevant here: an unpaid request must be 402 and never 400/422 (that would mean
+#     the paywall is not engaged). This holds for /variant-audit too even though the body below is not
+#     a valid variant-audit request — a 400/422 there is a wiring failure, not a schema complaint.
+for m in GET POST; do for p in /scan /audit /harden /variant-audit; do
   code=$(curl -s -o /dev/null -w '%{http_code}' -X "$m" -H 'content-type: application/json' -d '{"payload":"hi"}' "$base$p")
   echo "$m $p -> $code"; test "$code" = 402
 done; done
