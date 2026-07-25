@@ -170,6 +170,15 @@ systemd-analyze verify \
 # status "not_running", which is the honest state and matches the published README.
 # Re-running this gate with the file present is the way to adopt alerting later; it
 # needs no app downtime. Do not skip these assertions while also enabling the timer.
+#
+# Under this deviation `systemctl start warden-monitor.service` below also FAILS, and
+# that failure is expected and inert. Its ExecStartPre runs notify_service_transition.py,
+# which requires WARDEN_ALERT_WEBHOOK_URL from the absent monitor-alert.env and returns 1
+# (scripts/notify_service_transition.py:109,213), so ExecStart never reaches the readiness
+# probe and service-monitor.json keeps its seeded "not_running" value. warden.service is
+# unaffected. Observed 2026-07-25 during the 0.1 USDT deploy. Run it last, outside any
+# `set -e` block that also starts the app, and `systemctl reset-failed
+# warden-monitor.service` afterwards so the unit is not left in a failed state.
 test -f /opt/warden/monitor-alert.env
 test ! -L /opt/warden/monitor-alert.env
 test "$(stat -c '%U:%G:%a' /opt/warden/monitor-alert.env)" = "root:warden:640"
