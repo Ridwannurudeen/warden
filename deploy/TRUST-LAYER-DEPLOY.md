@@ -7,6 +7,12 @@ The two paths are intentionally separate; never install scheduled units during a
 Warden Shield is a separate, owner-enrolled opt-in lifecycle with its own service and daily timer; this
 runbook does not install or enable it.
 
+**Two artifacts, not one:** `/opt/warden` is the application; `/opt/warden-site` is the nginx static root
+(`root /opt/warden-site;`). An app-only deploy leaves any new page 404 — `/lineage` did exactly that on
+2026-07-25 until `site/` was overlaid into `/opt/warden-site` too. Back that directory up first, and preserve
+the host-generated `data/marketplace-summary.json` and `data/warden-services.json`, which `build_index.py`
+regenerates on the host and which Step 0 asserts.
+
 **Log route boundary:** `/log` is the flat static compatibility page served from
 `/opt/warden-site/log.html`. `/apa/log` is the canonical FastAPI route: it returns JSON by default and returns
 the app copy of `site/log.html` only when the request explicitly accepts `text/html`.
@@ -29,22 +35,37 @@ units, or ports are touched. Do not run `systemctl restart nginx` — reload onl
 
 ---
 
-## Live install reality (verified 2026-07-19) — read before choosing a path
+## Live install reality (verified 2026-07-25) — read before choosing a path
 
-The box (`75.119.153.252`) runs a **minimal** flat install, narrower than the app-upgrade gate below assumes.
-Verify with `ls /etc/systemd/system | grep -i warden` before acting. As of 2026-07-19 the box has ONLY:
+Always confirm with `ls /etc/systemd/system | grep -i warden` before acting; this section is a snapshot,
+not a guarantee.
 
-- `warden.service` — `User=warden`, `Group=warden`, `WorkingDirectory=/opt/warden`,
+**Superseded 2026-07-25.** The 2026-07-19 snapshot recorded a minimal install with the monitor and anchor
+lineage absent and told operators not to run the app-upgrade gate. That is no longer true: the gate has
+since been run twice against this box, most recently for the 0.1 USDT deploy, and it installed the units it
+describes. The evidence lineage is now live. Do not follow the older guidance.
+
+Verified on the box (`75.119.153.252`) on 2026-07-25:
+
+- `warden.service` — active, enabled. `User=warden`, `Group=warden`, `WorkingDirectory=/opt/warden`,
   `ExecStart=/opt/warden/.venv/bin/uvicorn warden.api:app --host 127.0.0.1 --port 8031`,
   `ReadWritePaths=/opt/warden/data /opt/warden/badges /opt/warden/gauntlet /opt/warden/logs`,
   `ProtectSystem=strict`, plus a `warden.service.d/privatetmp.conf` drop-in (`PrivateTmp=yes`).
+- `warden-anchor-publish.service` (static) and `warden-anchor-publish.timer` — **active and enabled**.
+- `warden-monitor.service` (static) and `warden-monitor.timer` — **installed but the timer is disabled**,
+  deliberately, under the "deploy now, alert later" deviation documented in the gate below.
+- `/opt/warden/monitor` and `/opt/warden/anchor` — **both exist**, mode `751` (`0750` plus the `o+x`
+  traversal the gate grants so nginx can serve the aliased evidence files).
 - `warden-a2a.service` — a separate OKX buyer-agent (#4844) daemon; unrelated to the API.
+- `warden-scan-bot.service` — also present on the box and likewise unrelated to the API.
 
-**NOT installed:** `warden-monitor.{service,timer}`, `warden-anchor-publish.{service,timer}`,
-`warden-apa-reprobe.timer`, and there is **no `/opt/warden/monitor-alert.env`** and no
-`/opt/warden/monitor` or `/opt/warden/anchor` runtime dirs. The "Mandatory flat app-upgrade gate" below
-is therefore **drifted** from this host: run verbatim it fails on the missing `monitor-alert.env` and would
-newly install timer units that were never here. Do not run it as-is against this box.
+**Still absent:** `/opt/warden/monitor-alert.env`, so no alert destination is configured. That single fact
+is what keeps `warden-monitor.timer` disabled and makes the monitor one-shot fail inertly; see the approved
+deviation in the gate below. `warden-apa-reprobe.{service,timer}` are also still not installed.
+
+**Choosing a path:** the app-upgrade gate below is the correct, exercised procedure for a source deploy, run
+with that deviation. The minimal code-only redeploy that follows remains valid for a source-only change when
+you want to skip the log-checkpoint migration and unit reinstall entirely.
 
 ### Minimal code-only redeploy (the procedure that matches this box)
 
@@ -96,10 +117,12 @@ over `/opt/warden`, `chmod 755 /opt/warden`, restart.
 
 ## Mandatory flat app-upgrade gate — signed log checkpoint and hardened unit
 
-> **Drift warning (2026-07-19):** the monitor/anchor units and `monitor-alert.env` this gate installs and
-> requires are NOT present on the live box (see "Live install reality" above). Use the minimal code-only
-> redeploy for source-only changes. Run this full gate only when the monitor/anchor lineage is actually being
-> introduced, and reconcile the missing files first.
+> **Status (2026-07-25):** this gate is the exercised path — it has been run twice against the live box, most
+> recently for the 0.1 USDT deploy, and the monitor/anchor units it installs are now present (see "Live install
+> reality" above). The one prerequisite still missing is `monitor-alert.env`, so run it under the approved
+> "deploy now, alert later" deviation below. The earlier 2026-07-19 drift warning, which said these units were
+> absent and this gate should not be run, is superseded. The minimal code-only redeploy above remains a valid
+> lighter alternative for a source-only change.
 
 The numbered Trust Layer steps below remain nginx-only. When an approved deploy also replaces the flat
 application at `/opt/warden`, this gate is mandatory before the new code starts. The app service is the flat
@@ -166,6 +189,15 @@ install -d -o warden -g warden -m 0750 \
   /opt/warden/data /opt/warden/badges /opt/warden/gauntlet /opt/warden/logs \
   /opt/warden/monitor /opt/warden/anchor
 
+# nginx aliases /data/service-monitor.json, /data/apa-log-anchor.json and
+# /data/apa-log-anchor-history.json into /opt/warden/monitor and /opt/warden/anchor.
+# nginx runs as www-data, which is not in the warden group, so at 0750 it cannot
+# traverse those directories and all three routes answer 403. Grant traversal only
+# (o+x): the directory still cannot be listed, and every file inside is already
+# public evidence served through those aliases. Verified necessary on 2026-07-25 —
+# without this the three routes regress from 200 to 403.
+chmod o+x /opt/warden/monitor /opt/warden/anchor
+
 runuser -u warden -- env -i HOME=/opt/warden PATH=/opt/warden/.venv/bin:/usr/local/bin:/usr/bin:/bin bash -s <<'WARDEN_MIGRATION'
 set -euo pipefail
 set -a
@@ -214,6 +246,26 @@ systemd-analyze verify \
   /opt/warden/deploy/systemd/warden-anchor-publish.service \
   /opt/warden/deploy/systemd/warden-anchor-publish.timer
 
+# These four assertions require a configured alert destination before the monitor
+# timer may be enabled. They are load-bearing: they run AFTER warden.service has
+# already been stopped, so on a host without monitor-alert.env this gate aborts and
+# leaves the app down. Verified missing on the live host 2026-07-25.
+#
+# APPROVED DEVIATION (2026-07-25, "deploy now, alert later"): when no alert
+# destination is configured yet, skip these four assertions AND do not enable
+# warden-monitor.timer below. The seeded service-monitor.json then keeps reporting
+# status "not_running", which is the honest state and matches the published README.
+# Re-running this gate with the file present is the way to adopt alerting later; it
+# needs no app downtime. Do not skip these assertions while also enabling the timer.
+#
+# Under this deviation `systemctl start warden-monitor.service` below also FAILS, and
+# that failure is expected and inert. Its ExecStartPre runs notify_service_transition.py,
+# which requires WARDEN_ALERT_WEBHOOK_URL from the absent monitor-alert.env and returns 1
+# (scripts/notify_service_transition.py:109,213), so ExecStart never reaches the readiness
+# probe and service-monitor.json keeps its seeded "not_running" value. warden.service is
+# unaffected. Observed 2026-07-25 during the 0.1 USDT deploy. Run it last, outside any
+# `set -e` block that also starts the app, and `systemctl reset-failed
+# warden-monitor.service` afterwards so the unit is not left in a failed state.
 test -f /opt/warden/monitor-alert.env
 test ! -L /opt/warden/monitor-alert.env
 test "$(stat -c '%U:%G:%a' /opt/warden/monitor-alert.env)" = "root:warden:640"
@@ -224,6 +276,9 @@ unit_backup="$(cat /root/warden-evidence-units.last)"
 test -d "$unit_backup"
 
 # Seed the bounded monitor and append-only anchor lineage only when no runtime copy exists.
+# The `install -d` block earlier in this gate already created /opt/warden/monitor and
+# /opt/warden/anchor at mode 0750 (verified absent on the live host 2026-07-25, so that
+# block is doing real work on the first upgrade — do not skip it).
 if ! test -e /opt/warden/monitor/service-monitor.json; then
   install -o warden -g warden -m 0644 \
     /opt/warden/site/data/service-monitor.json \
@@ -353,9 +408,10 @@ scp deploy/nginx-warden.conf root@75.119.153.252:/root/warden-nginx.trustlayer.c
 ssh root@75.119.153.252 'diff -u /etc/nginx/sites-available/warden.gudman.xyz.conf /root/warden-nginx.trustlayer.candidate.conf || true'
 ```
 
-**Gate (manual review):** the diff may show only the `location /apa/ { ... }` and
-`location = /.well-known/apa-issuer.json { ... }` proxy blocks (both proxying to
-`http://127.0.0.1:8031`) plus these exact aliases:
+**Gate (manual review):** the diff may show only the `location /apa/ { ... }`,
+`location = /.well-known/apa-issuer.json { ... }`, `location = /harden { ... }` and
+`location = /variant-audit { ... }` proxy blocks (all proxying to `http://127.0.0.1:8031`) plus these
+exact aliases:
 
 - `/data/service-monitor.json` → `/opt/warden/monitor/service-monitor.json`;
 - `/data/apa-log-anchor.json` → `/opt/warden/anchor/apa-log-anchor.json`;
@@ -363,6 +419,13 @@ ssh root@75.119.153.252 'diff -u /etc/nginx/sites-available/warden.gudman.xyz.co
 
 No `root` change away from `/opt/warden-site`, no `/opt/warden-index`, no `current`, no listen/server_name/ssl
 changes, and no directory-wide alias for runtime state. If anything else appears, STOP and investigate.
+
+`location = /harden` and `location = /variant-audit` are both expected here because the paid hardening and
+adversarial variant-pack routes are additive and must reach the app — Step 5b below requires public
+`/harden` and `/variant-audit` to answer 402. Both ride the same pinned rail as `/scan` and `/audit`
+(0.1 USDT, `exact`, `eip155:196`); a diff that also changes a price or a rail parameter is out of scope for
+this runbook and must STOP. `/lineage` must **not** appear as its own block: it is a static page served by
+the existing `location /` catch-all (`try_files $uri $uri.html`).
 
 ## Step 3 — Install + syntax gate (the only mutating step)
 
@@ -403,13 +466,17 @@ set -euo pipefail
 base=https://warden.gudman.xyz
 
 # 5a. Static pages and the /log compatibility page -> 200
-for p in / /playground /hire /docs /status /badges /agents /agents/3808 /gauntlet /showcase /theater /verify /log /integrate /privacy /terms; do
+for p in / /playground /hire /docs /status /badges /agents /agents/3808 /gauntlet /showcase /theater /verify /trust /lineage /log /integrate /privacy /terms; do
   code=$(curl -s -o /dev/null -w '%{http_code}' "$base$p")
   echo "$p -> $code"; test "$code" = 200
 done
 
-# 5b. Frozen paid contract: /scan and /audit -> 402, GET and POST (DO NOT expect anything else)
-for m in GET POST; do for p in /scan /audit; do
+# 5b. Frozen paid contract: /scan, /audit, /harden and /variant-audit -> 402, GET and POST
+#     (DO NOT expect anything else). The paywall middleware answers before body validation, so the
+#     probe body is irrelevant here: an unpaid request must be 402 and never 400/422 (that would mean
+#     the paywall is not engaged). This holds for /variant-audit too even though the body below is not
+#     a valid variant-audit request — a 400/422 there is a wiring failure, not a schema complaint.
+for m in GET POST; do for p in /scan /audit /harden /variant-audit; do
   code=$(curl -s -o /dev/null -w '%{http_code}' -X "$m" -H 'content-type: application/json' -d '{"payload":"hi"}' "$base$p")
   echo "$m $p -> $code"; test "$code" = 402
 done; done
@@ -426,6 +493,11 @@ curl -fsS "$base/data/apa-log-anchor.json" | grep -q '"schema_version": 1'
 curl -fsS "$base/data/apa-log-anchor-history.json" | grep -q '"history_head_hash"'
 test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{}' "$base/apa/register")" = 422   # reaches FastAPI (422 validation), NOT 404/405 from nginx
 test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{}' "$base/apa/revoke")" = 422
+# Signed hardening-pack lookup: an unknown pack id must reach FastAPI and 404, not 404 from nginx.
+# (A valid-format-but-absent id and a malformed id both return 404 — verified locally 2026-07-25.)
+test "$(curl -s -o /dev/null -w '%{http_code}' "$base/apa/hardening/$(printf '0%.0s' $(seq 64))")" = 404
+# Audit evidence lineage page (served by the static catch-all try_files, no dedicated nginx block).
+curl -fsS "$base/lineage" | grep -q 'data-lineage'
 
 # 5d. Demo APIs
 curl -fsS -X POST -H 'content-type: application/json' -d '{"payload":"hello"}' "$base/api/demo/scan"    | grep -q '"verdict"'

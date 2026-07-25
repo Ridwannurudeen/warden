@@ -70,10 +70,15 @@ def test_secret_scan_is_read_only_has_full_history_and_fails_on_detected_credent
     assert "--github-actions" not in secret_job
     excluded = re.search(r"--exclude-globs=([^\s]+)", secret_job)
     assert excluded is not None
+    # Every entry here holds a synthetic credential-bearing URI that a test asserts is
+    # rejected, so the URI detector fires on the fixture itself. Widening this set is a
+    # deliberate act: add a path only when the finding is a fixture, never to silence a
+    # real one.
     assert set(excluded.group(1).split(",")) == {
         "benchmark/held_out_benign.jsonl",
         "sdk/python/tests/test_ph5_reverse_proxy.py",
         "tests/test_apa_browser_verifier.py",
+        "tests/test_variant_audit.py",
     }
     for key, value in TRUFFLEHOG_ALLOWED_SYNTHETIC_FINDING.items():
         env_name = f"TRUFFLEHOG_ALLOWED_{key.upper()}"
@@ -90,7 +95,11 @@ def test_secret_scan_is_read_only_has_full_history_and_fails_on_detected_credent
     assert "pull-requests: write" not in workflow
     assert "security-events: write" not in workflow
     assert "trufflesecurity/trufflehog@" not in workflow
-    assert workflow.count("persist-credentials: false") == 2
+    # Every checkout must drop the credential, so pin the count to the number of
+    # checkouts rather than a literal. A new job that forgets the setting fails here.
+    checkout_count = workflow.count("uses: actions/checkout@")
+    assert checkout_count >= 2
+    assert workflow.count("persist-credentials: false") == checkout_count
 
 
 def test_dependency_updates_require_reviewed_lock_refresh_and_full_gates() -> None:

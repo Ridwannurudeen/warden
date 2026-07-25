@@ -41,6 +41,12 @@ _DEFAULT_BENCHMARK_PATH = (
 _DEFAULT_BENIGN_BENCHMARK_PATH = (
     Path(__file__).resolve().parents[1] / "benchmark" / "held_out_benign.jsonl"
 )
+_DEFAULT_TRAINING_ATTACKS_PATH = Path(__file__).resolve().parents[1] / "corpus" / "attacks.jsonl"
+_DEFAULT_TRAINING_BENIGN_PATH = Path(__file__).resolve().parents[1] / "corpus" / "benign.jsonl"
+_DEFAULT_LICENSE_MANIFEST_PATH = (
+    Path(__file__).resolve().parents[1] / "corpus" / "license-manifest.json"
+)
+_DEFAULT_CORPUS_FINGERPRINT_PATH = Path(__file__).with_name("corpus_fingerprint.txt")
 _CLAIM_ID_RE = re.compile(r"[0-9a-f]{64}")
 _CERTIFICATE_ID_RE = re.compile(r"[0-9a-f]{32}")
 _MAX_CONFIRMATION_CLOCK_SKEW_SECONDS = 300
@@ -141,6 +147,19 @@ def _credit_hash(request: GauntletRequest) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _training_consent_hash(request: GauntletRequest) -> str:
+    canonical = json.dumps(
+        {
+            "claim_scope": "human-reviewed-redacted-training-reproducer",
+            "claim_id": _claim_id(request),
+            "training_use_consent": request.training_use_consent,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def record_attempt(
     request: GauntletRequest,
     response: ScanResponse,
@@ -180,6 +199,8 @@ def record_attempt(
                 record["context"] = request.context.model_dump(mode="json")
                 record["credit_hash"] = _credit_hash(request)
                 record["public_credit_consent"] = request.public_credit_consent
+                record["training_use_consent"] = request.training_use_consent
+                record["training_consent_hash"] = _training_consent_hash(request)
                 if request.finder:
                     record["finder"] = request.finder
             else:
@@ -387,6 +408,7 @@ def _validated_pending_request(
                 "context": claim["context"],
                 "finder": claim.get("finder"),
                 "public_credit_consent": claim.get("public_credit_consent", False),
+                "training_use_consent": claim.get("training_use_consent", False),
             }
         )
     except (KeyError, ValueError) as exc:
@@ -397,6 +419,12 @@ def _validated_pending_request(
         or claim.get("intent_hash") != hashlib.sha256(request.intent.encode("utf-8")).hexdigest()
         or claim.get("credit_hash") != _credit_hash(request)
     ):
+        raise ValueError("pending Gauntlet claim failed its stored digest checks")
+    consent_hash = claim.get("training_consent_hash")
+    if consent_hash is None:
+        if claim.get("training_use_consent") is not None:
+            raise ValueError("pending Gauntlet claim failed its stored digest checks")
+    elif consent_hash != _training_consent_hash(request):
         raise ValueError("pending Gauntlet claim failed its stored digest checks")
     return request
 
@@ -582,3 +610,228 @@ def confirm_bypass(
         claim["log_seq"] = certificate["log_seq"]
         _write_records(records)
         return {"held_out_case": case, "certificate": certificate}
+
+
+def _records_bytes(records: list[dict[str, object]]) -> bytes:
+    return b"".join(
+        json.dumps(record, ensure_ascii=False, sort_keys=True).encode("utf-8") + b"\n"
+        for record in records
+    )
+
+
+def _corpus_fingerprint_bytes(dataset_bytes: dict[str, bytes]) -> tuple[str, bytes]:
+    corpus = dataset_bytes["training-attacks"] + dataset_bytes["training-benign"]
+    corpus = corpus.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    digest = hashlib.sha256(corpus).hexdigest()
+    return f"sha256:{digest}", (digest + "\n").encode("ascii")
+
+
+def _confirmed_training_source(
+    claim: dict[str, object],
+    *,
+    certificate_id: str,
+    held_out_attacks_path: Path,
+) -> tuple[dict[str, object], ReasonCode]:
+    if claim.get("status") != "confirmed":
+        raise ValueError("Gauntlet claim must be confirmed before training review")
+    if claim.get("certificate_id") != certificate_id:
+        raise ValueError("BREAKER certificate does not match the confirmed Gauntlet claim")
+    certificate = protection_store.get_breaker_certificate(certificate_id)
+    if certificate is None:
+        raise ValueError("linked BREAKER certificate was not found")
+    benchmark_case_id = certificate.get("benchmark_case_id")
+    matches = [
+        entry
+        for entry in _load_jsonl(held_out_attacks_path)
+        if entry.get("id") == benchmark_case_id
+    ]
+    if len(matches) != 1:
+        raise ValueError("linked held-out BREAKER case was not found")
+    held_out_case = matches[0]
+    try:
+        category = ReasonCode(str(certificate["threat_class"]))
+    except (KeyError, ValueError) as exc:
+        raise ValueError("linked BREAKER certificate has an invalid threat class") from exc
+    payload = held_out_case.get("payload")
+    if (
+        held_out_case.get("source") != "human-reviewed-gauntlet"
+        or not isinstance(payload, str)
+        or not _certificate_matches_review(
+            certificate,
+            certificate_id=certificate_id,
+            case=held_out_case,
+            category=category,
+            payload_sha256=hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+            finder=certificate.get("finder")
+            if isinstance(certificate.get("finder"), str)
+            else None,
+        )
+    ):
+        raise ValueError("linked BREAKER certificate does not bind the held-out case")
+    return held_out_case, category
+
+
+def _training_entry(
+    *,
+    certificate_id: str,
+    benchmark_case_id: str,
+    category: ReasonCode,
+    payload: str,
+    verdict: str,
+    consent_hash: str,
+    reviewed_at: str,
+    context: object,
+) -> dict[str, object]:
+    entry: dict[str, object] = {
+        "id": f"gauntlet-training-{certificate_id[:16]}",
+        "category": category.value,
+        "payload": payload,
+        "expected_verdict": verdict,
+        "expected_classes": [category.value],
+        "note": "first-party-human-reviewed-gauntlet",
+        "source": "human-reviewed-gauntlet-training",
+        "source_certificate_id": certificate_id,
+        "source_benchmark_case_id": benchmark_case_id,
+        "rights_basis": "submitter-training-use-consent",
+        "training_consent_sha256": consent_hash,
+        "training_reviewed_at": reviewed_at,
+    }
+    if isinstance(context, dict) and context.get("expected_addresses"):
+        entry["context"] = {"expected_addresses": context["expected_addresses"]}
+    return entry
+
+
+def promote_confirmed_bypass_to_training(
+    claim_id: str,
+    *,
+    certificate_id: str,
+    training_payload: str,
+    reviewer_approved: bool,
+    reviewed_at: str | None = None,
+    training_attacks_path: Path = _DEFAULT_TRAINING_ATTACKS_PATH,
+    training_benign_path: Path = _DEFAULT_TRAINING_BENIGN_PATH,
+    held_out_attacks_path: Path = _DEFAULT_BENCHMARK_PATH,
+    held_out_benign_path: Path = _DEFAULT_BENIGN_BENCHMARK_PATH,
+    manifest_path: Path = _DEFAULT_LICENSE_MANIFEST_PATH,
+    fingerprint_path: Path = _DEFAULT_CORPUS_FINGERPRINT_PATH,
+) -> dict[str, object]:
+    """Promote a separately reviewed, consented BREAKER-derived training attack."""
+    if reviewer_approved is not True:
+        raise ValueError("explicit second human training review is required")
+    if _CLAIM_ID_RE.fullmatch(claim_id) is None:
+        raise ValueError("claim_id must be 64 lowercase hex characters")
+    if _CERTIFICATE_ID_RE.fullmatch(certificate_id) is None:
+        raise ValueError("certificate_id must be 32 lowercase hex characters")
+    if not isinstance(training_payload, str) or not training_payload.strip():
+        raise ValueError("training_payload must not be blank")
+    if len(training_payload) > 4_000:
+        raise ValueError("training_payload must not exceed 4000 characters")
+    review_timestamp, _ = _parse_confirmed_at(reviewed_at or _timestamp())
+
+    with _exclusive_store_lock():
+        records = _read_records_locked()
+        claim = next(
+            (record for record in records if record.get("claim_id") == claim_id),
+            None,
+        )
+        if claim is None:
+            raise ValueError("confirmed Gauntlet claim was not found")
+        submitted_request = _validated_pending_request(claim, claim_id)
+        if (
+            submitted_request.training_use_consent is not True
+            or claim.get("training_use_consent") is not True
+            or not isinstance(claim.get("training_consent_hash"), str)
+        ):
+            raise ValueError(
+                "Gauntlet claim lacks explicit training-use consent and rights evidence"
+            )
+
+        held_out_case, category = _confirmed_training_source(
+            claim,
+            certificate_id=certificate_id,
+            held_out_attacks_path=held_out_attacks_path,
+        )
+        payload_sha256 = hashlib.sha256(training_payload.encode("utf-8")).hexdigest()
+        existing_promotion = claim.get("training_promotion")
+        if existing_promotion is not None:
+            if (
+                not isinstance(existing_promotion, dict)
+                or existing_promotion.get("certificate_id") != certificate_id
+                or existing_promotion.get("training_payload_sha256") != payload_sha256
+            ):
+                raise ValueError("confirmed Gauntlet claim already has a conflicting promotion")
+            expected_entry_id = existing_promotion.get("case_id")
+            existing_entries = _load_jsonl(training_attacks_path)
+            if sum(entry.get("id") == expected_entry_id for entry in existing_entries) != 1:
+                raise ValueError("stored Gauntlet training promotion is missing its corpus row")
+            return dict(existing_promotion)
+
+        scan_context = held_out_case.get("context")
+        verdict = asyncio.run(
+            WardenEngine().scan(
+                training_payload,
+                depth="fast",
+                context=scan_context if isinstance(scan_context, dict) else {},
+            )
+        )
+        if verdict.verdict not in {"SANITIZE", "BLOCK"} or category not in verdict.threat_classes:
+            raise ValueError(
+                "training reproducer is not detected as the certificate's assigned threat class"
+            )
+
+        entry = _training_entry(
+            certificate_id=certificate_id,
+            benchmark_case_id=str(held_out_case["id"]),
+            category=category,
+            payload=training_payload,
+            verdict=verdict.verdict,
+            consent_hash=str(claim["training_consent_hash"]),
+            reviewed_at=review_timestamp,
+            context=scan_context,
+        )
+        promotion: dict[str, object] = {
+            "dataset": "training-attacks",
+            "case_id": entry["id"],
+            "certificate_id": certificate_id,
+            "benchmark_case_id": held_out_case["id"],
+            "category": category.value,
+            "expected_verdict": verdict.verdict,
+            "rights_basis": "submitter-training-use-consent",
+            "training_consent_sha256": claim["training_consent_hash"],
+            "training_payload_sha256": payload_sha256,
+            "reviewed_at": review_timestamp,
+        }
+        claim["training_promotion"] = promotion
+
+        from warden.corpus_ingestion import (
+            build_license_manifest,
+            license_manifest_bytes,
+        )
+        from warden.dataset_promotion import promote_reviewed_training_batch
+
+        def build_artifacts(
+            entries_by_dataset: dict[str, list[dict[str, object]]],
+            dataset_bytes: dict[str, bytes],
+        ) -> dict[Path, bytes]:
+            corpus_fingerprint, fingerprint_bytes = _corpus_fingerprint_bytes(dataset_bytes)
+            promotion["corpus_fingerprint"] = corpus_fingerprint
+            manifest = build_license_manifest(entries_by_dataset=entries_by_dataset)
+            return {
+                _STORE_PATH: _records_bytes(records),
+                manifest_path: license_manifest_bytes(manifest),
+                fingerprint_path: fingerprint_bytes,
+            }
+
+        promoted = promote_reviewed_training_batch(
+            [entry],
+            dataset="attacks",
+            reviewer_approved=True,
+            training_attacks_path=training_attacks_path,
+            training_benign_path=training_benign_path,
+            held_out_attacks_path=held_out_attacks_path,
+            held_out_benign_path=held_out_benign_path,
+            artifact_builder=build_artifacts,
+        )
+        if promoted != 1:
+            raise ValueError("Gauntlet training promotion did not add exactly one corpus row")
+        return dict(promotion)

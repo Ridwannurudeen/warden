@@ -80,6 +80,10 @@ SENSITIVE_OBJECT_RE = re.compile(
     r"|passwords?"
     r"|(?:api|access|auth|private|secret|signing)[_ -]?keys?"
     r")\b"
+    # Custom credential headers follow a strong naming convention, so an
+    # `x-<vendor>-token|key|secret` name is treated as sensitive even when the
+    # vendor and its token prefix are both unknown to SECRET_TOKEN_RES.
+    r"|(?<![\w-])x-[a-z0-9]+(?:-[a-z0-9]+)*-(?:tokens?|keys?|secrets?)(?![\w-])"
     r")"
 )
 OUTBOUND_SINK_RE = re.compile(

@@ -312,7 +312,7 @@ curl --fail-with-body -sS ${shellEndpoint} \\
   }
 }
 
-Local MCP does not spend ${price} USDT or call marketplace service #${serviceId} at ${endpoint}. It exposes scan_payload and audit_agent from your local checkout.`,
+Local MCP does not spend ${price} USDT or call marketplace service #${serviceId} at ${endpoint}. It exposes scan_payload, audit_agent, and harden_agent from your local checkout.`,
     };
   }
 

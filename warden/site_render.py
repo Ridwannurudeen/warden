@@ -30,6 +30,7 @@ NAV_GROUPS = (
             ("/verify", "Verify an attestation", "verify"),
             ("/apa/log", "Transparency log", "apa-log"),
             ("/badges", "Endpoint audit records", "badges"),
+            ("/lineage", "Audit evidence lineage", "lineage"),
             ("/agents", "Marketplace evidence index", "agents"),
             ("/status", "Service status", "status"),
         ),
@@ -49,7 +50,7 @@ PRIMARY_NAV = (
     ("/playground", "Playground", ("playground",)),
     ("/integrate", "Developers", ("integrate", "integrate-quickstart")),
     ("/docs", "Docs", ("docs",)),
-    ("/verify", "Evidence", ("verify", "apa-log", "badges", "agents", "status")),
+    ("/verify", "Evidence", ("verify", "apa-log", "badges", "lineage", "agents", "status")),
     ("/gauntlet", "Research", ("gauntlet", "agents-methodology", "showcase")),
 )
 

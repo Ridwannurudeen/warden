@@ -29,7 +29,7 @@ const services = {
     serviceName: "Payload Security Scan",
     serviceType: "A2MCP",
     endpoint: "https://warden.gudman.xyz/scan",
-    feeAmount: "0.5",
+    feeAmount: "0.1",
     feeTokenAddress: "0x779ded0c9e1022225f8e0630b35a9b54be713736",
     taskTitle: "Warden payload scan",
     taskDescription: "Scan an untrusted agent response with Warden",
@@ -45,7 +45,7 @@ const services = {
     serviceName: "Agent Endpoint Security Audit",
     serviceType: "A2MCP",
     endpoint: "https://warden.gudman.xyz/audit",
-    feeAmount: "0.5",
+    feeAmount: "0.1",
     feeTokenAddress: "0x779ded0c9e1022225f8e0630b35a9b54be713736",
     taskTitle: "Warden endpoint audit",
     taskDescription: "Audit an agent endpoint with Warden",
@@ -109,7 +109,7 @@ test("commands use the selected snapshot service and complete the reviewable tas
     );
     assert.match(commands[1], /--accepts '\[/);
     assert.match(commands[1], /"name":"USD₮0","version":"1"/);
-    assert.match(commands[1], /--token-symbol USDT --token-amount 0\.5/);
+    assert.match(commands[1], /--token-symbol USDT --token-amount 0\.1/);
     assert.doesNotMatch(commands[1], /--token-symbol USD₮0/);
     assert.equal(commands[2], "onchainos agent complete 'job-123456'");
     assert.equal(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import httpx
@@ -46,12 +47,17 @@ def _blocked() -> WardenBlocked:
     )
 
 
-async def _request(app: WardenReverseProxy, method: str = "POST", **kwargs) -> httpx.Response:
+async def _request(
+    app: WardenReverseProxy,
+    method: str = "POST",
+    path: str = "/v1/run?mode=fast",
+    **kwargs,
+) -> httpx.Response:
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app),
         base_url="http://proxy.test",
     ) as client:
-        return await client.request(method, "/v1/run?mode=fast", **kwargs)
+        return await client.request(method, path, **kwargs)
 
 
 async def test_allow_preserves_method_path_query_and_strips_hop_headers():
@@ -287,5 +293,151 @@ def test_gateway_help_exposes_required_mode_and_upstream(capsys):
     assert "warden-gateway" in output
     assert "--upstream" in output
     assert "--mode" in output
+    assert "--graceful-timeout" in output
     assert "local" in output
     assert "hosted" in output
+
+
+async def test_gateway_health_and_metrics_are_internal_bounded_and_metadata_only():
+    delivered: list[bytes] = []
+    secret = "secret-header-and-payload-value"
+    address = "0x9999999999999999999999999999999999999999"
+
+    class MetricsGuard(StubGuard):
+        async def scan(self, payload: str, **kwargs: object) -> ScanResult:
+            self.payloads.append(payload)
+            if payload == "scanner-failure":
+                raise WardenError("scanner unavailable")
+            if payload == f"block {address}":
+                return ScanResult(
+                    verdict="BLOCK",
+                    risk_level="CRITICAL",
+                    threat_classes=["DRAIN_ADDRESS"],
+                    sanitized_payload="",
+                    raw={"verdict": "BLOCK"},
+                )
+            if payload == "sanitize":
+                return ScanResult(
+                    verdict="SANITIZE",
+                    risk_level="HIGH",
+                    sanitized_payload="clean",
+                    raw={"verdict": "SANITIZE"},
+                )
+            return ScanResult(
+                verdict="ALLOW",
+                risk_level="NONE",
+                sanitized_payload=payload,
+                raw={"verdict": "ALLOW"},
+            )
+
+    async def upstream(request: httpx.Request) -> httpx.Response:
+        delivered.append(await request.aread())
+        return httpx.Response(200, content=b"accepted")
+
+    guard = MetricsGuard()
+    app = WardenReverseProxy(
+        "http://upstream.test",
+        client=guard,
+        transport=httpx.MockTransport(upstream),
+    )
+
+    health = await _request(app, "GET", "/healthz", headers={"authorization": secret})
+    allowed = await _request(app, content=secret.encode())
+    sanitized = await _request(app, content=b"sanitize")
+    blocked = await _request(app, content=f"block {address}".encode())
+    failed = await _request(app, content=b"scanner-failure")
+    metrics = await _request(app, "GET", "/metrics", headers={"authorization": secret})
+
+    assert health.status_code == 200
+    assert health.json() == {"status": "ok"}
+    assert [
+        allowed.status_code,
+        sanitized.status_code,
+        blocked.status_code,
+        failed.status_code,
+    ] == [
+        200,
+        200,
+        403,
+        503,
+    ]
+    assert delivered == [secret.encode(), b"clean"]
+    assert guard.payloads == [secret, "sanitize", f"block {address}", "scanner-failure"]
+
+    assert metrics.status_code == 200
+    assert metrics.headers["content-type"].startswith("text/plain")
+    body = metrics.text
+    for line in (
+        "warden_gateway_decisions_total 3",
+        "warden_gateway_blocks_total 1",
+        "warden_gateway_sanitizations_total 1",
+        "warden_gateway_failures_total 1",
+        "warden_gateway_scanner_latency_seconds_count 4",
+        "warden_gateway_upstream_latency_seconds_count 2",
+        "warden_gateway_in_flight_requests 0",
+    ):
+        assert line in body
+    assert "warden_gateway_uptime_seconds " in body
+    assert "{" not in body
+    assert secret not in body
+    assert address not in body
+    assert "authorization" not in body.lower()
+    assert "DRAIN_ADDRESS" not in body
+
+
+async def test_gateway_shutdown_rejects_new_work_and_drains_an_active_request():
+    upstream_started = asyncio.Event()
+    release_upstream = asyncio.Event()
+
+    async def upstream(request: httpx.Request) -> httpx.Response:
+        upstream_started.set()
+        await release_upstream.wait()
+        return httpx.Response(200, content=b"accepted")
+
+    app = WardenReverseProxy(
+        "http://upstream.test",
+        client=StubGuard(),
+        transport=httpx.MockTransport(upstream),
+    )
+    active_request = asyncio.create_task(_request(app, content=b"safe"))
+    await upstream_started.wait()
+
+    lifespan_messages: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+    await lifespan_messages.put({"type": "lifespan.startup"})
+    await lifespan_messages.put({"type": "lifespan.shutdown"})
+    sent: list[dict[str, object]] = []
+
+    async def receive() -> dict[str, object]:
+        return await lifespan_messages.get()
+
+    async def send(message: dict[str, object]) -> None:
+        sent.append(message)
+
+    shutdown = asyncio.create_task(app({"type": "lifespan"}, receive, send))
+    while not sent:
+        await asyncio.sleep(0)
+    premature_shutdown = shutdown.done()
+    if premature_shutdown:
+        release_upstream.set()
+        await active_request
+        await shutdown
+    assert not premature_shutdown
+
+    closing_health = await _request(app, "GET", "/healthz")
+
+    assert sent == [{"type": "lifespan.startup.complete"}]
+    assert closing_health.status_code == 503
+    assert not shutdown.done()
+    assert not active_request.done()
+
+    release_upstream.set()
+    response = await active_request
+    await shutdown
+
+    assert response.status_code == 200
+    assert sent == [
+        {"type": "lifespan.startup.complete"},
+        {"type": "lifespan.shutdown.complete"},
+    ]
+    rejected = await _request(app, content=b"new work")
+    assert rejected.status_code == 503

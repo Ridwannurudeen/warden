@@ -16,7 +16,7 @@ Warden keeps payment enforcement at the HTTP boundary. The scan engine, auditor,
 - Rail contract: x402 v2 `exact`, OKX facilitator, X Layer mainnet
   (`eip155:196`), X Layer USDT
   (`0x779ded0c9e1022225f8e0630b35a9b54be713736`, 6 decimals), and
-  `500000` atomic units (`0.5 USDT`). `warden/payment.py` passes the
+  `100000` atomic units (`0.1 USDT`). `warden/payment.py` passes the
   atomic amount and asset explicitly; it does not rely on dollar-price or
   default-token inference.
 - EIP-712 domain: the token's signed authorization metadata is pinned to
@@ -45,8 +45,8 @@ The tested source contract on this branch is:
 
 | Route | Price | Network | Token | Pay to |
 |---|---:|---|---|---|
-| `POST /scan` | `0.5 USDT` | `eip155:196` | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | `0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51` |
-| `POST /audit` | `0.5 USDT` | `eip155:196` | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | `0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51` |
+| `POST /scan` | `0.1 USDT` | `eip155:196` | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | `0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51` |
+| `POST /audit` | `0.1 USDT` | `eip155:196` | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | `0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51` |
 
 These corrections are not yet deployed. A read-only probe on 2026-07-18
 confirmed that the live `/scan` challenge still publishes the stale

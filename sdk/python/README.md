@@ -187,6 +187,29 @@ warden-guard verify https://api.example.com                # verify a live heart
 warden-guard verify attestation.json --issuer-pub ed25519:...  # offline attestation verify
 ```
 
+### Hardening Pack self-test
+
+The SDK installs a separate `warden-selftest` command for exercising verified Hardening Pack
+vectors with the local fail-closed engine. Its report contains totals, per-class counts, and
+payload-free failure identifiers only. It does not issue a grade, badge, or certification, and
+local execution does not send vector payloads to Warden's hosted or paid routes.
+
+Download the evidence bundle or pass its canonical public URL:
+
+```bash
+warden-selftest hardening-evidence.json
+warden-selftest https://warden.gudman.xyz/apa/hardening/<pack_id>
+warden-selftest hardening-evidence.json --endpoint http://127.0.0.1:8080/scan
+```
+
+The command independently verifies the strict schema, deterministic pack identifier, Ed25519
+signature against issuer history, signed expiry, current revocation evidence, and inclusion from
+the pack's log entry through the signed checkpoint. Duplicate JSON keys, redirects, environment
+proxies, cross-origin URLs, stale or revoked packs, and mismatched log evidence fail closed. The
+optional endpoint must be explicitly supplied by the caller and return Warden's complete scan
+response contract; otherwise vectors run through local fail-closed enforcement. Empty signed packs
+produce a successful, explicit no-op report.
+
 ## Protected hosted route
 
 `WardenClient(paid=True)` selects the x402-gated `/scan` endpoint. With no
@@ -195,7 +218,7 @@ the previous non-paying behavior.
 
 To opt into one paid replay, inject a callback owned by the caller's wallet boundary.
 The callback receives an immutable `X402Challenge` only after Warden's exact x402 v2
-route, recipient, X Layer network, USDT asset, `500000` atomic amount, 300-second
+route, recipient, X Layer network, USDT asset, `100000` atomic amount, 300-second
 timeout, and `USD₮0`/`1` EIP-712 domain have been validated:
 
 ```python

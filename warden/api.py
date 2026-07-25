@@ -22,10 +22,14 @@ from warden import (
     __version__,
     audit_attestations,
     feedback_store,
+    hardening,
     protection,
     protection_store,
+    shield,
     threat_intel,
 )
+from warden.audit_findings import get_findings
+from warden.variant_audit import run_variant_audit
 from warden.auditor import AgentAuditor
 from warden.core.verdict import ReasonCode, Verdict
 from warden.engine import WardenEngine
@@ -62,13 +66,19 @@ from warden.models import (
     GauntletRequest,
     GauntletResponse,
     GauntletStats,
+    HardenRequest,
+    HardenEvidenceResponse,
+    HardenResponse,
     HealthResponse,
     ReadinessCheck,
     ReadinessResponse,
     RuntimeStatsResponse,
     ScanRequest,
     ScanResponse,
+    ShieldLineageResponse,
     ThreatIntelSummary,
+    VariantAuditRequest,
+    VariantAuditResponse,
 )
 from warden.observability import runtime_metrics
 from warden.payment import (
@@ -83,6 +93,7 @@ MAX_JSON_NESTING_DEPTH = 64
 APA_LOG_DEFAULT_PAGE_SIZE = 100
 APA_LOG_MAX_PAGE_SIZE = 500
 APA_LOG_PAGE = Path(__file__).resolve().parents[1] / "site" / "log.html"
+SHIELD_STATE_PATH = Path(os.getenv("WARDEN_SHIELD_STATE", "/opt/warden/data/shield/lifecycle.json"))
 
 
 class RequestBodyLimitMiddleware:
@@ -248,13 +259,74 @@ _AUDIT_INPUT = {
     },
 }
 _AUDIT_OUTPUT = {"type": "json", "example": {"grade": "A", "score": 100}}
+_HARDEN_INPUT = {
+    "type": "http",
+    "method": "POST",
+    "bodyType": "json",
+    "body": {"audit_id": "0123456789abcdef"},
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "audit_id": {
+                "type": "string",
+                "description": "Identifier of a completed Warden endpoint audit",
+            }
+        },
+        "required": ["audit_id"],
+    },
+}
+_HARDEN_OUTPUT = {
+    "type": "json",
+    "example": {
+        "spec_version": "warden-hardening-pack/0.1",
+        "pack_id": "0" * 64,
+        "audit_id": "0123456789abcdef",
+        "addressed_classes": ["SECRET_EXFIL"],
+        "message": "Hardening guidance for 1 missed threat class.",
+        "issuer_sig": "sig:<base64url-ed25519-signature>",
+    },
+}
+
+_VARIANT_AUDIT_INPUT = {
+    "type": "http",
+    "method": "POST",
+    "bodyType": "json",
+    "body": {"target_url": "https://example.com/endpoint"},
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "target_url": {
+                "type": "string",
+                "description": "Consenting endpoint URL to attack-test with adversarial variants",
+            },
+            "threat_classes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Optional subset of Warden threat classes; omit to audit every class",
+            },
+            "max_variants_per_class": {
+                "type": "integer",
+                "description": "Optional per-class variant cap between 1 and 25",
+            },
+        },
+        "required": ["target_url"],
+    },
+}
+_VARIANT_AUDIT_OUTPUT = {
+    "type": "json",
+    "example": {"totals": {"variants_sent": 150, "detection_rate": 98.37}},
+}
 
 _PAYMENT_OUTPUT_SCHEMAS = {
     "/scan": {"input": _SCAN_INPUT, "output": _SCAN_OUTPUT},
     "/audit": {"input": _AUDIT_INPUT, "output": _AUDIT_OUTPUT},
+    "/harden": {"input": _HARDEN_INPUT, "output": _HARDEN_OUTPUT},
+    "/variant-audit": {"input": _VARIANT_AUDIT_INPUT, "output": _VARIANT_AUDIT_OUTPUT},
 }
 _SCAN_EXTENSIONS = {"bazaar": {"info": _PAYMENT_OUTPUT_SCHEMAS["/scan"]}}
 _AUDIT_EXTENSIONS = {"bazaar": {"info": _PAYMENT_OUTPUT_SCHEMAS["/audit"]}}
+_HARDEN_EXTENSIONS = {"bazaar": {"info": _PAYMENT_OUTPUT_SCHEMAS["/harden"]}}
+_VARIANT_AUDIT_EXTENSIONS = {"bazaar": {"info": _PAYMENT_OUTPUT_SCHEMAS["/variant-audit"]}}
 
 
 def _rate_limit_per_minute() -> int:
@@ -432,6 +504,18 @@ if os.getenv("OKX_API_KEY"):
         mime_type="application/json",
         extensions=_AUDIT_EXTENSIONS,
     )
+    _variant_audit_route = RouteConfig(
+        accepts=[build_payment_option(_payment_rail)],
+        description="Warden adversarial variant audit",
+        mime_type="application/json",
+        extensions=_VARIANT_AUDIT_EXTENSIONS,
+    )
+    _harden_route = RouteConfig(
+        accepts=[build_payment_option(_payment_rail)],
+        description="Warden endpoint hardening pack",
+        mime_type="application/json",
+        extensions=_HARDEN_EXTENSIONS,
+    )
     # Challenge unpaid GET as well as POST: OKX's x402-check probes with GET and
     # expects a 402 payment challenge; a POST-only paywall returns 405 and reads
     # as an invalid x402 service. OKX's paid auto-replay also uses GET, so /scan
@@ -442,6 +526,10 @@ if os.getenv("OKX_API_KEY"):
         "GET /scan": _scan_route,
         "POST /audit": _audit_route,
         "GET /audit": _audit_route,
+        "POST /harden": _harden_route,
+        "POST /variant-audit": _variant_audit_route,
+        "GET /variant-audit": _variant_audit_route,
+        "GET /harden": _harden_route,
     }
     # The installed middleware may consult OKX while building a challenge.
     # Scheduled probes verify only unsigned challenge generation; they do not
@@ -460,7 +548,12 @@ async def rate_limit_middleware(request: Request, call_next):
     carries_payment = bool(
         request.headers.get("payment-signature") or request.headers.get("x-payment")
     )
-    paid_payment_route = carries_payment and path in {"/scan", "/audit"}
+    paid_payment_route = carries_payment and path in {
+        "/scan",
+        "/audit",
+        "/harden",
+        "/variant-audit",
+    }
     if paid_payment_route and is_verified_payer(request):
         # Only a client that has already completed a verified x402 settlement earns
         # the elevated bucket. A forged/unverified payment header falls through to
@@ -485,7 +578,7 @@ async def rate_limit_middleware(request: Request, call_next):
     elif path in {"/apa/log", "/apa/log/checkpoint", "/apa/log/anchor"}:
         limit_per_minute = _apa_log_rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute, scope="apa-log")
-    elif path in {"/scan", "/audit"}:
+    elif path in {"/scan", "/audit", "/harden", "/variant-audit"}:
         limit_per_minute = _rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute)
     else:
@@ -550,7 +643,7 @@ _SCAN_RECOVERY_HINT = (
     " Your task froze because OKX's auto-replay sent no body. No charge was made. "
     "To finish it yourself: fetch the live 402 from this endpoint, then run "
     "`onchainos agent task-402-pay <JOB_ID> --provider-agent-id 3808 "
-    "--endpoint https://warden.gudman.xyz/scan --token-symbol USDT --token-amount 0.5 "
+    "--endpoint https://warden.gudman.xyz/scan --token-symbol USDT --token-amount 0.1 "
     "--accepts '<accepts from the 402>' --body "
     '\'{"payload":"<your untrusted text>"}\'` then '
     "`onchainos agent complete <JOB_ID>`. Guided version: https://warden.gudman.xyz/hire"
@@ -559,9 +652,29 @@ _AUDIT_RECOVERY_HINT = (
     " Your task froze because OKX's auto-replay sent no body. No charge was made. "
     "To finish it yourself: fetch the live 402 from this endpoint, then run "
     "`onchainos agent task-402-pay <JOB_ID> --provider-agent-id 3808 "
-    "--endpoint https://warden.gudman.xyz/audit --token-symbol USDT --token-amount 0.5 "
+    "--endpoint https://warden.gudman.xyz/audit --token-symbol USDT --token-amount 0.1 "
     "--accepts '<accepts from the 402>' --body "
     '\'{"target_url":"<your authorized endpoint URL>"}\'` then '
+    "`onchainos agent complete <JOB_ID>`. Guided version: https://warden.gudman.xyz/hire"
+)
+_VARIANT_AUDIT_RECOVERY_HINT = (
+    " Your task froze because OKX's auto-replay sent no body. No charge was made. "
+    "To finish it yourself: fetch the live 402 from this endpoint, then run "
+    "`onchainos agent task-402-pay <JOB_ID> --provider-agent-id 3808 "
+    "--endpoint https://warden.gudman.xyz/variant-audit --token-symbol USDT --token-amount 0.1 "
+    "--accepts '<accepts from the 402>' --body "
+    '\'{"target_url":"<your consenting endpoint URL>"}\'` then '
+    "`onchainos agent complete <JOB_ID>`. Guided version: https://warden.gudman.xyz/hire"
+)
+
+
+_HARDEN_RECOVERY_HINT = (
+    " Your task froze because OKX's auto-replay sent no body. No charge was made. "
+    "To finish it yourself: fetch the live 402 from this endpoint, then run "
+    "`onchainos agent task-402-pay <JOB_ID> --provider-agent-id 3808 "
+    "--endpoint https://warden.gudman.xyz/harden --token-symbol USDT --token-amount 0.1 "
+    "--accepts '<accepts from the 402>' --body "
+    '\'{"audit_id":"<your completed audit id>"}\'` then '
     "`onchainos agent complete <JOB_ID>`. Guided version: https://warden.gudman.xyz/hire"
 )
 
@@ -806,6 +919,124 @@ async def audit_get(request: Request) -> AuditResponse:
     return await audit(req)
 
 
+@app.post("/variant-audit", response_model=VariantAuditResponse)
+async def variant_audit(req: VariantAuditRequest) -> VariantAuditResponse:
+    try:
+        report = await run_variant_audit(
+            req.target_url,
+            threat_classes=tuple(req.threat_classes) if req.threat_classes is not None else None,
+            max_variants_per_class=req.max_variants_per_class,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return VariantAuditResponse.model_validate(report)
+
+
+@app.get("/variant-audit", response_model=VariantAuditResponse)
+async def variant_audit_get(request: Request) -> VariantAuditResponse:
+    fields = await _get_request_fields(request)
+    try:
+        req = VariantAuditRequest.model_validate(fields)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Provide the consenting endpoint to attack-test as a 'target_url' query "
+                "parameter or JSON body field." + _VARIANT_AUDIT_RECOVERY_HINT
+            ),
+        ) from exc
+    return await variant_audit(req)
+
+
+@app.post("/harden", response_model=HardenResponse)
+async def harden(req: HardenRequest) -> HardenResponse:
+    findings = get_findings(req.audit_id)
+    if findings is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No retained findings for that audit_id. Findings exist only for a "
+                "conclusive, consented audit that issued signed evidence."
+            ),
+        )
+    try:
+        record = hardening.publish_pack(findings)
+    except (
+        protection_store.LogCheckpointMissing,
+        protection_store.ProtectionStateConflict,
+    ) as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Hardening pack evidence is invalid",
+        ) from exc
+    return HardenResponse.model_validate(record)
+
+
+@app.get("/harden", response_model=HardenResponse)
+async def harden_get(request: Request) -> HardenResponse:
+    fields = await _get_request_fields(request)
+    try:
+        req = HardenRequest.model_validate(fields)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Provide the completed audit identifier as an 'audit_id' query "
+                "parameter or JSON body field." + _HARDEN_RECOVERY_HINT
+            ),
+        ) from exc
+    return await harden(req)
+
+
+@app.get(
+    "/apa/hardening/{pack_id}",
+    response_model=HardenEvidenceResponse,
+    responses={409: {"model": HardenEvidenceResponse}},
+)
+async def apa_hardening_pack(
+    pack_id: str,
+) -> HardenEvidenceResponse | JSONResponse:
+    try:
+        evidence = protection_store.get_hardening_pack_evidence(
+            pack_id,
+            record_validator=hardening.verify_pack,
+        )
+    except (
+        protection_store.LogCheckpointMissing,
+        protection_store.ProtectionStateConflict,
+    ):
+        return JSONResponse(
+            status_code=409,
+            content={
+                "pack": None,
+                "status": "invalid",
+                "verified": False,
+                "revoked_at": None,
+                "issuer_document": None,
+                "log_suffix": [],
+                "checkpoint": None,
+                "limitations": hardening.LIMITATIONS,
+            },
+        )
+    if evidence is None:
+        raise HTTPException(status_code=404, detail="Hardening pack not found")
+    record = evidence["pack"]
+    status = hardening.effective_status(
+        record,
+        revoked=evidence["status"] == "revoked",
+    )
+    return HardenEvidenceResponse(
+        pack=HardenResponse.model_validate(record),
+        status=status,
+        verified=hardening.verify_pack(record),
+        revoked_at=evidence["revoked_at"],
+        issuer_document=protection.issuer_document(),
+        log_suffix=evidence["log_suffix"],
+        checkpoint=evidence["checkpoint"],
+        limitations=hardening.LIMITATIONS,
+    )
+
+
 @app.get("/badge/{audit_id}")
 async def get_badge_endpoint(audit_id: str):
     badge = get_badge(audit_id)
@@ -865,6 +1096,29 @@ async def apa_audit_attestation(audit_id: str) -> AuditEvidenceResponse | JSONRe
         revoked_at=evidence["revoked_at"],
         limitations=audit_attestations.LIMITATIONS,
     )
+
+
+@app.get(
+    "/api/shield/{target_id}/lineage",
+    response_model=ShieldLineageResponse,
+)
+def shield_lineage(target_id: str) -> ShieldLineageResponse:
+    try:
+        lineage = shield.get_audit_evidence_lineage(SHIELD_STATE_PATH, target_id)
+    except ValueError as exc:
+        if str(exc).startswith("target_id must"):
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=409, detail="Shield lineage evidence is invalid") from exc
+    except (
+        protection_store.LogCheckpointMissing,
+        protection_store.ProtectionStateConflict,
+    ) as exc:
+        raise HTTPException(status_code=409, detail="Shield lineage evidence is invalid") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=503, detail="Shield lineage state is unavailable") from exc
+    if lineage is None:
+        raise HTTPException(status_code=404, detail="Shield lineage not found")
+    return ShieldLineageResponse.model_validate(lineage)
 
 
 @app.get("/.well-known/apa-issuer.json")
@@ -1057,6 +1311,7 @@ async def root() -> dict[str, object]:
         "endpoints": {
             "scan": "POST /scan",
             "audit": "POST /audit",
+            "harden": "POST /harden",
             "health": "GET /health",
             "badge": "GET /badge/{audit_id}",
         },

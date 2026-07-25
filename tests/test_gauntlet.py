@@ -74,6 +74,7 @@ def test_allowed_claim_is_pending_and_never_auto_confirmed(tmp_path, monkeypatch
                 "payload": "A normal weather report for Lagos.",
                 "finder": "researcher.example",
                 "public_credit_consent": True,
+                "training_use_consent": True,
             },
         )
         stats = client.get("/api/demo/gauntlet/stats")
@@ -87,6 +88,8 @@ def test_allowed_claim_is_pending_and_never_auto_confirmed(tmp_path, monkeypatch
     assert record["payload"] == "A normal weather report for Lagos."
     assert record["finder"] == "researcher.example"
     assert record["public_credit_consent"] is True
+    assert record["training_use_consent"] is True
+    assert len(record["training_consent_hash"]) == 64
     assert stats.json()["attempts"] == 1
     assert stats.json()["pending_claims"] == 1
     assert stats.json()["confirmed_bypasses"] == 0
@@ -375,6 +378,9 @@ assert 'payment-required' not in response.headers
 def test_gauntlet_page_discloses_human_review_and_retention():
     page = (ROOT / "site" / "gauntlet.html").read_text(encoding="utf-8")
     normalized_page = " ".join(page.lower().split())
+    terms = " ".join((ROOT / "site" / "terms.html").read_text(encoding="utf-8").lower().split())
+    privacy = " ".join((ROOT / "site" / "privacy.html").read_text(encoding="utf-8").lower().split())
+    status = " ".join((ROOT / "site" / "status.html").read_text(encoding="utf-8").lower().split())
 
     assert "data-gauntlet-form" in page
     assert "data-gauntlet-stats" in page
@@ -386,6 +392,11 @@ def test_gauntlet_page_discloses_human_review_and_retention():
         assert state in normalized_page
     assert "no reward or bounty is promised" in normalized_page
     assert "not authenticated identities" in normalized_page
+    assert "separate second human review" in normalized_page
+    assert "training-use consent" in normalized_page
+    for disclosure in (terms, privacy, status):
+        assert "training-use consent" in disclosure
+        assert "distinct" in disclosure
 
 
 def test_paid_http_contract_remains_frozen():

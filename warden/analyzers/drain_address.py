@@ -5,7 +5,9 @@ import re
 from warden.core.analyzer import AnalysisContext, Analyzer, AnalyzerResult
 from warden.core.verdict import ReasonCode
 
-EVM_ADDRESS_RE = re.compile(r"0x[a-fA-F0-9]{40}(?![a-fA-F0-9])")
+# `0X` is an accepted address prefix, so the prefix is matched case-insensitively:
+# upper-casing only the `x` must not hide a recipient from the drain gate.
+EVM_ADDRESS_RE = re.compile(r"0[xX][a-fA-F0-9]{40}(?![a-fA-F0-9])")
 SOLANA_ADDRESS_RE = re.compile(r"(?<![A-Za-z0-9])([1-9A-HJ-NP-Za-km-z]{32,44})(?![A-Za-z0-9])")
 TRANSFER_INTENT_RE = re.compile(
     r"(?i)\b(send|transfer|pay|deposit|withdraw|wire|to address"
@@ -49,7 +51,7 @@ HIGH_RISK_DRAIN_INTENT_RE = re.compile(
 # exactly 64 hex is a tx hash / private key (exfiltration analyzer), so both
 # lengths are excluded here.
 MALFORMED_ADDR_RE = re.compile(
-    r"0x[a-fA-F0-9]{20,39}(?![a-fA-F0-9])|0x[a-fA-F0-9]{41,63}(?![a-fA-F0-9])"
+    r"0[xX][a-fA-F0-9]{20,39}(?![a-fA-F0-9])|0[xX][a-fA-F0-9]{41,63}(?![a-fA-F0-9])"
 )
 
 
@@ -153,7 +155,7 @@ class DrainAddressAnalyzer(Analyzer):
             and not FORWARD_TRANSFER_INTENT_RE.search(window)
             and not (has_expected and CONTEXTUAL_RECIPIENT_RE.search(window))
         ):
-            return 0.0
+            return 0.60 if has_expected else 0.0
         return 0.95 if has_expected else 0.80
 
     @staticmethod

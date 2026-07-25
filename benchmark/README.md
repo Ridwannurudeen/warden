@@ -66,8 +66,26 @@ position. The certificate and its typed `breaker-confirmed` entry commit atomica
 checkpoint. Publication remains gated on the claim's final confirmed state, and retries recover without
 duplicating the benchmark case, certificate, or log entry.
 
-After promotion, rerun the benchmark, intentionally update the published result, and record the dated
-measurement. There is no public confirmation API, no automatic confirmation, and no training-corpus mutation.
+The first confirmation remains held out. A distinct training copy is possible only when the original
+submission contains explicit training-use consent and a second operator reviews a different redacted
+reproducer that the current scanner detects under the certificate's assigned class:
+
+```powershell
+$env:WARDEN_PROTECTION_DB = "C:\path\to\protection.db"
+python scripts/promote_gauntlet.py CLAIM_ID CERTIFICATE_ID `
+  --training-payload-file .\reviewed-training-reproducer.txt `
+  --confirm-human-training-review
+```
+
+The second review verifies the signed certificate and held-out binding, consent digest, current detection,
+and overlap against both training datasets, both held-out datasets, and built-in injections. It commits the
+first-party training row, claim promotion record, license/rights manifest, and corpus fingerprint as one
+rollback-safe operation. The training row cites the BREAKER certificate and remains distinct from
+allowlisted third-party corpus rows. An identical retry is idempotent.
+
+After the first held-out confirmation, rerun the benchmark, intentionally update the published result, and
+record the dated measurement. There is no public confirmation or training-promotion API, and neither review
+is automatic.
 
 Optional paid model tiers have separate guarded evaluation modes:
 
@@ -91,6 +109,14 @@ accounting only, never model performance. Model-tier runs cannot use `--record` 
 `history.jsonl` or the public evaluation file. Keep both network tiers disabled unless a real
 provider-backed held-out evaluation beats the 92.55% baseline with zero benign false positives and an
 independently reviewed public-evidence schema is added.
+
+`scripts/capture_model_calibration.py` accepts only a separate reviewed JSONL dataset outside `benchmark/`
+and `corpus/`. It retains case IDs, labels, scores, review records, and provenance but not payloads.
+`scripts/select_model_threshold.py` performs the threshold sweep offline and emits a hash-bound candidate;
+the candidate states that a production change requires explicit review and does not edit scanner constants.
+The committed JSON schemas are
+`spec/schemas/model-calibration-capture-v1.schema.json` and
+`spec/schemas/model-threshold-candidate-v1.schema.json`.
 
 A semantic-enabled run recorded on 2026-07-16 against the original 28-case set is published separately in
 `history.jsonl`: **71.43% recall (20/28)** with **0.00% false positives

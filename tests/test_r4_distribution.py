@@ -28,10 +28,19 @@ def _run(command: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
 
 def _copy_minimal_project(repo_root: Path, project: Path) -> None:
     project.mkdir()
-    for name in ("pyproject.toml", "MANIFEST.in", "README.md"):
+    for name in ("pyproject.toml", "MANIFEST.in", "README.md", "THIRD-PARTY-NOTICES"):
         shutil.copy2(repo_root / name, project / name)
     shutil.copytree(repo_root / "audit", project / "audit")
     shutil.copytree(repo_root / "warden", project / "warden")
+    (project / "corpus").mkdir()
+    shutil.copy2(
+        repo_root / "corpus" / "license-manifest.json",
+        project / "corpus" / "license-manifest.json",
+    )
+    (project / "spec").mkdir()
+    for name in ("corpus-source-allowlist-v1.json", "taxonomy-map-v1.json"):
+        shutil.copy2(repo_root / "spec" / name, project / "spec" / name)
+    shutil.copytree(repo_root / "spec" / "schemas", project / "spec" / "schemas")
 
 
 def test_clean_wheel_install_imports_runtime_data(tmp_path: Path) -> None:
@@ -64,6 +73,21 @@ def test_clean_wheel_install_imports_runtime_data(tmp_path: Path) -> None:
         assert "warden/analyzers/bip39_words.txt" in archive.namelist()
         assert "warden/corpus_fingerprint.txt" in archive.namelist()
         assert "audit/warden-core-http-2026-07.json" in archive.namelist()
+        assert any(name.endswith("/THIRD-PARTY-NOTICES") for name in archive.namelist())
+        assert any(name.endswith("/corpus/license-manifest.json") for name in archive.namelist())
+        assert any(
+            name.endswith("/spec/corpus-source-allowlist-v1.json")
+            for name in archive.namelist()
+        )
+        assert any(name.endswith("/spec/taxonomy-map-v1.json") for name in archive.namelist())
+        assert any(
+            name.endswith("/spec/schemas/model-calibration-capture-v1.schema.json")
+            for name in archive.namelist()
+        )
+        assert any(
+            name.endswith("/spec/schemas/model-threshold-candidate-v1.schema.json")
+            for name in archive.namelist()
+        )
 
     target = tmp_path / "site-packages"
     install = _run(
@@ -96,7 +120,10 @@ def test_clean_wheel_install_imports_runtime_data(tmp_path: Path) -> None:
                 "from warden.feedback_store import corpus_fingerprint; "
                 "assert Path(warden.__file__).resolve().is_relative_to(target); "
                 "assert AUDIT_BATTERY_PATH.resolve().is_relative_to(target); "
-                "assert AUDIT_BATTERY_PATH.is_file(); "
+                    "assert AUDIT_BATTERY_PATH.is_file(); "
+                    "from warden.taxonomy import TAXONOMY_MAP_PATH; "
+                    "assert TAXONOMY_MAP_PATH.resolve().is_relative_to(target); "
+                    "assert TAXONOMY_MAP_PATH.is_file(); "
                 "assert AUDIT_BATTERY_SHA256 == "
                 "'7e18f89d7249fe97e007f37dc91839492cfb7a40af4d7b660309645c0fe33f3f'; "
                 "assert AUDIT_BATTERY_SIZE == 20; "
@@ -135,6 +162,25 @@ def test_clean_sdist_contains_endpoint_audit_battery(tmp_path: Path) -> None:
     with tarfile.open(sdists[0], "r:gz") as archive:
         assert any(
             name.endswith("/audit/warden-core-http-2026-07.json") for name in archive.getnames()
+        )
+        assert any(name.endswith("/THIRD-PARTY-NOTICES") for name in archive.getnames())
+        assert any(
+            name.endswith("/corpus/license-manifest.json") for name in archive.getnames()
+        )
+        assert any(
+            name.endswith("/spec/corpus-source-allowlist-v1.json")
+            for name in archive.getnames()
+        )
+        assert any(
+            name.endswith("/spec/taxonomy-map-v1.json") for name in archive.getnames()
+        )
+        assert any(
+            name.endswith("/spec/schemas/model-calibration-capture-v1.schema.json")
+            for name in archive.getnames()
+        )
+        assert any(
+            name.endswith("/spec/schemas/model-threshold-candidate-v1.schema.json")
+            for name in archive.getnames()
         )
 
 

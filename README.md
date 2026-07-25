@@ -150,7 +150,7 @@ The integration code is complete in this repository, but neither SDK distributio
 | --- | --- |
 | [Python SDK](sdk/python/README.md) | Sync and async clients, local fail-closed enforcement, hosted scanning, ASGI middleware, a decorator, LangChain and LlamaIndex adapters, APA proof utilities, and the standalone `warden-gateway` reverse proxy. |
 | [TypeScript SDK](sdk/ts/README.md) | A typed hosted client and Express-style middleware with a zero-dependency emitted runtime. It does not contain the local scanner engine. |
-| [FastMCP server](warden/mcp_server.py) | Local stdio tools named `scan_payload` and `audit_agent`, started from a trusted checkout with `python -m warden.mcp_server`. |
+| [FastMCP server](warden/mcp_server.py) | Local stdio tools named `scan_payload`, `audit_agent`, and `harden_agent`, started from a trusted checkout with `python -m warden.mcp_server`. |
 | [Direct integrations](site/integrate.html) | Source-backed direct HTTP, OnchainOS, raw x402, Python, TypeScript, MCP, LangChain, and LlamaIndex placement and decision-handling examples. |
 
 The Python and TypeScript clients do not create a wallet or authorize spending. Their paid flow is enabled
@@ -208,7 +208,7 @@ WardenClient(local=True, fail_open=False)
 - **Proof path:** an endpoint self-signs `/.well-known/agent-protection`; the issuer verifies freshness,
   nonce uniqueness, and Ed25519 ownership before TOFU-binding `endpoint_host` to the key.
 - **Transparency:** issuance and status changes append to a SHA-256 hash chain at `/apa/log`.
-- **Commerce:** production `/scan` and `/audit` remain additive x402 v2 `exact` services on X Layer.
+- **Commerce:** production `/scan`, `/audit`, and `/harden` remain additive x402 v2 `exact` services on X Layer.
 - **Clients:** the Python SDK supports in-process enforcement; the source-built TypeScript SDK is a typed
   hosted fetch client with Express-style middleware and no local engine.
 - **Frontend:** dependency-free HTML, CSS, and JavaScript with self-hosted fonts and a self-only CSP.
@@ -244,12 +244,32 @@ only and are not performance evidence.
 `--record` remains deterministic-only, so model-tier output cannot update public history or evaluation data.
 No network model tier is enabled by repository configuration.
 
+The source-ready calibration harness keeps tuning separate from that held-out evaluation. An operator first
+creates an independently reviewed JSONL file with `id`, `label`, `payload`, `source`, and `reviewed_by`, then
+captures provider scores without retaining the payloads:
+
+```bash
+python scripts/capture_model_calibration.py --tier semantic \
+  --dataset C:\review\semantic-calibration.jsonl \
+  --dataset-id independent-semantic-v1 --provider PROVIDER \
+  --captured-at 2026-07-24T12:00:00Z --output semantic-capture.json
+python scripts/select_model_threshold.py semantic-capture.json semantic-candidate.json
+```
+
+The embedding command uses `--tier embedding` and the corresponding documented embedding environment.
+Capture requires the exact enabled provider configuration described above. The selector is offline and
+deterministic: it maximizes attack recall subject to zero calibration false positives, emits every candidate
+confusion matrix, and writes a hash-bound review artifact. It never changes runtime thresholds. Until a real
+independent dataset is reviewed, a provider capture is run, and the resulting candidate is explicitly
+approved, both production thresholds remain uncalibrated and disabled by default.
+
 ### APA and endpoint audit evidence
 
 | Contract                    | Signature                                          | Evidence                                                                                                                       | Verification                                                                                                            |
 | --------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | **APA attestation**         | Ed25519 issuer signature with a published key      | Fresh endpoint-key control, `guard-live` state, signed rolling 24-hour count or explicit unavailable state, and current status | Portable offline verification plus optional live proof refresh                                                          |
 | **Portable endpoint audit** | Ed25519 issuer signature with a published key      | Exact subject, fixed battery identity and hash, conclusive result, consent, liveness, issue and expiry times, and limitations   | `/apa/audit/{audit_id}` verifies the signature, issuance-log binding, current expiry, and any append-only revocation    |
+| **Hardening Pack**          | Ed25519 issuer signature with a published key      | Source audit, corpus fingerprint, deterministic pack ID, execution metadata, attribution, signed expiry, and limitations       | `/apa/hardening/{pack_id}` returns issuer history, current status, and a signed-checkpoint log suffix for independent verification |
 | **Legacy audit badge**      | HMAC-SHA256 with server-held `WARDEN_BADGE_SECRET` | Point-in-time, consented endpoint-audit score and battery result                                                               | Server verification through `/badge/{audit_id}` or `/api/badges`; not public-key portable                               |
 
 Every new conclusive, consented audit issues the portable record and appends `audit-issued` to the shared
@@ -257,6 +277,13 @@ transparency log. Revocation appends `audit-revoked` without mutating the signed
 can travel with the record; establishing its current lifecycle still requires the issuer key history and log.
 The legacy routes stay available for compatibility and remain clearly labelled as narrower server-verified
 records.
+
+A conclusive signed audit can produce one deterministic signed Hardening Pack through paid `GET` or
+`POST /harden`, or the local `harden_agent` MCP tool. Repeating the request returns the same immutable
+record. An audit with no misses still produces a signed empty pack with an explicit
+`Nothing to harden` message. Example attacks come only from the training corpus and retain their source
+and license attribution, scan depth, context, and expected classes; held-out evaluation cases are never
+included. Pack revocation is append-only through `scripts/revoke_hardening_pack.py`.
 
 ### Warden Shield lifecycle
 
@@ -298,11 +325,13 @@ an availability claim.
 | `GET`  | `/api/threat-intel/v1/summary`                | Aggregate feedback counts with k=5 suppression                  |
 | `POST` | `/scan`                                       | Production x402 payload scan                                    |
 | `POST` | `/audit`                                      | Production x402 endpoint audit                                  |
+| `GET`/`POST` | `/harden`                                | Production x402 signed Hardening Pack for a completed audit     |
 | `GET`  | `/.well-known/apa-issuer.json`                | Current and recent issuer Ed25519 verification keys             |
 | `POST` | `/apa/register`                               | Probe `{endpoint}`, TOFU-bind its key, and issue an attestation |
 | `GET`  | `/apa/attestation/{attestation_id}`           | Attestation JSON and effective status                           |
 | `GET`  | `/apa/attestation/{attestation_id}/badge.svg` | No-store SVG rendering the true current status                  |
 | `GET`  | `/apa/audit/{audit_id}`                       | Signed endpoint-audit record, log binding, and lifecycle        |
+| `GET`  | `/apa/hardening/{pack_id}`                    | Signed Hardening Pack with verified issuance-log binding        |
 | `GET`  | `/apa/log`                                    | JSON by default; HTML when the client explicitly accepts it     |
 | `POST` | `/apa/revoke`                                 | Key-signed attestation revocation                               |
 | `GET`  | `/badge/{audit_id}`                           | Legacy HMAC audit badge record                                  |
@@ -384,6 +413,13 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
   depth, truncation, and network failure can prevent enforcement.
 - Local deterministic analysis is intentionally conservative and cannot claim semantic coverage beyond
   the implemented scanner categories, analyzers, and corpus.
+- Three detector gaps were found by generating adversarial variants of the training corpus and are now
+  fixed, each with a regression test in `tests/test_multivector_payload.py`: a swapped recipient more than
+  80 characters from any transfer wording; an upper-cased `0X` address prefix, which made a drain recipient
+  invisible to the analyzer entirely; and an unknown vendor token shape behind a custom credential header
+  (for example `vk_live_…` carried by `x-vendor-token`). Merely naming such a header is still `ALLOW` —
+  exfiltration requires an intent verb and an outbound sink as well — and closing these did not move the
+  published 87/94 recall or the 0/45 false-positive result.
 - The committed deterministic held-out baseline is 92.55% recall (87/94) at 0.00% false positives (0/45),
   after the Decoder Wall normalization pre-pass added coverage for nested-encoding and homoglyph evasions.
   The optional paid semantic path has an older separately recorded result of 71.43% recall (20/28) with
@@ -397,6 +433,9 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
   network targets, redirects, oversized responses, and slow endpoints. A portable endpoint-audit record is
   point-in-time evidence, not certification, continuous monitoring, or proof of future behavior. Its current
   active, stale, or revoked state depends on the issuer's key history and transparency log.
+- A Hardening Pack is deterministic guidance derived from one point-in-time audit and the shipped training
+  corpus. Its valid signature and log entry prove provenance and integrity, not that an endpoint applied the
+  guidance or became safe; only a later audit can provide evidence of changed behavior.
 - Warden Shield is a source-ready scheduling and comparison mechanism, not a deployed managed service. It
   requires explicit owner enrollment and live target consent; an inconclusive result preserves prior
   evidence, while a battery change requires a new enrollment revision before comparisons resume.

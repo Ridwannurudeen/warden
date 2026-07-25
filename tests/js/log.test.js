@@ -17,6 +17,7 @@ const {
 const BREAKER_ID = "0123456789abcdef0123456789abcdef";
 const BENCHMARK_CASE_ID = "gauntlet-0123456789abcdef";
 const AUDIT_ID = "0123456789abcdef";
+const PACK_ID = "f".repeat(64);
 
 function entry(seq, prevHash, overrides = {}) {
   return {
@@ -55,6 +56,20 @@ function auditEntry(seq, prevHash, overrides = {}) {
     audit_id: AUDIT_ID,
     endpoint_host: "audit.example.org",
     record_hash: "e".repeat(64),
+    prev_hash: prevHash,
+    ...overrides,
+  };
+}
+
+function hardeningEntry(seq, prevHash, overrides = {}) {
+  return {
+    seq,
+    ts: 1_789_000_000 + seq,
+    event: "hardening-pack-issued",
+    record_type: "hardening-pack",
+    pack_id: PACK_ID,
+    audit_id: AUDIT_ID,
+    record_hash: "d".repeat(64),
     prev_hash: prevHash,
     ...overrides,
   };
@@ -191,6 +206,27 @@ test("log payload normalization accepts endpoint-audit lifecycle entries and rej
   }
 });
 
+test("log payload normalization accepts hardening packs and rejects ambiguous shapes", () => {
+  const pack = hardeningEntry(1, GENESIS_PREV_HASH);
+  assert.deepEqual(normalizeLogPayload({ entries: [pack], total: 1 }), [pack]);
+  for (const overrides of [
+    { event: "issued" },
+    { pack_id: "f".repeat(63) },
+    { audit_id: "0123456789abcdeF" },
+    { endpoint_host: "ambiguous.example" },
+    { record_type: "hardening" },
+  ]) {
+    assert.throws(
+      () =>
+        normalizeLogPayload({
+          entries: [hardeningEntry(1, GENESIS_PREV_HASH, overrides)],
+          total: 1,
+        }),
+      /hardening|pack_id|audit_id|endpoint_host|record_type/,
+    );
+  }
+});
+
 test("browser-compatible SHA-256 verifies continuity and detects tampering", async () => {
   const entries = await validChain();
   const verified = await verifyLogChain(entries, webcrypto);
@@ -230,7 +266,7 @@ test("mixed APA and BREAKER entries verify as one chain and reject breaker tampe
   assert.match(rejected.reason, /previous entry hash/);
 });
 
-test("APA, BREAKER, and endpoint-audit entries verify in one chain", async () => {
+test("APA, BREAKER, endpoint-audit, and hardening entries verify in one chain", async () => {
   const first = entry(1, GENESIS_PREV_HASH);
   const second = breakerEntry(
     2,
@@ -247,13 +283,17 @@ test("APA, BREAKER, and endpoint-audit entries verify in one chain", async () =>
       event: "audit-revoked",
     },
   );
+  const fifth = hardeningEntry(
+    5,
+    await sha256Hex(canonicalJson(fourth), webcrypto),
+  );
 
   const verified = await verifyLogChain(
-    [first, second, third, fourth],
+    [first, second, third, fourth, fifth],
     webcrypto,
   );
   assert.equal(verified.ok, true);
-  assert.equal(verified.total, 4);
+  assert.equal(verified.total, 5);
 });
 
 test("sequence and genesis failures stay distinguishable from valid chains", async () => {
@@ -273,6 +313,8 @@ test("human log renderer uses text nodes and never HTML injection", () => {
   assert.match(source, /textContent/);
   assert.match(source, /Endpoint audit/);
   assert.match(source, /Audit ID/);
+  assert.match(source, /Hardening Pack/);
+  assert.match(source, /Pack ID/);
   assert.doesNotMatch(source, /innerHTML|insertAdjacentHTML|document\.write/);
 });
 

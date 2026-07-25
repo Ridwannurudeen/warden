@@ -1,0 +1,50 @@
+services:
+  protected-agent:
+    image: ${WARDEN_AGENT_IMAGE:?Set WARDEN_AGENT_IMAGE}
+    expose:
+      - "8000"
+    networks:
+      - gateway-boundary
+      - agent-egress
+
+  warden-gateway:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.gateway
+    command:
+      - --upstream
+      - http://protected-agent:8000
+      - --mode
+      - local
+      - --listen
+      - 0.0.0.0
+      - --port
+      - "8787"
+      - --graceful-timeout
+      - "30"
+    depends_on:
+      protected-agent:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - warden-gateway-state:/var/lib/warden-gateway
+    networks:
+      - gateway-boundary
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+volumes:
+  warden-gateway-state:
+
+networks:
+  gateway-boundary:
+    internal: true
+  agent-egress:

@@ -15,7 +15,7 @@ from warden.api import app as api_app
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site"
-API_PATHS = {"/audit", "/health", "/scan"}
+API_PATHS = {"/audit", "/harden", "/health", "/scan"}
 PREVIEW_SECURITY_HEADERS = {
     b"content-security-policy": (
         b"default-src 'self'; base-uri 'none'; object-src 'none'; "

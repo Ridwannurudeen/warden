@@ -1,9 +1,13 @@
-# Warden Trust Layer Demo Script
+# Warden Demo Scripts
 
-The canonical recording preflight, 75-second beat sheet, narration, and honesty gates are in
-[`docs/HACKATHON_DEMO.md`](../docs/HACKATHON_DEMO.md).
+The current Phase 0 product demo is the audit → signed Hardening Pack → enforcement → improved
+re-audit loop. Its recording preflight, ≤90-second beat sheet, narration, evidence gates, and
+no-funds command are in
+[`submission/HARDENING-LOOP-LAUNCH.md`](../submission/HARDENING-LOOP-LAUNCH.md).
 
-Use the auto-playing `/theater` flow. Do not substitute the legacy playground or a prerecorded response log,
-and do not claim the Trust Layer routes are live until the reviewed release has been deployed and checked.
+The earlier Attack Theater and APA recording plan remains in
+[`docs/HACKATHON_DEMO.md`](../docs/HACKATHON_DEMO.md), but it does not demonstrate the paid
+audit → harden → re-audit product loop.
 
-Do not spend funds, post the X thread, upload the video, or submit the form without explicit user approval.
+Do not deploy, update listing #3808, spend funds, record/upload, post, or submit the form without
+the corresponding explicit approval in the launch ledger.

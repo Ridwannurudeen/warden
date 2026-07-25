@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Follow one enrolled endpoint's audit evidence lineage: every recurring fixed-battery grade in order, each record's lifecycle, and independent transparency-log verification in the browser."
+    />
+    <meta name="color-scheme" content="dark light" />
+    <title>Audit Evidence Lineage | Warden</title>
+    <link rel="canonical" href="https://warden.gudman.xyz/lineage" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Warden" />
+    <meta property="og:title" content="Audit Evidence Lineage | Warden" />
+    <meta
+      property="og:description"
+      content="Follow one enrolled endpoint's audit evidence lineage: every recurring fixed-battery grade in order, each record's lifecycle, and independent transparency-log verification in the browser."
+    />
+    <meta property="og:url" content="https://warden.gudman.xyz/lineage" />
+    <meta
+      property="og:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image"
+      content="https://warden.gudman.xyz/assets/warden-social-card.png"
+    />
+    <link rel="icon" href="/assets/warden-mark.svg" />
+    <script src="/theme.js?v=8864f626"></script>
+    <link rel="stylesheet" href="/styles.css?v=5b6a7ef2" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header page-shell">
+      <a class="brand" href="/" aria-label="Warden home"
+        ><img
+          src="/assets/warden-mark.svg"
+          alt=""
+          width="32"
+          height="32"
+        /><span>Warden</span></a
+      >
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-nav"
+        data-nav-toggle
+      >
+        Menu
+      </button>
+      <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
+        <a class="nav-link" href="/">Product</a>
+        <a class="nav-link" href="/playground">Playground</a>
+        <a class="nav-link" href="/integrate">Developers</a>
+        <a class="nav-link" href="/docs">Docs</a>
+        <a class="nav-link is-active-section" href="/verify">Evidence</a>
+        <a class="nav-link" href="/gauntlet">Research</a>
+        <div class="nav-mobile-actions">
+          <a class="button secondary" href="/integrate">Integrate</a>
+          <a class="button primary" href="/playground">Run a live scan</a>
+        </div>
+      </nav>
+      <div class="header-actions">
+        <a
+          class="status-pill"
+          href="/status"
+          aria-label="Service status: unknown"
+          data-health-state="unknown"
+          ><span
+            class="live-dot is-unknown"
+            data-health-dot
+            aria-hidden="true"
+          ></span
+          ><span data-health-label>Status unknown</span></a
+        >
+        <a class="header-integrate" href="/integrate">Integrate</a>
+        <a class="header-scan" href="/playground">Run a live scan</a>
+        <button
+          class="theme-toggle"
+          type="button"
+          data-theme-toggle
+          aria-label="Switch color theme"
+        >
+          Theme
+        </button>
+      </div>
+    </header>
+
+    <main id="main" class="page-shell site-main">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Home</a><span aria-hidden="true">/</span
+        ><a href="/verify">Evidence</a><span aria-hidden="true">/</span
+        ><span aria-current="page">Audit evidence lineage</span>
+      </nav>
+      <section class="page-hero page-hero--compact">
+        <p class="eyebrow">Recurring evidence</p>
+        <h1>Audit evidence lineage</h1>
+        <p class="hero-text">
+          Every recurring fixed-battery audit for one enrolled endpoint, in the
+          order it was observed. Each entry keeps its own signed record and
+          lifecycle, so a grade that changed over time is visible as a sequence
+          of independent point-in-time results rather than a standing claim.
+        </p>
+        <div class="hero-actions">
+          <a class="button secondary" href="/apa/log">Transparency log</a>
+          <a class="button secondary" href="/badges">Endpoint audit records</a>
+        </div>
+      </section>
+
+      <section class="console-card" data-lineage aria-labelledby="lineage-title">
+        <div class="section-heading">
+          <h2 id="lineage-title" data-lineage-heading>Lineage not requested</h2>
+          <p>
+            <span
+              class="source-stamp source-stamp--unknown"
+              data-source-stamp
+              data-source-state="unknown"
+              data-lineage-source
+              >UNKNOWN &middot; lineage not requested</span
+            >
+          </p>
+          <p data-lineage-status aria-live="polite">
+            Enter an enrolled target id to load its ordered audit evidence.
+          </p>
+        </div>
+
+        <form class="stack" data-lineage-form>
+          <label for="lineage-target">Enrolled target id</label>
+          <input
+            id="lineage-target"
+            name="target"
+            type="text"
+            inputmode="latin"
+            autocomplete="off"
+            maxlength="64"
+            placeholder="target id from your Shield enrollment"
+            data-lineage-target
+          />
+          <div class="hero-actions">
+            <button class="button primary" type="submit" data-lineage-load>
+              Load lineage
+            </button>
+            <button
+              class="button secondary"
+              type="button"
+              data-lineage-verify
+              disabled
+            >
+              Verify transparency-log inclusion
+            </button>
+          </div>
+        </form>
+
+        <p data-lineage-verification aria-live="polite"></p>
+
+        <ol class="stack" data-lineage-entries hidden></ol>
+
+        <p data-lineage-empty hidden>
+          No audit evidence is recorded for that target id yet. A lineage entry
+          appears only after a consented, conclusive recurring audit issues a
+          signed record.
+        </p>
+
+        <details class="snippet-card">
+          <summary>Inspect the lineage JSON</summary>
+          <p data-lineage-raw-description>
+            The lineage response will appear after a successful lookup.
+          </p>
+          <pre><code data-lineage-raw-json>Lineage JSON is unavailable until the lookup succeeds.</code></pre>
+        </details>
+
+        <p class="caveat evidence-boundary" data-lineage-limitations>
+          <strong>This is point-in-time evidence, not certification.</strong>
+          Each entry describes one fixed-battery run against one endpoint at one
+          moment. A later grade does not retroactively describe earlier traffic,
+          an earlier grade does not describe current behavior, and no sequence
+          establishes target ownership, continuous monitoring, or future safety.
+        </p>
+      </section>
+    </main>
+
+    <footer class="site-footer page-shell">
+      <div>
+        <strong>Warden</strong>
+        <span>Pre-action security for agent systems.</span>
+      </div>
+      <nav aria-label="Footer">
+        <div class="site-footer__col">
+          <span class="site-footer__label">Product</span>
+          <a href="/">Overview</a>
+          <a href="/playground">Live playground</a>
+          <a href="/theater">Incident replay</a>
+          <a href="/hire">Use Warden</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Developers</span>
+          <a href="/integrate#sdk-first">5-minute quickstart</a>
+          <a href="/integrate">Integration guide</a>
+          <a href="/docs">Documentation</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Evidence</span>
+          <a href="/verify">Verify an attestation</a>
+          <a href="/apa/log">Transparency log</a>
+          <a href="/badges">Endpoint audit records</a>
+          <a href="/lineage">Audit evidence lineage</a>
+          <a href="/agents">Marketplace evidence index</a>
+          <a href="/status">Service status</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Research</span>
+          <a href="/gauntlet">Gauntlet</a>
+          <a href="/agents#methodology">Methodology</a>
+          <a href="/showcase">Product tour</a>
+        </div>
+        <div class="site-footer__col">
+          <span class="site-footer__label">Policy</span>
+          <a href="/trust">Trust &amp; security</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+        </div>
+      </nav>
+    </footer>
+    <script src="/app.js?v=e888a292" defer></script>
+    <script src="/log.js?v=3088d242" defer></script>
+    <script src="/lineage.js?v=b75a4d0d" defer></script>
+  </body>
+</html>

@@ -121,3 +121,14 @@ def test_benign_you_are_a_phrase_is_allowed():
     )
     assert response.status_code == 200
     assert response.json()["verdict"] == "ALLOW"
+
+
+def test_root_metadata_documents_every_paid_route():
+    # A paid route that the service sells but never advertises at `/` is
+    # undiscoverable to a buyer reading the API root.
+    response = client.get("/")
+    assert response.status_code == 200
+    advertised = response.json()["endpoints"]
+    documented_paths = {value.split(" ", 1)[1] for value in advertised.values()}
+    for paid_path in ("/scan", "/audit", "/harden"):
+        assert paid_path in documented_paths, f"{paid_path} is sold but not advertised at /"

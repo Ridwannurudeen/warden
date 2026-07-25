@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "source": "contracts/src/WardenLogAnchor.sol",
+  "source_sha256": "229185d5ba1a29b3637c7a75e01de953a36f8d8fdd241b89d93998c6d9bff82b",
+  "compiler": {
+    "name": "solc",
+    "version": "0.8.24",
+    "long_version": "0.8.24+commit.e11b9ed9",
+    "evm_version": "shanghai",
+    "via_ir": true,
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "metadata_bytecode_hash": "none"
+  },
+  "artifact": {
+    "creation_bytes": 704,
+    "creation_sha256": "963b6ffe4aef8787d9873dc57764ddfa461407f9627470c3f1184474535a97eb",
+    "runtime_bytes_before_immutable_linking": 543,
+    "runtime_sha256_before_immutable_linking": "5b4527249bd2b65275d16ecc16f9a8a4829e9a33dad56cfe37956e0ba537047e"
+  }
+}

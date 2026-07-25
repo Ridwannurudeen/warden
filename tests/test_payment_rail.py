@@ -46,19 +46,19 @@ def test_payment_rail_is_fixed_to_xlayer_usdt_exact() -> None:
         scheme="exact",
         network="eip155:196",
         asset="0x779ded0c9e1022225f8e0630b35a9b54be713736",
-        amount="500000",
+        amount="100000",
         eip712_name="USD₮0",
         eip712_version="1",
         symbol="USDT",
         decimals=6,
-        display_price="0.5 USDT",
+        display_price="0.1 USDT",
         pay_to=PAY_TO,
     )
     assert (PAYMENT_SCHEME, PAYMENT_NETWORK, PAYMENT_ASSET, PAYMENT_AMOUNT) == (
         "exact",
         "eip155:196",
         "0x779ded0c9e1022225f8e0630b35a9b54be713736",
-        "500000",
+        "100000",
     )
 
 
@@ -120,7 +120,7 @@ def test_payment_option_uses_explicit_atomic_amount_and_asset() -> None:
     assert option.max_timeout_seconds == 300
     assert isinstance(option.price, AssetAmount)
     assert option.price.model_dump() == {
-        "amount": "500000",
+        "amount": "100000",
         "asset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
         "extra": {
             "name": "USD₮0",

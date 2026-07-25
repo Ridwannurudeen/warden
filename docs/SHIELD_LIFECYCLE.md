@@ -14,8 +14,15 @@ contain no more than 32 targets. Each target binds:
 - literal `owner_enrolled: true`;
 - a monotonically increasing `enrollment_revision`;
 - one canonical HTTPS endpoint without credentials, query parameters, or a fragment;
-- a re-audit interval from 24 through 672 hours; and
-- the expected fixed battery ID, version, and SHA-256.
+- a re-audit interval from 24 through 672 hours;
+- the expected fixed battery ID, version, and SHA-256; and
+- optionally `"delivery": {"webhook_url": "<HTTPS URL>"}`, the owner's own destination for this
+  target's alerts.
+
+The optional `delivery` block is part of the hashed enrollment, so adding, changing, or removing it
+requires an incremented `enrollment_revision` like any other enrollment change. When a target enrols a
+destination it is used instead of the operator-wide `WARDEN_SHIELD_WEBHOOK_URL`; a target with no
+`delivery` block still falls back to that single global operator webhook.
 
 Owner enrollment does not replace endpoint consent. Every run still uses `AgentAuditor`, which performs the
 existing SSRF-safe public-address validation, IP-pinned request, `/.well-known/warden-consent` check, fixed
@@ -62,16 +69,45 @@ service's outer `flock`. It retains at most 32 target states and 1,000 events. E
 scores, battery identities, timestamps, audit IDs, and fixed operator actions. Shield does not store probe
 payloads, target URLs, response bodies, signatures, credentials, or exception text in lifecycle events.
 
+## Continuous hardening
+
+A conclusive audit that Shield accepts as a baseline is also checked against the per-class findings the
+auditor retained for that same `audit_id`. Shield issues a signed hardening pack when the drift is
+`regressed`, or when the retained findings show at least one unblocked class. Issuance reuses the existing
+`hardening.publish_pack` path, so the pack is Ed25519-signed by the same issuer, committed to the same
+hash-chained transparency log, and readable at `/apa/hardening/{pack_id}`. There is no second signing
+scheme and no pack content beyond the committed training corpus and guidance table.
+
+An inconclusive comparison never issues a pack. Shield refuses to build remediation on evidence it also
+refuses to accept as a baseline, which covers audit failure, an inconclusive grade, missing, invalid,
+stale, or revoked evidence, a subject mismatch, and a battery change.
+
+The pack outcome is recorded on the lifecycle event as a bounded `hardening` block holding a status, the
+`pack_id`, the source `audit_id`, and the addressed class names. Issuance is idempotent per `audit_id`, so
+a repeated observation of one audit returns the existing pack instead of committing a second one. Because
+the block is not part of the event's hashed identity, a transient issuance failure does not change the
+`event_id`.
+
+| Status | Meaning |
+| ------ | ------- |
+| `not_applicable` | Inconclusive comparison, or a conclusive audit that missed no class. |
+| `findings_unavailable` | No retained per-class findings for that audit; no pack was built. |
+| `issue_failed` | Signing or log commitment failed; the run exits nonzero. |
+| `issued` | A signed, log-committed pack exists for that audit. |
+
 ## Alerts and service outcome
 
-Regressions and inconclusive runs create actionable bounded events. If
-`WARDEN_SHIELD_WEBHOOK_URL` is present, it must be HTTPS and receives only the event metadata above, with
-redirects and ambient proxy settings disabled. Delivery failure is persisted without logging the URL or
-error detail.
+Regressions, inconclusive runs, issued packs, and failed pack issuance create actionable bounded events.
+Alerts go to the target's enrolled `delivery.webhook_url` when it has one, and otherwise to the
+operator-wide `WARDEN_SHIELD_WEBHOOK_URL`. Either must be HTTPS and receives only the event metadata above
+plus the `hardening` block, with redirects and ambient proxy settings disabled. Delivery is attempted at
+most twice per event under one `Idempotency-Key`; failure after that is persisted without logging the URL
+or error detail. Pack contents, including example payloads, are never pushed to a webhook — the alert
+carries only the `pack_id` needed to fetch the signed pack.
 
-The runner exits nonzero for every regression or inconclusive result, even when webhook delivery succeeds.
-This gives systemd and external operators a clear failure signal when no notifier is configured. Initial,
-unchanged, and improved runs return zero. Journal output is count-only.
+The runner exits nonzero for every regression, inconclusive result, or failed pack issuance, even when
+webhook delivery succeeds. This gives systemd and external operators a clear failure signal when no
+notifier is configured. Initial, unchanged, and improved runs return zero. Journal output is count-only.
 
 ## Operator preparation
 
@@ -88,7 +124,7 @@ WARDEN_ISSUER_KEY=<existing current issuer seed>
 WARDEN_ISSUER_KID=<existing current issuer key ID>
 WARDEN_ISSUER_HISTORY=/opt/warden/issuer-history.json
 WARDEN_PROTECTION_DB=/opt/warden/data/protection.db
-WARDEN_SHIELD_WEBHOOK_URL=<optional HTTPS operator webhook>
+WARDEN_SHIELD_WEBHOOK_URL=<optional HTTPS operator webhook for targets with no enrolled destination>
 ```
 
 Do not copy payment, wallet, model-provider, marketplace, or analytics credentials into this file. The

@@ -1,0 +1,80 @@
+WARDEN THIRD-PARTY DATASET NOTICES
+
+The current corpus/license-manifest.json is authoritative for which third-party
+records are included in a Warden corpus build. The following notices cover every
+dataset source that the version 1 ingestion allowlist permits.
+
+AgentDojo
+Source: https://github.com/ethz-spylab/agentdojo
+Pinned revision: 089ed468cf3ed0322acc66b0211f26d9d90dbf60
+License: MIT
+Copyright (c) 2024 Edoardo Debenedetti, Jie Zhang, Mislav Balunovic,
+Luca Beurer-Kellner, Marc Fischer, and Florian Tramèr
+
+InjecAgent
+Source: https://github.com/uiuc-kang-lab/InjecAgent
+Pinned revision: f19c9f2c79a41046eb13c03c51a24c567a8ffa07
+License: MIT
+Copyright (c) 2023 Qiusi Zhan
+
+LLMail-Inject unique labelled submissions
+Source: https://huggingface.co/datasets/microsoft/llmail-inject-challenge
+Pinned revision: 1063bdf01ec8762b812d5e06ee768a06faa5a6f7
+License declared by the pinned dataset card: MIT
+Copyright (c) Microsoft Corporation.
+Only data/labelled_unique_submissions_phase1.json and
+data/labelled_unique_submissions_phase2.json are allowlisted. Raw submissions,
+false-positive test emails, challenge contexts, and metadata are not included.
+
+BIPIA Microsoft-authored attack instructions
+Source: https://github.com/microsoft/BIPIA
+Pinned revision: a004b69ec0dd446e0afd461d98cb5e96e120a5d0
+License: MIT
+Copyright (c) Microsoft Corporation.
+Only benchmark/code_attack_test.json, benchmark/code_attack_train.json,
+benchmark/text_attack_test.json, and benchmark/text_attack_train.json are
+allowlisted. Third-party benchmark contexts are not included.
+
+Lakera gandalf_ignore_instructions
+Source: https://huggingface.co/datasets/Lakera/gandalf_ignore_instructions
+Pinned revision: 04737b65e90a6794ec227012e4a255a7def6344b
+License declared by the pinned dataset card: MIT
+The pinned dataset card supplies no separate copyright notice.
+
+Lakera gandalf_summarization
+Source: https://huggingface.co/datasets/Lakera/gandalf_summarization
+Pinned revision: 8e213cc8dd65f099c61dc32dbcfdb2ff6b1c92d8
+License declared by the pinned dataset card: MIT
+The pinned dataset card supplies no separate copyright notice.
+
+MIT LICENSE TEXT
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+deepset prompt-injections
+Source: https://huggingface.co/datasets/deepset/prompt-injections
+Pinned revision: 4f61ecb038e9c3fb77e21034b22511b523772cdd
+Licenses declared simultaneously by the pinned dataset card:
+- Apache License 2.0
+- Creative Commons Attribution 4.0 International
+Attribution: deepset, "prompt-injections" dataset.
+Changes made by Warden: selected records may be reformatted and assigned a
+human-reviewed Warden threat category and expected verdict.
+Apache-2.0 license text: LICENSE
+CC-BY-4.0 license: https://creativecommons.org/licenses/by/4.0/legalcode

@@ -26,7 +26,7 @@ function requirement(
     scheme: "exact",
     network: "eip155:196",
     asset: "0x779ded0c9e1022225f8e0630b35a9b54be713736",
-    amount: "500000",
+    amount: "100000",
     payTo,
     maxTimeoutSeconds: 300,
     extra: { name: "USD₮0", version: "1" },

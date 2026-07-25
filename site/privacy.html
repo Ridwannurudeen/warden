@@ -105,7 +105,7 @@
           legal privacy notice.
         </p>
         <p class="snapshot-note">
-          Last updated <time datetime="2026-07-18">18 July 2026</time>.
+          Last updated <time datetime="2026-07-24">24 July 2026</time>.
         </p>
       </section>
 
@@ -156,11 +156,11 @@
               <code>POST /api/feedback</code> route accepts only a structured
               outcome, observed verdict, implemented threat class, and a
               reproducer that you have already redacted. Submission requires
-              literal <code>true</code> confirmations that Warden may retain
-              the record and that the reproducer is redacted. The route has no
-              field for the original scan payload, an endpoint, wallet,
-              submitter details, or arbitrary metadata. Warden cannot establish
-              that your redaction removed every sensitive value.
+              literal <code>true</code> confirmations that Warden may retain the
+              record and that the reproducer is redacted. The route has no field
+              for the original scan payload, an endpoint, wallet, submitter
+              details, or arbitrary metadata. Warden cannot establish that your
+              redaction removed every sensitive value.
             </p>
             <p>
               A pending record contains the redacted reproducer, its structured
@@ -172,8 +172,8 @@
               cap. Scanner-equivalent Unicode and whitespace-normalized
               duplicate submissions reference one retained record. Stored
               identifiers and content digests are rechecked before review or
-              aggregation. HTTP infrastructure may still process the
-              operational metadata described below.
+              aggregation. HTTP infrastructure may still process the operational
+              metadata described below.
             </p>
             <p>
               The public <code>/api/threat-intel/v1/summary</code> route exposes
@@ -186,9 +186,9 @@
               self-reported counts do not measure threat prevalence.
             </p>
             <p>
-              Feedback does not update a detector automatically. An operator
-              may promote a consented redacted reproducer only after human
-              review, and only into one training or held-out dataset after
+              Feedback does not update a detector automatically. An operator may
+              promote a consented redacted reproducer only after human review,
+              and only into one training or held-out dataset after
               scanner-equivalent duplicate and cross-dataset checks under the
               same promotion lock used by Gauntlet review. A promoted reproducer
               may be published as part of that dataset and may remain there
@@ -217,13 +217,22 @@
             <p>
               For a human-confirmed bypass, the raw submitted payload is not
               published. A reviewer prepares and rescans a publishable redacted
-              reproducer; only that reproducer enters the held-out benchmark.
-              The public WARDEN BREAKER certificate contains its payload digest,
-              assigned threat class, confirmation time, log position, and either
-              a consented finder handle or an anonymous credit. It does not
-              contain the private claim, raw submission, declared intent, or
-              private review context. Finder handles are self-asserted; Warden
-              does not authenticate account ownership.
+              reproducer; that first confirmed reproducer enters only the
+              held-out benchmark. A separate redacted training reproducer may
+              enter the training corpus only when the submission includes
+              explicit training-use consent and rights confirmation and an
+              operator completes a distinct second review. The training row
+              records certificate-bound first-party provenance and a consent
+              digest.
+            </p>
+            <p>
+              The public WARDEN BREAKER certificate contains the held-out
+              reproducer's payload digest, assigned threat class, confirmation
+              time, log position, and either a consented finder handle or an
+              anonymous credit. It does not contain the private claim, raw
+              submission, declared intent, or private review context. Warden
+              does not authenticate account ownership. Finder handles are
+              self-asserted.
             </p>
           </section>
 
@@ -303,6 +312,7 @@
           <a href="/verify">Verify an attestation</a>
           <a href="/apa/log">Transparency log</a>
           <a href="/badges">Endpoint audit records</a>
+          <a href="/lineage">Audit evidence lineage</a>
           <a href="/agents">Marketplace evidence index</a>
           <a href="/status">Service status</a>
         </div>

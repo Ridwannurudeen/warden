@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Inspect Warden's shared APA, endpoint-audit, and WARDEN BREAKER evidence log and verify its SHA-256 chain continuity in your browser."
+      content="Inspect Warden's shared APA, endpoint-audit, hardening-pack, and WARDEN BREAKER evidence log and verify its SHA-256 chain continuity in your browser."
     />
     <meta name="color-scheme" content="dark light" />
     <title>Transparency log | Warden</title>
@@ -15,7 +15,7 @@
     <meta property="og:title" content="Transparency log | Warden" />
     <meta
       property="og:description"
-      content="Inspect the shared APA, endpoint-audit, and WARDEN BREAKER log and independently recompute its internal SHA-256 chain."
+      content="Inspect the shared APA, endpoint-audit, hardening-pack, and WARDEN BREAKER log and independently recompute its internal SHA-256 chain."
     />
     <meta property="og:url" content="https://warden.gudman.xyz/apa/log" />
     <meta
@@ -103,10 +103,10 @@
         <p class="eyebrow">Public evidence history</p>
         <h1>Transparency log</h1>
         <p class="hero-text">
-          APA records, endpoint audit lifecycle events, and confirmed WARDEN
-          BREAKER certificates share one ordered hash chain. This page fetches
-          the public entries, recomputes continuity, and verifies checkpoint
-          history in your browser.
+          APA records, endpoint audit lifecycle events, hardening-pack issuance,
+          and confirmed WARDEN BREAKER certificates share one ordered hash
+          chain. This page fetches the public entries, recomputes continuity,
+          and verifies checkpoint history in your browser.
         </p>
         <div class="hero-actions">
           <button class="button primary" type="button" data-apa-log-retry>
@@ -217,9 +217,9 @@
           </h2>
           <p class="section-copy">
             Each entry identifies an APA attestation, an endpoint audit
-            lifecycle event, or a WARDEN BREAKER certificate, then includes the
-            signed record hash and the canonical hash of the preceding log
-            entry.
+            lifecycle event, a signed Hardening Pack issuance, or a WARDEN
+            BREAKER certificate, then includes the signed record hash and the
+            canonical hash of the preceding log entry.
           </p>
         </div>
         <ol class="command-flow" data-apa-log-entries>
@@ -323,6 +323,7 @@
           <a href="/verify">Verify an attestation</a>
           <a href="/apa/log">Transparency log</a>
           <a href="/badges">Endpoint audit records</a>
+          <a href="/lineage">Audit evidence lineage</a>
           <a href="/agents">Marketplace evidence index</a>
           <a href="/status">Service status</a>
         </div>
@@ -341,6 +342,6 @@
       </nav>
     </footer>
     <script src="/app.js?v=e888a292" defer></script>
-    <script src="/log.js?v=c65679b0" defer></script>
+    <script src="/log.js?v=3088d242" defer></script>
   </body>
 </html>

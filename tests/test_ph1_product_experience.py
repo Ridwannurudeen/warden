@@ -102,7 +102,7 @@ def test_homepage_uses_dated_proof_and_catalog_sources_without_stale_literals():
     assert "4.8/5" not in page
     assert "0.23 ms" not in page
     assert "15 sold" not in page.lower()
-    assert "0.5 USDT" not in page
+    assert "0.1 USDT" not in page
     assert "122-payload" not in page
     assert "data-product-proof-status" in page
     assert "data-service-catalog" in page

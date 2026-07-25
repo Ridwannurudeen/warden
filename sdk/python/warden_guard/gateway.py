@@ -30,12 +30,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--listen", default="0.0.0.0", help="gateway listen address")
     parser.add_argument("--port", type=int, default=8787, help="gateway listen port")
     parser.add_argument("--max-body-bytes", type=int, default=100_000)
+    parser.add_argument("--graceful-timeout", type=int, default=30)
     args = parser.parse_args(argv)
 
     if not 1 <= args.port <= 65_535:
         parser.error("port must be between 1 and 65535")
     if args.max_body_bytes < 1:
         parser.error("max-body-bytes must be positive")
+    if not 1 <= args.graceful_timeout <= 300:
+        parser.error("graceful-timeout must be between 1 and 300 seconds")
     if args.mode == "local" and args.warden_url != DEFAULT_BASE_URL:
         parser.error("--warden-url applies only to --mode hosted")
 
@@ -55,7 +58,12 @@ def main(argv: list[str] | None = None) -> int:
         client=client,
         max_body_bytes=args.max_body_bytes,
     )
-    uvicorn.run(app, host=args.listen, port=args.port)
+    uvicorn.run(
+        app,
+        host=args.listen,
+        port=args.port,
+        timeout_graceful_shutdown=args.graceful_timeout,
+    )
     return 0
 
 

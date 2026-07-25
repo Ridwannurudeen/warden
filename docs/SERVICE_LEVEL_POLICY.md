@@ -14,7 +14,7 @@ The scheduled monitor records two bounded signals every five minutes:
   semantic model may be ready or disabled.
 - **Unsigned x402 challenge generation** is `ready` only when a benign `POST /scan` returns the
   pinned HTTP 402 challenge for `https://warden.gudman.xyz/scan`: x402 v2, the `exact` scheme,
-  X Layer `eip155:196`, the published Warden recipient, 500000 base units, and the published USDT
+  X Layer `eip155:196`, the published Warden recipient, 100000 base units, and the published USDT
   asset. The monitor never signs, pays, verifies a payer, or requests settlement.
 
 The challenge signal establishes only that Warden generated the expected unsigned terms. It is not

@@ -124,6 +124,7 @@ class GauntletRequest(BaseModel):
     context: DemoScanContext = Field(default_factory=DemoScanContext)
     finder: str | None = Field(default=None, max_length=128)
     public_credit_consent: bool = Field(default=False, strict=True)
+    training_use_consent: bool = Field(default=False, strict=True)
 
     @field_validator("intent")
     @classmethod
@@ -313,9 +314,11 @@ class AuditRequest(BaseModel):
 
 
 class AuditResult(BaseModel):
+    probe_id: str | None = None
     attack_class: str
     sent: str
     blocked: bool
+    taxonomy_ids: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class BadgeRecord(BaseModel):
@@ -380,6 +383,30 @@ class AuditEvidenceResponse(BaseModel):
     limitations: str
 
 
+class ShieldLineageEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enrollment_revision: int | None = Field(default=None, ge=1)
+    comparison: Literal["initial", "unchanged", "improved", "regressed", "inconclusive"]
+    reason: str
+    occurred_at: int = Field(ge=0)
+    accepted_as_baseline: bool
+    attestation: AuditAttestationRecord
+    status: Literal["active", "stale", "revoked"]
+    verified: Literal[True]
+    revoked_at: int | None = Field(default=None, ge=0)
+
+
+class ShieldLineageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1]
+    target_id: str = Field(min_length=1, max_length=64)
+    entries: list[ShieldLineageEntry]
+    total: int = Field(ge=0)
+    limitations: str
+
+
 class AuditResponse(BaseModel):
     score: float = Field(ge=0, le=100)
     grade: Grade
@@ -388,6 +415,130 @@ class AuditResponse(BaseModel):
     recommendations: list[str]
     badge_record: BadgeRecord | None = None
     consent_verified: bool = True
+
+
+class HardenRequest(BaseModel):
+    audit_id: str = Field(pattern=r"^[0-9a-f]{16}$")
+
+
+class HardenContext(BaseModel):
+    expected_addresses: list[str] = Field(default_factory=list, max_length=20)
+
+
+class HardenExample(BaseModel):
+    id: str
+    payload: str
+    expected_verdict: str
+    expected_classes: list[str]
+    depth: Depth
+    context: HardenContext
+    source_id: str
+    source_revision: str | None
+    source_path: str | None
+    source_record_id: str | None
+    source_url: str | None
+    source_file_sha256: str | None = Field(pattern=r"^[0-9a-f]{64}$")
+    license_spdx: list[str]
+    license_url: str | None
+
+
+class HardenRemediation(BaseModel):
+    attack_class: str
+    missed: int = Field(ge=1)
+    blocked: int = Field(ge=0)
+    total: int = Field(ge=1)
+    summary: str
+    pattern_families: list[str]
+    analyzers: list[str]
+    example_attacks: list[HardenExample]
+    taxonomy_ids: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class HardenResponse(BaseModel):
+    spec_version: Literal["warden-hardening-pack/0.1"]
+    predicate_type: Literal["https://warden.gudman.xyz/spec/hardening-pack/v1"]
+    pack_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    issuer: Literal["warden"]
+    schema_version: Literal[1]
+    audit_id: str = Field(pattern=r"^[0-9a-f]{16}$")
+    target_host: str
+    battery_id: str
+    battery_version: str
+    observed_on: str
+    corpus_fingerprint: str
+    addressed_classes: list[str]
+    remediation: list[HardenRemediation]
+    integration: dict[str, str]
+    limitations: str
+    message: str
+    issued_at: int = Field(ge=0)
+    expires_at: int = Field(ge=0)
+    log_seq: int = Field(ge=1)
+    issuer_sig: str = Field(pattern=r"^sig:")
+
+
+class HardenEvidenceResponse(BaseModel):
+    pack: HardenResponse | None
+    status: Literal["active", "stale", "revoked", "invalid"]
+    verified: bool
+    revoked_at: int | None = Field(default=None, ge=0)
+    issuer_document: dict[str, object] | None
+    log_suffix: list[dict[str, object]]
+    checkpoint: dict[str, object] | None
+    limitations: str
+
+
+class VariantAuditRequest(BaseModel):
+    target_url: str = Field(min_length=1, max_length=MAX_TARGET_URL_LENGTH)
+    # None means every class that has variants. An explicit empty list is rejected by
+    # the engine rather than silently treated as "all".
+    threat_classes: list[str] | None = Field(default=None, max_length=len(ReasonCode))
+    max_variants_per_class: int = Field(default=25, ge=1, le=25)
+
+
+class VariantAuditCaps(BaseModel):
+    max_variants_per_class: int = Field(ge=1)
+    max_total_variants: int = Field(ge=1)
+    probe_timeout_seconds: float = Field(gt=0)
+    total_timeout_seconds: float = Field(gt=0)
+    max_response_bytes: int = Field(ge=1)
+
+
+class VariantAuditClassResult(BaseModel):
+    threat_class: str
+    total: int = Field(ge=0)
+    detected: int = Field(ge=0)
+    missed: int = Field(ge=0)
+    inconclusive: int = Field(ge=0)
+    conclusive: int = Field(ge=0)
+    # None when no probe in the class was conclusive, so a rate would be meaningless.
+    detection_rate: float | None = Field(default=None, ge=0, le=100)
+
+
+class VariantAuditTotals(BaseModel):
+    threat_classes: int = Field(ge=0)
+    variants_sent: int = Field(ge=0)
+    detected: int = Field(ge=0)
+    missed: int = Field(ge=0)
+    inconclusive: int = Field(ge=0)
+    conclusive: int = Field(ge=0)
+    detection_rate: float | None = Field(default=None, ge=0, le=100)
+
+
+class VariantAuditResponse(BaseModel):
+    schema_version: Literal[1]
+    target_host: str
+    corpus_fingerprint: str
+    generator: str
+    caps: VariantAuditCaps
+    per_class: list[VariantAuditClassResult]
+    totals: VariantAuditTotals
+    consent_verified: Literal[True]
+    limitations: list[str]
+    report_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    issuer: Literal["warden"]
+    issued_at: int = Field(ge=0)
+    issuer_sig: str
 
 
 class ApaRegisterRequest(BaseModel):

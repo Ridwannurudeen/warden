@@ -33,22 +33,37 @@ from warden import api
 
 assert api._scan_route.extensions == api._SCAN_EXTENSIONS
 assert api._audit_route.extensions == api._AUDIT_EXTENSIONS
+assert api._harden_route.extensions == api._HARDEN_EXTENSIONS
+assert api._variant_audit_route.extensions == api._VARIANT_AUDIT_EXTENSIONS
 assert api._scan_route.extensions["bazaar"]["info"]["input"]["inputSchema"]["required"] == ["payload"]
 assert api._audit_route.extensions["bazaar"]["info"]["input"]["inputSchema"]["required"] == ["target_url"]
+assert api._harden_route.extensions["bazaar"]["info"]["input"]["inputSchema"]["required"] == ["audit_id"]
+assert api._variant_audit_route.extensions["bazaar"]["info"]["input"]["inputSchema"]["required"] == ["target_url"]
 expected_price = {
-    "amount": "500000",
+    "amount": "100000",
     "asset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
     "extra": {"name": "USD₮0", "version": "1"},
 }
 assert [option.price.model_dump() for option in api._scan_route.accepts] == [expected_price]
 assert [option.price.model_dump() for option in api._audit_route.accepts] == [expected_price]
+assert [option.price.model_dump() for option in api._harden_route.accepts] == [expected_price]
+assert [option.price.model_dump() for option in api._variant_audit_route.accepts] == [expected_price]
 assert api._payment_rail.protocol == "x402-v2"
 assert api._payment_rail.facilitator == "okx"
 assert api._payment_rail.network == "eip155:196"
-assert api._payment_rail.display_price == "0.5 USDT"
+assert api._payment_rail.display_price == "0.1 USDT"
 assert api._facilitator_http_client.follow_redirects is False
 assert api._facilitator_http_client.trust_env is False
-assert set(api._paid_routes) == {"POST /scan", "GET /scan", "POST /audit", "GET /audit"}
+assert set(api._paid_routes) == {
+    "POST /scan",
+    "GET /scan",
+    "POST /audit",
+    "GET /audit",
+    "POST /harden",
+    "GET /harden",
+    "POST /variant-audit",
+    "GET /variant-audit",
+}
 assert api.app.user_middleware[0].kwargs["dispatch"] is api.payment_required_schema_middleware
 assert next(
     index
@@ -56,7 +71,12 @@ assert next(
     if middleware.cls is PaymentMiddlewareASGI
 ) > 0
 
-required_by_path = {"/scan": "payload", "/audit": "target_url"}
+required_by_path = {
+    "/scan": "payload",
+    "/audit": "target_url",
+    "/harden": "audit_id",
+    "/variant-audit": "target_url",
+}
 with TestClient(api.app) as client:
     for path, required_field in required_by_path.items():
         response = client.post(path, json={})
@@ -66,7 +86,7 @@ with TestClient(api.app) as client:
         assert challenge["extensions"]["bazaar"]["info"]["input"]["inputSchema"]["required"] == [required_field]
         assert challenge["outputSchema"]["input"]["inputSchema"]["required"] == [required_field]
         assert challenge["accepts"][0]["outputSchema"]["input"]["inputSchema"]["required"] == [required_field]
-        assert challenge["accepts"][0]["amount"] == "500000"
+        assert challenge["accepts"][0]["amount"] == "100000"
         assert challenge["accepts"][0]["asset"] == "0x779ded0c9e1022225f8e0630b35a9b54be713736"
         assert challenge["accepts"][0]["network"] == "eip155:196"
         assert challenge["accepts"][0]["scheme"] == "exact"
@@ -107,6 +127,8 @@ assert api._facilitator_http_client.is_closed is True
     [
         ("/scan", '{"payload":"<your untrusted text>"}'),
         ("/audit", '{"target_url":"<your authorized endpoint URL>"}'),
+        ("/harden", '{"audit_id":"<your completed audit id>"}'),
+        ("/variant-audit", '{"target_url":"<your consenting endpoint URL>"}'),
     ],
 )
 def test_bodyless_get_has_complete_route_specific_recovery(path: str, request_body: str):
@@ -119,7 +141,7 @@ def test_bodyless_get_has_complete_route_specific_recovery(path: str, request_bo
     assert "No charge was made." in detail
     assert "onchainos agent task-402-pay <JOB_ID> --provider-agent-id 3808" in detail
     assert f"--endpoint https://warden.gudman.xyz{path}" in detail
-    assert "--token-symbol USDT --token-amount 0.5" in detail
+    assert "--token-symbol USDT --token-amount 0.1" in detail
     assert "--accepts '<accepts from the 402>'" in detail
     assert f"--body '{request_body}'" in detail
     assert "onchainos agent complete <JOB_ID>" in detail

@@ -104,7 +104,7 @@
           This is a technical service summary, not a complete legal contract.
         </p>
         <p class="snapshot-note">
-          Last updated <time datetime="2026-07-18">18 July 2026</time>.
+          Last updated <time datetime="2026-07-24">24 July 2026</time>.
         </p>
       </section>
 
@@ -179,8 +179,17 @@
               confirmed, prepare a redacted reproducer and add only that
               reproducer to the held-out benchmark. A confirmed bypass also
               receives a public signed WARDEN BREAKER certificate and a
-              hash-chained transparency-log entry. It is not copied into the
-              scanner's training corpus by this workflow.
+              hash-chained transparency-log entry. That first confirmed
+              reproducer remains held out and is not copied into training.
+            </p>
+            <p>
+              Training use is a separate opt-in. It requires explicit
+              training-use consent confirming the submitter has rights to grant
+              that use, followed by a separate second human review of a distinct
+              redacted training reproducer. Promotion is bound to the confirmed
+              WARDEN BREAKER certificate, records first-party provenance and
+              consent evidence, and rejects overlap with training, held-out, or
+              built-in material.
             </p>
             <p>
               Public finder credit requires a supplied handle and explicit
@@ -200,9 +209,9 @@
             <p>
               Feedback is a separate action and is never inferred from a scan.
               By calling <code>POST /api/feedback</code>, you confirm that the
-              submitted reproducer is redacted, that you are authorized to
-              share it, and that Warden may retain it for review. Do not submit
-              an original private payload, credentials, personal information,
+              submitted reproducer is redacted, that you are authorized to share
+              it, and that Warden may retain it for review. Do not submit an
+              original private payload, credentials, personal information,
               wallet material, or content you lack permission to share.
             </p>
             <p>
@@ -255,15 +264,13 @@
               rate-limit budget, while <code>/scan</code> and
               <code>/audit</code> use the paid-route budget.
               <code>POST /api/feedback</code> uses a separate feedback budget.
-              <code>GET /api/threat-intel/v1/summary</code> uses a separate
-              read budget.
-              The current
-              application does not apply that limiter to <code>/health</code>,
-              <code>/api/badges</code>, or <code>/badge/{audit_id}</code>.
-              Availability, marketplace listing state, corpus content, and
-              service metadata may change. The status page distinguishes current
-              browser reachability from historical uptime, which is not
-              measured.
+              <code>GET /api/threat-intel/v1/summary</code> uses a separate read
+              budget. The current application does not apply that limiter to
+              <code>/health</code>, <code>/api/badges</code>, or
+              <code>/badge/{audit_id}</code>. Availability, marketplace listing
+              state, corpus content, and service metadata may change. The status
+              page distinguishes current browser reachability from historical
+              uptime, which is not measured.
             </p>
           </section>
 
@@ -314,6 +321,7 @@
           <a href="/verify">Verify an attestation</a>
           <a href="/apa/log">Transparency log</a>
           <a href="/badges">Endpoint audit records</a>
+          <a href="/lineage">Audit evidence lineage</a>
           <a href="/agents">Marketplace evidence index</a>
           <a href="/status">Service status</a>
         </div>

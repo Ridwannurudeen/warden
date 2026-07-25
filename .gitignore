@@ -7,6 +7,7 @@ badges/
 gauntlet/
 /data/feedback/
 /data/shield/
+/data/audit-findings/
 
 # Generated marketplace pages (rebuild with scripts/build_index.py)
 /site/agents/
@@ -21,6 +22,9 @@ venv/
 /sdk/python/dist/
 .pytest_cache/
 .ruff_cache/
+node_modules/
+artifacts/
+cache/
 
 # APA runtime artifacts — NEVER commit (issuer private key, sqlite)
 data/*.key

@@ -16,9 +16,11 @@ from urllib.parse import ParseResult, urlparse
 import httpx
 
 from warden.apa_url import is_blocked_ip, resolve_host, validate_public_http_url
+from warden.audit_findings import record_findings
 from warden.badge_store import record_badge
 from warden.badges import issue_badge
 from warden.models import AuditResponse, AuditResult
+from warden.taxonomy import mappings_for_probe
 
 _ROOT = Path(__file__).resolve().parents[1]
 AUDIT_BATTERY_PATH = _ROOT / "audit" / "warden-core-http-2026-07.json"
@@ -289,6 +291,18 @@ class AgentAuditor:
                 ),
             )
             record_badge(badge_record)
+            # Only signed evidence earns retained findings, so a hardening pack can
+            # never be built from an inconclusive or unconsented run. Caller-supplied
+            # prompts stay excluded here for the same prompt-provenance reason they
+            # are excluded from the grade.
+            record_findings(
+                audit_id=str(badge_record["audit_id"]),
+                target_host=host_header,
+                findings=self._class_findings(fixed_results),
+                battery_id=BATTERY_ID,
+                battery_version=BATTERY_VERSION,
+                observed_on=issued_at,
+            )
         elif not conclusive_count:
             badge = (
                 "Warden audit inconclusive (no grade or badge issued): "
@@ -350,11 +364,15 @@ class AgentAuditor:
             )
             outcomes.append(outcome)
             if outcome is not AuditOutcome.INCONCLUSIVE:
+                probe_id = str(attack["id"])
+                attack_class = str(attack["category"])
                 results.append(
                     AuditResult(
-                        attack_class=str(attack["category"]),
+                        probe_id=probe_id,
+                        attack_class=attack_class,
                         sent=str(attack["payload"]),
                         blocked=outcome is AuditOutcome.BLOCKED,
+                        taxonomy_ids=mappings_for_probe(probe_id, attack_class),
                     )
                 )
         return results, outcomes
@@ -386,6 +404,18 @@ class AgentAuditor:
             "benign_passed": benign_conclusive - benign_blocked,
             "caller_prompts": caller_prompts,
         }
+
+    @staticmethod
+    def _class_findings(results: list[AuditResult]) -> list[dict[str, object]]:
+        counts: dict[str, dict[str, object]] = {}
+        for result in results:
+            entry = counts.setdefault(
+                result.attack_class,
+                {"attack_class": result.attack_class, "total": 0, "blocked": 0},
+            )
+            entry["total"] = int(entry["total"]) + 1
+            entry["blocked"] = int(entry["blocked"]) + int(result.blocked)
+        return list(counts.values())
 
     def _load_representative_attacks(self) -> list[dict[str, object]]:
         return [dict(attack) for attack in _FIXED_ATTACKS]

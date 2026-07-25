@@ -163,6 +163,7 @@ def test_generated_shell_uses_canonical_information_architecture_and_unknown_sta
                 ("/verify", "Verify an attestation", "verify"),
                 ("/apa/log", "Transparency log", "apa-log"),
                 ("/badges", "Endpoint audit records", "badges"),
+                ("/lineage", "Audit evidence lineage", "lineage"),
                 ("/agents", "Marketplace evidence index", "agents"),
                 ("/status", "Service status", "status"),
             ),
@@ -189,7 +190,11 @@ def test_generated_shell_uses_canonical_information_architecture_and_unknown_sta
         ("/playground", "Playground", ("playground",)),
         ("/integrate", "Developers", ("integrate", "integrate-quickstart")),
         ("/docs", "Docs", ("docs",)),
-        ("/verify", "Evidence", ("verify", "apa-log", "badges", "agents", "status")),
+        (
+            "/verify",
+            "Evidence",
+            ("verify", "apa-log", "badges", "lineage", "agents", "status"),
+        ),
         (
             "/gauntlet",
             "Research",
@@ -921,7 +926,7 @@ def test_home_playground_badges_integrations_and_status_are_real_surfaces():
     assert 'rel="canonical" href="https://warden.gudman.xyz/badge"' in badge
     for label in ("OnchainOS", "Raw x402", "Python", "TypeScript", "MCP"):
         assert label in integrate
-    assert "scan_payload" in integrate and "audit_agent" in integrate
+    assert all(tool in integrate for tool in ("scan_payload", "audit_agent", "harden_agent"))
     assert "historical uptime" in status.lower()
     assert "transaction-specific" in status.lower()
 
@@ -1027,3 +1032,35 @@ def test_site_contains_no_stale_phase_five_service_or_listing_copy():
     assert "18954" not in source
     assert "18955" not in source
     assert "under review" not in source.lower()
+
+
+def test_audit_evidence_lineage_page_is_honest_and_wired_to_shared_verification():
+    page = (SITE / "lineage.html").read_text(encoding="utf-8")
+    script = (SITE / "lineage.js").read_text(encoding="utf-8")
+
+    # The page reads the real read-only lineage route and reuses the shared log
+    # verifier rather than shipping its own crypto.
+    assert "/api/shield/" in script
+    assert "/lineage" in script
+    assert "WardenTransparencyLog" in script
+    # build_site.py appends a cache-busting version, so allow it as elsewhere.
+    assert re.search(r'src="/log\.js(?:\?v=[0-9a-f]{8})?"', page)
+    assert re.search(r'src="/lineage\.js(?:\?v=[0-9a-f]{8})?"', page)
+    assert not re.search(r"crypto\.subtle", script)
+
+    # Ordered history, per-entry lifecycle, verification links, and an explicit
+    # empty state must all be present.
+    for hook in (
+        "data-lineage-entries",
+        "data-lineage-empty",
+        "data-lineage-verify",
+        "data-lineage-verification",
+    ):
+        assert hook in page, hook
+    assert "/badge?audit_id=" in script
+
+    # I5: this surface reports audit evidence, never certification.
+    assert "point-in-time evidence, not certification" in page
+    assert "certification lineage" not in page.lower()
+    for forbidden in ("certified", "compliant", "guaranteed safe", "accredited"):
+        assert forbidden not in page.lower(), forbidden
