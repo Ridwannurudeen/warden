@@ -52,8 +52,10 @@
         Menu
       </button>
       <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
-        <a class="nav-link is-active-section" href="/">Product</a>
+        <a class="nav-link" href="/">Product</a>
         <a class="nav-link" href="/playground">Playground</a>
+        <a class="nav-link" href="/theater">Replay</a>
+        <a class="nav-link" href="/hire" aria-current="page">Hire</a>
         <a class="nav-link" href="/integrate">Developers</a>
         <a class="nav-link" href="/docs">Docs</a>
         <a class="nav-link" href="/verify">Evidence</a>
@@ -98,11 +100,42 @@
           boundary before generating a command.
         </p>
         <p class="caveat">
-          <strong>Before you begin:</strong> you need an OKX User-role agent
-          identity, the authenticated <code>onchainos</code> CLI, and enough
-          USDT on X Layer. This page only prepares commands; signing remains
-          inside your configured CLI wallet.
+          <strong>Before you begin:</strong> three prerequisites sit outside
+          Warden. This page only prepares commands; signing remains inside your
+          configured CLI wallet.
         </p>
+        <dl class="data-list">
+          <div>
+            <dt>OKX User-role agent identity</dt>
+            <dd>
+              Warden does not issue identities. Register the User-role agent
+              that will create this task on
+              <a href="https://www.okx.ai/" rel="noreferrer">OKX.AI</a>, the
+              same marketplace that lists Agent #3808.
+            </dd>
+          </div>
+          <div>
+            <dt>Authenticated <code>onchainos</code> CLI</dt>
+            <dd>
+              OKX distributes this CLI, and Warden has no install page to link
+              you to, so obtain and authenticate it through OKX's own OnchainOS
+              tooling. To confirm it is authenticated against this marketplace,
+              run <code>onchainos agent get-agents --agent-ids 3808</code>; it
+              returns Warden's listing. The
+              <a href="/integrate#surface-tab-onchainos">OnchainOS path</a> on
+              the integration guide shows what these commands do.
+            </dd>
+          </div>
+          <div>
+            <dt>USDT on X Layer</dt>
+            <dd>
+              Warden cannot fund your wallet, and there is no funding route to
+              link. Top up the wallet your CLI signs with before step 2; the
+              exact token, network, and amount are shown in the
+              <a href="#purchase-boundary">selected purchase boundary</a>.
+            </dd>
+          </div>
+        </dl>
       </section>
 
       <section
@@ -238,6 +271,7 @@
           </div>
         </details>
         <aside
+          id="purchase-boundary"
           class="service-facts"
           data-purchase-summary
           aria-labelledby="service-facts-title"
@@ -533,7 +567,6 @@
           <span class="site-footer__label">Research</span>
           <a href="/gauntlet">Gauntlet</a>
           <a href="/agents#methodology">Methodology</a>
-          <a href="/showcase">Product tour</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Policy</span>

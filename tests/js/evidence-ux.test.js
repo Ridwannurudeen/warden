@@ -23,6 +23,8 @@ test("evidence routes use the canonical direct site shell", () => {
   const expectedLinks = [
     ["/", "Product"],
     ["/playground", "Playground"],
+    ["/theater", "Replay"],
+    ["/hire", "Hire"],
     ["/integrate", "Developers"],
     ["/docs", "Docs"],
     ["/verify", "Evidence"],
@@ -198,6 +200,10 @@ test("status and trust pages keep unlike evidence layers separate", () => {
   }
   assert.match(trust, /<table>/);
   assert.match(trust, /Warden evidence layers and their limits/);
-  assert.equal((trust.match(/<th scope="row">/g) || []).length, 4);
+  const layers = trust.match(
+    /<section aria-labelledby="trust-stack-title">[\s\S]*?<\/section>/,
+  );
+  assert.ok(layers);
+  assert.equal((layers[0].match(/<th scope="row">/g) || []).length, 4);
   assert.equal((trust.match(/class="badge-evidence"/g) || []).length, 0);
 });

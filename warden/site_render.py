@@ -40,18 +40,19 @@ NAV_GROUPS = (
         (
             ("/gauntlet", "Gauntlet", "gauntlet"),
             ("/agents#methodology", "Methodology", "agents-methodology"),
-            ("/showcase", "Product tour", "showcase"),
         ),
     ),
 )
 
 PRIMARY_NAV = (
-    ("/", "Product", ("overview", "theater", "hire")),
+    ("/", "Product", ("overview",)),
     ("/playground", "Playground", ("playground",)),
+    ("/theater", "Replay", ("theater",)),
+    ("/hire", "Hire", ("hire",)),
     ("/integrate", "Developers", ("integrate", "integrate-quickstart")),
     ("/docs", "Docs", ("docs",)),
     ("/verify", "Evidence", ("verify", "apa-log", "badges", "lineage", "agents", "status")),
-    ("/gauntlet", "Research", ("gauntlet", "agents-methodology", "showcase")),
+    ("/gauntlet", "Research", ("gauntlet", "agents-methodology")),
 )
 
 

@@ -54,6 +54,8 @@
       <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
         <a class="nav-link" href="/">Product</a>
         <a class="nav-link" href="/playground">Playground</a>
+        <a class="nav-link" href="/theater">Replay</a>
+        <a class="nav-link" href="/hire">Hire</a>
         <a class="nav-link" href="/integrate">Developers</a>
         <a class="nav-link" href="/docs">Docs</a>
         <a class="nav-link" href="/verify">Evidence</a>
@@ -187,6 +189,194 @@
         <pre><code>safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)</code></pre>
       </section>
 
+      <section aria-labelledby="evidence-ledger-title">
+        <div class="section-heading">
+          <h2 id="evidence-ledger-title">Published evidence artifacts</h2>
+          <p>
+            Every record this site serves, with the date it was produced, the
+            bounded method that produced it, and a link to the raw file. Two
+            rows are published but empty; they stay in the table so the absence
+            stays visible.
+          </p>
+        </div>
+        <div class="table-shell">
+          <table>
+            <caption>
+              Warden evidence ledger · generated from the committed records
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Artifact</th>
+                <th scope="col">Produced</th>
+                <th scope="col">Method and scope</th>
+                <th scope="col">What the record holds</th>
+                <th scope="col">Raw record</th>
+              </tr>
+            </thead>
+            <tbody data-evidence-ledger>
+              <tr>
+                <th scope="row">Held-out detection evaluation</th>
+                <td>2026-07-17T17:36:22Z</td>
+                <td>warden-held-out-v1 · deterministic fast path; thorough only where declared; semantic disabled</td>
+                <td>87 of 94 attacks detected (92.55%); 0 of 45 benign false positives; result <code>sha256:b4a268736339cce0…</code></td>
+                <td><a href="/data/evaluation.json">evaluation.json</a></td>
+              </tr>
+              <tr>
+                <th scope="row">Endpoint audit probe battery</th>
+                <td>warden-core-http 2026-07</td>
+                <td>Independent fixed HTTP probes; no scanner, training-corpus, or held-out-evaluation imports.</td>
+                <td>20 fixed probes across 11 threat classes and 3 benign controls</td>
+                <td><a href="/audit/warden-core-http-2026-07.json">warden-core-http-2026-07.json</a></td>
+              </tr>
+              <tr>
+                <th scope="row">Marketplace evidence index</th>
+                <td>2026-07-18T18:35:07Z</td>
+                <td>Fast-depth scan of public listing text only; no endpoint is called</td>
+                <td>882 agent records with a verdict and scanned-field count; linked endpoint audits: none; linked attestations: none</td>
+                <td><a href="/agents">index</a> · <a href="/agents/index-data.json">index-data.json</a></td>
+              </tr>
+              <tr>
+                <th scope="row">Marketplace capture summary</th>
+                <td>2026-07-18T18:35:07Z</td>
+                <td>Listing search for query “a”</td>
+                <td>882 of 885 listed agents captured, 3 dropped; 5 public-text matches; 0 audited</td>
+                <td><a href="/data/marketplace-summary.json">marketplace-summary.json</a></td>
+              </tr>
+              <tr>
+                <th scope="row">Checkout benchmark and corpus snapshot</th>
+                <td>2026-07-16T02:47:26Z</td>
+                <td>Local checkout · deterministic fast-path</td>
+                <td>p50 0.23 ms over 124 payloads; corpus 124 cases (94 attack, 30 benign)</td>
+                <td><a href="/data/product-proof.json">product-proof.json</a></td>
+              </tr>
+              <tr>
+                <th scope="row">Repository and listing status</th>
+                <td>2026-07-16</td>
+                <td>566 Python + 122 site JavaScript + 31 TypeScript SDK tests passed in this checkout; 1 Python test skipped; this is not a live CI signal.</td>
+                <td>719 tests recorded; corpus 124 cases fingerprinted <code>sha256:b095d7653635dfa7…</code>; listing listed 2026-07-13</td>
+                <td><a href="/data/site-status.json">site-status.json</a></td>
+              </tr>
+              <tr>
+                <th scope="row">Published service catalogue</th>
+                <td>2026-07-25T15:02:51Z</td>
+                <td>Marketplace snapshot for provider agent #3808</td>
+                <td>#33460 Payload Security Scan, #33461 Agent Endpoint Security Audit; 0.1 USDT each</td>
+                <td><a href="/data/warden-services.json">warden-services.json</a></td>
+              </tr>
+              <tr>
+                <th scope="row">APA transparency-log anchor</th>
+                <td>Not produced</td>
+                <td>Independently anchored checkpoint over the signed log</td>
+                <td>status <code>unpublished</code>; no checkpoint exists in this build, so log continuity has no external timestamp</td>
+                <td><a href="/data/apa-log-anchor.json">apa-log-anchor.json</a></td>
+              </tr>
+              <tr>
+                <th scope="row">Service availability monitor</th>
+                <td>Not produced</td>
+                <td>Independently scheduled readiness probes over a 30-day window</td>
+                <td>status <code>not_running</code>; 0 retained samples, so no availability is measured</td>
+                <td><a href="/data/service-monitor.json">service-monitor.json</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="source-stamp" data-source-stamp="DATED" data-ledger-stamp>
+          DATED · newest committed record 2026-07-25T15:02:51Z
+        </p>
+        <p class="boundary-note">
+          Rows are generated from the same files the site serves, so a refreshed
+          snapshot moves the table rather than leaving a stale literal behind.
+          No row is a score, a grade, or a summary of the rows above it.
+        </p>
+      </section>
+
+      <section aria-labelledby="not-verified-title">
+        <div class="section-heading">
+          <h2 id="not-verified-title">What Warden does not verify</h2>
+          <p>
+            These boundaries are measured and published, not discovered later.
+            Each one is the reason a Warden record is worth reading: it states
+            where the evidence stops.
+          </p>
+        </div>
+        <div class="card-grid">
+          <article>
+            <h3>Detection coverage</h3>
+            <p data-detection-limit>
+              ALLOW means no implemented detector fired, not that the payload is
+              safe. The committed held-out baseline is 92.55% recall (87 of 94
+              attacks) at 0 of 45 benign false positives, so 7 known attacks are
+              not detected. Their case ids stay published rather than trained
+              away: held-prompt-002, held-prompt-003, held-role-002,
+              held-corpus-002, held-drain-002, held-secret-002,
+              held-evade-mix-003. The optional semantic and embedding tiers are
+              disabled by default and their thresholds are uncalibrated.
+            </p>
+          </article>
+          <article>
+            <h3>Enforcement path</h3>
+            <p>
+              A signed attestation binds a live conforming guard and an
+              endpoint-signed rolling count or an explicit unavailable state. It
+              does not prove that every request traversed the guard, and it does
+              not audit the endpoint owner's local counter. The free hosted SDK
+              path defaults to fail-open, so rate limiting, forced fast depth,
+              truncation, and network failure can leave it as best-effort
+              telemetry rather than enforcement.
+            </p>
+          </article>
+          <article>
+            <h3>Signatures and keys</h3>
+            <p>
+              A valid signature proves that the named issuer signed the bounded
+              facts and committed them to its log. It cannot rule out key theft,
+              and a retained or stolen retired key can still backdate a record
+              inside the bounded rotation grace. First registration is
+              trust-on-first-use; without an independently anchored checkpoint a
+              hash chain cannot expose a complete rewrite.
+            </p>
+          </article>
+          <article>
+            <h3>Endpoint audits</h3>
+            <p>
+              An endpoint audit is point-in-time evidence, not certification,
+              continuous monitoring, or proof of future behaviour. The battery
+              is fixed and public, so a target can recognise it. The auditor
+              assumes the target accepts POST JSON with a payload field, and it
+              rejects internal network targets, redirects, oversized responses,
+              and slow endpoints.
+            </p>
+          </article>
+          <article>
+            <h3>Marketplace index</h3>
+            <p>
+              The index scans public listing text only — profile and service
+              descriptions from a dated snapshot — at fast depth. It never calls
+              the endpoint. A listing-text match is not evidence that an agent
+              is malicious, safe, or compromised, and an absent match is not
+              evidence of review.
+            </p>
+          </article>
+          <article>
+            <h3>Availability</h3>
+            <p>
+              The published readiness objective covers Warden application
+              readiness only. It is not a contractual service-level agreement,
+              creates no remedies, and is not an achieved uptime claim; the
+              committed monitor has produced no samples. Payment-facilitator
+              uptime and settlement are out of scope.
+            </p>
+          </article>
+        </div>
+        <p class="caveat evidence-boundary">
+          <strong>Warden publishes evidence. It does not certify.</strong> No
+          Warden record states that an endpoint, an agent, a payload, or an
+          implementation is certified, compliant, guaranteed safe, or assessed
+          by an accredited body, and none is offered as one. Every record above
+          describes what one bounded method observed at one stated time.
+        </p>
+      </section>
+
       <section class="surface-callout" aria-labelledby="proof-title">
         <div>
           <h2 id="proof-title">A valid signature is not endpoint safety</h2>
@@ -271,7 +461,6 @@
           <span class="site-footer__label">Research</span>
           <a href="/gauntlet">Gauntlet</a>
           <a href="/agents#methodology">Methodology</a>
-          <a href="/showcase">Product tour</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Policy</span>

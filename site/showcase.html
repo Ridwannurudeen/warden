@@ -54,10 +54,12 @@
       <nav class="site-nav" id="primary-nav" aria-label="Primary" data-site-nav>
         <a class="nav-link" href="/">Product</a>
         <a class="nav-link" href="/playground">Playground</a>
+        <a class="nav-link" href="/theater">Replay</a>
+        <a class="nav-link" href="/hire">Hire</a>
         <a class="nav-link" href="/integrate">Developers</a>
         <a class="nav-link" href="/docs">Docs</a>
         <a class="nav-link" href="/verify">Evidence</a>
-        <a class="nav-link is-active-section" href="/gauntlet">Research</a>
+        <a class="nav-link" href="/gauntlet">Research</a>
         <div class="nav-mobile-actions">
           <a class="button secondary" href="/integrate">Integrate</a
           ><a class="button primary" href="/playground">Run a live scan</a>
@@ -94,6 +96,11 @@
       data-showcase
       aria-keyshortcuts="ArrowLeft ArrowRight"
     >
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Overview</a><span aria-hidden="true">/</span
+        ><span aria-current="page">Product tour</span>
+      </nav>
+
       <section class="showcase-header">
         <div>
           <p class="eyebrow">Product tour · controlled example</p>
@@ -102,6 +109,13 @@
             This short tour compares an untrusted recipient with trusted caller
             context, then runs Warden's free scanner. No wallet or downstream
             system is connected.
+          </p>
+          <p class="inline-notice">
+            This is a fixed narrated example, kept for reference and no longer
+            listed in the site navigation. To scan your own payload, use the
+            <a href="/playground">live playground</a>. To see what a downstream
+            handler actually received, use the
+            <a href="/theater">incident replay</a>.
           </p>
         </div>
         <div class="showcase-settings">
@@ -319,8 +333,7 @@
         <div class="site-footer__col">
           <span class="site-footer__label">Research</span>
           <a href="/gauntlet">Gauntlet</a
-          ><a href="/agents#methodology">Methodology</a
-          ><a href="/showcase">Product tour</a>
+          ><a href="/agents#methodology">Methodology</a>
         </div>
         <div class="site-footer__col">
           <span class="site-footer__label">Policy</span>

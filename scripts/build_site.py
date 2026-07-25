@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.bake_homepage_proof import baked_homepage  # noqa: E402
+from scripts.bake_trust_ledger import baked_trust_page  # noqa: E402
 from warden.site_docs import render_docs  # noqa: E402
 from warden.sitemap import write_crawler_files  # noqa: E402
 
@@ -102,6 +103,9 @@ def main() -> None:
         homepage = site_root / "index.html"
         homepage.write_text(baked_homepage(site_root), encoding="utf-8", newline="\n")
         print("Baked the dated evaluation, product-proof, and catalog values into the homepage.")
+        trust = site_root / "trust.html"
+        trust.write_text(baked_trust_page(site_root), encoding="utf-8", newline="\n")
+        print("Baked the published evidence ledger and detection limit into the trust page.")
         versioned = version_static_assets(site_root)
         routes = write_crawler_files(site_root)
         print(f"Versioned local CSS/JavaScript references on {versioned} page(s).")

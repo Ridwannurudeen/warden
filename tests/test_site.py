@@ -8,6 +8,7 @@ import sys
 from html.parser import HTMLParser
 from pathlib import Path
 
+from scripts.bake_trust_ledger import baked_trust_page
 from warden.core.verdict import ReasonCode
 from warden.site_docs import load_reason_documents, render_docs
 from warden.site_render import NAV_GROUPS, PRIMARY_NAV, page_shell
@@ -33,7 +34,7 @@ CORE_NAV = {
     "/playground",
     "/agents",
     "/gauntlet",
-    "/showcase",
+    "/lineage",
     "/hire",
     "/docs",
     "/integrate",
@@ -173,7 +174,6 @@ def test_generated_shell_uses_canonical_information_architecture_and_unknown_sta
             (
                 ("/gauntlet", "Gauntlet", "gauntlet"),
                 ("/agents#methodology", "Methodology", "agents-methodology"),
-                ("/showcase", "Product tour", "showcase"),
             ),
         ),
     )
@@ -186,8 +186,10 @@ def test_generated_shell_uses_canonical_information_architecture_and_unknown_sta
     )
 
     assert PRIMARY_NAV == (
-        ("/", "Product", ("overview", "theater", "hire")),
+        ("/", "Product", ("overview",)),
         ("/playground", "Playground", ("playground",)),
+        ("/theater", "Replay", ("theater",)),
+        ("/hire", "Hire", ("hire",)),
         ("/integrate", "Developers", ("integrate", "integrate-quickstart")),
         ("/docs", "Docs", ("docs",)),
         (
@@ -198,7 +200,7 @@ def test_generated_shell_uses_canonical_information_architecture_and_unknown_sta
         (
             "/gauntlet",
             "Research",
-            ("gauntlet", "agents-methodology", "showcase"),
+            ("gauntlet", "agents-methodology"),
         ),
     )
     assert '<details class="nav-group' not in rendered
@@ -349,7 +351,16 @@ def test_evidence_pages_mark_exact_and_section_navigation_context():
 
 
 def test_top_nav_is_curated_and_utility_pages_live_in_footer():
-    curated_hrefs = ["/", "/playground", "/integrate", "/docs", "/verify", "/gauntlet"]
+    curated_hrefs = [
+        "/",
+        "/playground",
+        "/theater",
+        "/hire",
+        "/integrate",
+        "/docs",
+        "/verify",
+        "/gauntlet",
+    ]
     policy_footer = ("/trust", "/privacy", "/terms")
     top_level_pages = [
         "index.html",
@@ -500,6 +511,11 @@ def test_attack_theater_is_real_owned_one_pass_surface():
 
 def test_trust_layer_page_exposes_honest_open_contracts():
     page = (SITE / "trust.html").read_text(encoding="utf-8")
+    layers = re.search(
+        r'<section aria-labelledby="trust-stack-title">(?P<body>.*?)</section>',
+        page,
+        re.DOTALL,
+    )
 
     for pillar in (
         "Local enforcement",
@@ -508,7 +524,8 @@ def test_trust_layer_page_exposes_honest_open_contracts():
     ):
         assert pillar in page
     assert "<table>" in page
-    assert page.count('<th scope="row">') == 4
+    assert layers
+    assert layers.group("body").count('<th scope="row">') == 4
     assert 'class="badge-evidence"' not in page
     assert "safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)" in page
     assert 'href="/agents"' in page
@@ -518,6 +535,41 @@ def test_trust_layer_page_exposes_honest_open_contracts():
     badge_sources = re.findall(r'<img[^>]+src="([^"]+/badge\.svg)"', page)
     assert badge_sources == ["https://warden.gudman.xyz/apa/attestation/ATTESTATION_ID/badge.svg"]
     assert "does not prove that every request" in page
+
+
+def test_trust_page_ledger_rows_are_generated_and_every_artifact_resolves():
+    page = (SITE / "trust.html").read_text(encoding="utf-8")
+    ledger = re.search(r"<tbody data-evidence-ledger>(?P<body>.*?)</tbody>", page, re.DOTALL)
+
+    assert baked_trust_page(SITE) == page, (
+        "Trust ledger literals drifted from their committed records; "
+        "run python scripts/bake_trust_ledger.py"
+    )
+    assert ledger
+    rows = ledger.group("body").count('<th scope="row">')
+    assert rows >= 3
+    hrefs = set(re.findall(r'href="(/[^"]+)"', ledger.group("body")))
+    assert len(hrefs) >= rows
+    for href in hrefs:
+        artifact = SITE / href.lstrip("/")
+        assert artifact.is_file() or (artifact / "index.html").is_file(), href
+
+
+def test_trust_page_states_the_boundaries_warden_does_not_verify():
+    page = (SITE / "trust.html").read_text(encoding="utf-8")
+    misses = json.loads((ROOT / "benchmark" / "results.json").read_text(encoding="utf-8"))
+    normalized = re.sub(r"\s+", " ", page)
+
+    assert 'id="not-verified-title"' in page
+    for case_id in misses["attack_misses"]:
+        assert case_id in normalized, case_id
+    assert "ALLOW means no implemented detector fired, not that the payload is safe" in normalized
+    assert "Warden publishes evidence. It does not certify." in normalized
+    assert (
+        "is certified, compliant, guaranteed safe, or assessed by an accredited body" in normalized
+    )
+    assert "It never calls the endpoint." in normalized
+    assert "not a contractual service-level agreement" in normalized
 
 
 def test_public_apa_copy_discloses_the_explicit_unavailable_counter_state():
@@ -654,7 +706,7 @@ def test_marketplace_rows_and_mobile_navigation_fit_narrow_viewports():
     )
 
     mobile_navigation = re.search(
-        r"@media \(max-width: 1060px\) \{(?P<body>.*?)\n\}\n\n@media \(max-width: 900px\)",
+        r"@media \(max-width: 1200px\) \{(?P<body>.*?)\n\}\n\n@media \(max-width: 900px\)",
         css,
         re.DOTALL,
     )
@@ -1019,7 +1071,7 @@ def test_privacy_and_terms_cover_gauntlet_retention_and_public_surfaces():
     for source in (privacy_source, terms_source):
         assert 'href="/privacy"' in source
         assert 'href="/terms"' in source
-        assert 'href="/showcase"' in source
+        assert 'href="/trust"' in source
 
 
 def test_site_contains_no_stale_phase_five_service_or_listing_copy():

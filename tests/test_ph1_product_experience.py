@@ -225,7 +225,7 @@ def test_supporting_surfaces_use_a_compact_route_index_and_complete_footer():
 
     for href in ("/verify", "/apa/log", "/gauntlet", "/agents"):
         assert final_cta < page.index(f'href="{href}"', final_cta) < footer
-    for href in ("/badges", "/showcase", "/theater"):
+    for href in ("/badges", "/lineage", "/theater"):
         assert page.index(f'href="{href}"', footer) > footer
     assert "Supporting surfaces" not in page
     assert "route-index" in page

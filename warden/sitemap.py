@@ -17,6 +17,7 @@ PUBLIC_TOP_LEVEL_ROUTES = {
     "hire.html": "/hire",
     "index.html": "/",
     "integrate.html": "/integrate",
+    "lineage.html": "/lineage",
     "log.html": "/apa/log",
     "playground.html": "/playground",
     "privacy.html": "/privacy",

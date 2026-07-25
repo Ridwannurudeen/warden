@@ -15,6 +15,8 @@ const shellPages = ["hire", "integrate", "privacy", "terms"];
 const canonicalLinks = [
   ["/", "Product"],
   ["/playground", "Playground"],
+  ["/theater", "Replay"],
+  ["/hire", "Hire"],
   ["/integrate", "Developers"],
   ["/docs", "Docs"],
   ["/verify", "Evidence"],
@@ -67,11 +69,11 @@ test("commerce, developer, and legal routes use the canonical site shell", () =>
   }
   assert.match(
     page("hire"),
-    /<a class="nav-link is-active-section" href="\/">Product<\/a>/,
+    /<a class="nav-link" href="\/hire" aria-current="page">Hire<\/a>/,
   );
   assert.doesNotMatch(
     page("hire").match(/<nav class="site-nav"[^>]*>([\s\S]*?)<\/nav>/)[1],
-    /aria-current="page"/,
+    /is-active-section/,
   );
   assert.match(
     page("integrate"),

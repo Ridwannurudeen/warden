@@ -248,7 +248,7 @@ def test_shared_shell_uses_direct_navigation_and_one_footer_positioning_line():
 
     assert '<details class="nav-group' not in navigation.group("body")
     assert navigation.group("body").count("<summary>") <= 1
-    for href in ("/playground", "/integrate", "/docs"):
+    for href in ("/playground", "/theater", "/hire", "/integrate", "/docs"):
         assert f'href="{href}"' in navigation.group("body")
     assert '<a class="header-integrate" href="/integrate">Integrate</a>' in rendered
 
@@ -334,8 +334,8 @@ def test_product_routes_use_one_claim_model_and_one_step_vocabulary():
     gauntlet = (SITE / "gauntlet.html").read_text(encoding="utf-8")
     css = (SITE / "styles.css").read_text(encoding="utf-8")
 
-    assert '<a class="nav-link is-active-section" href="/">Product</a>' in theater
-    assert 'aria-current="page"' not in re.search(
+    assert '<a class="nav-link" href="/theater" aria-current="page">Replay</a>' in theater
+    assert "is-active-section" not in re.search(
         r'<nav class="site-nav"[^>]*>(?P<body>.*?)</nav>',
         theater,
         re.DOTALL,
@@ -369,9 +369,7 @@ def test_product_routes_use_one_claim_model_and_one_step_vocabulary():
 
 def test_section_proxy_navigation_is_visual_without_claiming_the_current_page():
     proxies = {
-        "theater.html": ("/", "Product"),
-        "hire.html": ("/", "Product"),
-        "showcase.html": ("/gauntlet", "Research"),
+        "lineage.html": ("/verify", "Evidence"),
         "badges.html": ("/verify", "Evidence"),
         "badge.html": ("/verify", "Evidence"),
         "log.html": ("/verify", "Evidence"),
@@ -411,6 +409,35 @@ def test_section_proxy_navigation_is_visual_without_claiming_the_current_page():
             in navigation.group("body")
         )
         assert 'aria-current="page"' not in navigation.group("body")
+
+
+def test_every_top_level_page_marks_its_own_location_for_assistive_technology():
+    for filename in (*MANUAL_TOP_LEVEL_PAGES, "lineage.html"):
+        source = (SITE / filename).read_text(encoding="utf-8")
+        canonical = re.search(
+            r'<link rel="canonical" href="https://warden\.gudman\.xyz(?P<path>[^"]*)"',
+            source,
+        )
+        assert canonical, filename
+        route = canonical.group("path") or "/"
+        navigation = re.search(
+            r'<nav class="site-nav"[^>]*>(?P<body>.*?)</nav>',
+            source,
+            re.DOTALL,
+        )
+        assert navigation, filename
+
+        destinations = re.findall(
+            r'<a class="nav-link[^"]*" href="([^"]+)"',
+            navigation.group("body"),
+        )
+        claimed = re.findall(
+            r'<a class="nav-link" href="([^"]+)" aria-current="page">',
+            navigation.group("body"),
+        )
+        assert claimed == ([route] if route in destinations else []), filename
+        assert f'is-active-section" href="{route}"' not in navigation.group("body"), filename
+        assert 'aria-current="page"' in source, filename
 
 
 def test_endpoint_audit_lifecycle_uses_the_gold_evidence_ledger():

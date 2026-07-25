@@ -369,7 +369,9 @@ summary {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  padding: 0 var(--space-xs);
+  /* Eight destinations have to share a column the 1180px container caps at 586px.
+     At 12px inline padding they need 590px and overflow at every desktop width. */
+  padding: 0 var(--space-2xs);
   color: var(--muted);
   border-radius: var(--radius-sm);
   text-decoration: none;
@@ -426,7 +428,11 @@ summary {
   padding-inline: var(--space-sm);
   color: var(--on-accent);
   background: var(--accent);
-  border-color: var(--accent);
+  /* The accent fill is only 2.85:1 on the light background, so the filled block
+     alone does not define the control's edge (WCAG 1.4.11). The glyph token draws
+     that edge at 4.79:1 in light and resolves to --accent in dark, where the fill
+     already carries 9.18:1. */
+  border-color: var(--accent-glyph);
 }
 
 .header-integrate {
@@ -688,7 +694,7 @@ li {
 .button.primary {
   color: var(--on-accent);
   background: var(--accent);
-  border-color: var(--accent);
+  border-color: var(--accent-glyph);
 }
 
 .button.primary:hover {
@@ -1674,7 +1680,7 @@ code {
 }
 
 .action-boundary__gate {
-  border-inline: 2px solid var(--accent);
+  border-inline: 2px solid var(--accent-glyph);
 }
 
 .action-boundary__flow {
@@ -2387,7 +2393,7 @@ ins[data-diff="added"] {
   min-height: 128px;
   align-content: center;
   padding: var(--space-md);
-  border-left: 2px solid var(--accent);
+  border-left: 2px solid var(--accent-glyph);
 }
 
 .theater-stage__gate strong,
@@ -3386,7 +3392,10 @@ body[data-page-archetype="legal"],
   box-shadow: var(--shadow-floating);
 }
 
-@media (max-width: 1060px) {
+/* The drawer takes over until the eight-item nav genuinely fits its column.
+   Below 1200px the column is narrower than the nav needs, so the row would
+   overlap the brand and the header actions. */
+@media (max-width: 1200px) {
   .site-header {
     grid-template-columns: auto minmax(0, 1fr);
   }
