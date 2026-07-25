@@ -42,6 +42,15 @@ exact allowlisted files, rejects Git LFS pointer files and local source modifica
 candidate batch against both training files, both held-out files, and the built-in injection list,
 and atomically promotes into exactly one training dataset.
 
+## Over-defence measurement set
+
+`corpus/benign_ops_v1.jsonl` is a 378-row first-party benign corpus used to measure how often
+Warden flags text that is not an attack. It is authored by us rather than sampled from
+production or ingested from a third party, so it carries no `source_*` or license metadata and
+never enters the ingestion workflow above. The scanner does not load it; it is disjoint from
+both training files and both held-out files. Run it with `python scripts/measure_benign_fp.py`
+and see `docs/BENIGN_OPS_CORPUS.md` for provenance, composition, and the measured result.
+
 ## Deterministic adversarial variants
 
 Build offline per-threat-class evaluation packs from `corpus/attacks.jsonl`:
