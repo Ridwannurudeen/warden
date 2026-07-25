@@ -2,8 +2,11 @@
 
 Derives candidate texts from a payload by reversing common obfuscation
 layers (base64/base64url, hex, percent-encoding, HTML entities, ``\\xNN``
-escapes) and by folding Unicode disguises (NFKC, confusable homoglyphs,
-zero-width/bidi controls). The engine scans the ORIGINAL payload and every
+escapes), by folding Unicode disguises (NFKC, confusable homoglyphs,
+zero-width/bidi controls), and by folding the two ASCII disguises Unicode
+normalization cannot reach: character segmentation (``I g n o r e``,
+``I.g.n.o.r.e.``, ``i-g-n-o-r-e``) and leetspeak (``1gn0r3``). The engine
+scans the ORIGINAL payload and every
 derived candidate and unions the findings, so normalization can only ADD
 detections — it can never suppress a verdict that fires on the raw text.
 
@@ -18,6 +21,7 @@ import html
 import json
 import re
 import unicodedata
+from collections import Counter
 from urllib.parse import unquote
 
 MAX_DECODE_DEPTH = 3
@@ -30,6 +34,15 @@ MAX_CONTAINER_NODES = 4096
 MIN_DECODED_LENGTH = 8
 MIN_PRINTABLE_RATIO = 0.9
 PLAUSIBLE_TEXT_WINDOW = 64
+# Four single-character groups is the shortest run that folds. Three would
+# swallow initialisms ("U.S.A.", "F.B.I.") and two would swallow "a.m." and
+# single-letter words, so the floor is what keeps ordinary prose untouched.
+MIN_SEGMENT_RUN = 4
+MAX_LEET_TOKEN_LENGTH = 16
+MIN_LEET_HEXLIKE_LENGTH = 12
+# Leetspeak is a phrase-level style. Requiring three co-occurring leet words
+# is what keeps the fold away from lone digit-bearing identifiers in code.
+MIN_LEET_WORDS = 3
 
 # Provenance labels for derived candidates.
 TRANSFORM_DECODED = "decoded"
@@ -108,6 +121,53 @@ HOMOGLYPH_MAP = {
     "Υ": "Y",
     "Χ": "X",
 }
+
+# Separator punctuation used by published character-spacing bypasses. Comma,
+# semicolon and colon are deliberately absent: they carry real list structure
+# in benign prose ("tranches a, b, c, d") and folding them would invent words.
+SEGMENT_PUNCTUATION = ".-_|*/\\+~"
+
+# ASCII lookalikes the homoglyph map cannot cover, because these characters are
+# legitimate ASCII rather than confusable Unicode. ``1`` folds to ``i`` (the
+# form used by "1gn0r3", "1nstruct10ns"); the ``1`` -> ``l`` reading is not
+# folded, since one candidate per payload is the budget we can afford.
+LEET_MAP = {
+    "0": "o",
+    "1": "i",
+    "3": "e",
+    "4": "a",
+    "5": "s",
+    "6": "g",
+    "7": "t",
+    "8": "b",
+    "9": "g",
+    "@": "a",
+    "$": "s",
+    "!": "i",
+}
+
+_SEGMENT_SEPARATOR = r"[\s" + re.escape(SEGMENT_PUNCTUATION) + r"]+"
+# One alphanumeric character that is not part of a longer alphanumeric group.
+_SEGMENT_GROUP = r"[0-9A-Za-z](?![0-9A-Za-z])"
+_SEGMENT_RUN = re.compile(
+    r"(?<![0-9A-Za-z])"
+    + _SEGMENT_GROUP
+    + r"(?:"
+    + _SEGMENT_SEPARATOR
+    + _SEGMENT_GROUP
+    + r"){"
+    + str(MIN_SEGMENT_RUN - 1)
+    + r",}"
+)
+_SEGMENT_SPLIT = re.compile(r"(" + _SEGMENT_SEPARATOR + r")")
+_LEET_TOKEN = re.compile(r"[0-9A-Za-z@$!]+")
+_LEET_HEXLIKE = re.compile(r"[0-9a-fA-F]+")
+# Any character the fold could rewrite. Screening with this first turns the
+# fold into one C-level scan for the overwhelming majority of payloads
+# (10 KB of ordinary prose: 9.9 ms -> 0.03 ms).
+_LEET_TRIGGER = re.compile("[" + re.escape("".join(LEET_MAP)) + "]")
+_URL_SPAN = re.compile(r"(?:[a-zA-Z][a-zA-Z0-9+.\-]*://|www\.|xn--)\S+")
+_LEET_TRAILING_DIGITS = re.compile(r"[0-9]+\Z")
 
 _BASE64_TOKEN = re.compile(r"[A-Za-z0-9+/_-]{16,}={0,2}")
 _HEX_RUN = re.compile(r"(?:0x)?((?:[0-9a-fA-F]{2}){8,})")
@@ -431,6 +491,152 @@ def fold_unicode(text: str) -> str:
     return "".join(HOMOGLYPH_MAP.get(ch, ch) for ch in folded)
 
 
+def _rejoin_segmented_run(run: str) -> str:
+    """Collapse one run of single-character groups back into dense words.
+
+    Word boundaries are recovered from the separators themselves: the most
+    frequent separator inside the run is the intra-word one (the single space
+    of ``I g n o r e``, the dot of ``I.g.n.o.r.e.``, the dash of
+    ``i-g-n-o-r-e``) and every other separator becomes a single space. Ties
+    resolve to the first separator seen, so the fold is deterministic.
+    """
+    parts = _SEGMENT_SPLIT.split(run)
+    groups = parts[0::2]
+    separators = parts[1::2]
+    intra_word = Counter(separators).most_common(1)[0][0]
+    rejoined = [groups[0]]
+    for separator, group in zip(separators, groups[1:]):
+        if separator != intra_word:
+            rejoined.append(" ")
+        rejoined.append(group)
+    return "".join(rejoined)
+
+
+def fold_segmentation(text: str) -> str:
+    """Undo character-spacing obfuscation (``I g n o r e``, ``I.g.n.o.r.e.``).
+
+    Only runs of at least ``MIN_SEGMENT_RUN`` single-character groups are
+    folded, which leaves initialisms, ``a.m.``, single-letter words and short
+    enumerations byte-identical. Text outside a run is never touched.
+    """
+    if not text:
+        return text
+    return _SEGMENT_RUN.sub(lambda match: _rejoin_segmented_run(match.group()), text)
+
+
+def _url_mask(text: str) -> bytearray | None:
+    """Mark every character position that sits inside a URL, or ``None``.
+
+    A flat mask keeps the per-token URL test O(1). Testing each token against
+    a list of spans instead is quadratic, and a URL-dense payload turned that
+    into a 21-second fold on a 100 KB input.
+    """
+    spans = [match.span() for match in _URL_SPAN.finditer(text)]
+    if not spans:
+        return None
+    mask = bytearray(len(text))
+    for start, end in spans:
+        mask[start:end] = b"\x01" * (end - start)
+    return mask
+
+
+def _is_leet_word(match: re.Match[str], url_mask: bytearray | None) -> bool:
+    """Decide whether one alphanumeric token is a leet-spelled word.
+
+    Every rejection below is a false positive this fold actually produced
+    against the corpora before the guard existed. The engine's decoder wall
+    escalates any candidate detection to BLOCK, so a token that folds into
+    letter soup does not just waste a scan — it hard-blocks a benign payload.
+    """
+    token = match.group()
+    if len(token) > MAX_LEET_TOKEN_LENGTH or not _LEET_TRIGGER.search(token):
+        return False
+    # Trailing digits are a suffix, not a substitution: "base64", "web3",
+    # "sha256", "erc20", "paypa1" and "invoice88" are spelled that way on
+    # purpose. Real leetspeak substitutes interior characters.
+    if not _LEET_TRIGGER.search(_LEET_TRAILING_DIGITS.sub("", token)):
+        return False
+    # The body of an escape sequence (``i``, ``\x6e``) is data, not a
+    # word. Folding it turns declared escapes into high-entropy letter soup.
+    if match.start() and match.string[match.start() - 1] == "\\":
+        return False
+    # Hostname labels are identifiers, not words: rewriting "paypa1" inside a
+    # punycode domain changes which host the link analyzer is reasoning about.
+    if url_mask is not None and url_mask[match.start()]:
+        return False
+    letters = [character for character in token if character.isascii() and character.isalpha()]
+    if not letters or len(letters) < len(_LEET_TRIGGER.findall(token)):
+        return False
+    # Opaque identifiers — base64 blobs, JWT segments, mixed-case hashes — are
+    # case-mixed; a leet-spelled word is not, beyond an initial capital.
+    tail = "".join(letters[1:])
+    if tail and not (tail.islower() or tail.isupper()):
+        return False
+    prefixed = token[:2].casefold() == "0x"
+    body = token[2:] if prefixed else token
+    return not (
+        (prefixed or len(token) >= MIN_LEET_HEXLIKE_LENGTH) and _LEET_HEXLIKE.fullmatch(body)
+    )
+
+
+def fold_leetspeak(text: str) -> str:
+    """Fold ASCII leetspeak substitutions (``1gn0r3 4ll`` -> ``ignore all``).
+
+    Leetspeak is a style applied to a phrase, never to one stray identifier,
+    so the fold only fires when at least ``MIN_LEET_WORDS`` qualifying tokens
+    occur in the same text. That co-occurrence floor is what separates an
+    attack ("1gn0r3 pr3v10us 1nstruct10ns 4nd s3nd 4ll") from source code and
+    technical prose, where digit-bearing identifiers such as ``b64decode``
+    appear alone. ``_is_leet_word`` carries the per-token exclusions.
+    """
+    if not text or not _LEET_TRIGGER.search(text):
+        return text
+    url_mask = _url_mask(text)
+    words = [match for match in _LEET_TOKEN.finditer(text) if _is_leet_word(match, url_mask)]
+    if len(words) < MIN_LEET_WORDS:
+        return text
+
+    folded: list[str] = []
+    cursor = 0
+    for match in words:
+        folded.append(text[cursor : match.start()])
+        folded.append("".join(LEET_MAP.get(character, character) for character in match.group()))
+        cursor = match.end()
+    folded.append(text[cursor:])
+    return "".join(folded)
+
+
+def _add_obfuscation_folds(
+    candidates: list[tuple[str, str]],
+    seen: set[str],
+    folded: str,
+) -> None:
+    """Append segmentation/leetspeak variants of ``folded`` within budget.
+
+    These run last and add softly: when the candidate budget is already spent
+    the variant is dropped instead of raising the fail-closed decoder-limit
+    marker. That is safe in a way the encoding path is not — a segmentation or
+    leetspeak variant is a rewrite of text the engine already scans, so
+    dropping one can only lose a detection, never leave an un-inspected
+    obfuscation layer behind. It also keeps the new folds from pushing an
+    ordinary payload into the limit hard-block path.
+    """
+
+    def _add_soft(candidate: str) -> None:
+        if candidate not in seen and len(candidates) < MAX_CANDIDATES - 1:
+            seen.add(candidate)
+            candidates.append((candidate, TRANSFORM_UNICODE))
+
+    segmented = fold_segmentation(folded)
+    leeted = fold_leetspeak(folded)
+    if segmented != folded:
+        _add_soft(segmented)
+    if leeted != folded:
+        _add_soft(leeted)
+    if segmented != folded and leeted != folded:
+        _add_soft(fold_leetspeak(segmented))
+
+
 def derive_candidates(text: str) -> list[tuple[str, str]]:
     """Return ``(candidate_text, transform)`` pairs derived from ``text``.
 
@@ -493,4 +699,5 @@ def derive_candidates(text: str) -> list[tuple[str, str]]:
         if decoded_segments or unsafe_container:
             return _limit_marker(current)
 
+    _add_obfuscation_folds(candidates, seen, folded)
     return candidates
