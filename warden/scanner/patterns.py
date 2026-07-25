@@ -221,12 +221,23 @@ KNOWN_INJECTIONS = [
 ]
 
 # ── Layer 3: TF-IDF similarity threshold ───────────────────────────────
-# Calibrated on the held-out benchmark: benign operational text peaks at
-# 0.506 cosine similarity against the corpus, while genuine corpus-match
-# attacks score 0.535+. 0.35 over-fired on benign phrasing that merely
-# shares vocabulary with known injections.
+# Derived only from `benchmark/calibration_benign.jsonl`, a first-party benign
+# calibration split that is disjoint from both held-out benchmark files and from
+# the training corpus. Measured over its 60 rows: max 0.5831, p95 0.3939,
+# mean 0.2785. The maximum is `calib-benign-discuss-004`, ordinary text that
+# discusses an injection pattern without carrying one.
+#
+# Rule: the smallest two-decimal value strictly above the calibration maximum,
+# i.e. zero false positives on the calibration split. 0.5831 -> 0.59.
+#
+# The previous 0.52 was tuned against held-out benchmark scores, which violates
+# the held-out invariant; its quoted 0.506 benign peak was also stale (the
+# held-out benign maximum is now 0.6477). Honest calibration costs recall:
+# 0.59 exceeds the best genuine corpus-match attack score in the held-out set
+# (held-corpus-001 at 0.5353), so Layer 3 no longer separates that case. Do not
+# re-tune this constant against `benchmark/held_out_*.jsonl`.
 
-SIMILARITY_THRESHOLD = 0.52
+SIMILARITY_THRESHOLD = 0.59
 
 # Ambiguous heuristic score range that triggers Layer 3
 AMBIGUOUS_RANGE = (0.4, 0.7)
