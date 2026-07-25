@@ -9,9 +9,16 @@ from warden.core.verdict import ReasonCode
 # upper-casing only the `x` must not hide a recipient from the drain gate.
 EVM_ADDRESS_RE = re.compile(r"0[xX][a-fA-F0-9]{40}(?![a-fA-F0-9])")
 SOLANA_ADDRESS_RE = re.compile(r"(?<![A-Za-z0-9])([1-9A-HJ-NP-Za-km-z]{32,44})(?![A-Za-z0-9])")
+# `remit` and `disburse` are the remaining members of the standard payment verb
+# family already represented here by send/transfer/pay/wire/payout: verbs whose only
+# ordinary sense is causing value to reach a named party. Unlike the polysemous
+# members of that family (settle, release, sweep, credit) they carry no non-financial
+# reading, so they are safe as bare verbs; the polysemous ones are handled by
+# FORWARD_TRANSFER_INTENT_RE, which also requires an object and a destination.
 TRANSFER_INTENT_RE = re.compile(
     r"(?i)\b(send|transfer|pay|deposit|withdraw|wire|to address"
-    r"|move|redirect|payout|route|wallet\s+is|receiving address)\b"
+    r"|move|redirect|payout|route|wallet\s+is|receiving address"
+    r"|remit(?:s|ted|ting|tance)?|disburse(?:s|d|ment)?)\b"
 )
 CONTEXTUAL_RECIPIENT_RE = re.compile(r"(?i)\b(?:recipients?|payments?)\b")
 STRUCTURED_DESTINATION_RE = re.compile(
@@ -35,15 +42,24 @@ STRUCTURED_PAYMENT_CONTEXT_RE = re.compile(
     r"(?i)\b(?:payment|settlement|payout|transfer|transaction|amount|"
     r"eth|btc|bnb|sol|usdt|usdc|dai|tokens?|funds?|balance|assets?)\b"
 )
+# `forward` generalised to the conveyance half of the payment verb family — the verbs
+# that also have an everyday non-financial reading (settle a dispute, release a build,
+# sweep a directory). Requiring a value object and an explicit `to` destination is what
+# makes them safe to include: "settle the payout to <address>" is a payment
+# instruction, "settle the review comments" is not.
 FORWARD_TRANSFER_INTENT_RE = re.compile(
-    r"(?i)\bforward\s+(?:(?:the|all|remaining|entire)\s+)?"
+    r"(?i)\b(?:forward|settle|release|sweep|remit|disburse|dispatch|push|credit)\s+"
+    r"(?:(?:the|all|remaining|entire|outstanding|residual)\s+){0,2}"
     r"(?:\d+(?:\.\d+)?\s+)?"
-    r"(?:eth|btc|bnb|sol|usdt|usdc|dai|tokens?|funds?|payments?|balance|assets?|holdings)"
+    r"(?:eth|btc|bnb|sol|usdt|usdc|dai|tokens?|funds?|payments?|balance|assets?|holdings"
+    # Treasury nouns for money still owed or left over — the objects these verbs take.
+    r"|proceeds|remainder|residual|earnings|payouts?|remittance|disbursement|settlement)"
     r"\s+to\b"
 )
 HIGH_RISK_DRAIN_INTENT_RE = re.compile(
-    r"(?i)\b(?:send|transfer|wire|route|forward|move)\s+(?:the\s+)?"
-    r"(?:remaining|entire|all)\s+(?:funds|balance|holdings|assets|tokens?)\b"
+    r"(?i)\b(?:send|transfer|wire|route|forward|move|remit|disburse|sweep)\s+(?:the\s+)?"
+    r"(?:remaining|entire|all)\s+"
+    r"(?:funds|balance|holdings|assets|tokens?|proceeds|earnings|payouts?)\b"
 )
 # A payment instruction paired with a malformed (non-40-char) 0x token.
 # The strict EVM path cannot see a truncated or overlong recipient, so inspect
