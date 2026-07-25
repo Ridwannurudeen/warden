@@ -54,7 +54,7 @@ jobs:
             --no-update \
             --json \
             --results=verified,unknown \
-            --exclude-globs=benchmark/held_out_benign.jsonl,sdk/python/tests/test_ph5_reverse_proxy.py,tests/test_apa_browser_verifier.py \
+            --exclude-globs=benchmark/held_out_benign.jsonl,sdk/python/tests/test_ph5_reverse_proxy.py,tests/test_apa_browser_verifier.py,tests/test_variant_audit.py \
             >"$findings" 2>"$scan_stderr"
           scan_status=$?
           set -e

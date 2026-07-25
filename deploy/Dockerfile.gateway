@@ -8,9 +8,17 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 
 WORKDIR /app
 
-COPY pyproject.toml MANIFEST.in README.md LICENSE ./
+COPY pyproject.toml MANIFEST.in README.md LICENSE THIRD-PARTY-NOTICES ./
 COPY warden ./warden
 COPY sdk/python ./sdk/python
+
+# [tool.setuptools.data-files] names these explicitly, so the root wheel fails to
+# build without them ("can't copy ...: doesn't exist"). Only the corpus license
+# manifest is copied, never the licensed corpus data itself.
+COPY corpus/license-manifest.json ./corpus/
+COPY spec/corpus-source-allowlist-v1.json spec/taxonomy-map-v1.json ./spec/
+COPY spec/schemas/model-calibration-capture-v1.schema.json \
+     spec/schemas/model-threshold-candidate-v1.schema.json ./spec/schemas/
 
 RUN python -m pip install . "./sdk/python[proxy]" \
     && groupadd --system warden-gateway \
