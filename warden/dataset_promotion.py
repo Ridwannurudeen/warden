@@ -21,6 +21,14 @@ DatasetArtifactsBuilder = Callable[
 ]
 
 
+class NearDuplicateLeakage(ValueError):
+    """A reviewed batch was rejected because a row nearly duplicates held-out material."""
+
+    def __init__(self, message: str, report: dict[str, object]) -> None:
+        super().__init__(message)
+        self.report = report
+
+
 def canonical_dataset_payload(value: object) -> str:
     return " ".join(fold_unicode(str(value)).casefold().split())
 
@@ -73,6 +81,24 @@ def _load_jsonl(path: Path) -> list[dict[str, object]]:
                 raise ValueError(f"{path}:{line_number} must contain payload text")
             entries.append(entry)
     return entries
+
+
+def _row_pairs(dataset_name: str, entries: list[dict[str, object]]) -> list[tuple[str, str]]:
+    """Return ``(row_id, payload)`` pairs, naming rows positionally when they carry no id."""
+    pairs: list[tuple[str, str]] = []
+    for position, entry in enumerate(entries):
+        row_id = entry.get("id")
+        pairs.append(
+            (
+                row_id if isinstance(row_id, str) and row_id else f"{dataset_name}#{position}",
+                str(entry["payload"]),
+            )
+        )
+    return pairs
+
+
+def _report_bytes(report: Mapping[str, object]) -> bytes:
+    return (json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
 def _serialize_jsonl(entries: list[dict[str, object]]) -> bytes:
@@ -131,7 +157,18 @@ def promote_reviewed_training_batch(
     held_out_benign_path: Path,
     artifact_builder: DatasetArtifactsBuilder | None = None,
 ) -> int:
-    """Atomically append one reviewed batch to exactly one training dataset."""
+    """Atomically append one reviewed batch to exactly one training dataset.
+
+    The near-duplicate gates are imported here rather than at module scope because they
+    need NumPy, which the shipped ``warden`` package does not declare. Promotion is an
+    offline reviewer operation, so a missing NumPy fails the promotion closed instead of
+    breaking every module that merely imports this one.
+    """
+    from warden.near_duplicates import (
+        DECONTAMINATION_REPORT_NAME,
+        build_decontamination_report,
+    )
+
     if reviewer_approved is not True:
         raise ValueError("explicit human reviewer approval is required")
     if dataset not in {"attacks", "benign"}:
@@ -206,6 +243,38 @@ def promote_reviewed_training_batch(
             name: list(existing_entries) for name, existing_entries in entries_by_dataset.items()
         }
         prospective_entries[target_name].extend(additions)
+
+        report_path = training_attacks_path.parent / DECONTAMINATION_REPORT_NAME
+        decontamination: dict[str, object] | None = None
+        if additions:
+            decontamination = build_decontamination_report(
+                dataset=target_name,
+                candidates=[(str(entry["id"]), str(entry["payload"])) for entry in additions],
+                held_out={
+                    "held-out-attacks": _row_pairs(
+                        "held-out-attacks", entries_by_dataset["held-out-attacks"]
+                    ),
+                    "held-out-benign": _row_pairs(
+                        "held-out-benign", entries_by_dataset["held-out-benign"]
+                    ),
+                },
+                corpus=_row_pairs("training-attacks", prospective_entries["training-attacks"])
+                + _row_pairs("training-benign", prospective_entries["training-benign"]),
+            )
+            rejected = decontamination["rejected"]
+            if rejected:
+                raise NearDuplicateLeakage(
+                    "reviewed payload near-duplicates held-out benchmark material "
+                    f"({', '.join(str(row_id) for row_id in rejected)}): "
+                    + "; ".join(
+                        reason
+                        for row in decontamination["rows"]
+                        if row["rejected"]
+                        for reason in row["reasons"]
+                    ),
+                    decontamination,
+                )
+
         dataset_bytes = {
             name: (
                 _serialize_jsonl(prospective_entries[name])
@@ -219,10 +288,15 @@ def promote_reviewed_training_batch(
         replacements: dict[Path, bytes] = {}
         if additions:
             replacements[target_path] = dataset_bytes[target_name]
+            replacements[report_path] = _report_bytes(decontamination)
         if artifact_builder is not None:
             for path, content in artifact_builder(prospective_entries, dataset_bytes).items():
                 if path in paths.values():
                     raise ValueError("promotion artifact must not replace another dataset")
+                if path == report_path:
+                    raise ValueError(
+                        "promotion artifact must not replace the decontamination report"
+                    )
                 if not isinstance(content, bytes):
                     raise ValueError("promotion artifact content must be bytes")
                 replacements[path] = content

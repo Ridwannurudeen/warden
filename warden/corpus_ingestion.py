@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
@@ -14,7 +15,10 @@ from urllib.parse import quote
 from uuid import uuid4
 
 from warden.core.verdict import ReasonCode
-from warden.dataset_promotion import promote_reviewed_training_batch
+from warden.dataset_promotion import (
+    canonical_dataset_payload,
+    promote_reviewed_training_batch,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ALLOWLIST_PATH = ROOT / "spec" / "corpus-source-allowlist-v1.json"
@@ -56,6 +60,15 @@ _FIRST_PARTY_GAUNTLET_KEYS = {
     "training_reviewed_at",
 }
 _CERTIFICATE_ID_RE = re.compile(r"[0-9a-f]{32}")
+_RECORD_ID_RE = re.compile(r"(py|json|jsonl|parquet):(\S.*)", re.DOTALL)
+_DOTTED_PATH_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*")
+_ROW_LOCATOR_RE = re.compile(r"([0-9]+)(/.*)?", re.DOTALL)
+_RECORD_SCHEMES = {
+    ".py": "py",
+    ".json": "json",
+    ".jsonl": "jsonl",
+    ".parquet": "parquet",
+}
 _BENCHMARK_CASE_ID_RE = re.compile(r"gauntlet-[0-9a-f]{16}")
 _UTC_TIMESTAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 TrainingDataset = Literal["attacks", "benign"]
@@ -264,6 +277,195 @@ def load_review_mapping(path: Path, dataset: TrainingDataset) -> list[dict[str, 
     return reviewed
 
 
+def _read_source_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ValueError(f"cited source file is not decodable UTF-8 text: {path.name}") from exc
+
+
+def _load_parquet_rows(path: Path) -> list[dict[str, object]]:
+    try:
+        from pyarrow import parquet
+    except ImportError as exc:
+        raise ValueError(
+            "cited source file is Parquet but pyarrow is not installed; "
+            "install pyarrow in the review environment to verify Parquet provenance"
+        ) from exc
+    try:
+        return parquet.read_table(path).to_pylist()
+    except Exception as exc:  # noqa: BLE001 - any pyarrow failure is an unusable source file
+        raise ValueError(f"cited Parquet source file could not be read: {path.name}") from exc
+
+
+def load_source_document(path: Path) -> object:
+    """Parse one allowlisted source file into the structure its record ids address.
+
+    Python sources become an AST, JSON becomes its decoded value, JSONL becomes the list
+    of decoded lines, and Parquet becomes the list of row dicts. Parsing once per file
+    keeps a review mapping with thousands of rows from re-reading the same source.
+    """
+    suffix = path.suffix
+    if suffix == ".py":
+        try:
+            return ast.parse(_read_source_text(path))
+        except SyntaxError as exc:
+            raise ValueError(f"cited Python source file does not parse: {path.name}") from exc
+    if suffix == ".json":
+        try:
+            return json.loads(_read_source_text(path))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"cited JSON source file does not parse: {path.name}") from exc
+    if suffix == ".jsonl":
+        records: list[object] = []
+        for line_number, line in enumerate(_read_source_text(path).splitlines(), start=1):
+            if not line.strip():
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"cited JSONL source file does not parse at line {line_number}: {path.name}"
+                ) from exc
+        return records
+    if suffix == ".parquet":
+        return _load_parquet_rows(path)
+    raise ValueError(f"cited source file has an unsupported format: {path.name}")
+
+
+def _resolve_json_pointer(document: object, pointer: str) -> object:
+    """Resolve an RFC 6901 JSON Pointer, failing closed on any missing step."""
+    if not pointer.startswith("/"):
+        raise ValueError("source_record_id JSON pointer must start with '/'")
+    current = document
+    for raw_token in pointer[1:].split("/"):
+        token = raw_token.replace("~1", "/").replace("~0", "~")
+        if isinstance(current, Mapping):
+            if token not in current:
+                raise ValueError(f"source_record_id does not resolve: no member {token!r}")
+            current = current[token]
+        elif isinstance(current, list):
+            if not token.isdigit() or int(token) >= len(current):
+                raise ValueError(f"source_record_id does not resolve: no index {token!r}")
+            current = current[int(token)]
+        else:
+            raise ValueError(f"source_record_id does not resolve: {token!r} has no container")
+    return current
+
+
+def _resolve_python_symbol(module: ast.Module, dotted: str) -> object:
+    if _DOTTED_PATH_RE.fullmatch(dotted) is None:
+        raise ValueError("source_record_id Python locator must be a dotted symbol path")
+    *containers, terminal = dotted.split(".")
+    scope: ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef = module
+    for name in containers:
+        for node in scope.body:
+            if isinstance(node, ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef) and (
+                node.name == name
+            ):
+                scope = node
+                break
+        else:
+            raise ValueError(f"source_record_id does not resolve: no Python scope {name!r}")
+    if terminal == "__doc__":
+        docstring = ast.get_docstring(scope, clean=False)
+        if docstring is None:
+            raise ValueError("source_record_id does not resolve: the cited scope has no docstring")
+        return docstring
+    for node in scope.body:
+        targets: list[ast.expr] = []
+        if isinstance(node, ast.Assign):
+            targets = list(node.targets)
+        elif isinstance(node, ast.AnnAssign):
+            targets = [node.target]
+        if any(isinstance(target, ast.Name) and target.id == terminal for target in targets) and (
+            isinstance(node.value, ast.Constant)
+        ):
+            return node.value.value
+    raise ValueError(f"source_record_id does not resolve: no string assignment named {terminal!r}")
+
+
+def _resolve_indexed_row(
+    rows: list[object], locator: str, *, one_based: bool, label: str
+) -> object:
+    match = _ROW_LOCATOR_RE.fullmatch(locator)
+    if match is None:
+        raise ValueError(f"source_record_id {label} locator must be a row number and pointer")
+    index = int(match.group(1)) - (1 if one_based else 0)
+    if index < 0 or index >= len(rows):
+        raise ValueError(f"source_record_id does not resolve: {label} row {match.group(1)}")
+    row = rows[index]
+    pointer = match.group(2)
+    return _resolve_json_pointer(row, pointer) if pointer else row
+
+
+def resolve_source_record(document: object, source_path: str, source_record_id: str) -> str:
+    """Resolve ``source_record_id`` inside a parsed source file to its literal text.
+
+    Record ids are ``<scheme>:<locator>``, where the scheme must match the cited file's
+    format so a reviewer cannot address a Parquet row as if it were a Python symbol:
+
+    ``py:InjectionTask0.GOAL``       a string assignment or ``__doc__`` in a Python source
+    ``json:/text_attack_test/3``     an RFC 6901 JSON Pointer into a ``.json`` document
+    ``jsonl:12/Attacker Instruction``  1-based line, then an optional pointer into it
+    ``parquet:57/text``              0-based row, then an optional pointer into the row
+
+    The resolved value must be a string. Anything else, or any unresolvable step, fails
+    closed: an unresolvable citation is exactly the shape a laundered row takes.
+    """
+    match = _RECORD_ID_RE.fullmatch(source_record_id)
+    if match is None:
+        raise ValueError(
+            "source_record_id must be '<py|json|jsonl|parquet>:<locator>' naming a real record"
+        )
+    scheme, locator = match.group(1), match.group(2)
+    expected = _RECORD_SCHEMES.get(PurePosixPath(source_path).suffix)
+    if scheme != expected:
+        raise ValueError(
+            f"source_record_id scheme {scheme!r} does not match the cited source file format"
+        )
+    if scheme == "py":
+        resolved = _resolve_python_symbol(document, locator)  # type: ignore[arg-type]
+    elif scheme == "json":
+        resolved = _resolve_json_pointer(document, locator)
+    elif scheme == "jsonl":
+        resolved = _resolve_indexed_row(
+            document,  # type: ignore[arg-type]
+            locator,
+            one_based=True,
+            label="JSONL",
+        )
+    else:
+        resolved = _resolve_indexed_row(
+            document,  # type: ignore[arg-type]
+            locator,
+            one_based=False,
+            label="Parquet",
+        )
+    if not isinstance(resolved, str):
+        raise ValueError("source_record_id must resolve to text, not a container or number")
+    return resolved
+
+
+def verify_payload_provenance(payload: str, record_text: str) -> None:
+    """Require the reviewed payload to actually occur in the record it cites.
+
+    Both sides are folded with ``canonical_dataset_payload`` -- the same NFKC, invisible
+    and homoglyph fold, casefold, and whitespace collapse that decides whether two corpus
+    rows are duplicates. Reusing it means the fold that answers "is this row already in
+    the corpus" and the fold that answers "did this row really come from that source"
+    cannot disagree, and it tolerates the whitespace and case drift of copying a string
+    out of a Parquet cell or a wrapped Python literal. It deliberately does not collapse
+    punctuation, so punctuation stays load-bearing evidence rather than something a
+    reviewer can rewrite around fabricated text.
+    """
+    if canonical_dataset_payload(payload) not in canonical_dataset_payload(record_text):
+        raise ValueError(
+            "reviewed payload does not occur in the cited source record; "
+            "provenance metadata may only be stamped on text taken from the source"
+        )
+
+
 def _source_record_url(source: dict[str, object], source_path: str) -> str:
     return (
         f"{str(source['repository_url']).rstrip('/')}/blob/{source['revision']}/"
@@ -276,10 +478,27 @@ def build_training_entries(
     reviewed: list[dict[str, str]],
     source_file_digests: dict[str, str],
     dataset: TrainingDataset,
+    checkout: Path,
 ) -> list[dict[str, object]]:
+    """Stamp provenance onto reviewed rows, but only after proving each row is real.
+
+    Verifying the checkout proves the *file* is the allowlisted one; it says nothing
+    about the text a reviewer typed next to it. Every row is therefore resolved back to
+    the record it cites and required to occur in that record's text before it may carry
+    a source id, revision, file digest, and licence into a signed hardening pack.
+    """
+    documents: dict[str, object] = {}
     entries: list[dict[str, object]] = []
     for record in reviewed:
         source_path = record["source_path"]
+        if source_path not in documents:
+            documents[source_path] = load_source_document(
+                checkout.resolve().joinpath(*PurePosixPath(source_path).parts)
+            )
+        verify_payload_provenance(
+            record["payload"],
+            resolve_source_record(documents[source_path], source_path, record["source_record_id"]),
+        )
         identity = (f"{source['source_id']}\0{source_path}\0{record['source_record_id']}").encode(
             "utf-8"
         )
@@ -494,7 +713,7 @@ def ingest_reviewed_corpus(
     reviewed = load_review_mapping(review_path, dataset)
     source_paths = {record["source_path"] for record in reviewed}
     source_file_digests = verify_local_checkout(checkout, source, source_paths)
-    entries = build_training_entries(source, reviewed, source_file_digests, dataset)
+    entries = build_training_entries(source, reviewed, source_file_digests, dataset, checkout)
     promoted = promote_reviewed_training_batch(
         entries,
         dataset=dataset,
