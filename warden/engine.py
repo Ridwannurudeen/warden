@@ -15,6 +15,7 @@ from warden.scanner.embedding import (
     EmbeddingAnalyzer,
     build_embedding_analyzer_from_env,
 )
+from warden.scanner.learned import LearnedScorer, build_learned_scorer_from_env
 from warden.scanner.normalize import (
     TRANSFORM_AMBIGUOUS_CONTAINER,
     TRANSFORM_DECODED,
@@ -31,6 +32,7 @@ class WardenEngine:
         self,
         semantic_analyzer: SemanticAnalyzer | None = None,
         embedding_analyzer: EmbeddingAnalyzer | None = None,
+        learned_scorer: LearnedScorer | None = None,
     ):
         configured_semantic = (
             semantic_analyzer
@@ -42,11 +44,16 @@ class WardenEngine:
             if embedding_analyzer is not None
             else build_embedding_analyzer_from_env()
         )
+        configured_learned = (
+            learned_scorer if learned_scorer is not None else build_learned_scorer_from_env()
+        )
         self.semantic_enabled = configured_semantic is not None
         self.embedding_enabled = configured_embedding is not None
+        self.learned_scorer_enabled = configured_learned is not None
         self.scanner = InjectionScanner(
             ai_analyzer=configured_semantic,
             embedding_analyzer=configured_embedding,
+            learned_scorer=configured_learned,
         )
         self.registry = AnalyzerRegistry()
         self.registry.register(DrainAddressAnalyzer())

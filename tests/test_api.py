@@ -38,8 +38,11 @@ def test_scan_response_schema_for_clean_payload():
         "recommendation",
         "checks",
         "latency_ms",
+        "attack_probability",
     }
     assert data["verdict"] == "ALLOW"
+    # Null unless an operator loads the offline learned-scorer artifact.
+    assert data["attack_probability"] is None
 
 
 def test_health_shape():
@@ -88,7 +91,9 @@ def test_get_audit_without_target_is_400_never_405():
 def test_benign_tx_hash_is_not_hard_blocked():
     # A swap receipt mentioning a 64-hex tx hash must not BLOCK as SECRET_EXFIL.
     tx = "0x" + "a1b2c3d4" * 8
-    response = client.post("/scan", json={"payload": f"Swap settled, tx hash {tx} confirmed on chain."})
+    response = client.post(
+        "/scan", json={"payload": f"Swap settled, tx hash {tx} confirmed on chain."}
+    )
     assert response.status_code == 200
     assert response.json()["verdict"] != "BLOCK"
 

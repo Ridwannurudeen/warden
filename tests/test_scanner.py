@@ -244,7 +244,12 @@ class TestResponseFormat:
             "detections",
             "sanitized_content",
             "recommendation",
+            # Advisory block from the offline learned scorer, None when no
+            # weights artifact is loaded. It is deliberately outside
+            # `detections` so it cannot move `clean` or `risk_level`.
+            "learned",
         }
+        assert result["learned"] is None
 
     @pytest.mark.asyncio
     async def test_detection_format(self, scanner):

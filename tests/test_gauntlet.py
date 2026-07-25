@@ -401,6 +401,10 @@ def test_gauntlet_page_discloses_human_review_and_retention():
 
 def test_paid_http_contract_remains_frozen():
     assert set(ScanRequest.model_fields) == {"payload", "depth", "context"}
+    # attack_probability is additive, optional and defaults to null; it is
+    # advisory evidence from the offline learned scorer and never sets the
+    # verdict. Every pre-existing field keeps its name, type and meaning, so
+    # existing paid callers are unaffected.
     assert set(ScanResponse.model_fields) == {
         "verdict",
         "risk_level",
@@ -410,6 +414,7 @@ def test_paid_http_contract_remains_frozen():
         "recommendation",
         "checks",
         "latency_ms",
+        "attack_probability",
     }
     # input_field is additive and optional (defaults to "payload"); existing
     # callers that send only target_url are unaffected. Response envelope frozen.
