@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from eth_account import Account
@@ -237,3 +239,65 @@ def test_reputation_abi_matches_the_selector_deployed_on_x_layer() -> None:
         event_abi_to_log_topic(events[0]).hex()
         == "6a4a61743519c9d648a14e6493f47dbe3ff1aa29e7785c96c8326a205e58febc"
     )
+
+
+def test_operator_cli_writes_an_unsigned_transaction_without_signing(tmp_path, capsys) -> None:
+    from scripts import build_erc8004_feedback
+
+    sender = Account.create().address
+    record_path = tmp_path / "record.json"
+    record_path.write_text(json.dumps(_record("A")), encoding="utf-8")
+    output = tmp_path / "unsigned.json"
+
+    build_erc8004_feedback.main(
+        [
+            str(record_path),
+            str(output),
+            "--target-agent-id",
+            "4451",
+            "--sender",
+            sender,
+            "--attestation-uri",
+            ATTESTATION_URI,
+            "--nonce",
+            "7",
+            "--gas",
+            "250000",
+            "--max-fee-per-gas",
+            "1000000000",
+            "--max-priority-fee-per-gas",
+            "1000000000",
+        ]
+    )
+
+    transaction = json.loads(output.read_text(encoding="utf-8"))
+    assert transaction["chainId"] == onchain_attestation.X_LAYER_CHAIN_ID
+    assert transaction["to"] == onchain_attestation.REPUTATION_REGISTRY
+    assert transaction["nonce"] == 7
+    # An unsigned transaction carries no signature material whatsoever.
+    for signed_field in ("r", "s", "v", "rawTransaction", "hash"):
+        assert signed_field not in transaction
+    assert "nothing was signed or broadcast" in capsys.readouterr().out
+
+    # A second run must not clobber a reviewed artifact.
+    with pytest.raises(ValueError, match="refusing to overwrite"):
+        build_erc8004_feedback.main(
+            [
+                str(record_path),
+                str(output),
+                "--target-agent-id",
+                "4451",
+                "--sender",
+                sender,
+                "--attestation-uri",
+                ATTESTATION_URI,
+                "--nonce",
+                "8",
+                "--gas",
+                "250000",
+                "--max-fee-per-gas",
+                "1000000000",
+                "--max-priority-fee-per-gas",
+                "1000000000",
+            ]
+        )
