@@ -6,6 +6,8 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlparse
 
+from scripts.bake_homepage_proof import baked_homepage
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site"
@@ -100,10 +102,12 @@ def test_homepage_uses_dated_proof_and_catalog_sources_without_stale_literals():
     assert 'fetch("/data/product-proof.json"' in app
     assert 'fetch("/data/warden-services.json"' in app
     assert "4.8/5" not in page
-    assert "0.23 ms" not in page
     assert "15 sold" not in page.lower()
-    assert "0.1 USDT" not in page
     assert "122-payload" not in page
+    assert baked_homepage(SITE) == page, (
+        "Homepage proof literals drifted from their dated sources; "
+        "run python scripts/bake_homepage_proof.py"
+    )
     assert "data-product-proof-status" in page
     assert "data-service-catalog" in page
     assert "data-service-price" in page
@@ -229,20 +233,31 @@ def test_supporting_surfaces_use_a_compact_route_index_and_complete_footer():
 
 def test_homepage_exposes_source_states_without_ambiguous_initial_placeholders():
     page = (SITE / "index.html").read_text(encoding="utf-8")
+    app = (SITE / "app.js").read_text(encoding="utf-8")
 
     for state in ("LIVE", "DATED", "ILLUSTRATIVE", "DEGRADED", "UNKNOWN"):
-        assert state in (SITE / "app.js").read_text(encoding="utf-8")
+        assert state in app
     assert 'data-source-stamp="ILLUSTRATIVE"' in page
-    assert 'data-source-stamp="UNKNOWN"' in page
-    assert 'applySourceStamp(productProofStatus, "DATED")' in (SITE / "app.js").read_text(
-        encoding="utf-8"
-    )
-    assert 'applySourceStamp(productProofStatus, "DEGRADED")' in (SITE / "app.js").read_text(
-        encoding="utf-8"
-    )
+    assert 'data-source-stamp="DATED"' in page
+    assert 'applySourceStamp(productProofStatus, "DATED")' in app
+    assert 'applySourceStamp(productProofStatus, "DEGRADED")' in app
+    assert 'applySourceStamp(serviceStamp, "DATED")' in app
+    assert 'applySourceStamp(serviceStamp, "DEGRADED")' in app
     assert ">Loading" not in page
     assert ">Checking" not in page
     assert ">—<" not in page
+
+
+def test_homepage_ships_dated_values_instead_of_asserting_it_has_no_evidence():
+    page = (SITE / "index.html").read_text(encoding="utf-8")
+    app = (SITE / "app.js").read_text(encoding="utf-8")
+
+    assert 'data-source-stamp="UNKNOWN"' not in page
+    assert "Unavailable" not in page
+    assert "unavailable" not in page
+    assert "not loaded" not in page
+    assert 'Recall unavailable"' in app
+    assert '"Evaluation corpus unavailable"' in app
 
 
 def test_homepage_runtime_resources_remain_same_origin():

@@ -1,6 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-labelledby="title">
-  <title id="title">Warden</title>
-  <rect x="1" y="1" width="30" height="30" rx="7" fill="#14110b" stroke="#463f2c"/>
-  <path d="M8 9.5 12.2 23l3.8-9.2L19.8 23 24 9.5" fill="none" stroke="#f6f0e1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M16 5.5v4" stroke="#d7aa49" stroke-width="2.2" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-labelledby="wm-title">
+  <title id="wm-title">Warden</title>
+  <rect width="32" height="32" rx="7" fill="var(--warden-mark-ground,#12100a)"/>
+  <rect x=".5" y=".5" width="31" height="31" rx="6.5" fill="none" stroke="var(--warden-mark-edge,#2c2619)"/>
+  <g fill="var(--warden-mark-gold,#f1c766)">
+    <path d="M3.8 12.8h4.5l5.1 12.9h-4.5z"/>
+    <path d="M7.4 12.8h.9l5.1 12.9h-.9z" fill="var(--warden-mark-gold-mid,#e0a23a)"/>
+    <path d="M8.9 25.7h4.5l4.85-9h-4.5z" fill="var(--warden-mark-gold-deep,#b07a22)"/>
+    <path d="M13.75 16.7h4.5l4.85 9h-4.5z"/>
+    <path d="M17.35 16.7h.9l4.85 9h-.9z" fill="var(--warden-mark-gold-mid,#e0a23a)"/>
+    <path d="M18.6 25.7h4.5l5.1-12.9h-4.5z" fill="var(--warden-mark-gold-deep,#b07a22)"/>
+  </g>
+  <g fill="#ef6f5b">
+    <path d="M14.4 3.2h3.2l-.4 12.4h-2.4z"/>
+    <rect x="11.6" y="14.7" width="8.8" height="2" rx="1"/>
+    <path d="M6.8 9.4 12.2 12.2 9.8 14.6Z"/>
+    <path d="M25.4 10 20.4 12.1 22.6 14.5Z"/>
+    <path d="M22.2 5.8 18.4 9.2 20.9 10.6Z" fill="#f7907e"/>
+  </g>
 </svg>

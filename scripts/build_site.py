@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.bake_homepage_proof import baked_homepage  # noqa: E402
 from warden.site_docs import render_docs  # noqa: E402
 from warden.sitemap import write_crawler_files  # noqa: E402
 
@@ -98,6 +99,9 @@ def main() -> None:
     )
     site_root = _crawler_site_root(args)
     if site_root is not None:
+        homepage = site_root / "index.html"
+        homepage.write_text(baked_homepage(site_root), encoding="utf-8", newline="\n")
+        print("Baked the dated evaluation, product-proof, and catalog values into the homepage.")
         versioned = version_static_assets(site_root)
         routes = write_crawler_files(site_root)
         print(f"Versioned local CSS/JavaScript references on {versioned} page(s).")
