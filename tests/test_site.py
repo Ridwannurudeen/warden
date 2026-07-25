@@ -163,6 +163,7 @@ def test_generated_shell_uses_canonical_information_architecture_and_unknown_sta
                 ("/verify", "Verify an attestation", "verify"),
                 ("/apa/log", "Transparency log", "apa-log"),
                 ("/badges", "Endpoint audit records", "badges"),
+                ("/lineage", "Audit evidence lineage", "lineage"),
                 ("/agents", "Marketplace evidence index", "agents"),
                 ("/status", "Service status", "status"),
             ),
@@ -189,7 +190,11 @@ def test_generated_shell_uses_canonical_information_architecture_and_unknown_sta
         ("/playground", "Playground", ("playground",)),
         ("/integrate", "Developers", ("integrate", "integrate-quickstart")),
         ("/docs", "Docs", ("docs",)),
-        ("/verify", "Evidence", ("verify", "apa-log", "badges", "agents", "status")),
+        (
+            "/verify",
+            "Evidence",
+            ("verify", "apa-log", "badges", "lineage", "agents", "status"),
+        ),
         (
             "/gauntlet",
             "Research",
@@ -921,9 +926,7 @@ def test_home_playground_badges_integrations_and_status_are_real_surfaces():
     assert 'rel="canonical" href="https://warden.gudman.xyz/badge"' in badge
     for label in ("OnchainOS", "Raw x402", "Python", "TypeScript", "MCP"):
         assert label in integrate
-    assert all(
-        tool in integrate for tool in ("scan_payload", "audit_agent", "harden_agent")
-    )
+    assert all(tool in integrate for tool in ("scan_payload", "audit_agent", "harden_agent"))
     assert "historical uptime" in status.lower()
     assert "transaction-specific" in status.lower()
 
@@ -1040,8 +1043,9 @@ def test_audit_evidence_lineage_page_is_honest_and_wired_to_shared_verification(
     assert "/api/shield/" in script
     assert "/lineage" in script
     assert "WardenTransparencyLog" in script
-    assert 'src="/log.js"' in page
-    assert 'src="/lineage.js"' in page
+    # build_site.py appends a cache-busting version, so allow it as elsewhere.
+    assert re.search(r'src="/log\.js(?:\?v=[0-9a-f]{8})?"', page)
+    assert re.search(r'src="/lineage\.js(?:\?v=[0-9a-f]{8})?"', page)
     assert not re.search(r"crypto\.subtle", script)
 
     # Ordered history, per-entry lifecycle, verification links, and an explicit
