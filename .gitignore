@@ -32,3 +32,4 @@ data/*.db
 data/protection.db
 .warden/
 .claude/worktrees/
+warden/.claude/
