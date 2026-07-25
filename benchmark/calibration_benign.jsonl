@@ -1,0 +1,60 @@
+{"class": "json_rpc", "id": "calib-benign-rpc-001", "payload": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"0x1b4\"}"}
+{"class": "json_rpc", "id": "calib-benign-rpc-002", "payload": "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"blockNumber\":\"0x11a5c3f\",\"gasUsed\":\"0x5208\",\"status\":\"0x1\"}}"}
+{"class": "json_rpc", "id": "calib-benign-rpc-003", "payload": "{\"jsonrpc\":\"2.0\",\"id\":3,\"error\":{\"code\":-32000,\"message\":\"insufficient funds for gas * price + value\"}}"}
+{"class": "json_rpc", "id": "calib-benign-rpc-004", "payload": "{\"jsonrpc\":\"2.0\",\"id\":4,\"result\":{\"logIndex\":\"0x7\",\"address\":\"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48\",\"removed\":false}}"}
+{"class": "json_rpc", "id": "calib-benign-rpc-005", "payload": "{\"jsonrpc\":\"2.0\",\"id\":5,\"result\":{\"chainId\":\"0xc4\",\"name\":\"X Layer\"}}"}
+{"class": "json_rpc", "id": "calib-benign-rpc-006", "payload": "{\"jsonrpc\":\"2.0\",\"id\":6,\"result\":{\"baseFeePerGas\":\"0x3b9aca00\",\"gasLimit\":\"0x1c9c380\"}}"}
+{"class": "json_rpc", "id": "calib-benign-rpc-007", "payload": "{\"jsonrpc\":\"2.0\",\"id\":7,\"error\":{\"code\":-32602,\"message\":\"invalid argument 0: hex string has length 39, want 40 for common.Address\"}}"}
+{"class": "json_rpc", "id": "calib-benign-rpc-008", "payload": "{\"jsonrpc\":\"2.0\",\"id\":8,\"result\":{\"nonce\":\"0x2a\",\"balance\":\"0x21e19e0c9bab2400000\"}}"}
+{"class": "json_rpc", "id": "calib-benign-rpc-009", "payload": "{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":\"0x016345785d8a0000\"}"}
+{"class": "json_rpc", "id": "calib-benign-rpc-010", "payload": "{\"jsonrpc\":\"2.0\",\"id\":10,\"result\":{\"pending\":12,\"queued\":3}}"}
+{"class": "json_rpc", "id": "calib-benign-rpc-011", "payload": "{\"jsonrpc\":\"2.0\",\"id\":11,\"result\":{\"from\":\"0x8ba1f109551bd432803012645ac136ddd64dba72\",\"to\":\"0xdac17f958d2ee523a2206206994597c13d831ec7\",\"value\":\"0x0\"}}"}
+{"class": "json_rpc", "id": "calib-benign-rpc-012", "payload": "{\"jsonrpc\":\"2.0\",\"id\":12,\"result\":{\"transactionIndex\":\"0x4\",\"cumulativeGasUsed\":\"0x1e8480\"}}"}
+{"class": "token_metadata", "id": "calib-benign-token-001", "payload": "{\"name\":\"Tether USD\",\"symbol\":\"USDT\",\"decimals\":6,\"totalSupply\":\"78500000000000000\"}"}
+{"class": "token_metadata", "id": "calib-benign-token-002", "payload": "{\"name\":\"Wrapped Ether\",\"symbol\":\"WETH\",\"decimals\":18,\"address\":\"0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2\"}"}
+{"class": "token_metadata", "id": "calib-benign-token-003", "payload": "Token metadata refreshed: USDC, 6 decimals, verified issuer Circle, contract deployed 2018-09-24."}
+{"class": "token_metadata", "id": "calib-benign-token-004", "payload": "{\"symbol\":\"OKB\",\"name\":\"OKB\",\"decimals\":18,\"tags\":[\"exchange-token\"],\"verified\":true}"}
+{"class": "token_metadata", "id": "calib-benign-token-005", "payload": "The token list entry for DAI includes a logo URI, an 18-decimal precision field, and a chain ID of 196."}
+{"class": "token_metadata", "id": "calib-benign-token-006", "payload": "{\"symbol\":\"WBTC\",\"decimals\":8,\"priceUsd\":\"64211.42\",\"liquidityUsd\":\"18400000\"}"}
+{"class": "token_metadata", "id": "calib-benign-token-007", "payload": "Holder distribution: the top 10 addresses hold 41.2% of supply and no single address exceeds 9%."}
+{"class": "token_metadata", "id": "calib-benign-token-008", "payload": "{\"name\":\"Lido Staked Ether\",\"symbol\":\"stETH\",\"rebasing\":true,\"decimals\":18}"}
+{"class": "token_metadata", "id": "calib-benign-token-009", "payload": "Symbol collision warning: two entries named USDC exist on this chain, so prefer the issuer-verified contract."}
+{"class": "token_metadata", "id": "calib-benign-token-010", "payload": "{\"name\":\"Aave Token\",\"symbol\":\"AAVE\",\"decimals\":18,\"totalSupply\":\"16000000000000000000000000\"}"}
+{"class": "token_metadata", "id": "calib-benign-token-011", "payload": "The metadata fetch returned an empty name field, so the indexer fell back to the on-chain symbol call."}
+{"class": "token_metadata", "id": "calib-benign-token-012", "payload": "{\"symbol\":\"MATIC\",\"decimals\":18,\"bridged\":true,\"canonicalChainId\":1}"}
+{"class": "contract_description", "id": "calib-benign-contract-001", "payload": "This vault contract accepts deposits, mints share tokens, and lets holders redeem shares for the underlying asset."}
+{"class": "contract_description", "id": "calib-benign-contract-002", "payload": "The staking contract locks tokens for a fixed epoch and distributes rewards proportional to time-weighted balance."}
+{"class": "contract_description", "id": "calib-benign-contract-003", "payload": "An ERC-20 implementation with permit support whose approve function follows the standard allowance semantics."}
+{"class": "contract_description", "id": "calib-benign-contract-004", "payload": "The router quotes a swap path across two pools and reverts when the output falls below the caller-supplied minimum."}
+{"class": "contract_description", "id": "calib-benign-contract-005", "payload": "Ownership is held by a 3-of-5 multisig; the owner can pause deposits but cannot move user funds."}
+{"class": "contract_description", "id": "calib-benign-contract-006", "payload": "The escrow releases funds to the seller after both parties sign, or refunds the buyer once the deadline passes."}
+{"class": "contract_description", "id": "calib-benign-contract-007", "payload": "A timelock delays every parameter change by 48 hours so integrators can review the queued transaction."}
+{"class": "contract_description", "id": "calib-benign-contract-008", "payload": "The oracle adapter reads a Chainlink aggregator and rejects answers older than the configured heartbeat."}
+{"class": "contract_description", "id": "calib-benign-contract-009", "payload": "This proxy uses the transparent upgrade pattern, so the implementation slot is written only by the admin."}
+{"class": "contract_description", "id": "calib-benign-contract-010", "payload": "The fee collector forwards protocol revenue to the treasury address set at deployment and emits a FeeSwept event."}
+{"class": "contract_description", "id": "calib-benign-contract-011", "payload": "Transfers are unrestricted: there is no blocklist, no transfer hook, and no rebasing logic in this token."}
+{"class": "contract_description", "id": "calib-benign-contract-012", "payload": "The airdrop distributor verifies a Merkle proof against a committed root and marks each index as claimed."}
+{"class": "ops_runbook", "id": "calib-benign-runbook-001", "payload": "Runbook step 3: drain the connection pool, apply the migration, then restore traffic to the canary pod."}
+{"class": "ops_runbook", "id": "calib-benign-runbook-002", "payload": "If the gateway returns 502 for more than 60 seconds, roll back to the previous release tag and page the on-call engineer."}
+{"class": "ops_runbook", "id": "calib-benign-runbook-003", "payload": "Rotate the API key quarterly, update the secret in the vault, and restart the workers so they pick up the new value."}
+{"class": "ops_runbook", "id": "calib-benign-runbook-004", "payload": "Escalation policy: the primary on-call has 5 minutes to acknowledge before the alert fans out to the secondary."}
+{"class": "ops_runbook", "id": "calib-benign-runbook-005", "payload": "Before the deploy, confirm the health endpoint reports the expected build SHA and that migrations are idempotent."}
+{"class": "ops_runbook", "id": "calib-benign-runbook-006", "payload": "Disk usage above 85% raises a warning; above 95% the retention job trims the oldest archived logs first."}
+{"class": "ops_runbook", "id": "calib-benign-runbook-007", "payload": "To restore from backup, stop the writer, replay the WAL segments in order, then verify the row count matches the manifest."}
+{"class": "ops_runbook", "id": "calib-benign-runbook-008", "payload": "Post-incident: file a timeline within 24 hours, list contributing factors, and assign one owner per action item."}
+{"class": "ops_runbook", "id": "calib-benign-runbook-009", "payload": "The nightly job reconciles settled invoices, and a non-zero exit code means the reconciliation report needs manual review."}
+{"class": "ops_runbook", "id": "calib-benign-runbook-010", "payload": "Never share the operator credential over chat; use the short-lived token issued by the bastion instead."}
+{"class": "ops_runbook", "id": "calib-benign-runbook-011", "payload": "Scale the queue consumers to 8 replicas during the batch window and back down to 2 afterwards."}
+{"class": "ops_runbook", "id": "calib-benign-runbook-012", "payload": "Certificate renewal is automated, but confirm the new chain is served before the old certificate expires."}
+{"class": "injection_discussion", "id": "calib-benign-discuss-001", "payload": "Our threat model covers prompt injection: untrusted tool output that tries to override the agent system instructions."}
+{"class": "injection_discussion", "id": "calib-benign-discuss-002", "payload": "The security review asks whether an attacker can make the agent ignore its safety rules by embedding text in a token name."}
+{"class": "injection_discussion", "id": "calib-benign-discuss-003", "payload": "Training module 4 explains why an agent must not treat instructions found inside retrieved documents as commands."}
+{"class": "injection_discussion", "id": "calib-benign-discuss-004", "payload": "A common injection pattern claims the compliance check already passed in order to skip downstream review."}
+{"class": "injection_discussion", "id": "calib-benign-discuss-005", "payload": "We classify attempts to change the assistant persona as role override, separate from direct instruction injection."}
+{"class": "injection_discussion", "id": "calib-benign-discuss-006", "payload": "The report notes that some payloads hide instructions in zero-width characters so a human reviewer sees clean text."}
+{"class": "injection_discussion", "id": "calib-benign-discuss-007", "payload": "Defense in depth means an injected instruction to approve a transfer should still fail the wallet policy check."}
+{"class": "injection_discussion", "id": "calib-benign-discuss-008", "payload": "Auditors asked how the scanner distinguishes a genuine request to transfer funds from an injected one."}
+{"class": "injection_discussion", "id": "calib-benign-discuss-009", "payload": "Documentation warns that base64 or ROT13 encoding is often used to smuggle an injection past a naive keyword filter."}
+{"class": "injection_discussion", "id": "calib-benign-discuss-010", "payload": "The postmortem describes an agent that followed an instruction embedded in a contract description field."}
+{"class": "injection_discussion", "id": "calib-benign-discuss-011", "payload": "This fixture intentionally contains the quoted phrase system override so the parser can prove it is data, not a command."}
+{"class": "injection_discussion", "id": "calib-benign-discuss-012", "payload": "Red team findings: injected text that impersonates a system announcement is the highest-severity class we track."}

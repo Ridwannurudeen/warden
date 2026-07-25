@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import hashlib
 import json
+import math
 import sys
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -104,6 +105,31 @@ def _validate_recording_sources(
 
 def _percent(numerator: int, denominator: int) -> float:
     return round((numerator / denominator) * 100, 2) if denominator else 0.0
+
+
+def _wilson_interval_percent(successes: int, total: int) -> dict[str, object]:
+    """Wilson score 95% interval for a proportion, reported in percent.
+
+    A zero-false-positive observation bounds the true rate; it does not
+    demonstrate that the rate is zero.
+    """
+    if total <= 0:
+        raise ValueError("Wilson interval requires at least one observation")
+    z = 1.959963984540054
+    observed = successes / total
+    denominator = 1 + (z * z) / total
+    center = (observed + (z * z) / (2 * total)) / denominator
+    spread = (z / denominator) * math.sqrt(
+        observed * (1 - observed) / total + (z * z) / (4 * total * total)
+    )
+    return {
+        "level_percent": 95,
+        "method": "wilson-score",
+        "observations": total,
+        "events": successes,
+        "lower_percent": round(max(0.0, center - spread) * 100, 2),
+        "upper_percent": round(min(1.0, center + spread) * 100, 2),
+    }
 
 
 def _detection_tier(
@@ -219,12 +245,30 @@ def record_benchmark(
         "measured_at": measured_at,
         "benchmark": result["benchmark"],
         "mode": result["mode"],
+        "depth_policy": result["depth_policy"],
         "attack_cases": result["attack_cases"],
         "detected_attacks": result["detected_attacks"],
         "attack_recall_percent": result["attack_recall_percent"],
         "benign_cases": result["benign_cases"],
         "false_positives": result["false_positives"],
         "false_positive_rate_percent": result["false_positive_rate_percent"],
+        "false_positive_rate_ci_percent": result["false_positive_rate_ci_percent"],
+        "per_depth": {
+            depth: {
+                key: measured[key]
+                for key in (
+                    "attack_cases",
+                    "detected_attacks",
+                    "attack_recall_percent",
+                    "benign_cases",
+                    "false_positives",
+                    "false_positive_rate_percent",
+                    "false_positive_rate_ci_percent",
+                    "false_positive_ids",
+                )
+            }
+            for depth, measured in result["per_depth"].items()
+        },
         "result_sha256": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
     }
     history_path.parent.mkdir(parents=True, exist_ok=True)
@@ -239,6 +283,16 @@ def record_benchmark(
             "benign_false_positive": "any non-ALLOW decision",
             "held_out": True,
             "semantic_enabled": False,
+            "depth_is_caller_controlled": True,
+            "depth_disclosure": (
+                "the headline figures use each case's declared depth; `per_depth` reports "
+                "every case forced to fast and to thorough, because callers choose depth"
+            ),
+            "false_positive_rate_bounds": (
+                "Wilson score 95% interval; a zero-false-positive observation bounds the "
+                "true rate, it does not show the rate is zero"
+            ),
+            "layer_3_calibration_source": "benchmark/calibration_benign.jsonl",
         },
     }
     public_path.parent.mkdir(parents=True, exist_ok=True)
@@ -249,6 +303,90 @@ def record_benchmark(
     )
     temporary.replace(public_path)
     return record
+
+
+def _declared_depth_policy(
+    attacks: list[dict[str, object]],
+    benign: list[dict[str, object]],
+) -> str:
+    parts = []
+    for label, entries in (("attacks", attacks), ("benign", benign)):
+        counts: dict[str, int] = defaultdict(int)
+        for entry in entries:
+            counts[str(entry.get("depth", "fast"))] += 1
+        mix = " + ".join(f"{counts[depth]} {depth}" for depth in sorted(counts))
+        parts.append(f"{label} {mix}")
+    return "each case's declared depth (" + "; ".join(parts) + ")"
+
+
+async def _measure_pass(
+    engine: WardenEngine,
+    attacks: list[dict[str, object]],
+    benign: list[dict[str, object]],
+    *,
+    forced_depth: str | None,
+    allow_paid_semantic: bool,
+) -> dict[str, object]:
+    """Score one full pass. `forced_depth=None` honours each case's declared depth."""
+    detected_attacks = 0
+    attack_misses: list[str] = []
+    category_totals: dict[str, int] = defaultdict(int)
+    category_hits: dict[str, int] = defaultdict(int)
+    attack_attribution = {"deterministic": 0, "embedding": 0, "semantic": 0}
+    false_positive_attribution = {"deterministic": 0, "embedding": 0, "semantic": 0}
+
+    for entry in attacks:
+        category = str(entry["category"])
+        category_totals[category] += 1
+        verdict = await engine.scan(
+            str(entry["payload"]),
+            depth=forced_depth or str(entry.get("depth", "fast")),
+            context=entry.get("context") if isinstance(entry.get("context"), dict) else None,
+            allow_paid_semantic=allow_paid_semantic,
+        )
+        classes = {reason.value for reason in verdict.threat_classes}
+        if verdict.verdict != "ALLOW" and category in classes:
+            detected_attacks += 1
+            category_hits[category] += 1
+            attack_attribution[_detection_tier(verdict.detections, category)] += 1
+        else:
+            attack_misses.append(str(entry["id"]))
+
+    false_positive_ids: list[str] = []
+    for entry in benign:
+        verdict = await engine.scan(
+            str(entry["payload"]),
+            depth=forced_depth or str(entry.get("depth", "fast")),
+            context=entry.get("context") if isinstance(entry.get("context"), dict) else None,
+            allow_paid_semantic=allow_paid_semantic,
+        )
+        if verdict.verdict != "ALLOW":
+            false_positive_ids.append(str(entry["id"]))
+            false_positive_attribution[_detection_tier(verdict.detections)] += 1
+
+    return {
+        "attack_cases": len(attacks),
+        "detected_attacks": detected_attacks,
+        "attack_recall_percent": _percent(detected_attacks, len(attacks)),
+        "attack_misses": attack_misses,
+        "benign_cases": len(benign),
+        "false_positives": len(false_positive_ids),
+        "false_positive_rate_percent": _percent(len(false_positive_ids), len(benign)),
+        "false_positive_ids": false_positive_ids,
+        "false_positive_rate_ci_percent": _wilson_interval_percent(
+            len(false_positive_ids), len(benign)
+        ),
+        "per_category": {
+            category: {
+                "cases": category_totals[category],
+                "detected": category_hits[category],
+                "recall_percent": _percent(category_hits[category], category_totals[category]),
+            }
+            for category in sorted(category_totals)
+        },
+        "_attack_attribution": attack_attribution,
+        "_false_positive_attribution": false_positive_attribution,
+    }
 
 
 async def evaluate_benchmark(
@@ -273,52 +411,16 @@ async def evaluate_benchmark(
     attacks = load_jsonl(attacks_path)
     benign = load_jsonl(benign_path)
     model_tier_enabled = mode != "deterministic"
-    detected_attacks = 0
-    attack_misses: list[str] = []
-    category_totals: dict[str, int] = defaultdict(int)
-    category_hits: dict[str, int] = defaultdict(int)
-    attack_attribution = {"deterministic": 0, "embedding": 0, "semantic": 0}
-    false_positive_attribution = {"deterministic": 0, "embedding": 0, "semantic": 0}
+    headline = await _measure_pass(
+        engine,
+        attacks,
+        benign,
+        forced_depth="thorough" if model_tier_enabled else None,
+        allow_paid_semantic=model_tier_enabled,
+    )
+    attack_attribution = headline.pop("_attack_attribution")
+    false_positive_attribution = headline.pop("_false_positive_attribution")
 
-    for entry in attacks:
-        entry_id = str(entry["id"])
-        category = str(entry["category"])
-        category_totals[category] += 1
-        verdict = await engine.scan(
-            str(entry["payload"]),
-            depth="thorough" if model_tier_enabled else str(entry.get("depth", "fast")),
-            context=entry.get("context") if isinstance(entry.get("context"), dict) else None,
-            allow_paid_semantic=model_tier_enabled,
-        )
-        classes = {reason.value for reason in verdict.threat_classes}
-        detected = verdict.verdict != "ALLOW" and category in classes
-        if detected:
-            detected_attacks += 1
-            category_hits[category] += 1
-            attack_attribution[_detection_tier(verdict.detections, category)] += 1
-        else:
-            attack_misses.append(entry_id)
-
-    false_positive_ids: list[str] = []
-    for entry in benign:
-        verdict = await engine.scan(
-            str(entry["payload"]),
-            depth="thorough" if model_tier_enabled else str(entry.get("depth", "fast")),
-            context=entry.get("context") if isinstance(entry.get("context"), dict) else None,
-            allow_paid_semantic=model_tier_enabled,
-        )
-        if verdict.verdict != "ALLOW":
-            false_positive_ids.append(str(entry["id"]))
-            false_positive_attribution[_detection_tier(verdict.detections)] += 1
-
-    per_category = {
-        category: {
-            "cases": category_totals[category],
-            "detected": category_hits[category],
-            "recall_percent": _percent(category_hits[category], category_totals[category]),
-        }
-        for category in sorted(category_totals)
-    }
     result: dict[str, object] = {
         "schema_version": 1,
         "benchmark": ("warden-synthetic-harness-v1" if harness_only else "warden-held-out-v1"),
@@ -327,16 +429,27 @@ async def evaluate_benchmark(
             if harness_only
             else _MODE_DESCRIPTIONS[mode]
         ),
-        "attack_cases": len(attacks),
-        "detected_attacks": detected_attacks,
-        "attack_recall_percent": _percent(detected_attacks, len(attacks)),
-        "attack_misses": attack_misses,
-        "benign_cases": len(benign),
-        "false_positives": len(false_positive_ids),
-        "false_positive_rate_percent": _percent(len(false_positive_ids), len(benign)),
-        "false_positive_ids": false_positive_ids,
-        "per_category": per_category,
+        "depth_policy": (
+            "every case forced to thorough"
+            if model_tier_enabled
+            else _declared_depth_policy(attacks, benign)
+        ),
+        **headline,
     }
+    if not model_tier_enabled:
+        # `depth` is a caller-controlled request field, so the headline figure above
+        # describes only the declared-depth mix. Report each depth separately: a
+        # buyer can select `thorough` on every request.
+        per_depth: dict[str, object] = {}
+        for depth in ("fast", "thorough"):
+            measured = await _measure_pass(
+                engine, attacks, benign, forced_depth=depth, allow_paid_semantic=False
+            )
+            measured.pop("_attack_attribution")
+            measured.pop("_false_positive_attribution")
+            per_depth[depth] = measured
+        result["per_depth"] = per_depth
+        result["depth_is_caller_controlled"] = True
     if model_tier_enabled:
         result["model_tier"] = _model_tier_metadata(mode, harness_only=harness_only)
         result["model_attribution"] = {
@@ -425,6 +538,18 @@ def main(argv: list[str] | None = None) -> None:
     )
     if result["attack_misses"]:
         print(f"Missed attack IDs: {', '.join(result['attack_misses'])}")
+    per_depth = result.get("per_depth")
+    if isinstance(per_depth, dict):
+        for depth, measured in per_depth.items():
+            interval = measured["false_positive_rate_ci_percent"]
+            print(
+                f"depth={depth}: recall {measured['attack_recall_percent']:.2f}% "
+                f"({measured['detected_attacks']}/{measured['attack_cases']}), "
+                f"false positives {measured['false_positives']}/{measured['benign_cases']} "
+                f"(95% CI {interval['lower_percent']:.2f}%-{interval['upper_percent']:.2f}%)"
+            )
+            if measured["false_positive_ids"]:
+                print(f"  false-positive IDs: {', '.join(measured['false_positive_ids'])}")
     model_tier = result.get("model_tier")
     if isinstance(model_tier, dict):
         print(f"Model-tier mode: {model_tier['mode']}")
