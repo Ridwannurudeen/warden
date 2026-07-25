@@ -38,6 +38,20 @@ class RenderSummary:
 
 
 @dataclass(frozen=True)
+class PageProvenance:
+    """Where one agent page's facts came from.
+
+    Census pages describe a dated crawl of the public marketplace. Our own page cannot,
+    because `agent search` omits a listing under review, so it states our own listing as
+    its source instead. The page must never present one as the other.
+    """
+
+    note: str
+    scope_source: str
+    stat_suffix: str
+
+
+@dataclass(frozen=True)
 class ApaIssuerKey:
     kid: str
     pub: str
@@ -439,9 +453,34 @@ def _render_services(indexed: IndexedAgent) -> str:
     return "".join(rows)
 
 
+def _census_provenance(coverage: SnapshotMetadata) -> PageProvenance:
+    return PageProvenance(
+        note=_coverage_text(coverage),
+        scope_source="the dated marketplace snapshot",
+        stat_suffix="at snapshot",
+    )
+
+
+def _provider_provenance(fetched_at: str, *, in_census: bool) -> PageProvenance:
+    census_state = (
+        "It is also present in the dated discovery crawl."
+        if in_census
+        else "The discovery crawl omits it, because OKX excludes a listing under review "
+        "from agent search, so this page is not a census record."
+    )
+    return PageProvenance(
+        note=(
+            "Sourced from Warden's own OKX.AI listing via agent service-list, fetched "
+            f"{fetched_at}. {census_state}"
+        ),
+        scope_source="our own OKX.AI listing",
+        stat_suffix="at listing fetch",
+    )
+
+
 def _render_agent_page(
     indexed: IndexedAgent,
-    coverage: SnapshotMetadata,
+    provenance: PageProvenance,
     badge_records: list[dict[str, object]],
     attestation_records: list[dict[str, object]],
     apa_issuer_pub: str,
@@ -496,10 +535,12 @@ def _render_agent_page(
     verdict = indexed.verdict or "NOT_SCANNED"
     _, public_text_label = _public_text_status(indexed)
     sold_label = (
-        "Sold at snapshot" if agent.agent_id == WARDEN_MARKETPLACE_AGENT_ID else "Sold count"
+        f"Sold {provenance.stat_suffix}"
+        if agent.agent_id == WARDEN_MARKETPLACE_AGENT_ID
+        else "Sold count"
     )
     buyer_review_label = (
-        "Buyer review at snapshot"
+        f"Buyer review {provenance.stat_suffix}"
         if agent.agent_id == WARDEN_MARKETPLACE_AGENT_ID
         else "Buyer review average"
     )
@@ -543,7 +584,7 @@ def _render_agent_page(
     <div><dt>Threat classes</dt><dd>{_escape(threats)}</dd></div>
     <div><dt>Fields scanned</dt><dd class="num">{indexed.fields_scanned}</dd></div>
   </dl>
-  <p class="caveat"><strong>Scope:</strong> This scans only the public profile and service descriptions captured in the dated marketplace snapshot. It does not call the endpoint, establish malicious intent, or certify security.</p>
+  <p class="caveat"><strong>Scope:</strong> This scans only the public profile and service descriptions captured in {_escape(provenance.scope_source)}. It does not call the endpoint, establish malicious intent, or certify security.</p>
   </div>
 </section>
 <section>
@@ -560,7 +601,7 @@ def _render_agent_page(
   <h2>{len(agent.services)} listed service{"s" if len(agent.services) != 1 else ""}</h2>
   <div class="marketplace-service-list">{_render_services(indexed)}</div>
 </section>
-<p class="snapshot-note">{_escape(_coverage_text(coverage))}</p>
+<p class="snapshot-note">{_escape(provenance.note)}</p>
 """
     return page_shell(
         f"{agent.name or 'Unnamed agent'} · Agent #{agent.agent_id} | Warden Marketplace Evidence Index",
@@ -890,7 +931,7 @@ def render_marketplace(
             attested_agent_ids.add(indexed.agent.agent_id)
         page = _render_agent_page(
             indexed,
-            coverage,
+            _census_provenance(coverage),
             records,
             agent_attestations,
             issuer_pub,
@@ -924,3 +965,38 @@ def render_marketplace(
         encoding="utf-8",
     )
     return summary
+
+
+def render_provider_page(
+    indexed: IndexedAgent,
+    output_dir: Path,
+    *,
+    fetched_at: str,
+    in_census: bool,
+    badge_records: list[dict[str, object]] | None = None,
+    attestation_records: list[dict[str, object]] | None = None,
+    apa_issuer_pub: str | None = None,
+    apa_issuer_history: Sequence[ApaIssuerKey] = (),
+) -> Path:
+    """Write our own agent page from our own listing rather than from the census.
+
+    `render_marketplace` deletes any agent page the census does not contain, so this runs
+    after it. It writes only the page: the index and `index-data.json` stay a record of
+    the public crawl, which genuinely does not list us while the listing is under review.
+    """
+    records = badge_records or []
+    attestations = attestation_records or []
+    if attestations and not apa_issuer_pub:
+        raise ValueError("APA issuer public key is required to render attestation evidence")
+    page = _render_agent_page(
+        indexed,
+        _provider_provenance(fetched_at, in_census=in_census),
+        records,
+        attestations,
+        apa_issuer_pub or "",
+        apa_issuer_history,
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    path = output_dir / f"{indexed.agent.agent_id}.html"
+    path.write_text(page, encoding="utf-8")
+    return path

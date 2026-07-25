@@ -19,6 +19,7 @@ from warden.marketplace.fetch import (
     MarketplaceService,
     SearchPageData,
     SnapshotMetadata,
+    fetch_provider_agent,
     fetch_snapshot,
     load_snapshot,
     parse_search_output,
@@ -28,6 +29,7 @@ from warden.marketplace.render import (
     associate_attestations,
     associate_badges,
     render_marketplace,
+    render_provider_page,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -549,6 +551,174 @@ def test_marketplace_service_rejects_unsafe_fee_amounts(fee_amount):
         )
 
 
+SERVICE_LIST_OUTPUT = json.dumps(
+    {
+        "ok": True,
+        "data": [
+            {
+                "agentInfo": {
+                    "agentId": "3808",
+                    "name": "Warden",
+                    "profileDescription": "Security automation for AI agents.",
+                    "categoryCode": ["SOFTWARE_SERVICES"],
+                    "salesCount": 22,
+                    "securityRate": "5.0",
+                    "onlineStatus": 1,
+                    "communicationAddress": "0xBdaEF4FC4e2cf0173d0096B5487137fb808AaED9",
+                },
+                "list": [
+                    {
+                        "id": 33460,
+                        "serviceId": "c2783b5b-a932-4249-b0e2-4ccc6245fd63",
+                        "serviceName": "Payload Security Scan",
+                        "serviceDescription": "Scan an untrusted payload.",
+                        "serviceType": "A2MCP",
+                        "endpoint": "https://warden.gudman.xyz/scan",
+                        "fee": "0.1",
+                        "contractAddress": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+                    },
+                    {
+                        "id": 33461,
+                        "serviceId": "dc289c2e-e280-4786-95d0-0c5dc7ac6cfc",
+                        "serviceName": "Agent Endpoint Security Audit",
+                        "serviceDescription": "Audit an agent endpoint.",
+                        "serviceType": "A2MCP",
+                        "endpoint": "https://warden.gudman.xyz/audit",
+                        "fee": "0.1",
+                        "contractAddress": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+                    },
+                ],
+            }
+        ],
+    }
+)
+
+
+def test_provider_fetch_reads_the_sold_count_under_its_own_key():
+    # The census reports soldCount; our own service-list reports salesCount.
+    agent = fetch_provider_agent("3808", command_runner=lambda command: SERVICE_LIST_OUTPUT)
+
+    assert agent.sold_count == 22
+    assert agent.model_dump(by_alias=True)["soldCount"] == 22
+
+
+@pytest.mark.asyncio
+async def test_provider_page_states_our_own_listing_and_not_the_census(tmp_path):
+    agent = fetch_provider_agent("3808", command_runner=lambda command: SERVICE_LIST_OUTPUT)
+    indexed = await index_agent(agent, WardenEngine())
+
+    path = render_provider_page(
+        indexed,
+        tmp_path / "agents",
+        fetched_at="2026-07-25T14:00:00Z",
+        in_census=False,
+    )
+    page = path.read_text(encoding="utf-8")
+
+    assert path.name == "3808.html"
+    assert "Sourced from Warden&#x27;s own OKX.AI listing via agent service-list" in page
+    assert "fetched 2026-07-25T14:00:00Z" in page
+    # It must not borrow the census wording for facts the census does not contain.
+    assert "discovery snapshot for marketplace query" not in page
+    assert "Sold at listing fetch" in page
+    assert "Buyer review at listing fetch" in page
+    assert "captured in our own OKX.AI listing" in page
+    assert "OKX excludes a listing under review" in page
+
+
+@pytest.mark.asyncio
+async def test_provider_page_says_so_when_the_census_also_lists_us(tmp_path):
+    agent = fetch_provider_agent("3808", command_runner=lambda command: SERVICE_LIST_OUTPUT)
+    indexed = await index_agent(agent, WardenEngine())
+
+    page = render_provider_page(
+        indexed,
+        tmp_path / "agents",
+        fetched_at="2026-07-25T14:00:00Z",
+        in_census=True,
+    ).read_text(encoding="utf-8")
+
+    assert "also present in the dated discovery crawl" in page
+    assert "OKX excludes a listing under review" not in page
+
+
+@pytest.mark.asyncio
+async def test_build_keeps_our_page_when_the_census_omits_our_listing(tmp_path, monkeypatch):
+    # The census sweep deletes any agent page it does not contain, so a listing under
+    # review would otherwise leave /agents/3808 returning 404.
+    snapshot_path = tmp_path / "agents-v1.jsonl"
+    fetch_snapshot(
+        snapshot_path,
+        query="Warden",
+        page_size=10,
+        adapter=_FakeMarketplaceAdapter(
+            [
+                SearchPageData(
+                    agents=[_agent(agentId="1406", name="XMLaunch")],
+                    page=1,
+                    page_size=10,
+                    total=1,
+                ),
+                SearchPageData(agents=[], page=2, page_size=10, total=1),
+            ]
+        ),
+        captured_at="2026-07-13T15:30:00Z",
+    )
+    monkeypatch.setattr(
+        build_index_script,
+        "fetch_provider_agent",
+        lambda agent_id: fetch_provider_agent(
+            agent_id,
+            command_runner=lambda command: SERVICE_LIST_OUTPUT,
+        ),
+    )
+    output = tmp_path / "agents"
+
+    await build(
+        Namespace(
+            refresh=False,
+            query="Warden",
+            page_size=10,
+            snapshot=snapshot_path,
+            output=output,
+            hire_catalog=tmp_path / "warden-services.json",
+            no_provider_fetch=False,
+            provider_agent_id="3808",
+            marketplace_summary=tmp_path / "marketplace-summary.json",
+            badge_store=tmp_path / "issued.jsonl",
+            badge_links=tmp_path / "badge-links-v1.json",
+            apa_db=tmp_path / "missing-protection.db",
+            apa_issuer_pub=None,
+            apa_issuer_history=None,
+        )
+    )
+
+    assert (output / "3808.html").exists()
+    index_data = json.loads((output / "index-data.json").read_text(encoding="utf-8"))
+    # The index stays a record of the public crawl, which does not list us.
+    assert [record["agentId"] for record in index_data["records"]] == ["1406"]
+
+
+def test_marketplace_service_prefers_the_numeric_id_over_a_uuid_service_id():
+    # A live search row carries both identifiers; the UUID alone would break the crawl.
+    service = MarketplaceService.model_validate(
+        {
+            "id": "33460",
+            "serviceId": "c2783b5b-a932-4249-b0e2-4ccc6245fd63",
+            "serviceName": "Payload Security Scan",
+        }
+    )
+
+    assert service.service_id == "33460"
+    # Snapshots and the published catalog keep the serviceId key they already use.
+    assert service.model_dump(by_alias=True)["serviceId"] == "33460"
+
+
+def test_marketplace_service_rejects_a_row_carrying_only_a_uuid_identifier():
+    with pytest.raises(ValidationError):
+        MarketplaceService.model_validate({"serviceId": "c2783b5b-a932-4249-b0e2-4ccc6245fd63"})
+
+
 def test_renderer_escapes_content_handles_zero_services_and_verifies_badge(tmp_path, monkeypatch):
     monkeypatch.setenv("WARDEN_BADGE_SECRET", "marketplace-render-test-key")
     badge = issue_badge(
@@ -1041,6 +1211,8 @@ async def test_build_index_attaches_badge_for_unique_marketplace_service_host(
             snapshot=snapshot_path,
             output=output,
             hire_catalog=hire_catalog,
+            no_provider_fetch=True,
+            provider_agent_id="3808",
             marketplace_summary=marketplace_summary,
             badge_store=badge_store,
             badge_links=badge_links,
@@ -1571,6 +1743,8 @@ async def test_build_index_links_a_valid_sqlite_apa_record_without_counting_an_a
             snapshot=snapshot_path,
             output=output,
             hire_catalog=tmp_path / "warden-services.json",
+            no_provider_fetch=True,
+            provider_agent_id="3808",
             marketplace_summary=marketplace_summary,
             badge_store=badge_store,
             badge_links=evidence_links,
