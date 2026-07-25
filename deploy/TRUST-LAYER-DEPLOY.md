@@ -35,22 +35,37 @@ units, or ports are touched. Do not run `systemctl restart nginx` — reload onl
 
 ---
 
-## Live install reality (verified 2026-07-19) — read before choosing a path
+## Live install reality (verified 2026-07-25) — read before choosing a path
 
-The box (`75.119.153.252`) runs a **minimal** flat install, narrower than the app-upgrade gate below assumes.
-Verify with `ls /etc/systemd/system | grep -i warden` before acting. As of 2026-07-19 the box has ONLY:
+Always confirm with `ls /etc/systemd/system | grep -i warden` before acting; this section is a snapshot,
+not a guarantee.
 
-- `warden.service` — `User=warden`, `Group=warden`, `WorkingDirectory=/opt/warden`,
+**Superseded 2026-07-25.** The 2026-07-19 snapshot recorded a minimal install with the monitor and anchor
+lineage absent and told operators not to run the app-upgrade gate. That is no longer true: the gate has
+since been run twice against this box, most recently for the 0.1 USDT deploy, and it installed the units it
+describes. The evidence lineage is now live. Do not follow the older guidance.
+
+Verified on the box (`75.119.153.252`) on 2026-07-25:
+
+- `warden.service` — active, enabled. `User=warden`, `Group=warden`, `WorkingDirectory=/opt/warden`,
   `ExecStart=/opt/warden/.venv/bin/uvicorn warden.api:app --host 127.0.0.1 --port 8031`,
   `ReadWritePaths=/opt/warden/data /opt/warden/badges /opt/warden/gauntlet /opt/warden/logs`,
   `ProtectSystem=strict`, plus a `warden.service.d/privatetmp.conf` drop-in (`PrivateTmp=yes`).
+- `warden-anchor-publish.service` (static) and `warden-anchor-publish.timer` — **active and enabled**.
+- `warden-monitor.service` (static) and `warden-monitor.timer` — **installed but the timer is disabled**,
+  deliberately, under the "deploy now, alert later" deviation documented in the gate below.
+- `/opt/warden/monitor` and `/opt/warden/anchor` — **both exist**, mode `751` (`0750` plus the `o+x`
+  traversal the gate grants so nginx can serve the aliased evidence files).
 - `warden-a2a.service` — a separate OKX buyer-agent (#4844) daemon; unrelated to the API.
+- `warden-scan-bot.service` — also present on the box and likewise unrelated to the API.
 
-**NOT installed:** `warden-monitor.{service,timer}`, `warden-anchor-publish.{service,timer}`,
-`warden-apa-reprobe.timer`, and there is **no `/opt/warden/monitor-alert.env`** and no
-`/opt/warden/monitor` or `/opt/warden/anchor` runtime dirs. The "Mandatory flat app-upgrade gate" below
-is therefore **drifted** from this host: run verbatim it fails on the missing `monitor-alert.env` and would
-newly install timer units that were never here. Do not run it as-is against this box.
+**Still absent:** `/opt/warden/monitor-alert.env`, so no alert destination is configured. That single fact
+is what keeps `warden-monitor.timer` disabled and makes the monitor one-shot fail inertly; see the approved
+deviation in the gate below. `warden-apa-reprobe.{service,timer}` are also still not installed.
+
+**Choosing a path:** the app-upgrade gate below is the correct, exercised procedure for a source deploy, run
+with that deviation. The minimal code-only redeploy that follows remains valid for a source-only change when
+you want to skip the log-checkpoint migration and unit reinstall entirely.
 
 ### Minimal code-only redeploy (the procedure that matches this box)
 
@@ -102,10 +117,12 @@ over `/opt/warden`, `chmod 755 /opt/warden`, restart.
 
 ## Mandatory flat app-upgrade gate — signed log checkpoint and hardened unit
 
-> **Drift warning (2026-07-19):** the monitor/anchor units and `monitor-alert.env` this gate installs and
-> requires are NOT present on the live box (see "Live install reality" above). Use the minimal code-only
-> redeploy for source-only changes. Run this full gate only when the monitor/anchor lineage is actually being
-> introduced, and reconcile the missing files first.
+> **Status (2026-07-25):** this gate is the exercised path — it has been run twice against the live box, most
+> recently for the 0.1 USDT deploy, and the monitor/anchor units it installs are now present (see "Live install
+> reality" above). The one prerequisite still missing is `monitor-alert.env`, so run it under the approved
+> "deploy now, alert later" deviation below. The earlier 2026-07-19 drift warning, which said these units were
+> absent and this gate should not be run, is superseded. The minimal code-only redeploy above remains a valid
+> lighter alternative for a source-only change.
 
 The numbered Trust Layer steps below remain nginx-only. When an approved deploy also replaces the flat
 application at `/opt/warden`, this gate is mandatory before the new code starts. The app service is the flat
