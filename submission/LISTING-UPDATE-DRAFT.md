@@ -75,23 +75,36 @@ The earlier draft of this section was **598 characters and hard-failed `D8`**. I
 fail-closed gateway; that sentence was cut, because the gateway is self-hosted software rather than a
 purchasable service and the space was better spent on the loop.
 
-## Avatar — do not touch it
+## Avatar — replace it, in the post-deadline delta only
 
-**Correction to the earlier draft, which implied `site/assets/warden-avatar.png` is the live avatar. It
-is not.** The live CDN object is a *different, earlier* image: 440x440, colour type 2 (RGB, no alpha),
-16,962 bytes, uploaded 2026-07-11 14:58 UTC. That matches the repo blob at commit `13e05fc`, whose
-message records that **OKX had already rejected an earlier avatar** for dimensions and polish. The
-current on-disk file is the 2026-07-14 rebrand (440x440 RGBA, 17,957 bytes) and was **never uploaded**.
+**Superseded 2026-07-25.** The earlier draft said do not touch the avatar. That advice was right for a
+mid-review window and wrong as a permanent position, so it is reversed here with the timing constraint
+kept intact.
 
-So replacing it would submit a brand-new, never-reviewed image on the one axis where this listing has
-already been rejected once — for a purely aesthetic gain.
+The live CDN object is 440x440, colour type 2 (RGB, no alpha), 16,962 bytes, uploaded 2026-07-11
+14:58 UTC — the repo blob at commit `13e05fc`, whose message records that **OKX had already rejected an
+earlier avatar** for dimensions and polish. It is a shield with a checkmark: competent, and generic.
+Roughly 40 security-positioned agents share that iconography, so the mark identifies a category rather
+than Warden. Worse, a checkmark is the universal glyph for *certified* — the exact claim invariant I5
+forbids Warden from making, and the profile description explicitly disclaims with "narrow technical
+evidence, not certification". The avatar contradicted the product's own stance.
 
-It also does not need replacing. Every published requirement is met: PNG (also JPEG/WebP accepted), 1:1
-(square is advisory, not required), and far under the hard 1 MB cap. **No pixel-dimension requirement is
-published anywhere** — in the skill files, in the CLI binary, or on the ASP tutorial. The widely-repeated
-"440x440" is one developer's inference from a rejection notice, not a documented spec.
+The replacement now staged at `site/assets/warden-avatar.png` is a folded-ribbon gold **W** with a red
+payload crushed flat against its centre peak and shattering. It states the service without words —
+something hostile arrives, the boundary stops it before it lands — carries the site's own brand gold
+(`#e0a23a` / `#f1c766` from `site/styles.css`), and contains no checkmark or seal. `favicon-32.png` and
+`apple-touch-icon.png` are regenerated from the same mark, with heavier strokes so the letterform
+survives 32px; the previous gold shield in those slots would otherwise have clashed with the new avatar.
 
-`agent update --picture` is optional: omitted means unchanged. This update omits it.
+Constraints re-verified against the accepted 2026-07-11 upload: PNG, 1:1, RGB (no alpha), 440x440,
+33,318 bytes — far under the hard 1 MB cap. **No pixel-dimension requirement is published anywhere** —
+not in the skill files, the CLI binary, or the ASP tutorial; the widely-repeated "440x440" is one
+developer's inference from a rejection notice. Matching the previously accepted geometry and colour type
+is deliberate risk reduction on the one axis this listing has already been rejected on.
+
+**Timing is the whole safeguard.** `agent update --picture` re-enters review and de-lists the agent while
+it runs, so this must NOT ship before the hackathon deadline. It belongs in the single post-deadline
+delta alongside the four fee updates and the `/variant-audit` service — one review window, not three.
 
 ## The risk to weigh before confirming
 
