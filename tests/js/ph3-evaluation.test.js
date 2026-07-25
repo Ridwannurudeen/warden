@@ -40,8 +40,24 @@ test("public evaluation data matches the committed held-out benchmark", () => {
   assert.match(view.measuredAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
   assert.equal(evaluation.methodology.semantic_enabled, false);
   assert.equal(view.mode, "Deterministic; semantic model disabled");
-  assert.equal(benchmark.attack_recall_percent, 92.55);
+  assert.equal(benchmark.attack_recall_percent, 91.49);
   assert.equal(benchmark.false_positive_rate_percent, 0);
+
+  // `depth` is caller-controlled, so the public file must carry both depths and
+  // must not present the clean fast-path benign sheet as the whole story.
+  assert.equal(evaluation.methodology.depth_is_caller_controlled, true);
+  assert.deepEqual(Object.keys(evaluation.current.per_depth).sort(), [
+    "fast",
+    "thorough",
+  ]);
+  assert.deepEqual(evaluation.current.per_depth.fast.false_positive_ids, []);
+  assert.deepEqual(evaluation.current.per_depth.thorough.false_positive_ids, [
+    "held-benign-enc-016",
+  ]);
+  assert.equal(
+    evaluation.current.per_depth.thorough.false_positive_rate_ci_percent.method,
+    "wilson-score",
+  );
 });
 
 test("evaluation normalization rejects inflated or ambiguous evidence", () => {

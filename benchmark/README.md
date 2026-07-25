@@ -6,25 +6,64 @@ TF-IDF examples in `warden/scanner/patterns.py` after case and whitespace normal
 
 ## Published result
 
-Measured on 2026-07-17 with the deterministic fast path, using thorough mode only for the cases
-that declare it and with semantic analysis disabled. The set now includes a held-out evasion
+Measured on 2026-07-25 with semantic analysis disabled. The set includes a held-out evasion
 family (`held-evade-*`, 66 cases) covering nested base64/hex/percent/HTML/`\xNN`-encoded
 injections and drains, homoglyph-swapped keywords, and zero-width obfuscation, all folded by the
-Decoder Wall normalization pre-pass before detection:
+Decoder Wall normalization pre-pass before detection.
 
-- Attack recall: **92.55% (87/94)**
+`depth` is a caller-controlled request field (`warden/models.py`), so a single headline number
+would hide the depth a paying buyer actually selects. Every figure is therefore reported per
+depth, and `results.json` carries a `per_depth` block.
+
+Headline, using each case's declared depth (attacks 92 fast + 2 thorough; benign 45 fast):
+
+- Attack recall: **91.49% (86/94)**
 - False-positive rate: **0.00% (0/45)**
+
+Forcing every case to one depth instead:
+
+| depth | attack recall | false positives | FP rate | Wilson 95% CI for the FP rate |
+| --- | --- | --- | --- | --- |
+| `fast` | 91.49% (86/94) | 0/45 | 0.00% | 0.00% – 7.87% |
+| `thorough` | 91.49% (86/94) | 1/45 | 2.22% | 0.39% – 11.57% |
+
+The single `thorough` false positive is `held-benign-enc-016`, ordinary developer code containing
+`base64.b64decode(...)`, which scores 0.6477 TF-IDF cosine similarity against the injection corpus
+and returns `SANITIZE`. Zero *observed* false positives at `fast` is not a zero rate: with n=45 the
+Wilson upper bound is still 7.87%, so the honest claim is a bound, not certainty.
+
+Recall is identical at both depths, so on this set Layer 3 buys no additional detection and costs
+one false positive. That is published rather than hidden.
 
 An attack counts as detected only when Warden returns `SANITIZE` or `BLOCK` and includes the case's
 expected threat class. A benign case counts as a false positive when Warden returns anything other
 than `ALLOW`. The exact misses and per-category counts are committed in `results.json`.
 
 This is a small, authored regression benchmark, not a claim about universal production efficacy. In
-particular, it currently exposes misses in indirect prompt overrides, a semantic role override, a
-corpus paraphrase, `transmit` exfiltration, a bare address without expected-address context, and one
-base64-of-hex double-encoding whose intermediate hex blob is deliberately not treated as decodable
-text (that same conservatism keeps benign hex blobs at zero false positives). Those misses remain
-published rather than being copied into the detector's training corpus.
+particular, it currently exposes misses in indirect prompt overrides, a semantic role override, both
+corpus-paraphrase cases, `transmit` exfiltration, a bare address without expected-address context,
+and one base64-of-hex double-encoding whose intermediate hex blob is deliberately not treated as
+decodable text (that same conservatism keeps benign hex blobs out of the `fast` false-positive
+count). Those misses remain published rather than being copied into the detector's training corpus.
+
+## Layer 3 threshold provenance
+
+`SIMILARITY_THRESHOLD` in `warden/scanner/patterns.py` is derived **only** from
+`benchmark/calibration_benign.jsonl`: 60 first-party benign rows (JSON-RPC responses, ERC-20 token
+metadata, contract descriptions, ops runbook text, and text that merely *discusses* prompt
+injection) authored for calibration and disjoint from both held-out files and the training corpus.
+Measured over that split: max **0.5831**, p95 0.3939, mean 0.2785, with the maximum at
+`calib-benign-discuss-004`. The rule is the smallest two-decimal value strictly above the
+calibration maximum, giving **0.59** — zero false positives on the calibration split, with a thin
+0.0069 margin.
+
+The previous `0.52` was tuned against held-out benchmark scores, which breaks the held-out
+invariant, and its quoted 0.506 benign peak was also stale (the held-out benign maximum is 0.6477).
+Honest calibration costs one case: 0.59 exceeds `held-corpus-001`'s 0.5353, so recall fell from the
+previously published 92.55% (87/94) to 91.49% (86/94). On this data the calibration benign maximum
+(0.5831) sits *above* the best genuine corpus-match attack score (0.5353), so no threshold both
+detects that case and keeps the calibration split clean; the earlier number depended on the leak.
+Do not re-tune this constant against `benchmark/held_out_*.jsonl`.
 
 Run it from the repository root:
 
@@ -107,7 +146,7 @@ threshold requires a real provider/key and a separate independently labeled cali
 evaluation cases must not be used for tuning. Temporary synthetic fixtures verify harness routing and
 accounting only, never model performance. Model-tier runs cannot use `--record` and therefore cannot update
 `history.jsonl` or the public evaluation file. Keep both network tiers disabled unless a real
-provider-backed held-out evaluation beats the 92.55% baseline with zero benign false positives and an
+provider-backed held-out evaluation beats the 91.49% baseline with zero benign false positives and an
 independently reviewed public-evidence schema is added.
 
 `scripts/capture_model_calibration.py` accepts only a separate reviewed JSONL dataset outside `benchmark/`

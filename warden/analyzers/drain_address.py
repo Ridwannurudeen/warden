@@ -53,6 +53,28 @@ HIGH_RISK_DRAIN_INTENT_RE = re.compile(
 MALFORMED_ADDR_RE = re.compile(
     r"0[xX][a-fA-F0-9]{20,39}(?![a-fA-F0-9])|0[xX][a-fA-F0-9]{41,63}(?![a-fA-F0-9])"
 )
+# A report of a transfer that already happened states where it came from and how it
+# ended: explorer detail panels lead with `From:` / `Status: Success` / `Block:`, and
+# decoded calldata is labelled as decoded. An instruction to make a transfer names
+# only a destination. A structured `to:` inside one of these framings is therefore a
+# record, not a redirection. Only used when the caller supplied no expected
+# addresses — with an expectation to compare against, an unexpected recipient in a
+# receipt is still worth flagging.
+TRANSFER_REPORT_CONTEXT_RE = re.compile(
+    r"""(?ix)
+    (?:^|[\s|,;(\[])
+    (?:
+        from \s* [:=]
+      | sender \s* [:=]
+      | status \s* [:=] \s* (?:success|failed|reverted|confirmed|pending)
+      | block (?: \s* (?:number|hash) )? \s* [:=]
+      | (?:tx|transaction) \s* (?:hash|id) \s* [:=]
+      | timestamp \s* [:=]
+      | decoded \s+ (?:calldata|input|data|function|params?|event|log)
+      | (?:calldata|input \s+ data) \s* [:=]
+    )
+    """
+)
 
 
 class DrainAddressAnalyzer(Analyzer):
@@ -149,6 +171,8 @@ class DrainAddressAnalyzer(Analyzer):
         if STRUCTURED_DESTINATION_RE.search(window) and (
             has_expected or STRUCTURED_PAYMENT_CONTEXT_RE.search(window)
         ):
+            if not has_expected and TRANSFER_REPORT_CONTEXT_RE.search(payload):
+                return 0.0
             return 0.95 if has_expected else 0.80
         if (
             not TRANSFER_INTENT_RE.search(window)

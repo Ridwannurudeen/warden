@@ -2,21 +2,72 @@
   "schema_version": 1,
   "current": {
     "schema_version": 1,
-    "measured_at": "2026-07-17T17:36:22Z",
+    "measured_at": "2026-07-25T19:48:53Z",
     "benchmark": "warden-held-out-v1",
     "mode": "deterministic fast path; thorough only where declared; semantic disabled",
+    "depth_policy": "each case's declared depth (attacks 92 fast + 2 thorough; benign 45 fast)",
     "attack_cases": 94,
-    "detected_attacks": 87,
-    "attack_recall_percent": 92.55,
+    "detected_attacks": 86,
+    "attack_recall_percent": 91.49,
     "benign_cases": 45,
     "false_positives": 0,
     "false_positive_rate_percent": 0.0,
-    "result_sha256": "b4a268736339cce0a3833a8e284ac5f75cf22f1e5a3c8049eb4db68cbb529d4d"
+    "false_positive_rate_ci_percent": {
+      "level_percent": 95,
+      "method": "wilson-score",
+      "observations": 45,
+      "events": 0,
+      "lower_percent": 0.0,
+      "upper_percent": 7.87
+    },
+    "per_depth": {
+      "fast": {
+        "attack_cases": 94,
+        "detected_attacks": 86,
+        "attack_recall_percent": 91.49,
+        "benign_cases": 45,
+        "false_positives": 0,
+        "false_positive_rate_percent": 0.0,
+        "false_positive_rate_ci_percent": {
+          "level_percent": 95,
+          "method": "wilson-score",
+          "observations": 45,
+          "events": 0,
+          "lower_percent": 0.0,
+          "upper_percent": 7.87
+        },
+        "false_positive_ids": []
+      },
+      "thorough": {
+        "attack_cases": 94,
+        "detected_attacks": 86,
+        "attack_recall_percent": 91.49,
+        "benign_cases": 45,
+        "false_positives": 1,
+        "false_positive_rate_percent": 2.22,
+        "false_positive_rate_ci_percent": {
+          "level_percent": 95,
+          "method": "wilson-score",
+          "observations": 45,
+          "events": 1,
+          "lower_percent": 0.39,
+          "upper_percent": 11.57
+        },
+        "false_positive_ids": [
+          "held-benign-enc-016"
+        ]
+      }
+    },
+    "result_sha256": "06fd5aeaf220cbfc264b6dc1ebfc4cc12f611a605f93854f36fdd3a68731b65c"
   },
   "methodology": {
     "attack_success": "non-ALLOW decision with the expected threat class",
     "benign_false_positive": "any non-ALLOW decision",
     "held_out": true,
-    "semantic_enabled": false
+    "semantic_enabled": false,
+    "depth_is_caller_controlled": true,
+    "depth_disclosure": "the headline figures use each case's declared depth; `per_depth` reports every case forced to fast and to thorough, because callers choose depth",
+    "false_positive_rate_bounds": "Wilson score 95% interval; a zero-false-positive observation bounds the true rate, it does not show the rate is zero",
+    "layer_3_calibration_source": "benchmark/calibration_benign.jsonl"
   }
 }
