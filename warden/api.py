@@ -639,7 +639,7 @@ _SCAN_RECOVERY_HINT = (
     " Your task froze because OKX's auto-replay sent no body. No charge was made. "
     "To finish it yourself: fetch the live 402 from this endpoint, then run "
     "`onchainos agent task-402-pay <JOB_ID> --provider-agent-id 3808 "
-    "--endpoint https://warden.gudman.xyz/scan --token-symbol USDT --token-amount 0.5 "
+    "--endpoint https://warden.gudman.xyz/scan --token-symbol USDT --token-amount 0.1 "
     "--accepts '<accepts from the 402>' --body "
     '\'{"payload":"<your untrusted text>"}\'` then '
     "`onchainos agent complete <JOB_ID>`. Guided version: https://warden.gudman.xyz/hire"
@@ -648,7 +648,7 @@ _AUDIT_RECOVERY_HINT = (
     " Your task froze because OKX's auto-replay sent no body. No charge was made. "
     "To finish it yourself: fetch the live 402 from this endpoint, then run "
     "`onchainos agent task-402-pay <JOB_ID> --provider-agent-id 3808 "
-    "--endpoint https://warden.gudman.xyz/audit --token-symbol USDT --token-amount 0.5 "
+    "--endpoint https://warden.gudman.xyz/audit --token-symbol USDT --token-amount 0.1 "
     "--accepts '<accepts from the 402>' --body "
     '\'{"target_url":"<your authorized endpoint URL>"}\'` then '
     "`onchainos agent complete <JOB_ID>`. Guided version: https://warden.gudman.xyz/hire"
@@ -657,7 +657,7 @@ _VARIANT_AUDIT_RECOVERY_HINT = (
     " Your task froze because OKX's auto-replay sent no body. No charge was made. "
     "To finish it yourself: fetch the live 402 from this endpoint, then run "
     "`onchainos agent task-402-pay <JOB_ID> --provider-agent-id 3808 "
-    "--endpoint https://warden.gudman.xyz/variant-audit --token-symbol USDT --token-amount 0.5 "
+    "--endpoint https://warden.gudman.xyz/variant-audit --token-symbol USDT --token-amount 0.1 "
     "--accepts '<accepts from the 402>' --body "
     '\'{"target_url":"<your consenting endpoint URL>"}\'` then '
     "`onchainos agent complete <JOB_ID>`. Guided version: https://warden.gudman.xyz/hire"
@@ -668,7 +668,7 @@ _HARDEN_RECOVERY_HINT = (
     " Your task froze because OKX's auto-replay sent no body. No charge was made. "
     "To finish it yourself: fetch the live 402 from this endpoint, then run "
     "`onchainos agent task-402-pay <JOB_ID> --provider-agent-id 3808 "
-    "--endpoint https://warden.gudman.xyz/harden --token-symbol USDT --token-amount 0.5 "
+    "--endpoint https://warden.gudman.xyz/harden --token-symbol USDT --token-amount 0.1 "
     "--accepts '<accepts from the 402>' --body "
     '\'{"audit_id":"<your completed audit id>"}\'` then '
     "`onchainos agent complete <JOB_ID>`. Guided version: https://warden.gudman.xyz/hire"

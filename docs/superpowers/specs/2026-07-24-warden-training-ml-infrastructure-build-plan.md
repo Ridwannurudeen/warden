@@ -38,7 +38,7 @@ ready.
 
 1. Existing request and payment contracts remain unchanged. Detector corrections and explicitly
    versioned additive evidence fields must have exact regression coverage.
-2. `PAYMENT_AMOUNT` remains `500000`; unsupported payment overrides fail closed.
+2. `PAYMENT_AMOUNT` remains `100000`; unsupported payment overrides fail closed.
 3. Held-out rows never enter training packs, self-test packs, generated variants, shipped artifacts,
    or detector inputs.
 4. Deterministic verdict, pack, mutation, and calibration-selection paths make no model or network
@@ -117,7 +117,7 @@ workstream is reviewed and tested before integration.
 - unknown audit is 404;
 - fully passing audit returns a signed empty-remediation record;
 - held-out rows are absent from every pack;
-- GET and POST remain paywalled at 0.5 USDT;
+- GET and POST remain paywalled at 0.1 USDT;
 - MCP output matches the HTTP output schema.
 
 ### 4.2 Complete F → harden → improved re-audit proof

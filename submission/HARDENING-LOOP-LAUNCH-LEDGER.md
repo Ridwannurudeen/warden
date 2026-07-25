@@ -37,7 +37,7 @@ approval for one destination does not authorize another.
       terms.
 - [ ] Asset symbol/address presentation was recorded exactly; any source-versus-live `USDT` /
       `USD₮0` mismatch was flagged, not silently changed.
-- [ ] The amount was exactly 0.5 USDT / `500000` minimal units.
+- [ ] The amount was exactly 0.1 USDT / `100000` minimal units.
 - [ ] A reviewed paid smoke was separately approved before spending, or marked `[NOT RUN]`.
 - [ ] `/apa/hardening/[PACK_ID]` returned the expected active evidence bundle.
 - [ ] `/scan` and `/audit` contract smoke checks passed unchanged.
@@ -76,18 +76,46 @@ current exact rail must not be stretched into an unsupported subscription/sessio
 
 ## Pricing decision
 
-Recommended: keep `/scan`, `/audit`, and `/harden` at the pinned 0.5 USDT price for launch.
+Decided 2026-07-25 by the operator: move every paid route to 0.1 USDT (`100000` minimal units), the
+lowest price on the pinned rail rather than a per-route experiment.
 
-Reason: it preserves the tested additive route contract and avoids combining a product release with
-an unvalidated pricing experiment. `warden-selftest` remains the free practice funnel. Any
-subscription or hosted-gateway price requires a separate reviewed proposal and an explicit listing
-update.
+Reason: the constraint on demand at this stage is willingness to try an unfamiliar security service,
+not margin, and one price across all four routes preserves the single-`accepts` route contract that
+the tests pin. `warden-selftest` remains the free practice funnel. Any subscription or
+hosted-gateway price requires a separate reviewed proposal and an explicit listing update.
+
+This is the coordinated migration that invariant I2 requires: source, tests, docs, site catalogue,
+and the listing fees all move together.
+
+**Endpoint first, listing second.** If the listing drops to 0.1 while the endpoint still demands
+`500000`, buyers create and fund tasks at 0.1 that the 402 then rejects — real failed tasks against an
+agent currently at 100% approval. The reverse order only breaks the `/hire` command builder, and costs
+nobody money.
+
+**Known gap during the window: `/hire` payment commands will not build.**
+`site/hire.js` derives the expected atomic amount from the catalogue `feeAmount` and requires the live
+`accepts` entry to match it exactly (`site/hire.js:82-99`); no match throws before any command is
+generated. The catalogue is **generated**, not hand-maintained — `scripts/build_index.py:213` writes
+`site/data/warden-services.json` from `data/marketplace/agents-v1.jsonl`, whose Warden entry still
+records `0.5` as fetched on 2026-07-18. So the catalogue cannot honestly read 0.1 until OKX itself
+advertises 0.1.
+
+Order of operations, with the gap open between 1 and 3:
+
+1. Deploy the 0.1 endpoint build.
+2. Update the four listing fees to 0.1 and wait for approval.
+3. Re-fetch the marketplace snapshot, regenerate the catalogue, update the
+   `tests/test_hire_catalog.py` fee assertion to match the new snapshot, and redeploy the site index.
+
+Keep 1→3 tight. Do not hand-edit `site/data/warden-services.json` to close the gap early: the next
+index build overwrites it, so the edit reads as done while changing nothing.
 
 | Service | Launch price decision |
 | --- | --- |
-| `/scan` | `0.5 USDT — unchanged` |
-| `/audit` | `0.5 USDT — unchanged` |
-| `/harden` | `0.5 USDT — new service on existing rail` |
+| `/scan` | `0.1 USDT — reduced from 0.5` |
+| `/audit` | `0.1 USDT — reduced from 0.5` |
+| `/harden` | `0.1 USDT — new service on existing rail` |
+| `/variant-audit` | `0.1 USDT — new service on existing rail` |
 | `warden-selftest` | `Free local tool` |
 | Hosted gateway/subscription | `[NOT OFFERED]` |
 

@@ -85,7 +85,7 @@ const result = await warden.scan(untrustedText, { depth: "thorough" });
 ```
 
 The handler receives a frozen `X402Challenge` only after the SDK validates Warden's
-exact x402 v2 route, recipient, X Layer network, USDT asset, `500000` atomic amount,
+exact x402 v2 route, recipient, X Layer network, USDT asset, `100000` atomic amount,
 300-second timeout, and `USD₮0`/`1` EIP-712 domain. A handler may return a string or
 `Promise<string>`.
 

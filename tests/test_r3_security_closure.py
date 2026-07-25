@@ -151,4 +151,4 @@ def test_public_scan_price_and_corpus_count_match_runtime_contract() -> None:
     assert "94 attack cases" in readme
     assert "0.01 USDT" not in payment
     assert "0.01 USDT" not in ui_audit
-    assert challenge["scan"]["accepts"][0]["amount"] == "500000"
+    assert challenge["scan"]["accepts"][0]["amount"] == "100000"

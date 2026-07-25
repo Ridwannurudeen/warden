@@ -327,7 +327,7 @@ changes, and no directory-wide alias for runtime state. If anything else appears
 `location = /harden` and `location = /variant-audit` are both expected here because the paid hardening and
 adversarial variant-pack routes are additive and must reach the app — Step 5b below requires public
 `/harden` and `/variant-audit` to answer 402. Both ride the same pinned rail as `/scan` and `/audit`
-(0.5 USDT, `exact`, `eip155:196`); a diff that also changes a price or a rail parameter is out of scope for
+(0.1 USDT, `exact`, `eip155:196`); a diff that also changes a price or a rail parameter is out of scope for
 this runbook and must STOP. `/lineage` must **not** appear as its own block: it is a static page served by
 the existing `location /` catch-all (`try_files $uri $uri.html`).
 

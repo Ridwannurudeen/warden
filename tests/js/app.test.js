@@ -300,8 +300,8 @@ test("async status focus and copy labels remain stable across retries", () => {
 test("service metadata resolves only from a normalized catalog", () => {
   const catalog = {
     services: [
-      { key: "scan", serviceId: "33460", feeAmount: "0.5" },
-      { key: "audit", serviceId: "33461", feeAmount: "0.5" },
+      { key: "scan", serviceId: "33460", feeAmount: "0.1" },
+      { key: "audit", serviceId: "33461", feeAmount: "0.1" },
     ],
   };
   assert.equal(catalogServiceByKey(catalog, "audit").serviceId, "33461");

@@ -218,7 +218,7 @@ the previous non-paying behavior.
 
 To opt into one paid replay, inject a callback owned by the caller's wallet boundary.
 The callback receives an immutable `X402Challenge` only after Warden's exact x402 v2
-route, recipient, X Layer network, USDT asset, `500000` atomic amount, 300-second
+route, recipient, X Layer network, USDT asset, `100000` atomic amount, 300-second
 timeout, and `USD₮0`/`1` EIP-712 domain have been validated:
 
 ```python

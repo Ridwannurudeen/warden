@@ -72,7 +72,7 @@ trajectory while keeping held-out evaluation cases private.
 
 **Business model:**
 
-`/scan`, `/audit`, and `/harden` are each pay-per-call services on the existing pinned 0.5 USDT
+`/scan`, `/audit`, and `/harden` are each pay-per-call services on the existing pinned 0.1 USDT
 rail. The self-test and local SDK provide a free practice path before a graded paid audit. Local
 gateway operation is source-ready. Hosted gateway availability, subscription packaging, and any
 pricing changes are not live claims and require separate operator approval.

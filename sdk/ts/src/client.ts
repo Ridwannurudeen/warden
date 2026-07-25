@@ -4,7 +4,7 @@ const PAID_PATH = "/scan";
 const MAX_X402_HEADER_LENGTH = 16_384;
 const X402_NETWORK = "eip155:196";
 const X402_ASSET = "0x779ded0c9e1022225f8e0630b35a9b54be713736";
-const X402_AMOUNT = "500000";
+const X402_AMOUNT = "100000";
 const X402_PAY_TO = "0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51";
 const X402_MIN_REPLAY_WINDOW_SECONDS = 6n;
 const X402_CLOCK_TOLERANCE_SECONDS = 5n;
@@ -47,7 +47,7 @@ export interface X402PaymentRequirement {
   readonly scheme: "exact";
   readonly network: "eip155:196";
   readonly asset: "0x779ded0c9e1022225f8e0630b35a9b54be713736";
-  readonly amount: "500000";
+  readonly amount: "100000";
   readonly payTo: "0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51";
   readonly maxTimeoutSeconds: 300;
   readonly extra: {

@@ -814,7 +814,7 @@ Issued badges and APA attestations remain runtime state on the VPS. After the se
 - `/scan`, `/audit`, `/harden`, and `/variant-audit` proxy to `http://127.0.0.1:8031` on **both GET and
   POST** — the GET twins exist because OKX's x402 check and its paid auto-replay both use GET, and a
   POST-only paywall answers 405 and freezes the buyer's task. All four are paid on the one pinned x402 rail
-  (0.5 USDT, `exact`, `eip155:196`); adding a route never adds a price point. `GET /health` also proxies.
+  (0.1 USDT, `exact`, `eip155:196`); adding a route never adds a price point. `GET /health` also proxies.
   `/health/stats` and `/health/ready` are deliberately **not** published (`location = /health` is
   exact-match); readiness is consumed on localhost by `warden-monitor.service`. Route/conf parity is pinned
   by `tests/test_r3_deploy_parity.py`, which enumerates every FastAPI route and fails unless each one is

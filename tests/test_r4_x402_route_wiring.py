@@ -94,7 +94,7 @@ class CapturingHTTPResourceServer:
         assert payment_requirements == {
             "route": route_key,
             "price": {
-                "amount": "500000",
+                "amount": "100000",
                 "asset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
                 "extra": {"name": "USD₮0", "version": "1"},
             },
@@ -196,7 +196,7 @@ with TestClient(api.app) as client:
         assert options[0].network == "eip155:196"
         assert options[0].pay_to == "0x0000000000000000000000000000000000000001"
         assert options[0].price.model_dump() == {
-            "amount": "500000",
+            "amount": "100000",
             "asset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
             "extra": {"name": "USD₮0", "version": "1"},
         }

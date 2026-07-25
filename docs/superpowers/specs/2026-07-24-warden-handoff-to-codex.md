@@ -231,7 +231,7 @@ baseline to make it green.**
 
 All eight invariants in spec §2 are binding. The ones most at risk in the remaining work:
 
-- **I2 — the price is pinned.** `PAYMENT_AMOUNT = "500000"` and `load_payment_rail` fails closed on any
+- **I2 — the price is pinned.** `PAYMENT_AMOUNT = "100000"` and `load_payment_rail` fails closed on any
   override. New paid routes reuse the exact rail at the exact price. **No second price tier.**
 - **I3 — held-out data never ships.** Packs read `corpus/attacks.jsonl` only.
 - **I6 — no external actions.** No deploy, push, publish, form submission, social post, transaction,

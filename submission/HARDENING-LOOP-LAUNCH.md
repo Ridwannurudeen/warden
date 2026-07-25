@@ -8,7 +8,7 @@ updates, recording/upload, posting, payment, authentication, or form submission.
 - `POST /audit` runs the fixed `warden-core-http` battery against a consented endpoint and can issue
   a signed audit record.
 - `GET` and `POST /harden` accept a completed 16-character `audit_id` and return a deterministic,
-  Ed25519-signed Hardening Pack on the same pinned 0.5 USDT x402 rail.
+  Ed25519-signed Hardening Pack on the same pinned 0.1 USDT x402 rail.
 - A pack references its source audit, contains training-corpus examples only, carries source/license
   provenance, expires after 30 days, and is committed to Warden's transparency log.
 - `warden-selftest` can independently verify a public pack evidence bundle and exercise its vectors.
@@ -82,7 +82,7 @@ This is a fresh authenticated operator check, not a claim about current status.
       its service ID; an update delta is required instead.
 - [ ] Confirm the reviewed production deployment exposes valid unpaid x402 challenges on both
       `GET /harden` and `POST /harden`.
-- [ ] Confirm the displayed payment terms are the intended X Layer asset and exactly 0.5 USDT.
+- [ ] Confirm the displayed payment terms are the intended X Layer asset and exactly 0.1 USDT.
 - [ ] Run the platform's listing validation once against the final profile copy and the create/update
       service entry.
 - [ ] Review the exact diff card and obtain explicit user confirmation before the listing write.

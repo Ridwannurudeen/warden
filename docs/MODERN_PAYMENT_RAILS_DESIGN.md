@@ -3,8 +3,8 @@
 **Status:** design complete; implementation intentionally blocked until the supported client,
 server, and facilitator surfaces are verified together.
 
-Warden's production rail remains unchanged: x402 v2 `exact`, `eip155:196`, 0.5 USDT
-(`500000` atomic units), and one `accepts` entry on each paid route. This document does not authorize
+Warden's production rail remains unchanged: x402 v2 `exact`, `eip155:196`, 0.1 USDT
+(`100000` atomic units), and one `accepts` entry on each paid route. This document does not authorize
 a dependency update, deployment, authenticated OKX request, or payment.
 
 ## Verified 2026-07-24
@@ -47,7 +47,7 @@ challenge remains byte-identical.
 
 The existing `/scan`, `/audit`, and `/harden` routes keep exactly one `exact` option. A modern rail
 must first be proven on an additive route or a separate payment-router boundary at the same pinned
-0.5 USDT amount. The original readiness monitor continues to inspect the original `/scan` challenge;
+0.1 USDT amount. The original readiness monitor continues to inspect the original `/scan` challenge;
 a separate monitor validates the experimental route. No second price tier is introduced.
 
 The adapter must expose one internal result contract:

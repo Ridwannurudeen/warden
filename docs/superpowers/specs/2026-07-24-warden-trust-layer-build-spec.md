@@ -67,7 +67,7 @@ made. **A build that breaks one of these is rejected regardless of how well it w
 current behavior. New capability arrives as new routes, new modules, new stores. No repurposing.
 
 ### I2. The payment rail is pinned — do not change the price
-[VERIFIED — `warden/payment.py`] `PAYMENT_AMOUNT = "500000"` (0.5 USDT) is a module-level constant.
+[VERIFIED — `warden/payment.py`] `PAYMENT_AMOUNT = "100000"` (0.1 USDT) is a module-level constant.
 `load_payment_rail()` compares every `WARDEN_PAYMENT_*` environment variable against
 `_FIXED_CONFIGURATION` and **raises at startup** on any divergence (`payment.py:103-107`). The rail is
 x402 v2 `exact`, network `eip155:196` (X Layer), asset `0x779ded0c9e1022225f8e0630b35a9b54be713736`,
@@ -290,7 +290,7 @@ Pack content is **data, not prose generated at request time**. No LLM call (I4).
   fingerprint, and an explicit limitations string.
 - Unknown `audit_id` → 404. Known but **fully-passing** audit → a valid pack with zero remediation
   entries and a clear "nothing to harden" message, **not** an error.
-- Paid, at the pinned 0.5 USDT rail (I2). Wire all four places from 3.3.
+- Paid, at the pinned 0.1 USDT rail (I2). Wire all four places from 3.3.
 - Add matching models to `models.py` next to the audit models.
 
 #### A5. MCP tool
@@ -419,7 +419,7 @@ a retained head; sequence numbers are monotonic and gaps are detected.
 
 ### Workstream F — Modern payment rails (metered + subscription)
 
-**Why:** Warden bills per call at a flat 0.5 USDT. Continuous monitoring and high-frequency scanning
+**Why:** Warden bills per call at a flat 0.1 USDT. Continuous monitoring and high-frequency scanning
 need metered and recurring billing. [Context, unverified: adjacent OKX.AI security agents price at
 0.05–0.1 USDT, so per-call flat pricing is the weakest commercial surface — but see I2: **this
 workstream adds rails, it does not change the price**.]
