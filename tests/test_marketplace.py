@@ -549,6 +549,26 @@ def test_marketplace_service_rejects_unsafe_fee_amounts(fee_amount):
         )
 
 
+def test_marketplace_service_prefers_the_numeric_id_over_a_uuid_service_id():
+    # A live search row carries both identifiers; the UUID alone would break the crawl.
+    service = MarketplaceService.model_validate(
+        {
+            "id": "33460",
+            "serviceId": "c2783b5b-a932-4249-b0e2-4ccc6245fd63",
+            "serviceName": "Payload Security Scan",
+        }
+    )
+
+    assert service.service_id == "33460"
+    # Snapshots and the published catalog keep the serviceId key they already use.
+    assert service.model_dump(by_alias=True)["serviceId"] == "33460"
+
+
+def test_marketplace_service_rejects_a_row_carrying_only_a_uuid_identifier():
+    with pytest.raises(ValidationError):
+        MarketplaceService.model_validate({"serviceId": "c2783b5b-a932-4249-b0e2-4ccc6245fd63"})
+
+
 def test_renderer_escapes_content_handles_zero_services_and_verifies_badge(tmp_path, monkeypatch):
     monkeypatch.setenv("WARDEN_BADGE_SECRET", "marketplace-render-test-key")
     badge = issue_badge(
