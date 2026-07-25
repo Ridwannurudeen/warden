@@ -41,8 +41,16 @@ ready.
 2. `PAYMENT_AMOUNT` remains `100000`; unsupported payment overrides fail closed.
 3. Held-out rows never enter training packs, self-test packs, generated variants, shipped artifacts,
    or detector inputs.
-4. Deterministic verdict, pack, mutation, and calibration-selection paths make no model or network
-   call.
+4. Deterministic verdict, pack, mutation, and calibration-selection paths make no network call and
+   no third-party or remote model call. Bundled offline weights are explicitly permitted: a fitted
+   model that ships as a signed artifact inside the package and is evaluated by pure-numpy
+   arithmetic reads no clock, draws no randomness, contacts no provider, and returns the same value
+   for the same input in every process, so it does not weaken determinism — the property the
+   invariant exists to protect. What remains forbidden is any inference that leaves the process:
+   hosted classifiers, embedding services, and any weights fetched at runtime. Offline weights that
+   are wired to a verdict must still be version-pinned to the feature extractor that produced them
+   and must fail closed to the deterministic result when the artifact is absent or does not
+   validate.
 5. Warden emits technical evidence, not “certification,” accreditation, or safety guarantees.
 6. No external action listed in §1 occurs without explicit user approval.
 7. Consent remains mandatory for every active endpoint probe.

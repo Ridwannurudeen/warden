@@ -6,4 +6,5 @@ include spec/taxonomy-map-v1.json
 include spec/schemas/model-calibration-capture-v1.schema.json
 include spec/schemas/model-threshold-candidate-v1.schema.json
 include warden/analyzers/bip39_words.txt
+include warden/scanner/learned_scorer.json
 include warden/corpus_fingerprint.txt

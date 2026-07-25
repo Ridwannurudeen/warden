@@ -65,6 +65,15 @@ ANALYZER_POLICY_TABLE = (
     PolicyRule(20, "SANITIZE", "LOW"),
     PolicyRule(0, "ALLOW", "NONE"),
 )
+# The learned advisory scorer contributes one policy rule that is combined with
+# the deterministic rules by the same monotone `max`. Evidence-only is the
+# lowest rule in both orderings, so it is arithmetically incapable of changing
+# a verdict; enforcement, when an operator turns it on, can only escalate.
+LEARNED_EVIDENCE_ONLY_POLICY = PolicyRule(0, "ALLOW", "NONE")
+LEARNED_POLICY_TABLE: dict[str, PolicyRule] = {
+    "SANITIZE": PolicyRule(0, "SANITIZE", "MEDIUM"),
+    "BLOCK": PolicyRule(0, "BLOCK", "HIGH"),
+}
 
 
 @dataclass
@@ -78,6 +87,8 @@ class Verdict:
     checks: dict[str, str] = field(default_factory=dict)
     failed_checks: list[ReasonCode] = field(default_factory=list)
     latency_ms: float = 0.0
+    # Additive evidence field. None means no learned scorer was loaded.
+    attack_probability: float | None = None
 
 
 class VerdictEngine:
@@ -88,6 +99,47 @@ class VerdictEngine:
         payload: str | None,
         scanner_result: Mapping[str, object] | None,
         analyzer_results: Sequence[AnalyzerResult],
+    ) -> Verdict:
+        probability, learned_policy = self._learned_evidence(scanner_result)
+        verdict = self._decide(payload, scanner_result, analyzer_results, learned_policy)
+        if probability is not None:
+            verdict.attack_probability = probability
+            verdict.checks["learned_scorer"] = (
+                f"advisory - attack probability {probability:.4f}"
+                + (
+                    ""
+                    if learned_policy is LEARNED_EVIDENCE_ONLY_POLICY
+                    else f", enforcement requested {learned_policy.verdict.lower()}"
+                )
+            )
+        return verdict
+
+    @staticmethod
+    def _learned_evidence(
+        scanner_result: Mapping[str, object] | None,
+    ) -> tuple[float | None, PolicyRule]:
+        """Read the scanner's advisory block. Anything malformed stays evidence-only."""
+        learned = scanner_result.get("learned") if scanner_result else None
+        if not isinstance(learned, Mapping):
+            return None, LEARNED_EVIDENCE_ONLY_POLICY
+        probability = learned.get("attack_probability")
+        if (
+            isinstance(probability, bool)
+            or not isinstance(probability, (int, float))
+            or not math.isfinite(probability)
+            or not 0.0 <= probability <= 1.0
+        ):
+            return None, LEARNED_EVIDENCE_ONLY_POLICY
+        enforced = learned.get("enforced_verdict")
+        policy = LEARNED_POLICY_TABLE.get(enforced) if isinstance(enforced, str) else None
+        return float(probability), policy or LEARNED_EVIDENCE_ONLY_POLICY
+
+    def _decide(
+        self,
+        payload: str | None,
+        scanner_result: Mapping[str, object] | None,
+        analyzer_results: Sequence[AnalyzerResult],
+        learned_policy: PolicyRule,
     ) -> Verdict:
         if payload is None:
             return Verdict(
@@ -180,11 +232,11 @@ class VerdictEngine:
             rule for rule in ANALYZER_POLICY_TABLE if analyzer_score >= rule.minimum_score
         )
         selected_policy = max(
-            (scanner_policy, analyzer_policy),
+            (scanner_policy, analyzer_policy, learned_policy),
             key=lambda rule: VERDICT_ORDER[rule.verdict],
         )
         selected_risk = max(
-            (scanner_policy.risk_level, analyzer_policy.risk_level),
+            (scanner_policy.risk_level, analyzer_policy.risk_level, learned_policy.risk_level),
             key=lambda risk: RISK_ORDER[risk],
         )
         selected_verdict = selected_policy.verdict

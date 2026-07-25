@@ -172,6 +172,9 @@ class ScanResponse(BaseModel):
     recommendation: str
     checks: dict[str, str]
     latency_ms: float
+    # Additive evidence field from the offline learned advisory scorer. null when
+    # no weights artifact is loaded. Advisory only — it does not set the verdict.
+    attack_probability: float | None = Field(default=None, ge=0, le=1)
 
     @classmethod
     def from_verdict(cls, verdict: Verdict) -> "ScanResponse":
@@ -184,6 +187,7 @@ class ScanResponse(BaseModel):
             recommendation=verdict.recommendation,
             checks=verdict.checks,
             latency_ms=verdict.latency_ms,
+            attack_probability=verdict.attack_probability,
         )
 
 

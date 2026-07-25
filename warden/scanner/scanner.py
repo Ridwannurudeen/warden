@@ -18,6 +18,7 @@ from collections import Counter
 from typing import Dict, List, Optional, Tuple
 
 from warden.scanner.embedding import EmbeddingAnalyzer
+from warden.scanner.learned import LearnedScorer
 from warden.scanner.patterns import (
     INJECTION_PATTERNS,
     CATEGORY_CONFIDENCE,
@@ -64,9 +65,11 @@ class InjectionScanner:
         self,
         ai_analyzer: SemanticAnalyzer | None = None,
         embedding_analyzer: EmbeddingAnalyzer | None = None,
+        learned_scorer: LearnedScorer | None = None,
     ):
         self._ai = ai_analyzer
         self._embedding = embedding_analyzer
+        self._learned = learned_scorer
         # Pre-compile regex patterns for performance
         self._compiled_patterns: Dict[str, List[Tuple[re.Pattern, str]]] = {}
         for category, patterns in INJECTION_PATTERNS.items():
@@ -130,6 +133,9 @@ class InjectionScanner:
                 detections (list[dict]): Individual detection results
                 sanitized_content (str): Content with injections removed
                 recommendation (str): Human-readable guidance
+                learned (dict | None): Offline learned-scorer evidence, or None
+                    when no weights artifact is loaded. Never affects the keys
+                    above.
         """
         if not content or not content.strip():
             return self._build_result(
@@ -139,6 +145,7 @@ class InjectionScanner:
                 detections=[],
                 sanitized_content=content or "",
                 recommendation="Empty content — no injection risk.",
+                learned=None,
             )
 
         detections: List[Dict] = []
@@ -164,6 +171,8 @@ class InjectionScanner:
                 }
             )
             layers_triggered.append(2)
+
+        layer3_result: Optional[Dict] = None
 
         if depth == "thorough":
             heuristic_score = layer2_result["score"]
@@ -217,6 +226,22 @@ class InjectionScanner:
                     )
                     layers_triggered.append(5)
 
+        # ── Learned advisory layer ─────────────────────────────────
+        # Offline weights, pure numpy, evidence only: the block below is
+        # attached alongside the deterministic result and never enters
+        # `detections`, so `clean`, `risk_level`, `layers_triggered` and
+        # `sanitized_content` are byte-identical to a run without a model.
+        learned: Optional[Dict] = None
+        if self._learned is not None:
+            if layer3_result is None:
+                layer3_result = self._run_similarity_layer(content)
+            learned = self._learned.evaluate(
+                content,
+                regex_hits=layer1_hits,
+                heuristic=layer2_result,
+                similarity=layer3_result,
+            )
+
         # ── Aggregate results ──────────────────────────────────────
         clean = len(detections) == 0
         risk_level = self._compute_risk_level(detections, layers_triggered)
@@ -230,6 +255,7 @@ class InjectionScanner:
             detections=detections,
             sanitized_content=sanitized,
             recommendation=recommendation,
+            learned=learned,
         )
 
     # ── Layer 1: Regex ─────────────────────────────────────────────────
@@ -594,4 +620,5 @@ class InjectionScanner:
             "detections": kwargs["detections"],
             "sanitized_content": kwargs["sanitized_content"],
             "recommendation": kwargs["recommendation"],
+            "learned": kwargs["learned"],
         }
