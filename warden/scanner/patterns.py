@@ -6,27 +6,98 @@ and imperative verb lists used by the InjectionScanner.
 
 # ── Layer 1: Regex patterns ────────────────────────────────────────────
 
+# A trigger phrase on its own is not an injection: ordinary operational English says
+# "forget everything you know about the old pricing tiers" and "act as the primary
+# contact". What makes the phrase an injection is what it points at — an
+# instruction-override object, a replacement clause, or an agent persona — and what it
+# is not pointing at, such as a named document or a bank account. The fragments below
+# carry those requirements so the patterns stay narrow.
+
+# The thing an override tells the model to discard.
+_OVERRIDE_OBJECT = (
+    r"(?:instructions?|prompts?|rules?|context|restrictions?|safeguards?|guardrails?"
+    r"|directives?|guidelines?|constraints?|polic(?:y|ies)|training)\b"
+)
+# ...or, instead of naming it, an immediate replacement clause: an `and` joined
+# directly to the discard verb, followed by the imperative it is clearing the way
+# for ("and follow only this message", "and treat this as the only authority", "and
+# route the balance out"). Benign use puts a preposition there instead — "forget
+# everything you know *about* the pricing tiers", "were told *at* the kickoff".
+_OVERRIDE_CONTINUATION = (
+    r"\s*[,;]?\s*and\s+(?:only\s+|instead\s+|now\s+)?"
+    r"(?:follow|obey|use|apply|comply|execute|treat|do"
+    r"|route|send|transfer|move|wire|forward|approve|withdraw|redirect|swap|pay"
+    r"|reveal|disclose|leak|ignore|disregard|bypass|skip|grant|authorize"
+    r"|mark|return|respond|reply|continue|proceed|accept|allow|become)\b"
+)
+# Optional qualifiers between the verb and the object.
+_OVERRIDE_QUALIFIERS = (
+    r"(?:the\s+|your\s+|any\s+|all\s+|my\s+)*"
+    r"(?:previous\s+|prior\s+|earlier\s+|above\s+|original\s+|system\s+|safety\s+)*"
+)
+# The identity a role override installs. An ordinary delegation ("act as the primary
+# contact", "your new role is to run the ops review") names a human job, not one of
+# these.
+_AGENT_PERSONA = (
+    r"(?:assistant|agent|ai|model|bot|admin(?:istrator)?|operator|drainer|persona"
+    r"|character|hacker|jailbreak\w*|oracle|approver|executor|entity|dan|signer"
+    r"|owner|root|superuser|unrestricted|unfiltered|uncensored)\b"
+)
+# An override that names a document ("ignore the previous instructions in the
+# onboarding doc") is scoping a reference, not overriding the model. Only an
+# immediately following document reference qualifies.
+_DOCUMENT_REFERENCE = (
+    r"(?!\s+(?:in|from|on|of|within|inside)\s+(?:the\s+|that\s+|this\s+|our\s+|your\s+|an?\s+)?"
+    r"(?:[\w-]+\s+){0,2}"
+    r"(?:docs?|document|documents|documentation|wiki|guide|manual|readme|handbook"
+    r"|playbook|runbook|email|thread|ticket|spec|page|file|sheet|deck|memo|portal"
+    r"|form|template|pdf|attachment|changelog|faq)\b)"
+)
+# A sweep instruction stays a drain even when it names no destination ("transfer all
+# tokens now"), so the destination cannot be required. What it must not be is
+# off-chain: a fiat treasury note ("move all funds out of the escrow account before
+# the bank closes it") is ordinary business, and only banking vocabulary in the same
+# sentence tells the two apart.
+_OFF_CHAIN_DESTINATION = (
+    r"(?![^.!?\n]{0,120}?\b(?:bank|banks|banking|iban|swift\s+code|sort\s+code"
+    r"|routing\s+number|ach|sepa|wire\s+room"
+    r"|(?:escrow|checking|savings|current|deposit|bank)\s+account)\b)"
+)
+
 INJECTION_PATTERNS = {
     "direct_instruction": [
         r"(?i)(?:ignore|disregard|override|forget)\s+(?:all\s+)?(?:the\s+)?"
         r"(?:previous|prior|above|earlier|foregoing)\s+"
         r"(?:instructions?|prompts?|rules?|context|restrictions?|safeguards?"
         r"|guardrails?|directives?|guidelines?|constraints?|polic(?:y|ies)"
-        r"|safety\s+(?:constraints?|rules?|guidelines?|measures?|checks?))",
-        r"(?i)forget\s+(?:everything|all)\s+(?:you\s+)?(?:know|were\s+told)",
+        r"|safety\s+(?:constraints?|rules?|guidelines?|measures?|checks?))\b" + _DOCUMENT_REFERENCE,
+        r"(?i)forget\s+(?:everything|all)\s+(?:(?:that\s+)?you\s+)?(?:know|were\s+told)"
+        r"(?:\s+about)?"
+        r"(?:\s+" + _OVERRIDE_QUALIFIERS + _OVERRIDE_OBJECT + r"|" + _OVERRIDE_CONTINUATION + r")",
         r"(?i)\bset\s+aside\s+(?:(?:everything|all)\s+)?"
-        r"(?:(?:that|what)\s+)?you\s+(?:were\s+)?(?:told|instructed)\b",
+        r"(?:(?:that|what)\s+)?you\s+(?:were\s+)?(?:told|instructed)\b"
+        r"(?:\s+(?:about\s+)?"
+        + _OVERRIDE_QUALIFIERS
+        + _OVERRIDE_OBJECT
+        + r"|"
+        + _OVERRIDE_CONTINUATION
+        + r")",
         r"(?i)new\s+(?:instructions?|rules?|prompt)\s*:",
-        r"(?i)reveal\s+(?:the\s+)?(?:system|developer)\s+prompt",
+        r"(?i)reveal\s+(?:the\s+)?(?:system|developer)\s+prompt\b"
+        # "Please reveal the system prompt is our most common support request" quotes
+        # the phrase in order to answer it; a copular continuation marks the mention.
+        r"(?!\s*[\"'”]?\s+(?:is|was|are|were)\b)",
     ],
     "role_override": [
         r"(?i)you\s+are\s+(?:now\s+)?(?:a|an)\s+(?:[\w-]+\s+){0,4}"
         r"(?:assistant|agent|ai|model|bot|admin(?:istrator)?|operator|drainer|persona"
         r"|character|hacker|jailbreak\w*|oracle|approver|executor|entity|dan|"
         r"unrestricted|unfiltered|uncensored)",
-        r"(?i)act\s+as\s+(?:if\s+)?(?:you\s+are\s+)?",
+        r"(?i)act\s+as\s+(?:if\s+)?(?:you\s+(?:are|were)\s+)?(?:a|an|the)?\s*"
+        r"(?:[\w-]+\s+){0,4}" + _AGENT_PERSONA,
         r"(?i)pretend\s+(?:to\s+be|you\s+are)",
-        r"(?i)your\s+(?:new\s+)?(?:role|identity|persona)\s+is",
+        r"(?i)your\s+(?:new\s+)?(?:role|identity|persona)\s+is\s+(?:now\s+)?(?:to\s+)?"
+        r"(?:a|an|the)?\s*(?:[\w-]+\s+){0,4}" + _AGENT_PERSONA,
         r"(?i)developer\s+mode\s+(?:enabled|active)",
         r"(?i)from\s+now\s+on,?\s+respond\s+as\s+",
         r"(?i)ignore\s+(?:all\s+)?prior\s+instructions?\s+and\s+become\s+",
@@ -35,7 +106,7 @@ INJECTION_PATTERNS = {
     ],
     "web3_specific": [
         r"(?i)(?:transfer|approve|swap|move|redirect|route|wire|forward)\s+all\s+"
-        r"(?:tokens?|funds?|balance)",
+        r"(?:tokens?|funds?|balance)\b" + _OFF_CHAIN_DESTINATION,
         r"(?i)send\s+(?:everything|all)\s+to\s+0x[a-fA-F0-9]{40}",
         r"(?i)set\s+(?:unlimited|infinite)\s+approv",
         r"(?i)urgent\s*:\s*(?:withdraw|transfer|approve)",

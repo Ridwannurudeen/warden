@@ -28,6 +28,10 @@ SECRET_DOCUMENT_SUFFIX_RE = re.compile(
     r"(?i)^\s+(?:(?:rotation|security)\s+)?"
     r"(?:notice|documentation|docs?|guide|manual|policy|procedure|report)\b"
 )
+# A support answer quotes the request in order to refuse it: "reveal the system
+# prompt is the single most common thing people ask". A copular continuation makes
+# the phrase the subject of a sentence, which is a mention rather than a demand.
+QUOTED_REQUEST_SUFFIX_RE = re.compile(r"(?i)^\s*[\"'”’]?\s+(?:is|was|are|were)\b")
 # Distinctive API-key/token shapes with near-zero benign collision rates.
 # Only flagged when an exfil verb appears near the token (or a full exfil
 # instruction is present elsewhere), so documentation and benign prose that
@@ -280,6 +284,7 @@ class ExfiltrationAnalyzer(Analyzer):
                 if (
                     not NEGATED_INSTRUCTION_RE.search(prefix)
                     and not SECRET_DOCUMENT_SUFFIX_RE.search(suffix)
+                    and not QUOTED_REQUEST_SUFFIX_RE.search(suffix)
                     and not ExfiltrationAnalyzer._has_safe_transform_condition(
                         payload[instruction.start() : min(len(payload), instruction.end() + 256)]
                     )
