@@ -40,7 +40,7 @@ test("public evaluation data matches the committed held-out benchmark", () => {
   assert.match(view.measuredAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
   assert.equal(evaluation.methodology.semantic_enabled, false);
   assert.equal(view.mode, "Deterministic; semantic model disabled");
-  assert.equal(benchmark.attack_recall_percent, 91.49);
+  assert.equal(benchmark.attack_recall_percent, 94.68);
   assert.equal(benchmark.false_positive_rate_percent, 0);
 
   // `depth` is caller-controlled, so the public file must carry both depths and
