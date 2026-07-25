@@ -4,8 +4,8 @@
 **Agent:** #3808 (Warden), owner `0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51`
 **Status:** DRAFT — not submitted. The on-chain write is gated on an explicit confirmation.
 
-> Character limits and the exact service-key constraints are still being confirmed against OKX's own
-> published rules. Wording below may need trimming once those land. Nothing here is authorized yet.
+> Field rules below were verified against OKX's own offline validator and skill references.
+> The copy passes `validate-listing` with zero findings. Nothing here is authorized or submitted yet.
 
 ## Current state (verified from the registry, 2026-07-25)
 
@@ -45,28 +45,37 @@ bazaar schema declares `required: ["audit_id"]`.
 >
 > Provide: the audit_id of a completed Warden endpoint audit.
 
-## Proposed profile description
+## Proposed profile description — VALIDATED
 
-Positioning: **technical automation + agent training**, with the gateway named honestly as serving-path
-infrastructure rather than a hosted product.
+`onchainos agent validate-listing --role asp` returns **`pass: true`, zero findings** for this copy
+together with the service entry above. **492 characters** against OKX's hard 500-character limit
+(code `D8`, counted in Unicode characters — *not* display width, which applies only to
+`serviceDescription`). No URL (`D6`), no `0x` address (`U2`), no `(beta)`-style marker (`U1`), no
+negative-capability phrasing (`U3`).
 
-> Security automation and agent training for the agent economy. Warden screens untrusted responses, tool
-> outputs, and messages for prompt injection, hijacked tool calls, drain or attacker payout addresses, and
-> secret exfiltration, returning ALLOW / SANITIZE / BLOCK before your agent acts. It audits another agent's
-> endpoint against a fixed attack battery, then issues a signed Hardening Pack naming exactly what to fix
-> and re-audits to show whether the grade moved. A fail-closed gateway is available to run in front of your
-> own serving path. It returns narrow technical evidence, not certification.
+> Security automation and agent training for AI agents. Warden screens untrusted responses, tool outputs, and messages for prompt injection, hijacked tool calls, drain or attacker payout addresses, and secret exfiltration, returning ALLOW / SANITIZE / BLOCK before your agent acts. It also audits an agent endpoint against a fixed attack battery, then issues a signed Hardening Pack naming what to fix and re-audits to show whether the grade moved. Narrow technical evidence, not certification.
 
-Deliberate choices: no links, no example prompts, no tech-stack list, no pricing, no celebrity or
-third-party names, and the final sentence keeps the honesty commitment that Warden never claims
-certification.
+The earlier draft of this section was **598 characters and hard-failed `D8`**. It also advertised the
+fail-closed gateway; that sentence was cut, because the gateway is self-hosted software rather than a
+purchasable service and the space was better spent on the loop.
 
-## Avatar
+## Avatar — do not touch it
 
-Under assessment. The live avatar is
-`https://static.okx.com/cdn/web3/wallet/marketplace/headimages/agent/avatar/65ae9b37-4cd0-40d8-8440-affa2d333090.png`
-and the repo copy is `site/assets/warden-avatar.png`. It will only be replaced if it actually fails a
-published requirement — a working avatar on a 5.0-rated listing is not worth churning for taste.
+**Correction to the earlier draft, which implied `site/assets/warden-avatar.png` is the live avatar. It
+is not.** The live CDN object is a *different, earlier* image: 440x440, colour type 2 (RGB, no alpha),
+16,962 bytes, uploaded 2026-07-11 14:58 UTC. That matches the repo blob at commit `13e05fc`, whose
+message records that **OKX had already rejected an earlier avatar** for dimensions and polish. The
+current on-disk file is the 2026-07-14 rebrand (440x440 RGBA, 17,957 bytes) and was **never uploaded**.
+
+So replacing it would submit a brand-new, never-reviewed image on the one axis where this listing has
+already been rejected once — for a purely aesthetic gain.
+
+It also does not need replacing. Every published requirement is met: PNG (also JPEG/WebP accepted), 1:1
+(square is advisory, not required), and far under the hard 1 MB cap. **No pixel-dimension requirement is
+published anywhere** — in the skill files, in the CLI binary, or on the ASP tutorial. The widely-repeated
+"440x440" is one developer's inference from a rejection notice, not a documented spec.
+
+`agent update --picture` is optional: omitted means unchanged. This update omits it.
 
 ## The risk to weigh before confirming
 
