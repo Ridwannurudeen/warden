@@ -99,7 +99,13 @@ class MarketplaceAgent(BaseModel):
     name: str = ""
     profile_description: str = Field(default="", alias="profileDescription")
     category_codes: list[str] = Field(default_factory=list, alias="categoryCode")
-    sold_count: int | None = Field(default=None, alias="soldCount")
+    # The census reports the same figure as `soldCount`; our own `service-list` reports it
+    # as `salesCount`, so the provider fetch would otherwise lose it.
+    sold_count: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("soldCount", "salesCount"),
+        serialization_alias="soldCount",
+    )
     feedback_rate: float | None = Field(default=None, alias="feedbackRate", allow_inf_nan=False)
     security_rate: float | None = Field(default=None, alias="securityRate", allow_inf_nan=False)
     online_status: int | None = Field(default=None, alias="onlineStatus")
