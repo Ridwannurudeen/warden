@@ -89,6 +89,48 @@ behind loses its badge.
 
 ---
 
+## 2b. Phase 1 preflight results — BLOCKER FOUND (executed read-only, 2026-07-25)
+
+The preflight ran and **stopped Phase 1 at step 4.** Nothing on the VPS was modified: no user created, no
+package installed, no daemon started, no credential entered.
+
+**Host is fine.** Ubuntu 24.04.3 LTS, kernel 6.8, x86_64, 8 CPUs, 24 GB RAM (~9 GB available), 888 GB free
+on `/`. **node v23.11.1** and **npm 10.9.2** both clear the ≥ 22.14.0 requirement, so no node work is needed.
+
+**`deploy/DEPLOY.md:10` is stale.** It says an authenticated `onchainos` CLI does not exist on the VPS. Both
+CLIs are in fact already installed: `onchainos` **4.2.4** at `/usr/local/bin/onchainos` (newer than the
+laptop's 4.1.0) and `okx-a2a` **0.1.9** at `/usr/bin/okx-a2a` (the laptop is on 0.1.10). `/root/.okx-agent-task`
+exists with only a `sqlite/` subdirectory — no `xmtp/` state, so no agent communication identity has ever been
+established there. `okx-a2a daemon status` → **`stopped`**, and no `okx-a2a`/`a2a-node`/`onchainos` process is
+running, so constraint **C1 is not currently violated**.
+
+**The blocker: the VPS is authenticated to a different wallet than the one that owns Warden.**
+
+| Host | Wallet | Agents | Online |
+| --- | --- | --- | --- |
+| Laptop | `0xf4c9…cfa51` | **#3808 Warden** (ASP), #6961 Tilla (ASP), #4844 Gudman (User) | all `1` |
+| VPS | `0x43ea…af55` | #8333 Tilla Studio (ASP, *listing under review*), #8345 Tilla Demo Buyer (User) | both `2` |
+
+These are two separate OKX accounts. Warden's presence cannot be served from the VPS until the wallet that
+owns `#3808` is authenticated there, and that is a credential action for the user — not something to be
+automated.
+
+**Two consequences the plan did not anticipate:**
+
+1. **The laptop daemon carries three production agents, not one.** Migrating Warden moves Tilla `#6961` and
+   Gudman `#4844` too, since they share the same wallet and the same daemon. Any partial migration splits one
+   wallet across two hosts.
+2. **The VPS already serves another account's agents.** Adding a second wallet there must not disturb the
+   existing Tilla Studio setup, especially while `#8333` is under listing review. `onchainos` groups agents by
+   `accountName`, which suggests multiple wallets are supported on one host, but that is **unverified** and
+   must be confirmed before touching the VPS auth state.
+
+**Also worth noting, unrelated to this migration:** both VPS-account agents are offline (`onlineStatus: 2`),
+for the same root cause — no daemon is running anywhere for that wallet.
+
+**Decision required before Phase 1 can continue** (see §7 / C4): whether to authenticate Warden's wallet
+alongside the existing one on the shared host, and if so, who performs that credential step.
+
 ## 3. Phase 1 — Prepare the VPS (no cutover, fully reversible)
 
 Nothing in this phase touches the running laptop daemon or the live listing.
