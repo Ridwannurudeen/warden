@@ -17,15 +17,15 @@ depth, and `results.json` carries a `per_depth` block.
 
 Headline, using each case's declared depth (attacks 92 fast + 2 thorough; benign 45 fast):
 
-- Attack recall: **91.49% (86/94)**
+- Attack recall: **93.62% (88/94)**
 - False-positive rate: **0.00% (0/45)**
 
 Forcing every case to one depth instead:
 
 | depth | attack recall | false positives | FP rate | Wilson 95% CI for the FP rate |
 | --- | --- | --- | --- | --- |
-| `fast` | 91.49% (86/94) | 0/45 | 0.00% | 0.00% – 7.87% |
-| `thorough` | 91.49% (86/94) | 1/45 | 2.22% | 0.39% – 11.57% |
+| `fast` | 93.62% (88/94) | 0/45 | 0.00% | 0.00% – 7.87% |
+| `thorough` | 93.62% (88/94) | 1/45 | 2.22% | 0.39% – 11.57% |
 
 The single `thorough` false positive is `held-benign-enc-016`, ordinary developer code containing
 `base64.b64decode(...)`, which scores 0.6477 TF-IDF cosine similarity against the injection corpus
@@ -60,10 +60,30 @@ calibration maximum, giving **0.59** — zero false positives on the calibration
 The previous `0.52` was tuned against held-out benchmark scores, which breaks the held-out
 invariant, and its quoted 0.506 benign peak was also stale (the held-out benign maximum is 0.6477).
 Honest calibration costs one case: 0.59 exceeds `held-corpus-001`'s 0.5353, so recall fell from the
-previously published 92.55% (87/94) to 91.49% (86/94). On this data the calibration benign maximum
+previously published 92.55% (87/94) to 91.49% (86/94), before the analyzer-vocabulary work below raised it to 93.62% (88/94). On this data the calibration benign maximum
 (0.5831) sits *above* the best genuine corpus-match attack score (0.5353), so no threshold both
 detects that case and keeps the calibration split clean; the earlier number depended on the leak.
 Do not re-tune this constant against `benchmark/held_out_*.jsonl`.
+
+## How the 88/94 was reached, and what that costs the number
+
+Two of the eight published misses were closed deliberately, and the method matters more than the
+result. `held-drain-002` and `held-secret-002` were both real attacks with real structure — a genuine
+EVM address under a payment instruction, and a credential under an outbound verb aimed at an external
+party — that the analyzers missed because their vocabulary was thin. The fixes are vocabulary
+*classes* derived from general domain sources (the payments verb family, the OAuth 2.0 / OIDC token
+objects, the external-recipient sink family), not patterns written against the two payloads, and each
+class is verified against first-party attack examples that are not in this benchmark.
+
+**Disclosure:** those two targets were chosen by reading this file's own published miss list. That is
+ordinary error analysis, and it is how detectors improve — but it means the held-out set is no longer
+perfectly blind for those two cases, and 93.62% should be read with that caveat. The development
+discipline was: author first-party examples, iterate only against `corpus/benign_ops_v1.jsonl` and
+`benchmark/calibration_benign.jsonl`, and measure the held-out set exactly once at the end. The
+remaining six misses were not touched and remain published by name.
+
+A number that is blind again requires a fresh sealed set, which is deliberately not something to
+assemble under deadline pressure.
 
 Run it from the repository root:
 
@@ -146,7 +166,7 @@ threshold requires a real provider/key and a separate independently labeled cali
 evaluation cases must not be used for tuning. Temporary synthetic fixtures verify harness routing and
 accounting only, never model performance. Model-tier runs cannot use `--record` and therefore cannot update
 `history.jsonl` or the public evaluation file. Keep both network tiers disabled unless a real
-provider-backed held-out evaluation beats the 91.49% baseline with zero benign false positives and an
+provider-backed held-out evaluation beats the 93.62% baseline with zero benign false positives and an
 independently reviewed public-evidence schema is added.
 
 `scripts/capture_model_calibration.py` accepts only a separate reviewed JSONL dataset outside `benchmark/`

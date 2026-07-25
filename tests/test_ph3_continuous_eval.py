@@ -42,7 +42,7 @@ async def test_benchmark_harness_records_dated_history_and_public_current_result
     assert methodology["depth_is_caller_controlled"] is True
     assert methodology["layer_3_calibration_source"] == "benchmark/calibration_benign.jsonl"
     assert record["measured_at"] == "2026-07-16T16:30:00Z"
-    assert record["attack_recall_percent"] == 91.49
+    assert record["attack_recall_percent"] == 93.62
     assert record["false_positive_rate_percent"] == 0.0
     assert record["per_depth"]["thorough"]["false_positive_ids"] == ["held-benign-enc-016"]
     assert len(record["result_sha256"]) == 64

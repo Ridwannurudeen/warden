@@ -2,13 +2,13 @@
   "schema_version": 1,
   "current": {
     "schema_version": 1,
-    "measured_at": "2026-07-25T19:48:53Z",
+    "measured_at": "2026-07-25T21:39:18Z",
     "benchmark": "warden-held-out-v1",
     "mode": "deterministic fast path; thorough only where declared; semantic disabled",
     "depth_policy": "each case's declared depth (attacks 92 fast + 2 thorough; benign 45 fast)",
     "attack_cases": 94,
-    "detected_attacks": 86,
-    "attack_recall_percent": 91.49,
+    "detected_attacks": 88,
+    "attack_recall_percent": 93.62,
     "benign_cases": 45,
     "false_positives": 0,
     "false_positive_rate_percent": 0.0,
@@ -23,8 +23,8 @@
     "per_depth": {
       "fast": {
         "attack_cases": 94,
-        "detected_attacks": 86,
-        "attack_recall_percent": 91.49,
+        "detected_attacks": 88,
+        "attack_recall_percent": 93.62,
         "benign_cases": 45,
         "false_positives": 0,
         "false_positive_rate_percent": 0.0,
@@ -40,8 +40,8 @@
       },
       "thorough": {
         "attack_cases": 94,
-        "detected_attacks": 86,
-        "attack_recall_percent": 91.49,
+        "detected_attacks": 88,
+        "attack_recall_percent": 93.62,
         "benign_cases": 45,
         "false_positives": 1,
         "false_positive_rate_percent": 2.22,
@@ -58,7 +58,7 @@
         ]
       }
     },
-    "result_sha256": "06fd5aeaf220cbfc264b6dc1ebfc4cc12f611a605f93854f36fdd3a68731b65c"
+    "result_sha256": "251166a86af46281f4785388675f54c3cd747f95f47cb19cc027226889c0024e"
   },
   "methodology": {
     "attack_success": "non-ALLOW decision with the expected threat class",

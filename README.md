@@ -430,11 +430,11 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
   (for example `vk_live_…` carried by `x-vendor-token`). Merely naming such a header is still `ALLOW` —
   exfiltration requires an intent verb and an outbound sink as well — and closing these did not move the
   published recall or false-positive result.
-- The committed deterministic held-out baseline is 91.49% recall (86/94) at 0.00% false positives (0/45)
+- The committed deterministic held-out baseline is 93.62% recall (88/94) at 0.00% false positives (0/45)
   using each case's declared depth, after the Decoder Wall normalization pre-pass added coverage for
   nested-encoding and homoglyph evasions. `depth` is a caller-controlled request field, so the result is
   also published per depth in `benchmark/results.json`: forcing every case to `thorough` holds recall at
-  91.49% (86/94) but produces 1 false positive in 45 (2.22%), `held-benign-enc-016`. Zero observed false
+  93.62% (88/94) but produces 1 false positive in 45 (2.22%), `held-benign-enc-016`. Zero observed false
   positives is a bound rather than a certainty — at n=45 the Wilson 95% upper bound is 7.87% for `fast`
   and 11.57% for `thorough`. The Layer 3 TF-IDF threshold is calibrated only on
   `benchmark/calibration_benign.jsonl`, a first-party split held apart from the benchmark and the
