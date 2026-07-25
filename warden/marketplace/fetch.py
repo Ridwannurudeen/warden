@@ -142,6 +142,72 @@ class SearchPageData(BaseModel):
     total: int | None = Field(default=None, ge=0)
 
 
+class ServiceListRow(BaseModel):
+    """One row of `onchainos agent service-list`.
+
+    The row carries both a numeric `id` and a UUID `serviceId`; only the numeric one
+    satisfies `MarketplaceService.service_id`, and it is the identifier the published
+    catalog and the marketplace snapshot already use.
+    """
+
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    numeric_id: str = Field(alias="id")
+    service_name: str = Field(default="", alias="serviceName")
+    service_description: str = Field(default="", alias="serviceDescription")
+    service_type: str = Field(default="", alias="serviceType")
+    endpoint: str = ""
+    fee: str | float | int | None = None
+    contract_address: str = Field(default="", alias="contractAddress")
+
+    @field_validator("numeric_id", mode="before")
+    @classmethod
+    def normalize_numeric_id(cls, value: object) -> str:
+        # The CLI returns `id` as a JSON number while the snapshot stores it as a string.
+        normalized = str(value).strip()
+        if not normalized.isdecimal():
+            raise ValueError("service-list id must be a decimal identifier")
+        return normalized
+
+    @field_validator(
+        "service_name",
+        "service_description",
+        "service_type",
+        "endpoint",
+        "contract_address",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_text(cls, value: object) -> str:
+        # An A2A row carries no endpoint and reports it as null rather than omitting it.
+        return "" if value is None else str(value)
+
+    def to_service(self) -> MarketplaceService:
+        return MarketplaceService.model_validate(
+            {
+                "serviceId": self.numeric_id,
+                "serviceName": self.service_name,
+                "serviceDescription": self.service_description,
+                "serviceType": self.service_type,
+                "endpoint": self.endpoint,
+                "feeAmount": self.fee,
+                "feeToken": self.contract_address,
+            }
+        )
+
+
+class ServiceListEntry(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    agent_info: MarketplaceAgent = Field(alias="agentInfo")
+    rows: list[ServiceListRow] = Field(default_factory=list, alias="list")
+
+
+class ServiceListEnvelope(BaseModel):
+    ok: bool
+    data: list[ServiceListEntry]
+
+
 class MarketplaceProviderAdapter(Protocol):
     def search_page(self, *, query: str, page: int, page_size: int) -> SearchPageData: ...
 
@@ -190,6 +256,30 @@ def parse_search_output(output: str) -> SearchPageData:
     if not envelope.ok:
         raise RuntimeError("onchainos agent search returned ok:false")
     return envelope.data
+
+
+def parse_service_list_output(output: str) -> MarketplaceAgent:
+    """Build one agent from `agent service-list`, whose services the search index omits.
+
+    `agent search` only returns listed agents, so a provider under review disappears from
+    it entirely. `service-list` still answers for the owner, which is why this is a
+    separate source rather than a variation on the census.
+    """
+    try:
+        raw = json.loads(output)
+        envelope = ServiceListEnvelope.model_validate(raw)
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise RuntimeError(
+            "onchainos agent service-list returned an invalid JSON envelope"
+        ) from exc
+    if not envelope.ok:
+        raise RuntimeError("onchainos agent service-list returned ok:false")
+    if len(envelope.data) != 1:
+        raise RuntimeError("onchainos agent service-list must return exactly one agent")
+    entry = envelope.data[0]
+    return entry.agent_info.model_copy(
+        update={"services": [row.to_service() for row in entry.rows]}
+    )
 
 
 def _run_cli(command: list[str]) -> str:
@@ -248,6 +338,16 @@ class OnchainOSCLIAdapter:
             str(page_size),
         ]
         return parse_search_output(self._command_runner(command))
+
+    def provider_agent(self, *, agent_id: str) -> MarketplaceAgent:
+        command = [
+            "onchainos",
+            "agent",
+            "service-list",
+            "--agent-id",
+            agent_id,
+        ]
+        return parse_service_list_output(self._command_runner(command))
 
 
 def _utc_timestamp() -> str:
@@ -313,6 +413,23 @@ def fetch_snapshot(
     )
     _write_snapshot(snapshot_path, snapshot)
     return snapshot
+
+
+def fetch_provider_agent(
+    agent_id: str,
+    *,
+    command_runner: CommandRunner | None = None,
+    adapter: MarketplaceProviderAdapter | None = None,
+) -> MarketplaceAgent:
+    if adapter is not None and command_runner is not None:
+        raise ValueError("adapter and command_runner cannot both be provided")
+    provider = (
+        adapter if adapter is not None else OnchainOSCLIAdapter(command_runner=command_runner)
+    )
+    agent = provider.provider_agent(agent_id=agent_id)
+    if agent.agent_id != agent_id:
+        raise RuntimeError(f"onchainos agent service-list returned agent #{agent.agent_id}")
+    return agent
 
 
 def _write_snapshot(path: Path, snapshot: MarketplaceSnapshot) -> None:

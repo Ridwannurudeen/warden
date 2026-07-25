@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from warden.marketplace.fetch import MarketplaceSnapshot
+from warden.marketplace.fetch import MarketplaceAgent, MarketplaceSnapshot
 
 
 def _fee(value: str | float | int | None) -> str:
@@ -23,7 +23,26 @@ def build_hire_catalog(
     )
     if provider is None:
         raise RuntimeError(f"Agent #{provider_agent_id} is missing from the marketplace snapshot")
+    return _catalog(provider, snapshot.metadata.captured_at)
 
+
+def build_hire_catalog_from_agent(
+    provider: MarketplaceAgent,
+    captured_at: str,
+    provider_agent_id: str = "3808",
+) -> dict[str, object]:
+    """Build the catalog from the provider's own listing rather than the public census.
+
+    `agent search` omits an agent whose listing is under review, so the census cannot
+    describe our own services during that window. The provider's own `service-list`
+    still can, and it is the authoritative source for our fees either way.
+    """
+    if provider.agent_id != provider_agent_id:
+        raise RuntimeError(f"Expected agent #{provider_agent_id}, got #{provider.agent_id}")
+    return _catalog(provider, captured_at)
+
+
+def _catalog(provider: MarketplaceAgent, captured_at: str) -> dict[str, object]:
     service_copy = {
         "https://warden.gudman.xyz/scan": {
             "key": "scan",
@@ -70,7 +89,7 @@ def build_hire_catalog(
         )
     return {
         "schemaVersion": 1,
-        "snapshotFetchedAt": snapshot.metadata.captured_at,
+        "snapshotFetchedAt": captured_at,
         "providerAgentId": provider.agent_id,
         "providerName": provider.name,
         "services": services,

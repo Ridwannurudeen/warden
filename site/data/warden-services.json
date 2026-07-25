@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "snapshotFetchedAt": "2026-07-18T18:35:07Z",
+  "snapshotFetchedAt": "2026-07-25T15:02:51Z",
   "providerAgentId": "3808",
   "providerName": "Warden",
   "services": [
@@ -8,9 +8,9 @@
       "serviceId": "33460",
       "serviceName": "Payload Security Scan",
       "serviceType": "A2MCP",
-      "serviceDescription": "Runtime firewall for untrusted agent payloads: screens any inbound response, tool output, or message for a poisoned or hijacked tool call, hidden instructions (prompt injection), a swapped or attacker payout address (drain), and secret exfiltration, returning an ALLOW / SANITIZE / BLOCK verdict in under a second, before your agent acts. Provide: 1. the payload text to scan 2. optionally, the wallet addresses you expect payments to go to, so a redirect to an attacker wallet is caught.",
+      "serviceDescription": "Runtime firewall for untrusted agent payloads: screens any inbound response, tool output, or message for a poisoned or hijacked tool call, hidden instructions (prompt injection), a swapped or attacker payout address (drain), and secret exfiltration, returning an ALLOW / SANITIZE / BLOCK verdict in under a second, before your agent acts.\nProvide: 1. the payload text to scan 2. optionally, the wallet addresses you expect payments to go to, so a redirect to an attacker wallet is caught.",
       "endpoint": "https://warden.gudman.xyz/scan",
-      "feeAmount": "0.5",
+      "feeAmount": "0.1",
       "feeTokenAddress": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
       "key": "scan",
       "taskTitle": "Warden payload scan",
@@ -29,7 +29,7 @@
       "serviceType": "A2MCP",
       "serviceDescription": "Runs a fixed battery of attack payloads against another agent's endpoint and returns a graded pass/fail report per threat class, before that endpoint faces a marketplace's own listing review.\nProvide: 1. the target endpoint URL to audit 2. optionally, custom test prompts to include.",
       "endpoint": "https://warden.gudman.xyz/audit",
-      "feeAmount": "0.5",
+      "feeAmount": "0.1",
       "feeTokenAddress": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
       "key": "audit",
       "taskTitle": "Warden endpoint audit",
