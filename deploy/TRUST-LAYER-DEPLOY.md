@@ -144,6 +144,17 @@ systemd-analyze verify \
   /opt/warden/deploy/systemd/warden-anchor-publish.service \
   /opt/warden/deploy/systemd/warden-anchor-publish.timer
 
+# These four assertions require a configured alert destination before the monitor
+# timer may be enabled. They are load-bearing: they run AFTER warden.service has
+# already been stopped, so on a host without monitor-alert.env this gate aborts and
+# leaves the app down. Verified missing on the live host 2026-07-25.
+#
+# APPROVED DEVIATION (2026-07-25, "deploy now, alert later"): when no alert
+# destination is configured yet, skip these four assertions AND do not enable
+# warden-monitor.timer below. The seeded service-monitor.json then keeps reporting
+# status "not_running", which is the honest state and matches the published README.
+# Re-running this gate with the file present is the way to adopt alerting later; it
+# needs no app downtime. Do not skip these assertions while also enabling the timer.
 test -f /opt/warden/monitor-alert.env
 test ! -L /opt/warden/monitor-alert.env
 test "$(stat -c '%U:%G:%a' /opt/warden/monitor-alert.env)" = "root:warden:640"
@@ -153,13 +164,10 @@ grep -q '^WARDEN_ALERT_WEBHOOK_URL=https://' /opt/warden/monitor-alert.env
 unit_backup="$(cat /root/warden-evidence-units.last)"
 test -d "$unit_backup"
 
-# Create the runtime state directories first. `install` does NOT create parent
-# directories, and warden-monitor.service declares ReadWritePaths=/opt/warden/monitor,
-# so a missing directory fails the seed step and — because this gate is fail-closed —
-# leaves the app stopped. Verified missing on the live host on 2026-07-25.
-install -d -o warden -g warden -m 0755 /opt/warden/monitor /opt/warden/anchor
-
 # Seed the bounded monitor and append-only anchor lineage only when no runtime copy exists.
+# The `install -d` block earlier in this gate already created /opt/warden/monitor and
+# /opt/warden/anchor at mode 0750 (verified absent on the live host 2026-07-25, so that
+# block is doing real work on the first upgrade — do not skip it).
 if ! test -e /opt/warden/monitor/service-monitor.json; then
   install -o warden -g warden -m 0644 \
     /opt/warden/site/data/service-monitor.json \
