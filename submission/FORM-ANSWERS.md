@@ -12,7 +12,19 @@
 
 **One-line tagline:** The immune system of the agent economy — a watchable runtime defense and open Ed25519 trust standard for autonomous services.
 
-**Agent ID / listing:** #3808 on X Layer — listed and eligible for task recommendations (`approvalDisplayStatus: 4`).
+**Agent ID / listing:** #3808 on X Layer.
+
+> **Verify this line before submitting — it changed on 2026-07-25 and must not be copied blind.**
+> As of 2026-07-25 the listing is `approvalStatus: 2` / `status: 2` — "Listing under review", **not listed**,
+> after the avatar and fee update re-entered review. It is NOT "listed and eligible", which is what this line
+> claimed until this correction. The hackathon requires the ASP to have passed review and gone live, so
+> re-read the live value with `agent get-agents --agent-ids 3808` and write whatever is true at submission
+> time. Preserved through the update: `salesCount` 22, `securityRate` 5.0, `onlineStatus` 1.
+
+**Services listed (5, verified 2026-07-25):** Payload Security Scan (`/scan`, 0.1 USDT), Agent Endpoint
+Security Audit (`/audit`, 0.1), Endpoint Hardening Pack (`/harden`, 0.1), Adversarial Variant Audit
+(`/variant-audit`, 0.1), and Escrow Payload Security Scan (A2A, negotiable). All four paid routes answer a
+valid x402 402 on one pinned rail; OKX's own `x402-check` reports `valid: true`, `amountHuman: 0.1` on each.
 
 **Award categories:** Creative Genius (primary); Best Product (secondary); Software Utility (secondary).
 

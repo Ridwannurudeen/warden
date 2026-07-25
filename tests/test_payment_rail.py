@@ -232,8 +232,13 @@ def test_production_service_requires_the_paywall_and_docs_pin_the_origin() -> No
     assert "WARDEN_REQUIRE_PAYWALL=1" in payment_docs
     assert "https://web3.okx.com" in payment_docs
     assert "alternate facilitator origins are rejected" in normalized_docs
-    assert "not yet deployed" in normalized_docs_lower
-    assert "deploy and read-only reprobe" in normalized_docs_lower
+    # Until 2026-07-25 this pinned "not yet deployed", which kept PAYMENT.md from
+    # implying a live rail it had never probed. The rail is deployed now, so the
+    # honest claim changed rather than disappeared: the doc must say when it was
+    # deployed and cite the independent check, so a future edit cannot quietly
+    # assert a live rail again without naming its evidence.
+    assert "deployed and reprobed on 2026-07-25" in normalized_docs_lower
+    assert "x402-check" in normalized_docs_lower
     assert "The live payment gate is verified" not in payment_docs
     for path in (
         ROOT / "docs" / "build-history" / "CODEX-BUILD-PHASE5.md",

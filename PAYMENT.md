@@ -47,13 +47,21 @@ The tested source contract on this branch is:
 |---|---:|---|---|---|
 | `POST /scan` | `0.1 USDT` | `eip155:196` | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | `0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51` |
 | `POST /audit` | `0.1 USDT` | `eip155:196` | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | `0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51` |
+| `POST /harden` | `0.1 USDT` | `eip155:196` | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | `0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51` |
+| `POST /variant-audit` | `0.1 USDT` | `eip155:196` | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | `0xf4c9fa07f3bb852547fdc4df7c1d9fd9991cfa51` |
 
-These corrections are not yet deployed. A read-only probe on 2026-07-18
-confirmed that the live `/scan` challenge still publishes the stale
-`{"name":"USDT","version":"1"}` domain even though its amount, asset, network,
-and recipient match the table. Do not use that live challenge as evidence of a
-payable authorization. Deploy and read-only reprobe the exact domain before
-claiming live payment or settlement correctness.
+Each route has a `GET` twin on the same terms, for OKX's auto-replay. One
+`build_payment_option` call feeds all four, so there is exactly one price on the
+rail; a new route can never introduce a second price point.
+
+Deployed and reprobed on 2026-07-25. The earlier note here said these corrections
+were undeployed and that the live `/scan` challenge still published the stale
+`{"name":"USDT","version":"1"}` domain, observed on 2026-07-18. That is no longer
+the case. All four routes now answer `402` with amount `100000` and the pinned
+`{"name":"USD₮0","version":"1"}` domain, and OKX's own `agent x402-check` reports
+`valid: true`, `amountHuman: 0.1`, `amountMinimal: "100000"`, `decimals: 6` for
+each. The OKX listing advertises `0.1` on all four services as of the same date,
+so the advertised price and the challenge agree.
 
 `GET /health` and `/api/demo/*` stay free. The playground uses only those routes. The `/hire` page makes an unpaid `GET` request to `/scan` or `/audit` to read the current 402 terms, then guides an agent operator through the paid, reviewable task flow; browser code does not sign or submit the paid service call.
 
