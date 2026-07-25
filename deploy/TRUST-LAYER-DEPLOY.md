@@ -338,8 +338,10 @@ for p in / /playground /hire /docs /status /badges /agents /agents/3808 /gauntle
   echo "$p -> $code"; test "$code" = 200
 done
 
-# 5b. Frozen paid contract: /scan and /audit -> 402, GET and POST (DO NOT expect anything else)
-for m in GET POST; do for p in /scan /audit; do
+# 5b. Frozen paid contract: /scan, /audit and /harden -> 402, GET and POST (DO NOT expect anything else)
+#     The paywall middleware answers before body validation, so the probe body is irrelevant here:
+#     an unpaid request must be 402 and never 400/422 (that would mean the paywall is not engaged).
+for m in GET POST; do for p in /scan /audit /harden; do
   code=$(curl -s -o /dev/null -w '%{http_code}' -X "$m" -H 'content-type: application/json' -d '{"payload":"hi"}' "$base$p")
   echo "$m $p -> $code"; test "$code" = 402
 done; done
@@ -356,6 +358,11 @@ curl -fsS "$base/data/apa-log-anchor.json" | grep -q '"schema_version": 1'
 curl -fsS "$base/data/apa-log-anchor-history.json" | grep -q '"history_head_hash"'
 test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{}' "$base/apa/register")" = 422   # reaches FastAPI (422 validation), NOT 404/405 from nginx
 test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{}' "$base/apa/revoke")" = 422
+# Signed hardening-pack lookup: an unknown pack id must reach FastAPI and 404, not 404 from nginx.
+# (A valid-format-but-absent id and a malformed id both return 404 — verified locally 2026-07-25.)
+test "$(curl -s -o /dev/null -w '%{http_code}' "$base/apa/hardening/$(printf '0%.0s' $(seq 64))")" = 404
+# Audit evidence lineage page (served by the static catch-all try_files, no dedicated nginx block).
+curl -fsS "$base/lineage" | grep -q 'data-lineage'
 
 # 5d. Demo APIs
 curl -fsS -X POST -H 'content-type: application/json' -d '{"payload":"hello"}' "$base/api/demo/scan"    | grep -q '"verdict"'
