@@ -1,5 +1,6 @@
 """Pydantic boundary models for Warden HTTP and MCP surfaces."""
 
+import re
 import unicodedata
 from typing import Literal
 
@@ -297,11 +298,19 @@ class BreakerDetailResponse(BaseModel):
 class AuditRequest(BaseModel):
     target_url: str = Field(min_length=1, max_length=MAX_TARGET_URL_LENGTH)
     sample_prompts: list[str] = Field(default_factory=list, max_length=MAX_SAMPLE_PROMPTS)
+    input_field: str = Field(default="payload", min_length=1, max_length=64)
 
     @field_validator("sample_prompts")
     @classmethod
     def truncate_sample_prompts(cls, value: list[str]) -> list[str]:
         return [prompt[:MAX_PAYLOAD_LENGTH] for prompt in value]
+
+    @field_validator("input_field")
+    @classmethod
+    def validate_input_field(cls, value: str) -> str:
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value):
+            raise ValueError("input_field must be a valid JSON object key")
+        return value
 
 
 class AuditResult(BaseModel):

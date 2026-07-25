@@ -116,7 +116,7 @@ audit_calls = []
 
 
 class StubAuditor:
-    async def audit(self, target_url, sample_prompts):
+    async def audit(self, target_url, sample_prompts, input_field="payload"):
         audit_calls.append((target_url, sample_prompts))
         return api.AuditResponse(
             score=100,

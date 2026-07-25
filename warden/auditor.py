@@ -168,16 +168,22 @@ class AgentAuditor:
     """Posts Warden corpus attacks to an HTTP target and grades blocking behavior."""
 
     async def audit(
-        self, target_url: str, sample_prompts: list[str] | None = None
+        self,
+        target_url: str,
+        sample_prompts: list[str] | None = None,
+        input_field: str = "payload",
     ) -> AuditResponse:
         try:
             async with asyncio.timeout(AUDIT_TOTAL_TIMEOUT_SECONDS):
-                return await self._audit(target_url, sample_prompts)
+                return await self._audit(target_url, sample_prompts, input_field)
         except TimeoutError as exc:
             raise ValueError("audit timed out; no partial grade or badge was issued") from exc
 
     async def _audit(
-        self, target_url: str, sample_prompts: list[str] | None = None
+        self,
+        target_url: str,
+        sample_prompts: list[str] | None = None,
+        input_field: str = "payload",
     ) -> AuditResponse:
         try:
             async with asyncio.timeout(AUDIT_TIMEOUT_SECONDS):
@@ -204,7 +210,7 @@ class AgentAuditor:
                 client, host_header, parsed_target, connect_url
             )
             fixed_results, fixed_outcomes = await self._run_battery(
-                client, connect_url, host_authority, host_header, fixed_attacks
+                client, connect_url, host_authority, host_header, fixed_attacks, input_field
             )
             benign_outcomes = [
                 await self._target_outcome(
@@ -213,11 +219,12 @@ class AgentAuditor:
                     host_authority,
                     control,
                     sni_hostname=host_header,
+                    input_field=input_field,
                 )
                 for control in BENIGN_CONTROLS
             ]
             caller_results, _ = await self._run_battery(
-                client, connect_url, host_authority, host_header, caller_attacks
+                client, connect_url, host_authority, host_header, caller_attacks, input_field
             )
 
         results = [*fixed_results, *caller_results]
@@ -342,6 +349,7 @@ class AgentAuditor:
         host_authority: str,
         host_header: str,
         attacks: list[dict[str, object]],
+        input_field: str = "payload",
     ) -> tuple[list[AuditResult], list[AuditOutcome]]:
         results: list[AuditResult] = []
         outcomes: list[AuditOutcome] = []
@@ -352,6 +360,7 @@ class AgentAuditor:
                 host_authority,
                 str(attack["payload"]),
                 sni_hostname=host_header,
+                input_field=input_field,
             )
             outcomes.append(outcome)
             if outcome is not AuditOutcome.INCONCLUSIVE:
@@ -419,12 +428,13 @@ class AgentAuditor:
         payload: str,
         *,
         sni_hostname: str,
+        input_field: str = "payload",
     ) -> AuditOutcome:
         try:
             async with client.stream(
                 "POST",
                 connect_url,
-                json={"payload": payload},
+                json={input_field: payload},
                 headers={"Host": host_authority},
                 extensions={"sni_hostname": sni_hostname},
             ) as response:
