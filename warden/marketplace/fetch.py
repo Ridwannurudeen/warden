@@ -12,7 +12,14 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 SNAPSHOT_SCHEMA_VERSION = 2
 MAX_MARKETPLACE_PAGES = 100
@@ -24,7 +31,14 @@ CommandRunner = Callable[[list[str]], str]
 class MarketplaceService(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    service_id: str = Field(alias="serviceId")
+    # OKX moved the search row's `serviceId` to a UUID and kept the numeric identifier as
+    # `id`. The numeric one is what the published catalog, the stored snapshots, and the
+    # rendered "Service #33460" identity use, so prefer it and fall back to `serviceId`
+    # for rows and snapshots written before the change.
+    service_id: str = Field(
+        validation_alias=AliasChoices("id", "serviceId"),
+        serialization_alias="serviceId",
+    )
     service_name: str = Field(default="", alias="serviceName")
     endpoint: str = ""
     fee_amount: str | float | int | None = Field(default=None, alias="feeAmount")
@@ -85,7 +99,13 @@ class MarketplaceAgent(BaseModel):
     name: str = ""
     profile_description: str = Field(default="", alias="profileDescription")
     category_codes: list[str] = Field(default_factory=list, alias="categoryCode")
-    sold_count: int | None = Field(default=None, alias="soldCount")
+    # The census reports the same figure as `soldCount`; our own `service-list` reports it
+    # as `salesCount`, so the provider fetch would otherwise lose it.
+    sold_count: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("soldCount", "salesCount"),
+        serialization_alias="soldCount",
+    )
     feedback_rate: float | None = Field(default=None, alias="feedbackRate", allow_inf_nan=False)
     security_rate: float | None = Field(default=None, alias="securityRate", allow_inf_nan=False)
     online_status: int | None = Field(default=None, alias="onlineStatus")
