@@ -211,3 +211,29 @@ def test_feedback_signer_rejects_wrong_signer_and_non_feedback_calldata() -> Non
     wrong_call["data"] = "0x00000000"
     with pytest.raises(ValueError, match="calldata"):
         onchain_attestation.sign_feedback_transaction(wrong_call, signer)
+
+
+def test_reputation_abi_matches_the_selector_deployed_on_x_layer() -> None:
+    """Pin the wire identity confirmed against the live X Layer implementation.
+
+    Confirmed read-only on 2026-07-25: ReputationRegistry proxy
+    0x8004BAa17C55a88189AE136b182e5fdA19dE9b63 resolves to implementation
+    0x16e0fa7f7c56b9a767e34b192b51f921be31da34, whose runtime bytecode contains
+    both values below. If an ABI edit changes either, the calldata this module
+    builds would no longer be accepted by the deployed contract, so it must fail
+    here rather than at signing time. See deploy/X_LAYER_ERC8004.md.
+    """
+    from eth_utils import event_abi_to_log_topic, function_abi_to_4byte_selector
+
+    functions = [
+        entry for entry in onchain_attestation.REPUTATION_ABI if entry["type"] == "function"
+    ]
+    events = [entry for entry in onchain_attestation.REPUTATION_ABI if entry["type"] == "event"]
+    assert len(functions) == 1
+    assert len(events) == 1
+
+    assert function_abi_to_4byte_selector(functions[0]).hex() == "3c036a7e"
+    assert (
+        event_abi_to_log_topic(events[0]).hex()
+        == "6a4a61743519c9d648a14e6493f47dbe3ff1aa29e7785c96c8326a205e58febc"
+    )

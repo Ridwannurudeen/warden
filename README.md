@@ -391,13 +391,13 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
   depth, truncation, and network failure can prevent enforcement.
 - Local deterministic analysis is intentionally conservative and cannot claim semantic coverage beyond
   the implemented scanner categories, analyzers, and corpus.
-- One detector gap is known, published, and deliberately left failing rather than hidden:
-  `ExfiltrationAnalyzer` recognizes a fixed set of vendor key prefixes and sensitive nouns, so an unlisted
-  token shape behind an unlisted noun (for example `vk_live_…` carried by an `x-vendor-token` header) is
-  missed. It is pinned by the repository's only `xfail(strict=True)` case in
-  `tests/test_multivector_payload.py`, so the suite fails loudly if the gap is closed without updating the
-  marker. A related drain-address gap found the same way — a swapped recipient more than 80 characters from
-  any transfer wording, and an upper-cased `0X` address prefix — has since been fixed.
+- Three detector gaps were found by generating adversarial variants of the training corpus and are now
+  fixed, each with a regression test in `tests/test_multivector_payload.py`: a swapped recipient more than
+  80 characters from any transfer wording; an upper-cased `0X` address prefix, which made a drain recipient
+  invisible to the analyzer entirely; and an unknown vendor token shape behind a custom credential header
+  (for example `vk_live_…` carried by `x-vendor-token`). Merely naming such a header is still `ALLOW` —
+  exfiltration requires an intent verb and an outbound sink as well — and closing these did not move the
+  published 87/94 recall or the 0/45 false-positive result.
 - The committed deterministic held-out baseline is 92.55% recall (87/94) at 0.00% false positives (0/45),
   after the Decoder Wall normalization pre-pass added coverage for nested-encoding and homoglyph evasions.
   The optional paid semantic path has an older separately recorded result of 71.43% recall (20/28) with

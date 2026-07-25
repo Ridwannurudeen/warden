@@ -28,6 +28,25 @@ The X Layer transaction is pinned to chain ID `196` and ReputationRegistry
 read-only chain and explorer checks that chain ID, proxy address, current implementation, and ABI
 still match the reviewed values.
 
+### Deployed-ABI confirmation (read-only, 2026-07-25)
+
+The draft-spec shape was checked against the live contract rather than assumed. Via
+`https://rpc.xlayer.tech`, the proxy's EIP-1967 implementation slot resolved to implementation
+**`0x16e0fa7f7c56b9a767e34b192b51f921be31da34`** (10,491 bytes of runtime code), and that bytecode contains
+both of these:
+
+| Artifact | Value | Present |
+| --- | --- | --- |
+| `giveFeedback(uint256,int128,uint8,string,string,string,string,bytes32)` selector | `0x3c036a7e` | yes |
+| `NewFeedback` event `topic0` (keccak256 of the event signature) | `6a4a6174…5e58febc` | yes |
+
+So `REPUTATION_ABI` matches what is deployed today. `tests/test_onchain_attestation.py` pins the selector and
+the event topic, so an ABI edit that changes either fails the suite.
+
+**This does not remove the operator preflight.** The registry is an upgradeable proxy: re-read the
+implementation address and re-check the selector immediately before signing, because the implementation can
+change after this date. No transaction was sent and no key was used to produce this confirmation.
+
 ## Evidence encoding
 
 The transaction encodes one signed, consented, fully conclusive Warden endpoint audit:
