@@ -1029,3 +1029,34 @@ def test_site_contains_no_stale_phase_five_service_or_listing_copy():
     assert "18954" not in source
     assert "18955" not in source
     assert "under review" not in source.lower()
+
+
+def test_audit_evidence_lineage_page_is_honest_and_wired_to_shared_verification():
+    page = (SITE / "lineage.html").read_text(encoding="utf-8")
+    script = (SITE / "lineage.js").read_text(encoding="utf-8")
+
+    # The page reads the real read-only lineage route and reuses the shared log
+    # verifier rather than shipping its own crypto.
+    assert "/api/shield/" in script
+    assert "/lineage" in script
+    assert "WardenTransparencyLog" in script
+    assert 'src="/log.js"' in page
+    assert 'src="/lineage.js"' in page
+    assert not re.search(r"crypto\.subtle", script)
+
+    # Ordered history, per-entry lifecycle, verification links, and an explicit
+    # empty state must all be present.
+    for hook in (
+        "data-lineage-entries",
+        "data-lineage-empty",
+        "data-lineage-verify",
+        "data-lineage-verification",
+    ):
+        assert hook in page, hook
+    assert "/badge?audit_id=" in script
+
+    # I5: this surface reports audit evidence, never certification.
+    assert "point-in-time evidence, not certification" in page
+    assert "certification lineage" not in page.lower()
+    for forbidden in ("certified", "compliant", "guaranteed safe", "accredited"):
+        assert forbidden not in page.lower(), forbidden
