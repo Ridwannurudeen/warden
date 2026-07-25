@@ -70,10 +70,15 @@ def test_secret_scan_is_read_only_has_full_history_and_fails_on_detected_credent
     assert "--github-actions" not in secret_job
     excluded = re.search(r"--exclude-globs=([^\s]+)", secret_job)
     assert excluded is not None
+    # Every entry here holds a synthetic credential-bearing URI that a test asserts is
+    # rejected, so the URI detector fires on the fixture itself. Widening this set is a
+    # deliberate act: add a path only when the finding is a fixture, never to silence a
+    # real one.
     assert set(excluded.group(1).split(",")) == {
         "benchmark/held_out_benign.jsonl",
         "sdk/python/tests/test_ph5_reverse_proxy.py",
         "tests/test_apa_browser_verifier.py",
+        "tests/test_variant_audit.py",
     }
     for key, value in TRUFFLEHOG_ALLOWED_SYNTHETIC_FINDING.items():
         env_name = f"TRUFFLEHOG_ALLOWED_{key.upper()}"
