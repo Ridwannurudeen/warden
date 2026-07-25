@@ -375,6 +375,15 @@ def test_cli_fetches_only_the_canonical_pack_url_without_redirects(
             main(
                 [f"https://warden.gudman.xyz/apa/hardening/{pack_id}"],
                 client=client,
+                # `_bundle` pins issued_at/expires_at to a fixed instant, so the default
+                # verifier reads the pack as expired once the wall clock passes it. Verify
+                # against the same instant the fixture was built for; this test is about
+                # which URLs the CLI fetches, not about expiry.
+                verifier=lambda document, *, source: verify_evidence_bundle(
+                    document,
+                    source=source,
+                    now=1_785_000_000,
+                ),
             )
             == 0
         )
