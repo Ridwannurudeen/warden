@@ -11,6 +11,7 @@ import sys
 import tempfile
 from contextlib import closing
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,8 +21,11 @@ if str(ROOT) not in sys.path:
 from warden.engine import WardenEngine  # noqa: E402
 from warden.badge_store import list_badges  # noqa: E402
 from warden.badges import b64u_decode, b64u_encode  # noqa: E402
-from warden.marketplace.catalog import build_hire_catalog  # noqa: E402
-from warden.marketplace.fetch import load_snapshot  # noqa: E402
+from warden.marketplace.catalog import (  # noqa: E402
+    build_hire_catalog,
+    build_hire_catalog_from_agent,
+)
+from warden.marketplace.fetch import fetch_provider_agent, load_snapshot  # noqa: E402
 from warden.marketplace.index import index_agents  # noqa: E402
 from warden.marketplace.render import (  # noqa: E402
     ApaIssuerKey,
@@ -208,9 +212,34 @@ def load_apa_issuer_history(
     return tuple(sorted(history, key=lambda key: (-key.not_after, key.kid)))
 
 
+def _hire_catalog(snapshot, args: argparse.Namespace) -> dict[str, object]:
+    """Prefer our own listing over the census for our own fees.
+
+    The census is a record of the *public* marketplace, so it drops us entirely while
+    the listing is under review, and it lags the listing the rest of the time. The
+    provider fetch answers in both states. It needs the CLI, so the census remains the
+    fallback for offline and CI builds.
+    """
+    if args.no_provider_fetch:
+        return build_hire_catalog(snapshot)
+    try:
+        provider = fetch_provider_agent(args.provider_agent_id)
+    except RuntimeError as exc:
+        print(f"provider fetch failed, falling back to the snapshot: {exc}", file=sys.stderr)
+        return build_hire_catalog(snapshot)
+    fetched_at = (
+        datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
+    return build_hire_catalog_from_agent(
+        provider,
+        fetched_at,
+        provider_agent_id=args.provider_agent_id,
+    )
+
+
 async def build(args: argparse.Namespace) -> None:
     snapshot = load_snapshot(args.snapshot)
-    _write_json_atomic(args.hire_catalog, build_hire_catalog(snapshot))
+    _write_json_atomic(args.hire_catalog, _hire_catalog(snapshot, args))
     indexed = await index_agents(snapshot.agents, WardenEngine())
     evidence_links = load_evidence_links(args.badge_links)
     badges_by_agent = associate_badges(
@@ -273,6 +302,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--snapshot", type=Path, default=DEFAULT_SNAPSHOT)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--hire-catalog", type=Path, default=DEFAULT_HIRE_CATALOG)
+    parser.add_argument("--provider-agent-id", default="3808")
+    parser.add_argument(
+        "--no-provider-fetch",
+        action="store_true",
+        help="build the hire catalog from the snapshot only, without calling the CLI",
+    )
     parser.add_argument("--badge-store", type=Path, default=DEFAULT_BADGE_STORE)
     parser.add_argument("--badge-links", type=Path, default=DEFAULT_BADGE_LINKS)
     parser.add_argument("--apa-db", type=Path, default=DEFAULT_APA_DB)

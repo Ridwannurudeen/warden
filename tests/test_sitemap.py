@@ -172,6 +172,8 @@ async def test_marketplace_build_regenerates_crawler_files_for_an_explicit_site_
             snapshot=tmp_path / "snapshot.jsonl",
             output=site_root / "agents",
             hire_catalog=tmp_path / "services.json",
+            no_provider_fetch=True,
+            provider_agent_id="3808",
             marketplace_summary=tmp_path / "summary.json",
             badge_store=tmp_path / "badges.jsonl",
             badge_links=tmp_path / "links.json",
