@@ -153,6 +153,12 @@ grep -q '^WARDEN_ALERT_WEBHOOK_URL=https://' /opt/warden/monitor-alert.env
 unit_backup="$(cat /root/warden-evidence-units.last)"
 test -d "$unit_backup"
 
+# Create the runtime state directories first. `install` does NOT create parent
+# directories, and warden-monitor.service declares ReadWritePaths=/opt/warden/monitor,
+# so a missing directory fails the seed step and — because this gate is fail-closed —
+# leaves the app stopped. Verified missing on the live host on 2026-07-25.
+install -d -o warden -g warden -m 0755 /opt/warden/monitor /opt/warden/anchor
+
 # Seed the bounded monitor and append-only anchor lineage only when no runtime copy exists.
 if ! test -e /opt/warden/monitor/service-monitor.json; then
   install -o warden -g warden -m 0644 \
