@@ -6,25 +6,24 @@ The default free endpoint is rate-limited, best-effort telemetry. `failOpen` the
 
 `latencyMs` is reported by the hosted scanner. End-to-end call latency also includes network round-trip time.
 
-## Build from source
+## Install
 
-The package is publish-ready under the npm account-owned `@gudman` scope but is not
-claimed published until the user completes that release.
+```bash
+npm install @gudman/warden-guard
+```
 
-The emitted zero-dependency runtime supports Node 18+. Building and testing this checkout requires Node
-20.19+ because the locked Vite/Vitest development toolchain has a higher engine floor.
+The emitted runtime is zero-dependency and supports Node 18+.
+
+### Build from source
+
+Building and testing this checkout requires Node 20.19+ because the locked Vite/Vitest
+development toolchain has a higher engine floor.
 
 ```bash
 cd sdk/ts
 npm ci
 npm test
 npm run build
-```
-
-Install the built source package from a checkout:
-
-```bash
-npm install /path/to/warden/sdk/ts
 ```
 
 ## Client

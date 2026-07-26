@@ -123,10 +123,11 @@
             </p>
           </li>
           <li>
-            <span>1–2 min</span><strong>Install from source</strong>
+            <span>1–2 min</span><strong>Install</strong>
             <p>
-              Use the repository packages below; no PyPI or npm publication is
-              claimed.
+              <code>pip install warden-agent-guard</code> or
+              <code>npm install @gudman/warden-guard</code> — both published.
+              A source install adds the enforcement-grade local engine.
             </p>
           </li>
           <li>
@@ -146,11 +147,13 @@
           </li>
         </ol>
         <p>
-          Install the Python service and SDK from this repository. The package
-          currently named
-          <code>warden-guard</code> on PyPI is unrelated, so Warden does not
-          publish a PyPI install command here.
+          Install the published SDK with
+          <code>pip install warden-agent-guard</code>. The similarly named
+          <code>warden-guard</code> on PyPI is a different, unrelated project.
+          For the enforcement-grade local engine, also install the service and
+          SDK from this repository:
         </p>
+        <pre><code>pip install warden-agent-guard</code></pre>
         <pre><code>python -m pip install -e . -e sdk/python</code></pre>
         <h3>Python local enforcement — recommended</h3>
         <p>
@@ -177,17 +180,18 @@ safe = WardenClient(local=True, fail_open=False).guard(untrusted_text)</code></p
 result = warden.scan(untrusted_text)</code></pre>
           <h3>TypeScript hosted client from source</h3>
           <p>
-            The <code>@warden/guard</code> package under <code>sdk/ts</code> is
-            source-built; Warden does not claim it is published to npm. Install
-            the locked development dependencies, run its tests, and compile it
-            from the repository with Node 20.19+ (the built zero-dependency
-            runtime itself declares Node 18+):
+            The <code>@gudman/warden-guard</code> package is published to npm —
+            <code>npm install @gudman/warden-guard</code> (zero-dependency,
+            Node 18+). To build it from source instead, install the locked
+            development dependencies, run its tests, and compile with Node
+            20.19+:
           </p>
+          <pre><code>npm install @gudman/warden-guard</code></pre>
           <pre><code>cd sdk/ts
 npm ci
 npm test
 npm run build</code></pre>
-          <pre><code>import { WardenClient } from "@warden/guard";
+          <pre><code>import { WardenClient } from "@gudman/warden-guard";
 
 const warden = new WardenClient(); // hosted free default; failOpen: true
 const result = await warden.scan(untrustedText);</code></pre>
