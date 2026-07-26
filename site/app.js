@@ -192,7 +192,10 @@
       typeof benchmark.measuredAt !== "string" ||
       !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(benchmark.measuredAt) ||
       !Number.isFinite(Date.parse(benchmark.measuredAt)) ||
-      !benchmark.measuredAt.startsWith(value.verifiedAt) ||
+      // The benchmark is dated independently of the marketplace verification: the
+      // latency run and the listing snapshot are separate facts measured on their
+      // own days, so measuredAt is validated as a timestamp but not tied to
+      // verifiedAt. corpus.snapshotAt below still binds to this run.
       typeof benchmark.method !== "string" ||
       !benchmark.method.trim()
     ) {
