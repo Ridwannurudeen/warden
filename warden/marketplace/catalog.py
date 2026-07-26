@@ -43,9 +43,15 @@ def build_hire_catalog_from_agent(
 
 
 def _catalog(provider: MarketplaceAgent, captured_at: str) -> dict[str, object]:
+    # `required` services must be present in the listing (a missing core service is
+    # an error); newer A2MCP services are `required: False` — included when the
+    # listing carries them, skipped otherwise. This lets a historical snapshot that
+    # predates a service still build cleanly while a current listing shows them all.
+    # Escrow is A2A, not A2MCP, so it is intentionally absent from this A2MCP catalog.
     service_copy = {
         "https://warden.gudman.xyz/scan": {
             "key": "scan",
+            "required": True,
             "taskTitle": "Warden payload scan",
             "taskDescription": "Scan an untrusted agent response with Warden",
             "serviceParams": "Scan one untrusted agent response",
@@ -56,6 +62,7 @@ def _catalog(provider: MarketplaceAgent, captured_at: str) -> dict[str, object]:
         },
         "https://warden.gudman.xyz/audit": {
             "key": "audit",
+            "required": True,
             "taskTitle": "Warden endpoint audit",
             "taskDescription": "Audit an agent endpoint with Warden",
             "serviceParams": "Audit https://example.com/agent-endpoint",
@@ -64,17 +71,38 @@ def _catalog(provider: MarketplaceAgent, captured_at: str) -> dict[str, object]:
                 "sample_prompts": [],
             },
         },
+        "https://warden.gudman.xyz/harden": {
+            "key": "harden",
+            "required": False,
+            "taskTitle": "Warden hardening pack",
+            "taskDescription": "Turn a completed Warden audit into a signed hardening pack",
+            "serviceParams": "Harden a completed audit by its ID",
+            "requestBody": {"audit_id": "<completed audit id>"},
+        },
+        "https://warden.gudman.xyz/variant-audit": {
+            "key": "variant-audit",
+            "required": False,
+            "taskTitle": "Warden adversarial variant audit",
+            "taskDescription": "Attack-test a consenting endpoint and grade its resistance",
+            "serviceParams": "Variant-audit https://example.com/agent-endpoint",
+            "requestBody": {"target_url": "https://example.com/agent-endpoint"},
+        },
     }
     services = []
     for endpoint, copy in service_copy.items():
         matches = [service for service in provider.services if service.endpoint == endpoint]
-        if len(matches) != 1:
+        if len(matches) == 0:
+            if copy["required"]:
+                raise RuntimeError(f"Expected exactly one Warden service at {endpoint}")
+            continue
+        if len(matches) > 1:
             raise RuntimeError(f"Expected exactly one Warden service at {endpoint}")
         service = matches[0]
         if service.service_type != "A2MCP":
             raise RuntimeError(f"Warden service at {endpoint} must use A2MCP")
         if not service.fee_token:
             raise RuntimeError(f"Warden service at {endpoint} is missing its fee token")
+        entry_copy = {name: value for name, value in copy.items() if name != "required"}
         services.append(
             {
                 "serviceId": service.service_id,
@@ -84,7 +112,7 @@ def _catalog(provider: MarketplaceAgent, captured_at: str) -> dict[str, object]:
                 "endpoint": service.endpoint,
                 "feeAmount": _fee(service.fee_amount),
                 "feeTokenAddress": service.fee_token,
-                **copy,
+                **entry_copy,
             }
         )
     return {

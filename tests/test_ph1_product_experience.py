@@ -128,6 +128,8 @@ def test_commercial_ctas_use_the_live_catalog_without_invented_terms():
     assert page.count('href="/hire"') >= 2
     assert 'data-service-key="scan"' in page
     assert 'data-service-key="audit"' in page
+    assert 'data-service-key="harden"' in page
+    assert 'data-service-key="variant-audit"' in page
     assert 'href="https://www.okx.ai/"' in page
     assert "agent/3808" not in page.lower()
 

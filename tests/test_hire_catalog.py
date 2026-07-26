@@ -51,6 +51,59 @@ def test_hire_catalog_uses_changed_snapshot_ids_instead_of_stale_constants():
     assert catalog["services"][0]["serviceId"] == "99999"
 
 
+def test_hire_catalog_includes_optional_services_when_the_listing_carries_them():
+    """A current listing with harden + variant-audit lists all four A2MCP services;
+    a snapshot that predates them still builds cleanly with just the required core."""
+    from warden.marketplace.fetch import MarketplaceService
+
+    snapshot = load_snapshot(ROOT / "data" / "marketplace" / "agents-v1.jsonl").model_copy(
+        deep=True
+    )
+    provider = next(agent for agent in snapshot.agents if agent.agent_id == "3808")
+    token = provider.services[0].fee_token
+    provider.services.append(
+        MarketplaceService(
+            serviceId="36873",
+            serviceName="Endpoint Hardening Pack",
+            endpoint="https://warden.gudman.xyz/harden",
+            feeAmount="0.1",
+            feeToken=token,
+            serviceDescription="Signed hardening pack",
+            serviceType="A2MCP",
+        )
+    )
+    provider.services.append(
+        MarketplaceService(
+            serviceId="36941",
+            serviceName="Adversarial Variant Audit",
+            endpoint="https://warden.gudman.xyz/variant-audit",
+            feeAmount="0.1",
+            feeToken=token,
+            serviceDescription="Adversarial resistance grade",
+            serviceType="A2MCP",
+        )
+    )
+
+    catalog = build_hire_catalog(snapshot)
+
+    assert [service["key"] for service in catalog["services"]] == [
+        "scan",
+        "audit",
+        "harden",
+        "variant-audit",
+    ]
+    assert "required" not in catalog["services"][0]  # internal flag never leaks
+
+
+def test_hire_catalog_tolerates_absent_optional_services():
+    """The historical snapshot lacks harden/variant-audit; that is not an error."""
+    snapshot = load_snapshot(ROOT / "data" / "marketplace" / "agents-v1.jsonl")
+
+    catalog = build_hire_catalog(snapshot)
+
+    assert [service["key"] for service in catalog["services"]] == ["scan", "audit"]
+
+
 @pytest.mark.parametrize("mutation", ["missing", "duplicate", "wrong_type", "wrong_endpoint"])
 def test_hire_catalog_rejects_incomplete_or_unexpected_services(mutation):
     snapshot = load_snapshot(ROOT / "data" / "marketplace" / "agents-v1.jsonl").model_copy(
