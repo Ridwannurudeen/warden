@@ -39,6 +39,31 @@ def test_hire_catalog_is_derived_from_marketplace_snapshot():
     }
 
 
+def test_hire_catalog_carries_the_listings_live_traction_figures():
+    """Sold count and rating ride every refresh, so the page shows the current
+    OKX-reported figures instead of a hand-copied number that goes stale."""
+    snapshot = load_snapshot(ROOT / "data" / "marketplace" / "agents-v1.jsonl")
+
+    catalog = build_hire_catalog(snapshot)
+
+    assert catalog["soldCount"] == 16
+    assert catalog["rating"] == 4.8
+
+
+def test_hire_catalog_tolerates_a_listing_without_traction_figures():
+    snapshot = load_snapshot(ROOT / "data" / "marketplace" / "agents-v1.jsonl").model_copy(
+        deep=True
+    )
+    provider = next(agent for agent in snapshot.agents if agent.agent_id == "3808")
+    provider.sold_count = None
+    provider.security_rate = None
+
+    catalog = build_hire_catalog(snapshot)
+
+    assert catalog["soldCount"] is None
+    assert catalog["rating"] is None
+
+
 def test_hire_catalog_uses_changed_snapshot_ids_instead_of_stale_constants():
     snapshot = load_snapshot(ROOT / "data" / "marketplace" / "agents-v1.jsonl").model_copy(
         deep=True

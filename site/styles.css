@@ -1968,6 +1968,16 @@ code {
   justify-content: space-between;
 }
 
+.catalog-traction {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.catalog-traction strong {
+  color: var(--accent);
+}
+
 .result-cta {
   margin-top: 24px;
   padding: clamp(16px, 2.5vw, 22px);
