@@ -153,10 +153,6 @@
     if (!/^\d+$/.test(marketplace?.agentId || "")) {
       throw new Error("product proof agentId must be numeric");
     }
-    const sold = normalizeEvidenceCount(
-      marketplace.sold,
-      "product proof sold count",
-    );
     const reviewCount = normalizeEvidenceCount(
       marketplace.rating?.reviews,
       "product proof review count",
@@ -228,7 +224,6 @@
       verifiedAt: value.verifiedAt,
       marketplace: {
         agentId: marketplace.agentId,
-        sold,
         rating: {
           value: ratingValue,
           outOf: ratingOutOf,
@@ -631,7 +626,6 @@
         const proof = normalizeProductProof(source);
         const fields = {
           "agent-id": `#${proof.marketplace.agentId}`,
-          sold: proof.marketplace.sold.toLocaleString(),
           rating: `${proof.marketplace.rating.value} / ${proof.marketplace.rating.outOf}`,
           reviews: `${proof.marketplace.rating.reviews.toLocaleString()} external buyer reviews`,
           latency: `${proof.checkoutBenchmark.p50Ms} ms`,
