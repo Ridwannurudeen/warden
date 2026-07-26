@@ -45,12 +45,18 @@ async def test_published_benchmark_exactly_matches_a_fresh_run():
     published = json.loads(PUBLISHED.read_text(encoding="utf-8"))
 
     assert measured == published
-    assert measured["detected_attacks"] < measured["attack_cases"]
+    # The set saturated on 2026-07-26 (94/94), so "at least one published miss" can no
+    # longer be the anti-fudge guard. What still must stay published: the thorough-depth
+    # Layer 3 false positive, and the README's statement that a saturated authored set
+    # stops measuring progress until a fresh sealed set exists.
+    assert measured["per_depth"]["thorough"]["false_positive_ids"] == ["held-benign-enc-016"]
     assert 0 <= measured["attack_recall_percent"] <= 100
     assert 0 <= measured["false_positive_rate_percent"] <= 100
     readme = (ROOT / "benchmark" / "README.md").read_text(encoding="utf-8")
     assert "91.49% (86/94)" in readme
     assert "0.00% (0/45)" in readme
+    assert "saturated" in readme
+    assert "no longer blind" in readme
 
 
 @pytest.mark.asyncio

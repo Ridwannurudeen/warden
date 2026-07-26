@@ -430,13 +430,15 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
   (for example `vk_live_…` carried by `x-vendor-token`). Merely naming such a header is still `ALLOW` —
   exfiltration requires an intent verb and an outbound sink as well — and closing these did not move the
   published recall or false-positive result.
-- The committed deterministic held-out baseline is 94.68% recall (89/94) at 0.00% false positives (0/45)
-  using each case's declared depth, after the Decoder Wall normalization pre-pass added coverage for
-  nested-encoding and homoglyph evasions. `depth` is a caller-controlled request field, so the result is
-  also published per depth in `benchmark/results.json`: forcing every case to `thorough` holds recall at
-  94.68% (89/94) but produces 1 false positive in 45 (2.22%), `held-benign-enc-016`. Zero observed false
-  positives is a bound rather than a certainty — at n=45 the Wilson 95% upper bound is 7.87% for `fast`
-  and 11.57% for `thorough`. The Layer 3 TF-IDF threshold is calibrated only on
+- The committed deterministic held-out benchmark is saturated: 100% recall (94/94) at 0.00% false
+  positives (0/45) using each case's declared depth. Saturation is a coverage statement about a
+  94-case authored English-only set, not a detection rate — every formerly published miss was closed
+  by disclosed error analysis, so the set is no longer blind and the next real number requires a
+  fresh sealed set (`benchmark/README.md` carries the full caveats). `depth` is a caller-controlled
+  request field, so the result is also published per depth in `benchmark/results.json`: forcing
+  every case to `thorough` produces 1 false positive in 45 (2.22%), `held-benign-enc-016`. Zero
+  observed false positives is a bound rather than a certainty — at n=45 the Wilson 95% upper bound
+  is 7.87% for `fast` and 11.57% for `thorough`. The Layer 3 TF-IDF threshold is calibrated only on
   `benchmark/calibration_benign.jsonl`, a first-party split held apart from the benchmark and the
   training corpus; the previous 0.52 had been tuned on held-out scores and inflated recall to 92.55%.
   The optional paid semantic path has an older separately recorded result of 71.43% recall (20/28) with

@@ -70,7 +70,8 @@ the gap:
 
 ## What this means for the published recall figure
 
-The committed held-out baseline (92.55% recall, 87/94, at 0.00% false positives) is an
+The committed held-out result (100% recall, 94/94 — saturated, see `benchmark/README.md` for why
+that is a coverage statement rather than a detection rate — at 0.00% false positives) is an
 **English** figure. Both `corpus/attacks.jsonl` and `benchmark/held_out_attacks.jsonl`
 are English cases. No non-English case is scored in either set, so the benchmark neither
 measures nor bounds non-English performance. Reading the recall number as a

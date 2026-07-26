@@ -505,16 +505,14 @@ def report(scanner: InjectionScanner, model: LogisticRegression, threshold: floa
         ],
     )
 
-    miss_ids = {
-        "held-prompt-002",
-        "held-prompt-003",
-        "held-role-002",
-        "held-corpus-002",
-        "held-drain-002",
-        "held-secret-002",
-        "held-evade-mix-003",
-    }
-    print("\nHELD-OUT ROWS THE DETERMINISTIC ENGINE MISSES (model score, no tuning)")
+    miss_ids = set(
+        json.loads((ROOT / "benchmark" / "results.json").read_text(encoding="utf-8"))[
+            "attack_misses"
+        ]
+    )
+    print("\nHELD-OUT ROWS THE PUBLISHED BENCHMARK MISSES (model score, no tuning)")
+    if not miss_ids:
+        print("  (none — the published benchmark is saturated)")
     for row, score in zip(attacks, scores):
         if str(row["id"]) in miss_ids:
             print(f"  {str(row['id']):<22}{score:.4f}  {str(row['payload'])[:70]}")
