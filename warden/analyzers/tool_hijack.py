@@ -138,13 +138,15 @@ class ToolHijackAnalyzer(Analyzer):
         )
         fenced_tool = any(self._has_tool_shape(block) for block in FENCED_BLOCK_RE.findall(payload))
         tagged_action = self._tagged_dangerous_action(payload)
+        named_action = self._named_call_action(payload)
 
-        if not tool_shape and not fenced_tool and tagged_action is None:
+        if not tool_shape and not fenced_tool and tagged_action is None and named_action is None:
             return AnalyzerResult(
                 name=self.name, weight=self.weight, score=0, data={"detections": []}
             )
         if (
             tagged_action is None
+            and named_action is None
             and financial_action is None
             and self._is_read_only_tool_payload(payload)
         ):
@@ -152,7 +154,7 @@ class ToolHijackAnalyzer(Analyzer):
                 name=self.name, weight=self.weight, score=0, data={"detections": []}
             )
 
-        executable_action = tagged_action or financial_action
+        executable_action = tagged_action or named_action or financial_action
         confidence = 0.88 if executable_action else 0.60
         match = executable_action.group() if executable_action else "tool-shaped payload"
         detection = {
@@ -177,6 +179,30 @@ class ToolHijackAnalyzer(Analyzer):
         except json.JSONDecodeError:
             return False
         return cls._json_has_tool_key(parsed)
+
+    @classmethod
+    def _named_call_action(cls, payload: str) -> re.Match[str] | None:
+        """A bare function-call object — `{"name": ..., "args"|"arguments": ...}` —
+        whose name is an executable action. This shape carries no `tool_call`
+        wrapper (and `args` is not a tool key), so `_has_tool_shape` never sees it;
+        it is a hijack only when the name itself names an action, which keeps
+        benign named calls (`{"name": "get_user", "args": {...}}`) clean.
+        """
+        try:
+            parsed = json.loads(payload)
+        except json.JSONDecodeError:
+            return None
+        calls = parsed if isinstance(parsed, list) else [parsed]
+        for call in calls:
+            if (
+                isinstance(call, dict)
+                and isinstance(call.get("name"), str)
+                and ("args" in call or "arguments" in call)
+            ):
+                action = _dangerous_action(call["name"])
+                if action is not None:
+                    return action
+        return None
 
     @classmethod
     def _tagged_dangerous_action(cls, payload: str) -> re.Match[str] | None:
