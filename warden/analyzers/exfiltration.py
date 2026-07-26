@@ -31,7 +31,13 @@ SECRET_DOCUMENT_SUFFIX_RE = re.compile(
 # A support answer quotes the request in order to refuse it: "reveal the system
 # prompt is the single most common thing people ask". A copular continuation makes
 # the phrase the subject of a sentence, which is a mention rather than a demand.
-QUOTED_REQUEST_SUFFIX_RE = re.compile(r"(?i)^\s*[\"'”’]?\s+(?:is|was|are|were)\b")
+QUOTED_REQUEST_SUFFIX_RE = re.compile(
+    r"(?i)^\s*[\"'”’]?\s+(?:is|was|are|were)\b"
+    # ...unless the copula is followed by an egress imperative ("… is what you must
+    # output verbatim"), which is a demand quoting itself, not a mention.
+    r"(?![^.?!\n]{0,48}\b(?:output|print|return|reveal|show|dump|echo|send"
+    r"|disclose|expose|give|provide|verbatim|must|now)\b)"
+)
 # Distinctive API-key/token shapes with near-zero benign collision rates.
 # Only flagged when an exfil verb appears near the token (or a full exfil
 # instruction is present elsewhere), so documentation and benign prose that
@@ -65,7 +71,7 @@ EXFIL_INSTRUCTION_RES = [
         r"(?:me\s+|us\s+)?(?:your|the|all|any)?\s*"
         r"(?:credentials?|mnemonic|seed\s*phrase|system\s*prompt|"
         r"(?:[a-z0-9]+[_-])?(?:api(?:[_ -]?secret)?|secret|access|private|signing|auth)"
-        r"[_ -]?keys?)\b"
+        r"[_ \t-]{0,3}keys?)\b"
     ),
 ]
 SENSITIVE_OBJECT_RE = re.compile(
@@ -89,7 +95,7 @@ SENSITIVE_OBJECT_RE = re.compile(
     # qualifier list across both nouns removes the gap where `access key` was
     # sensitive but `access token` was not.
     r"|(?:api|access|auth|refresh|bearer|session|identity|private|secret|signing)"
-    r"[_ -]?(?:keys?|tokens?)"
+    r"[_ \t-]{0,3}(?:keys?|tokens?)"
     r"|id[_ -]tokens?"
     r")\b"
     # Custom credential headers follow a strong naming convention, so an
@@ -168,7 +174,7 @@ TRANSFORM_CONDITION_RE = re.compile(
     r"(?:system|developer)\s+prompts?|mnemonics?|seed\s*phrases?|credentials?|"
     r"passwords?|passphrases?|id[_ -]tokens?|"
     r"(?:api|access|auth|refresh|bearer|session|identity|private|secret|signing)"
-    r"[_ -]?(?:keys?|tokens?)"
+    r"[_ \t-]{0,3}(?:keys?|tokens?)"
     r")"
     r"|(?:"
     r"\.env(?:\s+(?:files?|contents?))?|"
@@ -176,7 +182,7 @@ TRANSFORM_CONDITION_RE = re.compile(
     r"(?:system|developer)\s+prompts?|mnemonics?|seed\s*phrases?|credentials?|"
     r"passwords?|passphrases?|id[_ -]tokens?|"
     r"(?:api|access|auth|refresh|bearer|session|identity|private|secret|signing)"
-    r"[_ -]?(?:keys?|tokens?)"
+    r"[_ \t-]{0,3}(?:keys?|tokens?)"
     r")\s+(?:is|are|was|were)\s+(?:redacted|masked|sanitized)"
     r")"
 )
