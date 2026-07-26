@@ -76,6 +76,15 @@ MALFORMED_ADDR_RE = re.compile(
 # record, not a redirection. Only used when the caller supplied no expected
 # addresses — with an expectation to compare against, an unexpected recipient in a
 # receipt is still worth flagging.
+# A money-movement verb used as a prose imperative, which is what overrides a
+# receipt framing. It deliberately excludes ABI/function-call syntax like
+# `transfer(address to, uint256 amount)` — there the verb is a decoded-calldata
+# signature (`transfer` immediately followed by `(`), not an instruction, so a
+# legitimate calldata dump keeps its receipt treatment.
+PROSE_TRANSFER_IMPERATIVE_RE = re.compile(
+    r"(?i)\b(?:send|transfer|wire|route|move|remit|disburse|forward|redirect"
+    r"|pay|payout|withdraw|sweep|release)\b(?!\s*\()"
+)
 TRANSFER_REPORT_CONTEXT_RE = re.compile(
     r"""(?ix)
     (?:^|[\s|,;(\[])
@@ -187,7 +196,19 @@ class DrainAddressAnalyzer(Analyzer):
         if STRUCTURED_DESTINATION_RE.search(window) and (
             has_expected or STRUCTURED_PAYMENT_CONTEXT_RE.search(window)
         ):
-            if not has_expected and TRANSFER_REPORT_CONTEXT_RE.search(payload):
+            # A genuine explorer receipt frames the address as a record (From:/
+            # Status:/Block:/decoded calldata) AND carries no transfer imperative —
+            # it describes a transfer that already happened. An imperative in the
+            # same window ("send 5 ETH to <addr>") is an instruction no matter what
+            # receipt-looking prefix an attacker prepends, so the report framing only
+            # demotes when the window has no active transfer intent. The framing is
+            # scoped to the window, not the whole payload: otherwise a single
+            # "Status: success" anywhere disables the gate for every address.
+            if (
+                not has_expected
+                and TRANSFER_REPORT_CONTEXT_RE.search(window)
+                and not PROSE_TRANSFER_IMPERATIVE_RE.search(window)
+            ):
                 return 0.0
             return 0.95 if has_expected else 0.80
         if (

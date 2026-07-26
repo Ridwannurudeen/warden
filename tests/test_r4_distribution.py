@@ -128,7 +128,7 @@ def test_clean_wheel_install_imports_runtime_data(tmp_path: Path) -> None:
                 "assert AUDIT_BATTERY_SIZE == 20; "
                 "assert len(BIP39_WORDS) == 2048; "
                 "assert corpus_fingerprint() == "
-                "'sha256:7cf19646edc64f04ed772c89f6045168c5420036b2ed6ebce2b72ac46e1e6d17'"
+                "'sha256:24652dc28d39660be05673f786173b64eea3df1e2618901f7d86ce6a70694b0d'"
             ),
         ],
         cwd=tmp_path,

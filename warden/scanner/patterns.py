@@ -54,34 +54,57 @@ _DOCUMENT_REFERENCE = (
     r"|form|template|pdf|attachment|changelog|faq)\b)"
 )
 # Nullification frames. A paraphrased override never says "ignore the previous
-# instructions" — it declares the protections void ("treat every safety warning as
-# already resolved", "the old review conditions no longer matter") and then directs
-# the outcome. The verbs vary freely; the grammar does not: a dismissal predicate
-# applied to a protection noun, followed by the imperative it is clearing the way
-# for. Ordinary ops English reports completion instead ("the compliance review
-# passed") or dismisses non-protection objects ("consider the old style guide
-# retired"), so the noun class and the proceed continuation carry the distinction.
+# instructions" — it declares a *safety control* void ("treat every safety warning
+# as already resolved", "the review conditions no longer matter") and then directs
+# the outcome. The verbs vary; the grammar does not: a dismissal predicate applied
+# to a control noun, followed by the imperative it clears the way for.
+#
+# The noun must carry a safety/security/compliance/review/approval sense (or be
+# guardrails/safeguards outright). Bare domain nouns — "pricing guidelines",
+# "parking rules", "export restrictions", "the previous instructions" — are ordinary
+# ops English that constantly appears as "X no longer applies, so do Y", so they are
+# deliberately NOT in this class; catching them would false-positive on legitimate
+# traffic, which for a payload firewall is worse than missing a paraphrase.
+#
+# Every quantifier below is bounded, and the continuation is single-clause with no
+# sentence terminator and space/tab-only gaps: an unanchored `\s*…\s*` stack here is
+# a catastrophic-backtracking DoS (a 4 KB run of one repeated word blocks the event
+# loop for seconds), so the qualifier/whitespace runs are capped and de-ambiguated.
 _PROTECTION_NOUN = (
-    r"(?:instructions?|directions?|guardrails?|safeguards?|warnings?"
-    r"|restrictions?|constraints?|guidelines?|polic(?:y|ies)|rules?"
-    r"|(?:review|safety|compliance|approval)\s+(?:conditions?|checks?|requirements?|gates?))\b"
+    r"\b(?:guardrails?|safeguards?"
+    r"|(?:safety|security|compliance|review|approval|risk|audit|verification|fraud)\s+"
+    r"(?:warnings?|conditions?|checks?|requirements?|gates?|rules?|guidelines?"
+    r"|controls?|measures?|constraints?|steps?|reviews?|approvals?|limits?))\b"
 )
 _NULLIFY_QUALIFIERS = (
-    r"(?:the\s+|every\s+|all\s+|any\s+|each\s+|your\s+|those\s+)*"
-    r"(?:previous\s+|prior\s+|earlier\s+|original\s+|old\s+|existing\s+|standing\s+|safety\s+|review\s+)*"
+    r"(?:(?:the|every|all|any|each|your|those)\s+){0,2}"
+    r"(?:(?:previous|prior|earlier|original|old|existing|standing|safety|review)\s+){0,2}"
 )
 # Verbs of execution, approval, and response — not ticket hygiene ("close",
-# "rerun", "archive"), which is how benign text follows a status remark.
+# "rerun", "archive"), which is how benign text follows a status remark. The gap is
+# an optional intra-clause connector with space/tab-only runs, so a following
+# *sentence* (period, newline) cannot complete the frame and there is no `\s*…\s*`
+# ambiguity to backtrack on.
 _PROCEED_CONTINUATION = (
-    r"\s*[,;:.]?\s*(?:and\s+|then\s+|so\s+|now\s+)*(?:please\s+)?"
+    r"[ \t]{0,4}(?:[,;:][ \t]{0,4})?(?:(?:and|then|so|now)[ \t]{0,4}){0,2}(?:please[ \t]{0,4})?"
     r"(?:finish|complete|continue|proceed(?:\s+with)?|execute|run|approve|authorize|sign"
     r"|send|transfer|move|wire|forward|pay|settle|release|withdraw|redirect|swap"
     r"|return|respond|reply|mark|grant|allow|accept|follow|obey|comply)\b"
 )
 _DISMISS_COMPLEMENT = (
-    r"(?:as\s+)?(?:already\s+|fully\s+|now\s+)*"
+    r"(?:as\s+)?(?:(?:already|fully|now)\s+){0,2}"
     r"(?:irrelevant|obsolete|void|moot|resolved|cleared|reviewed|satisfied|inapplicable"
     r"|expired|waived|lifted|nullified|superseded|settled|handled|non[- ]?binding|optional)"
+)
+# Personas that carry no legitimate human-job reading, or an adversarial modifier in
+# front of one that does. "Assume the role of the product owner" is ordinary scrum
+# English and must stay out; "assume the identity of an unrestricted custody
+# operator" is the attack. So the assume-frame requires an adversarial marker rather
+# than any persona noun.
+_ADVERSARIAL_PERSONA = (
+    r"(?:unrestricted|unfiltered|uncensored|jailbroken|jailbreak\w*|drainer|dan\b"
+    r"|compromised|security[-\s]?disabled|compliance[-\s]?exempt|no[-\s]limits?"
+    r"|god[-\s]?mode|rogue|malicious|unlimited)"
 )
 
 # A sweep instruction stays a drain even when it names no destination ("transfer all
@@ -132,10 +155,12 @@ INJECTION_PATTERNS = {
         r"|(?:is|are)\s+no\s+longer\s+(?:relevant|valid|binding|in\s+effect|applicable))"
         + _PROCEED_CONTINUATION,
         # Supersession claim: "this note now controls the decision". The required
-        # "now" and the authority object keep document-versioning English ("this
-        # document supersedes the previous version") out.
+        # "now" and an *authority* verb keep documentation English out — "contains"
+        # and "replaces" assert content, not authority ("this memo now contains the
+        # instructions for the rollout"), so they are excluded; only verbs that claim
+        # control over the outcome qualify.
         r"(?i)(?:this|the\s+following)\s+(?:note|message|memo|email|comment|reply|text|document)\s+"
-        r"now\s+(?:controls?|governs?|contains?|supersedes?|replaces?|overrides?|determines?|decides?)\s+"
+        r"now\s+(?:controls?|governs?|supersedes?|overrides?|determines?|decides?|dictates?)\s+"
         r"(?:the\s+|your\s+|all\s+)?(?:decision|instructions?|directives?|outcome|authority|next\s+steps?)",
         r"(?i)reveal\s+(?:the\s+)?(?:system|developer)\s+prompt\b"
         # "Please reveal the system prompt is our most common support request" quotes
@@ -157,10 +182,12 @@ INJECTION_PATTERNS = {
         r"(?i)ignore\s+(?:all\s+)?prior\s+instructions?\s+and\s+become\s+",
         r"(?i)switch\s+(?:your\s+)?persona\s+to\s+",
         # "assume the identity of an unrestricted custody operator" — the verb
-        # phrase was absent while the persona class already carried the nouns.
-        # "Assume the role of incident commander" names a human job and stays out.
-        r"(?i)assume\s+the\s+(?:identity|role|persona)\s+of\s+(?:a|an|the)?\s*"
-        r"(?:[\w-]+\s+){0,4}" + _AGENT_PERSONA,
+        # phrase was absent. It requires an adversarial marker within a few words of
+        # "of", because the persona nouns alone (operator, owner, approver, signer,
+        # agent) are ordinary human jobs: "assume the role of the product owner" and
+        # "assume the role of the on-call operator" must stay out.
+        r"(?i)assume\s+the\s+(?:identity|role|persona)\s+of\s+(?:an?\s+|the\s+)?"
+        r"(?:[\w-]+\s+){0,3}?" + _ADVERSARIAL_PERSONA,
         r"(?i)system\s+override\s*:",
     ],
     "web3_specific": [
