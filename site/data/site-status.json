@@ -8,7 +8,7 @@
   "repositoryTestsVerifiedAt": "2026-07-16",
   "repositoryTestsNote": "566 Python + 122 site JavaScript + 31 TypeScript SDK tests passed in this checkout; 1 Python test skipped; this is not a live CI signal.",
   "corpusCount": 124,
-  "corpusFingerprint": "sha256:b095d7653635dfa734ee21a52afe93e5716be520a2340719b2b3465bb85c58fc",
+  "corpusFingerprint": "sha256:24652dc28d39660be05673f786173b64eea3df1e2618901f7d86ce6a70694b0d",
   "services": [
     {
       "serviceId": "33460",

@@ -27,13 +27,29 @@ DANGEROUS_COMMAND_RE = re.compile(
 )
 ACTION_IDENTIFIER_BOUNDARY_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|[_-]+")
 EVM_ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{40}")
-BLOCK_REFERENCE_RE = re.compile(r"(?:latest|pending|safe|finalized|earliest|0x[0-9a-fA-F]+)")
+# A JSON-RPC 2.0 message carries exactly these members and nothing else, so an
+# envelope with a stray key is not the plain node call it is dressed as.
+JSON_RPC_REQUEST_KEYS = frozenset({"jsonrpc", "method", "params", "id"})
+JSON_RPC_RESPONSE_KEYS = frozenset({"jsonrpc", "result", "error", "id"})
+# Namespaces whose methods only ever read chain, network, or client state. The
+# namespaces that make a node act for the caller — `personal_`, `wallet_`, and
+# anything vendor-specific — are absent by construction, not by enumeration.
+JSON_RPC_READ_ONLY_NAMESPACES = frozenset({"eth", "net", "web3"})
+# Mutating verbs at the head of a method's local name. Every read-only call in
+# the namespaces above is a query (`getBalance`, `call`, `blockNumber`,
+# `subscribe`, `syncing`); the ones that sign, broadcast, or unlock
+# (`eth_sendTransaction`, `eth_sendRawTransaction`, `eth_signTransaction`,
+# `eth_sign`, `eth_submitWork`) all lead with one of these and none of the
+# queries do.
+JSON_RPC_STATE_CHANGING_RE = re.compile(r"(?i)^(?:send|sign|submit|import|unlock)")
 TOOL_SHAPE_RE = re.compile(
     r"(?i)(\"(?:tool_call|tool_calls|tool_result|function|arguments)\"|"
     r"\"role\"\s*:\s*\"tool\"|"
     r"\b(?:tool_call|tool_calls|tool_result|function|arguments)\s*[:=])"
 )
-FENCED_BLOCK_RE = re.compile(r"```(?:json|tool|javascript|python)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)
+FENCED_BLOCK_RE = re.compile(
+    r"```(?:json|tool|javascript|python)?\s*(.*?)```", re.IGNORECASE | re.DOTALL
+)
 MARKUP_TOKEN_RE = re.compile(
     r"(?P<cdata><!\[CDATA\[)|(?P<comment><!--)|(?P<instruction><\?)|"
     r"(?P<declaration><!)|"
@@ -112,7 +128,9 @@ class ToolHijackAnalyzer(Analyzer):
     async def analyze(self, ctx: AnalysisContext) -> AnalyzerResult:
         payload = str(ctx.extra.get("payload") or "")
         if not payload.strip():
-            return AnalyzerResult(name=self.name, weight=self.weight, score=0, data={"detections": []})
+            return AnalyzerResult(
+                name=self.name, weight=self.weight, score=0, data={"detections": []}
+            )
 
         tool_shape = self._has_tool_shape(payload)
         financial_action = FINANCIAL_ACTION_RE.search(payload) or FINANCIAL_ACTION_RE.search(
@@ -122,13 +140,17 @@ class ToolHijackAnalyzer(Analyzer):
         tagged_action = self._tagged_dangerous_action(payload)
 
         if not tool_shape and not fenced_tool and tagged_action is None:
-            return AnalyzerResult(name=self.name, weight=self.weight, score=0, data={"detections": []})
+            return AnalyzerResult(
+                name=self.name, weight=self.weight, score=0, data={"detections": []}
+            )
         if (
             tagged_action is None
             and financial_action is None
             and self._is_read_only_tool_payload(payload)
         ):
-            return AnalyzerResult(name=self.name, weight=self.weight, score=0, data={"detections": []})
+            return AnalyzerResult(
+                name=self.name, weight=self.weight, score=0, data={"detections": []}
+            )
 
         executable_action = tagged_action or financial_action
         confidence = 0.88 if executable_action else 0.60
@@ -216,8 +238,7 @@ class ToolHijackAnalyzer(Analyzer):
             tag = token.group("tag").lower()
             namespace_parts = tag.split(":")
             recognized_tool_tag = (
-                namespace_parts[0] in TOOL_TAG_NAMES
-                or namespace_parts[-1] in TOOL_TAG_NAMES
+                namespace_parts[0] in TOOL_TAG_NAMES or namespace_parts[-1] in TOOL_TAG_NAMES
             )
             if header_end < 0:
                 incomplete_tag = payload[token.start() :]
@@ -230,11 +251,7 @@ class ToolHijackAnalyzer(Analyzer):
                         spaced_fragments,
                         attributed_fragments,
                     )
-                return (
-                    _dangerous_action(unescape(incomplete_tag))
-                    if recognized_tool_tag
-                    else None
-                )
+                return _dangerous_action(unescape(incomplete_tag)) if recognized_tool_tag else None
 
             inside_tagged_body = bool(stack)
             header = payload[token.end() : header_end]
@@ -321,10 +338,45 @@ class ToolHijackAnalyzer(Analyzer):
         except json.JSONDecodeError:
             return False
 
+        # An explicit tool marker anywhere in the text — including nested inside
+        # `params` — means the envelope is carrying a tool call, whatever its
+        # method says, so the read-only escape must not apply to it.
+        if cls._is_read_only_json_rpc(parsed) and not TOOL_SHAPE_RE.search(payload):
+            return True
         if not isinstance(parsed, dict):
             return False
-        return cls._is_canonical_get_balance_call(parsed) or cls._is_canonical_eth_balance_call(
-            parsed
+        return cls._is_canonical_get_balance_call(parsed)
+
+    @classmethod
+    def _is_read_only_json_rpc(cls, message: object) -> bool:
+        """True for a JSON-RPC 2.0 message that cannot change state.
+
+        A request qualifies when it is a well-formed envelope whose method sits in a
+        read-only namespace and whose local name does not lead with a mutating verb.
+        A response qualifies when it carries a result or an error and no method at
+        all; the caller has already established that the payload holds no action
+        verb. A batch qualifies only when every member does.
+        """
+        if isinstance(message, list):
+            return bool(message) and all(cls._is_read_only_json_rpc(item) for item in message)
+        if not isinstance(message, dict) or message.get("jsonrpc") != "2.0":
+            return False
+
+        keys = set(message)
+        if "method" not in keys:
+            return keys <= JSON_RPC_RESPONSE_KEYS and bool(keys & {"result", "error"})
+        if not keys <= JSON_RPC_REQUEST_KEYS:
+            return False
+        if "params" in message and not isinstance(message["params"], (list, dict)):
+            return False
+
+        method = message["method"]
+        if not isinstance(method, str) or "_" not in method:
+            return False
+        namespace, _, local = method.partition("_")
+        return (
+            namespace.lower() in JSON_RPC_READ_ONLY_NAMESPACES
+            and JSON_RPC_STATE_CHANGING_RE.match(local) is None
         )
 
     @staticmethod
@@ -341,23 +393,4 @@ class ToolHijackAnalyzer(Analyzer):
             and set(arguments) == {"address"}
             and isinstance(arguments["address"], str)
             and EVM_ADDRESS_RE.fullmatch(arguments["address"]) is not None
-        )
-
-    @staticmethod
-    def _is_canonical_eth_balance_call(payload: dict[object, object]) -> bool:
-        required_keys = {"jsonrpc", "method", "params"}
-        if not required_keys <= set(payload) <= required_keys | {"id"}:
-            return False
-        if payload["jsonrpc"] != "2.0" or payload["method"] != "eth_getBalance":
-            return False
-        if "id" in payload and (isinstance(payload["id"], bool) or not isinstance(payload["id"], int)):
-            return False
-        params = payload["params"]
-        return (
-            isinstance(params, list)
-            and len(params) == 2
-            and isinstance(params[0], str)
-            and EVM_ADDRESS_RE.fullmatch(params[0]) is not None
-            and isinstance(params[1], str)
-            and BLOCK_REFERENCE_RE.fullmatch(params[1]) is not None
         )

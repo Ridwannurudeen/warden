@@ -76,8 +76,7 @@ def test_clean_wheel_install_imports_runtime_data(tmp_path: Path) -> None:
         assert any(name.endswith("/THIRD-PARTY-NOTICES") for name in archive.namelist())
         assert any(name.endswith("/corpus/license-manifest.json") for name in archive.namelist())
         assert any(
-            name.endswith("/spec/corpus-source-allowlist-v1.json")
-            for name in archive.namelist()
+            name.endswith("/spec/corpus-source-allowlist-v1.json") for name in archive.namelist()
         )
         assert any(name.endswith("/spec/taxonomy-map-v1.json") for name in archive.namelist())
         assert any(
@@ -120,16 +119,16 @@ def test_clean_wheel_install_imports_runtime_data(tmp_path: Path) -> None:
                 "from warden.feedback_store import corpus_fingerprint; "
                 "assert Path(warden.__file__).resolve().is_relative_to(target); "
                 "assert AUDIT_BATTERY_PATH.resolve().is_relative_to(target); "
-                    "assert AUDIT_BATTERY_PATH.is_file(); "
-                    "from warden.taxonomy import TAXONOMY_MAP_PATH; "
-                    "assert TAXONOMY_MAP_PATH.resolve().is_relative_to(target); "
-                    "assert TAXONOMY_MAP_PATH.is_file(); "
+                "assert AUDIT_BATTERY_PATH.is_file(); "
+                "from warden.taxonomy import TAXONOMY_MAP_PATH; "
+                "assert TAXONOMY_MAP_PATH.resolve().is_relative_to(target); "
+                "assert TAXONOMY_MAP_PATH.is_file(); "
                 "assert AUDIT_BATTERY_SHA256 == "
                 "'7e18f89d7249fe97e007f37dc91839492cfb7a40af4d7b660309645c0fe33f3f'; "
                 "assert AUDIT_BATTERY_SIZE == 20; "
                 "assert len(BIP39_WORDS) == 2048; "
                 "assert corpus_fingerprint() == "
-                "'sha256:b095d7653635dfa734ee21a52afe93e5716be520a2340719b2b3465bb85c58fc'"
+                "'sha256:24652dc28d39660be05673f786173b64eea3df1e2618901f7d86ce6a70694b0d'"
             ),
         ],
         cwd=tmp_path,
@@ -164,16 +163,11 @@ def test_clean_sdist_contains_endpoint_audit_battery(tmp_path: Path) -> None:
             name.endswith("/audit/warden-core-http-2026-07.json") for name in archive.getnames()
         )
         assert any(name.endswith("/THIRD-PARTY-NOTICES") for name in archive.getnames())
+        assert any(name.endswith("/corpus/license-manifest.json") for name in archive.getnames())
         assert any(
-            name.endswith("/corpus/license-manifest.json") for name in archive.getnames()
+            name.endswith("/spec/corpus-source-allowlist-v1.json") for name in archive.getnames()
         )
-        assert any(
-            name.endswith("/spec/corpus-source-allowlist-v1.json")
-            for name in archive.getnames()
-        )
-        assert any(
-            name.endswith("/spec/taxonomy-map-v1.json") for name in archive.getnames()
-        )
+        assert any(name.endswith("/spec/taxonomy-map-v1.json") for name in archive.getnames())
         assert any(
             name.endswith("/spec/schemas/model-calibration-capture-v1.schema.json")
             for name in archive.getnames()

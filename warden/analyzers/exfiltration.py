@@ -28,6 +28,10 @@ SECRET_DOCUMENT_SUFFIX_RE = re.compile(
     r"(?i)^\s+(?:(?:rotation|security)\s+)?"
     r"(?:notice|documentation|docs?|guide|manual|policy|procedure|report)\b"
 )
+# A support answer quotes the request in order to refuse it: "reveal the system
+# prompt is the single most common thing people ask". A copular continuation makes
+# the phrase the subject of a sentence, which is a mention rather than a demand.
+QUOTED_REQUEST_SUFFIX_RE = re.compile(r"(?i)^\s*[\"'”’]?\s+(?:is|was|are|were)\b")
 # Distinctive API-key/token shapes with near-zero benign collision rates.
 # Only flagged when an exfil verb appears near the token (or a full exfil
 # instruction is present elsewhere), so documentation and benign prose that
@@ -70,15 +74,23 @@ SENSITIVE_OBJECT_RE = re.compile(
     r"(?<![\w.-])\.env(?![\w.-])(?:\s+(?:files?|contents?))?"
     r"|\b(?:"
     r"authorization\s+headers?"
-    r"|bearer\s+tokens?"
-    r"|session\s+(?:cookies?|tokens?)"
+    r"|session\s+cookies?"
     r"|system\s+prompts?"
     r"|developer\s+prompts?"
     r"|mnemonics?"
     r"|seed\s*phrases?"
     r"|credentials?"
     r"|passwords?"
-    r"|(?:api|access|auth|private|secret|signing)[_ -]?keys?"
+    r"|passphrases?"
+    r"|client\s+secrets?"
+    # The key qualifiers already enumerated here (api/access/auth/private/secret/
+    # signing) name the same objects when the noun is `token`, and OAuth 2.0 and
+    # OpenID Connect add refresh/bearer/ID to that qualifier set. Sharing one
+    # qualifier list across both nouns removes the gap where `access key` was
+    # sensitive but `access token` was not.
+    r"|(?:api|access|auth|refresh|bearer|session|identity|private|secret|signing)"
+    r"[_ -]?(?:keys?|tokens?)"
+    r"|id[_ -]tokens?"
     r")\b"
     # Custom credential headers follow a strong naming convention, so an
     # `x-<vendor>-token|key|secret` name is treated as sensitive even when the
@@ -95,12 +107,28 @@ OUTBOUND_SINK_RE = re.compile(
     r"|\b(?:post|request)\s+bod(?:y|ies)\b"
     r"|\b(?:query|url)\s+parameters?\b"
     r"|\b(?:email|direct\s+message|dm|chat)\b"
+    # The sinks above are all technical destinations — a URL, a channel, a field of a
+    # request. The other half of the egress taxonomy is the destination named as a
+    # *party*: who receives it. A recipient noun on its own is far too common in
+    # ordinary prose, so this requires an explicit externality qualifier, which is
+    # what makes the destination out of bounds in the first place.
+    r"|\bthird[- ]part(?:y|ies)\b"
+    r"|\b(?:remote|external|third[- ]party|outside|off[- ]?site|unauthori[sz]ed"
+    r"|untrusted|unknown|foreign)\s+"
+    r"(?:operators?|part(?:y|ies)|counterpart(?:y|ies)|recipients?|contacts?|servers?"
+    r"|hosts?|services?|systems?|accounts?|agents?|addresses|inboxe?s?|mailboxe?s?"
+    r"|domains?|buckets?|destinations?|relays?|listeners?|handlers?)\b"
     r")"
 )
+# Verbs of outbound conveyance. The list already held the core of this class
+# (send/forward/upload/post/transmit/export/route); the additions are the remaining
+# members of the same family — the ways one system hands data to another.
 OUTBOUND_FLOW_RE = re.compile(
     r"(?i)\b(?:include|attach|place|put|embed|append|copy|route|forward|send(?:ing)?|"
     r"upload|post|transmit|write|add|contain|contains|containing|populate|set|"
-    r"carry|insert|serialize|encode|export|map|includes)\b"
+    r"carry|insert|serialize|encode|export|map|includes|"
+    r"relay|deliver|dispatch|submit|publish|share|disclose|leak|exfiltrate|"
+    r"push|stream|emit|mirror)\b"
 )
 OUTBOUND_NEGATION_PREFIX_RE = re.compile(
     r"(?i)\b(?:do\s+not|don't|does\s+not|doesn't|never|must\s+not|should\s+not|"
@@ -136,15 +164,19 @@ TRANSFORM_CONDITION_RE = re.compile(
     r"(?:the\s+)?(?:"
     r"it|them|"
     r"\.env(?:\s+(?:files?|contents?))?|"
-    r"authorization\s+headers?|bearer\s+tokens?|session\s+(?:cookies?|tokens?)|"
+    r"authorization\s+headers?|session\s+cookies?|client\s+secrets?|"
     r"(?:system|developer)\s+prompts?|mnemonics?|seed\s*phrases?|credentials?|"
-    r"passwords?|(?:api|access|auth|private|secret|signing)[_ -]?keys?"
+    r"passwords?|passphrases?|id[_ -]tokens?|"
+    r"(?:api|access|auth|refresh|bearer|session|identity|private|secret|signing)"
+    r"[_ -]?(?:keys?|tokens?)"
     r")"
     r"|(?:"
     r"\.env(?:\s+(?:files?|contents?))?|"
-    r"authorization\s+headers?|bearer\s+tokens?|session\s+(?:cookies?|tokens?)|"
+    r"authorization\s+headers?|session\s+cookies?|client\s+secrets?|"
     r"(?:system|developer)\s+prompts?|mnemonics?|seed\s*phrases?|credentials?|"
-    r"passwords?|(?:api|access|auth|private|secret|signing)[_ -]?keys?"
+    r"passwords?|passphrases?|id[_ -]tokens?|"
+    r"(?:api|access|auth|refresh|bearer|session|identity|private|secret|signing)"
+    r"[_ -]?(?:keys?|tokens?)"
     r")\s+(?:is|are|was|were)\s+(?:redacted|masked|sanitized)"
     r")"
 )
@@ -280,6 +312,7 @@ class ExfiltrationAnalyzer(Analyzer):
                 if (
                     not NEGATED_INSTRUCTION_RE.search(prefix)
                     and not SECRET_DOCUMENT_SUFFIX_RE.search(suffix)
+                    and not QUOTED_REQUEST_SUFFIX_RE.search(suffix)
                     and not ExfiltrationAnalyzer._has_safe_transform_condition(
                         payload[instruction.start() : min(len(payload), instruction.end() + 256)]
                     )

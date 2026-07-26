@@ -31,6 +31,7 @@ include = ["audit", "warden*"]
 "audit" = ["warden-core-http-2026-07.json"]
 "warden" = ["corpus_fingerprint.txt"]
 "warden.analyzers" = ["bip39_words.txt"]
+"warden.scanner" = ["learned_scorer.json"]
 
 [tool.setuptools.data-files]
 "." = ["THIRD-PARTY-NOTICES"]
