@@ -1968,6 +1968,26 @@ code {
   justify-content: space-between;
 }
 
+.result-cta {
+  margin-top: 24px;
+  padding: clamp(16px, 2.5vw, 22px);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.result-cta h3 {
+  margin: 6px 0 8px;
+}
+
+.result-cta pre {
+  margin: 8px 0;
+}
+
+.result-cta .button {
+  margin-top: 12px;
+}
+
 .scan-input-panel > label,
 .address-fieldset {
   margin-top: 18px;

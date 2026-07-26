@@ -55,6 +55,37 @@ safe = warden.guard(untrusted_text)                 # not rate-limited, sub-ms v
 
 Latency claim, precisely: the verdict *compute* is sub-millisecond; hosted paths add network RTT.
 
+## Use Warden as an MCP server
+
+Give any MCP client (Claude Desktop/Code, or any agent that speaks MCP) a Warden
+tool in one config line. Add to the client's MCP config:
+
+```json
+{ "mcpServers": { "warden": { "command": "warden-mcp" } } }
+```
+
+The agent then has two tools: `warden_scan` (structured ALLOW/SANITIZE/BLOCK
+verdict for any untrusted text) and `warden_guard` (returns the safe text, or
+errors on BLOCK). Zero config uses the free hosted endpoint; set `WARDEN_LOCAL=1`
+for in-process enforcement, `WARDEN_BASE_URL` to point elsewhere, or
+`WARDEN_FAIL_OPEN=0` to fail closed. It speaks JSON-RPC over stdio with no extra
+dependencies.
+
+## Guard a tool's output
+
+The dominant agent pattern is guarding what a tool *returned* before the model
+sees it — scan the output, not the input:
+
+```python
+from warden_guard import WardenClient, guard_output
+
+warden = WardenClient(local=True, fail_open=False)
+
+@guard_output(warden)
+def fetch_untrusted(query: str) -> str:
+    return call_some_tool(query)  # return value is scanned; BLOCK raises WardenBlocked
+```
+
 ## Async
 
 ```python

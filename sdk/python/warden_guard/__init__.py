@@ -14,7 +14,7 @@ from warden_guard.client import (
     X402PaymentHandler,
     X402PaymentRequirement,
 )
-from warden_guard.decorator import guard
+from warden_guard.decorator import guard, guard_output
 from warden_guard.middleware import WardenGuard
 from warden_guard.pipeline import AsyncTextGuard, GuardedText, TextGuard
 from warden_guard.proof import ProtectionProofApp, protection_proof
@@ -40,6 +40,7 @@ __all__ = [
     "X402PaymentHandler",
     "X402PaymentRequirement",
     "guard",
+    "guard_output",
     "protection_proof",
     "__version__",
 ]
