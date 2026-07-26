@@ -6,8 +6,15 @@
 deterministic payload firewall for the agent economy, plus a reference implementation of the
 open [APA v0.1](../../spec/APA-SPEC.md) protection-proof standard.
 
-The release target is the currently available PyPI name `warden-agent-guard`. Until the user
-publishes it, install from a checked-out Warden source tree:
+Install from PyPI:
+
+```bash
+pip install warden-agent-guard
+```
+
+The similarly named `warden-guard` on PyPI is a different, unrelated project — install
+`warden-agent-guard`. To also build the enforcement-grade local engine (below), install from a
+checked-out Warden source tree:
 
 ```bash
 python -m pip install -e /path/to/warden/sdk/python
