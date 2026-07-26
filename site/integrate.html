@@ -512,8 +512,10 @@ const result = await warden.scan(untrustedText);</code></pre>
             <code>harden_agent</code>, and <code>variant_audit_agent</code>. The
             hardening tool accepts a completed audit ID and returns its
             issuer-signed, transparency-logged pack. The variant audit tool
-            attack-tests a consenting endpoint with adversarial variants and
-            returns a graded, issuer-signed report. Neither purchases the hosted
+            attack-tests a consenting endpoint across encoding and semantic
+            attack families, returns an A–F per-class resistance grade in an
+            issuer-signed, verifiable report, and issues a shareable badge —
+            re-auditable against a prior run. Neither purchases the hosted
             x402 service.
           </p>
           <pre><code id="mcp-snippet" data-integration-example="mcp">Local MCP configuration not available.</code></pre>
