@@ -76,42 +76,69 @@ training-corpus fingerprint. It rejects any training/held-out overlap across can
 
 ### Transforms and what actually ships
 
-The generator applies nine transform chains, all of them bounded transformations already reversed
-by `warden/scanner/normalize.py`:
+The generator applies seventeen transform chains in three families. A family is defined by *how it
+proves the variant still carries its source's attack intent*, and nothing ships that cannot prove
+it one of these two ways:
 
-| Transform chain | Distinct in output |
-| --- | --- |
-| `encoding:base64` | yes |
-| `encoding:hex` | yes |
-| `encoding:percent` | yes |
-| `encoding:html-entities` | yes |
-| `encoding:x-escape` | yes |
-| `case:swap` + `encoding:base64` | yes |
-| `whitespace:expand` + `encoding:base64` | yes, except when the source contains no space |
-| `unicode:homoglyph` + `encoding:base64` | yes |
-| `nesting:json` + `encoding:base64` (twice) | yes |
+| Family | Proof of intent | Chains |
+| --- | --- | --- |
+| `encoding` | Warden's Decoder Wall reverses it, so the source's canonical form is in the variant's `derive_candidates` closure | the nine encoding chains below |
+| `normalization` | the same reversal, via `normalize.fold_segmentation` / `fold_leetspeak` rather than a decoder | `segmentation:dot`, `segmentation:dash`, `leet:substitute` |
+| `semantic` | the source attack is present **verbatim**; only its surroundings changed | the five frames below |
+
+| Transform chain | Family | Distinct in output |
+| --- | --- | --- |
+| `encoding:base64` | encoding | yes |
+| `encoding:hex` | encoding | yes |
+| `encoding:percent` | encoding | yes |
+| `encoding:html-entities` | encoding | yes |
+| `encoding:x-escape` | encoding | yes |
+| `case:swap` + `encoding:base64` | encoding | yes |
+| `whitespace:expand` + `encoding:base64` | encoding | yes, except when the source contains no space |
+| `unicode:homoglyph` + `encoding:base64` | encoding | yes |
+| `nesting:json` + `encoding:base64` (twice) | encoding | yes |
+| `segmentation:dot` (`I.g.n.o.r.e`) | normalization | yes, when the fold rebuilds the source exactly |
+| `segmentation:dash` (`i-g-n-o-r-e`) | normalization | yes, when the fold rebuilds the source exactly |
+| `leet:substitute` (`1gn0r3`) | normalization | yes, when at least three words qualify for the fold |
+| `semantic:nullification` | semantic | yes |
+| `semantic:role-override` | semantic | yes |
+| `semantic:supersession` | semantic | yes |
+| `semantic:benign-preamble` | semantic | yes |
+| `semantic:delimiter-injection` | semantic | yes |
+
+**Free paraphrase is deliberately absent.** A synonym rewrite can prove neither property, so
+shipping one would mean labelling a payload an attack without evidence that it still is one.
 
 Deduplication is by the variant's own canonicalized payload, because the engine scans the raw
 payload as well as every derived candidate — two encodings of the same source are different
 scanner inputs and exercise different decoder branches. `whitespace:expand` is the one chain that
 can collapse: expanding spaces in a source that has none reproduces the plain `encoding:base64`
-payload exactly, and the duplicate is dropped.
+payload exactly, and the duplicate is dropped. The same rule is why there is no plain
+zero-width or plain homoglyph chain: `canonical_dataset_payload` folds both, so such a variant
+canonicalizes to its own training row and is dropped as a duplicate.
 
-Two further exclusions reduce what ships, and both are deliberate:
+Three exclusions reduce what ships, and all three are deliberate:
 
 - **Sources that are built-in injections.** 16 of the 94 training attacks (all eight
   `CORPUS_MATCH` rows, `role-009`–`role-012`, `web3-004`, `web3-006`, `encoding-004`,
-  `encoding-005`) are scanner-equivalent to an entry in `KNOWN_INJECTIONS`, so every variant of
-  them is dropped by the built-in-injection guard. `CORPUS_MATCH` therefore ships as an empty
-  pack.
+  `encoding-005`) are scanner-equivalent to an entry in `KNOWN_INJECTIONS`, so every *encoding* and
+  *normalization* variant of them is dropped by the built-in-injection guard. A semantic frame is
+  not scanner-equivalent to what it wraps, so those sources do contribute frames and
+  `CORPUS_MATCH` is no longer an empty pack.
 - **Encodings the Decoder Wall will not reverse.** `web3-003` and `drain-005` are short and
   digit-heavy, so their single-layer encodings fail `normalize._is_plausible_text` and never
   decode back to the source. The generator refuses to emit a variant whose decoded closure does
-  not contain its own training source, so those two contribute only their nested-JSON variant.
+  not contain its own training source, so those two contribute no single-layer encoding.
+- **Normalization the fold will not reverse.** Segmentation only rebuilds the source when the
+  intra-word separator stays distinguishable from the word boundary, and leetspeak only folds when
+  at least three words qualify, so short or punctuation-dense sources contribute fewer
+  normalization variants.
 
-At the current corpus that yields **675 variants from 78 of the 94 training attacks**: 75 each for
-the five single-layer encodings, 76 each for `case:swap` and `unicode:homoglyph`, 77 for the
-nested-JSON chain, and 71 for `whitespace:expand`.
+At the current corpus that yields **1316 variants from all 94 training attacks** — 675 encoding,
+176 normalization, 465 semantic: 75 each for the five single-layer encodings, 76 each for
+`case:swap` and `unicode:homoglyph`, 77 for the nested-JSON chain, 71 for `whitespace:expand`,
+57 each for the two segmentation chains, 62 for `leet:substitute`, and 93 for each of the five
+frames.
 
 ### Consuming the packs
 

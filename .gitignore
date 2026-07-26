@@ -8,6 +8,7 @@ gauntlet/
 /data/feedback/
 /data/shield/
 /data/audit-findings/
+/data/variant-audits/
 
 # Generated marketplace pages (rebuild with scripts/build_index.py)
 /site/agents/

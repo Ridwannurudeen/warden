@@ -492,15 +492,26 @@ class HardenEvidenceResponse(BaseModel):
     limitations: str
 
 
+ResistanceGrade = Literal["A", "B", "C", "D", "F", "INCONCLUSIVE"]
+
+
 class VariantAuditRequest(BaseModel):
     target_url: str = Field(min_length=1, max_length=MAX_TARGET_URL_LENGTH)
     # None means every class that has variants. An explicit empty list is rejected by
     # the engine rather than silently treated as "all".
     threat_classes: list[str] | None = Field(default=None, max_length=len(ReasonCode))
-    max_variants_per_class: int = Field(default=25, ge=1, le=25)
+    # None means the depth tier's own ceiling. The engine enforces the per-tier
+    # limit, so 50 is only reachable at depth "deep".
+    max_variants_per_class: int | None = Field(default=None, ge=1, le=50)
+    # An earlier retained report for the same host, to be compared against.
+    since: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    # "deep" probes more variants over a longer whole-run budget. The listed fee
+    # is unchanged; depth is bounded work, not a different product.
+    depth: Literal["standard", "deep"] = "standard"
 
 
 class VariantAuditCaps(BaseModel):
+    depth: Literal["standard", "deep"]
     max_variants_per_class: int = Field(ge=1)
     max_total_variants: int = Field(ge=1)
     probe_timeout_seconds: float = Field(gt=0)
@@ -517,6 +528,8 @@ class VariantAuditClassResult(BaseModel):
     conclusive: int = Field(ge=0)
     # None when no probe in the class was conclusive, so a rate would be meaningless.
     detection_rate: float | None = Field(default=None, ge=0, le=100)
+    # INCONCLUSIVE is the absence of a grade, never a pass.
+    grade: ResistanceGrade
 
 
 class VariantAuditTotals(BaseModel):
@@ -527,10 +540,34 @@ class VariantAuditTotals(BaseModel):
     inconclusive: int = Field(ge=0)
     conclusive: int = Field(ge=0)
     detection_rate: float | None = Field(default=None, ge=0, le=100)
+    grade: ResistanceGrade
+
+
+class VariantAuditClassDelta(BaseModel):
+    threat_class: str
+    # None when either run had no conclusive probe in the class.
+    detection_rate_change: float | None = Field(default=None, ge=-100, le=100)
+    grade_from: ResistanceGrade
+    grade_to: ResistanceGrade
+
+
+class VariantAuditDelta(BaseModel):
+    since_report_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    since_issued_at: int = Field(ge=0)
+    # False when Warden's corpus or generator moved between the two runs, which
+    # makes them different tests rather than a before and after.
+    same_corpus: bool
+    detection_rate_change: float | None = Field(default=None, ge=-100, le=100)
+    grade_from: ResistanceGrade
+    grade_to: ResistanceGrade
+    per_class: list[VariantAuditClassDelta]
 
 
 class VariantAuditResponse(BaseModel):
-    schema_version: Literal[1]
+    # Deliberately not pinned to one version: retained reports outlive a schema
+    # bump, and a Literal here would turn every stored report into a 500 on the
+    # retrieval route the moment SCHEMA_VERSION moves.
+    schema_version: int = Field(ge=1)
     target_host: str
     corpus_fingerprint: str
     generator: str
@@ -539,10 +576,45 @@ class VariantAuditResponse(BaseModel):
     totals: VariantAuditTotals
     consent_verified: Literal[True]
     limitations: list[str]
+    # Server entropy that makes report_id unguessable; see variant_audit.
+    nonce: str = Field(pattern=r"^[0-9a-f]{32}$")
+    # None unless the request named an earlier report for the same host.
+    delta: VariantAuditDelta | None = None
     report_id: str = Field(pattern=r"^[0-9a-f]{64}$")
     issuer: Literal["warden"]
     issued_at: int = Field(ge=0)
     issuer_sig: str
+
+
+class VariantAuditReportResponse(BaseModel):
+    report: VariantAuditResponse
+    verified: bool
+
+
+class ResistanceBadge(BaseModel):
+    spec_version: Literal["warden-resistance-badge/1"]
+    report_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    target_host: str
+    # INCONCLUSIVE is absent by construction: an ungraded run earns no badge.
+    grade: Literal["A", "B", "C", "D", "F"]
+    detection_rate: float = Field(ge=0, le=100)
+    detected: int = Field(ge=0)
+    conclusive: int = Field(ge=1)
+    variants_sent: int = Field(ge=1)
+    threat_classes: int = Field(ge=1)
+    corpus_fingerprint: str
+    generator: str
+    observed_at: int = Field(ge=0)
+    expires_at: int = Field(ge=0)
+    issuer: Literal["warden"]
+    limitations: str
+    issuer_sig: str = Field(pattern=r"^sig:")
+
+
+class ResistanceBadgeResponse(BaseModel):
+    badge: ResistanceBadge
+    verified: bool
+    status: Literal["active", "stale", "invalid"]
 
 
 class ApaRegisterRequest(BaseModel):

@@ -1,6 +1,7 @@
 const DEFAULT_BASE_URL = "https://warden.gudman.xyz";
 const FEEDBACK_PATH = "/api/feedback";
 const PAID_PATH = "/scan";
+const VARIANT_AUDIT_PATH = "/variant-audit";
 const MAX_X402_HEADER_LENGTH = 16_384;
 const X402_NETWORK = "eip155:196";
 const X402_ASSET = "0x779ded0c9e1022225f8e0630b35a9b54be713736";
@@ -41,6 +42,48 @@ export interface WardenClientOptions {
 export interface ScanOptions {
   expectedAddresses?: readonly string[];
   depth?: "fast" | "thorough";
+}
+
+export type ResistanceGrade = "A" | "B" | "C" | "D" | "F" | "INCONCLUSIVE";
+
+export interface VariantAuditClassResult {
+  threat_class: string;
+  total: number;
+  detected: number;
+  missed: number;
+  inconclusive: number;
+  conclusive: number;
+  /** null when no probe in the class was conclusive, so a rate would be meaningless. */
+  detection_rate: number | null;
+  grade: ResistanceGrade;
+}
+
+export interface VariantAuditTotals extends VariantAuditClassResult {
+  threat_classes: number;
+  variants_sent: number;
+}
+
+export interface VariantAuditResponse extends Record<string, unknown> {
+  schema_version: number;
+  target_host: string;
+  corpus_fingerprint: string;
+  generator: string;
+  per_class: VariantAuditClassResult[];
+  totals: VariantAuditTotals;
+  consent_verified: true;
+  limitations: string[];
+  report_id: string;
+  issuer: string;
+  issued_at: number;
+  issuer_sig: string;
+}
+
+export interface VariantAuditOptions {
+  threatClasses?: readonly string[];
+  maxVariantsPerClass?: number;
+  /** report_id of an earlier audit of the same host, to be compared against. */
+  since?: string;
+  depth?: "standard" | "deep";
 }
 
 export interface X402PaymentRequirement {
@@ -186,6 +229,7 @@ export class WardenClient {
   readonly failOpen: boolean;
   private readonly paymentHandler: X402PaymentHandler | undefined;
   private readonly paidUrl: string | undefined;
+  private readonly variantAuditUrl: string | undefined;
 
   constructor(options: WardenClientOptions = {}) {
     const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
@@ -211,7 +255,11 @@ export class WardenClient {
     this.paidUrl =
       options.paymentHandler === undefined
         ? undefined
-        : canonicalPaidUrl(this.baseUrl);
+        : canonicalPaidUrl(this.baseUrl, PAID_PATH);
+    this.variantAuditUrl =
+      options.paymentHandler === undefined
+        ? undefined
+        : canonicalPaidUrl(this.baseUrl, VARIANT_AUDIT_PATH);
   }
 
   async scan(payload: string, options: ScanOptions = {}): Promise<ScanResult> {
@@ -237,7 +285,14 @@ export class WardenClient {
       body.context = { expected_addresses: options.expectedAddresses };
     }
     if (this.paymentHandler !== undefined && this.paidUrl !== undefined) {
-      return this.scanWithPayment(body, this.paymentHandler, this.paidUrl);
+      return scanResultFromResponse(
+        await this.postPaid<ScanResponse>(
+          body,
+          this.paymentHandler,
+          this.paidUrl,
+          validateScanResponse,
+        ),
+      );
     }
 
     const controller = new AbortController();
@@ -296,15 +351,12 @@ export class WardenClient {
     }
   }
 
-  private async scanWithPayment(
-    body: {
-      payload: string;
-      depth: "fast" | "thorough";
-      context?: { expected_addresses: readonly string[] };
-    },
+  private async postPaid<T>(
+    body: unknown,
     paymentHandler: X402PaymentHandler,
     requestUrl: string,
-  ): Promise<ScanResult> {
+    validate: (data: unknown) => asserts data is T,
+  ): Promise<T> {
     const requestBody = JSON.stringify(body);
     const firstController = new AbortController();
     let firstTimedOut = false;
@@ -342,12 +394,12 @@ export class WardenClient {
             `Warden x402 request failed with HTTP ${response.status}${suffix}`,
           );
         }
-        const data = await readPaidScanResponse(
+        return await readPaidResponse<T>(
           response,
           () => firstTimedOut,
           (cause) => this.timeoutError(cause),
+          validate,
         );
-        return scanResultFromResponse(data);
       }
     } finally {
       clearTimeout(firstTimeout);
@@ -416,15 +468,79 @@ export class WardenClient {
         );
       }
       validateX402SettlementHeader(replay.headers);
-      const data = await readPaidScanResponse(
+      return await readPaidResponse<T>(
         replay,
         () => replayTimedOut,
         (cause) => this.timeoutError(cause),
+        validate,
       );
-      return scanResultFromResponse(data);
     } finally {
       clearTimeout(replayTimeout);
     }
+  }
+
+  /**
+   * Run a paid adversarial variant audit against a consenting endpoint.
+   *
+   * Requires a paymentHandler: unlike `scan`, there is no free demo tier for
+   * firing hundreds of attack payloads at a third-party endpoint.
+   */
+  async variantAudit(
+    targetUrl: string,
+    options: VariantAuditOptions = {},
+  ): Promise<VariantAuditResponse> {
+    if (typeof targetUrl !== "string" || targetUrl === "") {
+      throw new TypeError("targetUrl must be a non-empty string");
+    }
+    if (this.paymentHandler === undefined || this.variantAuditUrl === undefined) {
+      throw new WardenError(
+        "variantAudit requires a paymentHandler; it is a paid route with no free tier",
+      );
+    }
+    if (
+      options.depth !== undefined &&
+      options.depth !== "standard" &&
+      options.depth !== "deep"
+    ) {
+      throw new WardenError("depth must be 'standard' or 'deep'");
+    }
+    const body: Record<string, unknown> = { target_url: targetUrl };
+    if (options.threatClasses !== undefined) {
+      if (
+        !isStringArray(options.threatClasses) ||
+        options.threatClasses.length === 0 ||
+        options.threatClasses.some((entry) => entry === "")
+      ) {
+        throw new TypeError(
+          "threatClasses must be a non-empty array of non-empty strings",
+        );
+      }
+      body.threat_classes = options.threatClasses;
+    }
+    if (options.maxVariantsPerClass !== undefined) {
+      if (
+        !Number.isInteger(options.maxVariantsPerClass) ||
+        options.maxVariantsPerClass < 1
+      ) {
+        throw new TypeError("maxVariantsPerClass must be a positive integer");
+      }
+      body.max_variants_per_class = options.maxVariantsPerClass;
+    }
+    if (options.since !== undefined) {
+      if (!/^[0-9a-f]{64}$/.test(options.since)) {
+        throw new TypeError("since must be a 64-character lowercase hex report_id");
+      }
+      body.since = options.since;
+    }
+    if (options.depth !== undefined) {
+      body.depth = options.depth;
+    }
+    return this.postPaid<VariantAuditResponse>(
+      body,
+      this.paymentHandler,
+      this.variantAuditUrl,
+      validateVariantAuditResponse,
+    );
   }
 
   async guard(payload: string, options: ScanOptions = {}): Promise<string> {
@@ -529,7 +645,7 @@ export class WardenClient {
   }
 }
 
-function canonicalPaidUrl(baseUrl: string): string {
+function canonicalPaidUrl(baseUrl: string, path: string): string {
   let parsed: URL;
   try {
     parsed = new URL(baseUrl);
@@ -550,7 +666,7 @@ function canonicalPaidUrl(baseUrl: string): string {
   ) {
     throw new WardenError("x402 payment requires a canonical HTTPS baseUrl");
   }
-  return `${parsed.origin}${PAID_PATH}`;
+  return `${parsed.origin}${path}`;
 }
 
 function decodeX402Header(value: unknown, label: string): unknown {
@@ -849,11 +965,12 @@ function sameX402Challenge(left: X402Challenge, right: X402Challenge): boolean {
   );
 }
 
-async function readPaidScanResponse(
+async function readPaidResponse<T>(
   response: Response,
   timedOut: () => boolean,
   timeoutError: (cause: unknown) => WardenError,
-): Promise<ScanResponse> {
+  validate: (data: unknown) => asserts data is T,
+): Promise<T> {
   let data: unknown;
   try {
     data = await response.json();
@@ -866,7 +983,7 @@ async function readPaidScanResponse(
     }
     throw new WardenError(errorMessage(error), error);
   }
-  validateScanResponse(data);
+  validate(data);
   return data;
 }
 
@@ -921,6 +1038,118 @@ function validateScanResponse(value: unknown): asserts value is ScanResponse {
     !Number.isFinite(value.latency_ms)
   ) {
     throw invalidResponse("latency_ms");
+  }
+}
+
+const RESISTANCE_GRADES = ["A", "B", "C", "D", "F", "INCONCLUSIVE"];
+
+/**
+ * Require the counts rather than type-checking whichever ones arrived.
+ *
+ * The assertion below types these as required numbers, so accepting an absent
+ * count hands a caller `undefined` where the type says `number` — silent NaN in
+ * their arithmetic, on a report they paid for. The totals are also checked for
+ * internal consistency: a report whose parts do not add up is not evidence.
+ */
+function isVariantAuditCounts(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const counts: number[] = [];
+  for (const field of [
+    "total",
+    "detected",
+    "missed",
+    "inconclusive",
+    "conclusive",
+  ]) {
+    const count = value[field];
+    if (!Number.isInteger(count) || (count as number) < 0) {
+      return false;
+    }
+    counts.push(count as number);
+  }
+  const [total, detected, missed, inconclusive, conclusive] = counts as [
+    number,
+    number,
+    number,
+    number,
+    number,
+  ];
+  if (
+    detected + missed + inconclusive !== total ||
+    detected + missed !== conclusive
+  ) {
+    return false;
+  }
+  if (value.detection_rate !== null) {
+    const rate = value.detection_rate;
+    if (
+      typeof rate !== "number" ||
+      !Number.isFinite(rate) ||
+      rate < 0 ||
+      rate > 100
+    ) {
+      return false;
+    }
+  }
+  return isOneOf(value.grade, RESISTANCE_GRADES);
+}
+
+function validateVariantAuditResponse(
+  value: unknown,
+): asserts value is VariantAuditResponse {
+  if (!isRecord(value)) {
+    throw invalidResponse("expected an object");
+  }
+  for (const field of [
+    "target_host",
+    "corpus_fingerprint",
+    "generator",
+    "issuer",
+    "issuer_sig",
+  ]) {
+    if (typeof value[field] !== "string") {
+      throw invalidResponse(field);
+    }
+  }
+  if (typeof value.report_id !== "string" || !/^[0-9a-f]{64}$/.test(value.report_id)) {
+    throw invalidResponse("report_id");
+  }
+  if (!Number.isInteger(value.schema_version)) {
+    throw invalidResponse("schema_version");
+  }
+  if (!Number.isInteger(value.issued_at) || (value.issued_at as number) < 0) {
+    throw invalidResponse("issued_at");
+  }
+  // An unconsented run must never reach a caller as if it were consented.
+  if (value.consent_verified !== true) {
+    throw invalidResponse("consent_verified");
+  }
+  if (
+    !isStringArray(value.limitations) ||
+    value.limitations.length === 0 ||
+    value.limitations.some((line) => line === "")
+  ) {
+    throw invalidResponse("limitations");
+  }
+  if (
+    !Array.isArray(value.per_class) ||
+    !value.per_class.every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry.threat_class === "string" &&
+        isVariantAuditCounts(entry),
+    )
+  ) {
+    throw invalidResponse("per_class");
+  }
+  if (
+    !isVariantAuditCounts(value.totals) ||
+    !Number.isInteger((value.totals as Record<string, unknown>).threat_classes) ||
+    !Number.isInteger((value.totals as Record<string, unknown>).variants_sent)
+  ) {
+    throw invalidResponse("totals");
   }
 }
 

@@ -12,10 +12,14 @@ from scripts.evaluate_variant_packs import evaluate_packs, load_packs
 from scripts.verify_variant_packs import verify_separation
 from warden import adversarial_variants, feedback_store
 from warden.adversarial_variants import (
+    CONTAINING_FAMILIES,
     INDEX_FILENAME,
     SCHEMA_VERSION,
+    SEMANTIC_FRAMES,
     THREAT_CLASSES,
+    VARIANT_FAMILIES,
     build_variant_packs,
+    scanner_equivalence,
     write_variant_packs,
 )
 from warden.dataset_promotion import canonical_dataset_payload
@@ -32,6 +36,10 @@ _ALL_TRANSFORM_CHAINS = {
     ("whitespace:expand", "encoding:base64"),
     ("unicode:homoglyph", "encoding:base64"),
     ("nesting:json", "encoding:base64", "nesting:json", "encoding:base64"),
+    ("segmentation:dot",),
+    ("segmentation:dash",),
+    ("leet:substitute",),
+    *((f"semantic:{name}",) for name, _frame in SEMANTIC_FRAMES),
 }
 
 
@@ -193,11 +201,18 @@ def test_variant_pack_is_deterministic_training_only_and_scanner_decodable(
         assert normalized not in occupied
         assert normalized not in generated_canonicals
         generated_canonicals.add(normalized)
-        decoded = {
-            canonical_dataset_payload(candidate)
-            for candidate, _transform in derive_candidates(row["payload"])
-        }
-        assert canonical_dataset_payload(source_payloads[row["source_case_id"]]) in decoded
+        source_payload = str(source_payloads[row["source_case_id"]])
+        assert row["variant_family"] in VARIANT_FAMILIES
+        if row["variant_family"] in CONTAINING_FAMILIES:
+            # A frame is not an encoding, so it proves intent by carrying the
+            # attack verbatim rather than by decoding back to it.
+            assert source_payload in str(row["payload"])
+        else:
+            decoded = {
+                canonical_dataset_payload(candidate)
+                for candidate, _transform in derive_candidates(row["payload"])
+            }
+            assert canonical_dataset_payload(source_payload) in decoded
 
     serialized = json.dumps(first, ensure_ascii=False, sort_keys=True)
     assert "held-secret-attack-id" not in serialized
@@ -442,3 +457,98 @@ async def test_pack_consumer_reports_per_class_results_and_rejects_tampering(
     tampered.write_text(json.dumps(pack), encoding="utf-8")
     with pytest.raises(ValueError, match="index digest"):
         load_packs(output)
+
+
+def test_every_variant_family_ships_and_declares_itself(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    paths = _fixture_paths(tmp_path, monkeypatch)
+
+    variants = _flat_variants(build_variant_packs(**paths))
+
+    assert {str(row["variant_family"]) for row in variants} == set(VARIANT_FAMILIES)
+    for row in variants:
+        chain = tuple(row["transform_chain"])
+        assert chain
+        if row["variant_family"] == "semantic":
+            assert chain[0].startswith("semantic:")
+        else:
+            assert not chain[0].startswith("semantic:")
+
+
+def test_semantic_frames_carry_the_attack_verbatim_without_encoding_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The frames are the point: they change the surroundings, not the attack.
+
+    A frame that decoded back to its source would just be another encoding, so
+    this pins both halves — the attack survives intact, and the payload is not
+    recoverable through the decoder wall.
+    """
+    paths = _fixture_paths(tmp_path, monkeypatch)
+    sources = {
+        str(row["id"]): str(row["payload"])
+        for row in (
+            json.loads(line)
+            for line in paths["training_attacks_path"].read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        )
+    }
+
+    framed = [
+        row
+        for row in _flat_variants(build_variant_packs(**paths))
+        if row["variant_family"] == "semantic"
+    ]
+
+    assert len(framed) == len(sources) * len(SEMANTIC_FRAMES)
+    for row in framed:
+        source = sources[str(row["source_case_id"])]
+        payload = str(row["payload"])
+        assert source in payload
+        assert payload != source
+        decoded = {
+            canonical_dataset_payload(candidate)
+            for candidate, _transform in derive_candidates(payload)
+        }
+        assert canonical_dataset_payload(source) not in decoded
+
+
+def test_normalization_families_fold_back_through_the_decoder_wall(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Leet and segmentation are only worth sending if Warden's folds reverse them.
+
+    A variant the fold cannot reverse would be an unlabelled payload rather
+    than a restatement of a known attack, so the generator must drop it.
+    """
+    paths = _fixture_paths(tmp_path, monkeypatch)
+    sources = {
+        str(row["id"]): str(row["payload"])
+        for row in (
+            json.loads(line)
+            for line in paths["training_attacks_path"].read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        )
+    }
+
+    normalized = [
+        row
+        for row in _flat_variants(build_variant_packs(**paths))
+        if row["variant_family"] == "normalization"
+    ]
+
+    assert {tuple(row["transform_chain"]) for row in normalized} == {
+        ("segmentation:dot",),
+        ("segmentation:dash",),
+        ("leet:substitute",),
+    }
+    for row in normalized:
+        source = sources[str(row["source_case_id"])]
+        payload = str(row["payload"])
+        assert payload != source
+        assert source not in payload
+        assert canonical_dataset_payload(source) in scanner_equivalence(payload)

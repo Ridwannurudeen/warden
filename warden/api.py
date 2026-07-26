@@ -14,6 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
+from starlette.concurrency import run_in_threadpool
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from warden.badge_store import get_badge, list_badges
@@ -29,7 +30,10 @@ from warden import (
     threat_intel,
 )
 from warden.audit_findings import get_findings
+from warden import resistance_badges
 from warden.variant_audit import run_variant_audit
+from warden.variant_audit import verify_report as verify_variant_audit_report
+from warden.variant_audit_store import get_report as get_variant_audit_report
 from warden.auditor import AgentAuditor
 from warden.core.verdict import ReasonCode, Verdict
 from warden.engine import WardenEngine
@@ -78,6 +82,8 @@ from warden.models import (
     ShieldLineageResponse,
     ThreatIntelSummary,
     VariantAuditRequest,
+    ResistanceBadgeResponse,
+    VariantAuditReportResponse,
     VariantAuditResponse,
 )
 from warden.observability import runtime_metrics
@@ -306,7 +312,25 @@ _VARIANT_AUDIT_INPUT = {
             },
             "max_variants_per_class": {
                 "type": "integer",
-                "description": "Optional per-class variant cap between 1 and 25",
+                "description": (
+                    "Optional per-class variant cap; defaults to the depth tier's own "
+                    "ceiling and may not exceed it (25 at standard depth, 50 at deep)"
+                ),
+            },
+            "depth": {
+                "type": "string",
+                "enum": ["standard", "deep"],
+                "description": (
+                    "Optional probing depth; 'deep' probes more variants over a longer "
+                    "whole-run budget at the same fee, under a tighter per-client quota"
+                ),
+            },
+            "since": {
+                "type": "string",
+                "description": (
+                    "Optional report_id of an earlier audit of the same host; the "
+                    "report then carries a signed comparison against it"
+                ),
             },
         },
         "required": ["target_url"],
@@ -314,7 +338,7 @@ _VARIANT_AUDIT_INPUT = {
 }
 _VARIANT_AUDIT_OUTPUT = {
     "type": "json",
-    "example": {"totals": {"variants_sent": 150, "detection_rate": 98.37}},
+    "example": {"totals": {"variants_sent": 150, "detection_rate": 98.37, "grade": "A"}},
 }
 
 _PAYMENT_OUTPUT_SCHEMAS = {
@@ -581,6 +605,14 @@ async def rate_limit_middleware(request: Request, call_next):
     elif path in {"/scan", "/audit", "/harden", "/variant-audit"}:
         limit_per_minute = _rate_limit_per_minute()
         rate_limited = check_rate_limit(request, limit_per_minute)
+    elif path.startswith("/variant-audit/"):
+        # Free evidence retrieval, but not free of cost: each lookup reads the
+        # retained-report store synchronously on the event loop, so an unmetered
+        # route here is a lever for stalling every paid route. The allowance is
+        # generous because a badge embedded in a README is fetched by many
+        # readers through one proxy address.
+        limit_per_minute = _evidence_rate_limit_per_minute()
+        rate_limited = check_rate_limit(request, limit_per_minute, scope="evidence")
     else:
         rate_limited = False
 
@@ -919,13 +951,48 @@ async def audit_get(request: Request) -> AuditResponse:
     return await audit(req)
 
 
+def _evidence_rate_limit_per_minute() -> int:
+    try:
+        return int(os.getenv("WARDEN_EVIDENCE_RATE_LIMIT_PER_MIN", "120") or "120")
+    except ValueError:
+        return 120
+
+
+def _deep_variant_audit_rate_limit_per_minute() -> int:
+    try:
+        return int(os.getenv("WARDEN_DEEP_VARIANT_AUDIT_RATE_LIMIT_PER_MIN", "2") or "2")
+    except ValueError:
+        return 2
+
+
+def _guard_deep_variant_audit(request: Request | None, depth: str) -> None:
+    """Meter the deep tier separately from the ordinary paid bucket.
+
+    A deep run holds one worker for minutes of sequential probing, so its quota
+    is per-client and much tighter than the standard tier's. The middleware
+    cannot see the request body, which is where depth is declared, so the check
+    belongs here.
+    """
+    if depth != "deep" or request is None:
+        return
+    if check_rate_limit(request, _deep_variant_audit_rate_limit_per_minute(), scope="variant-deep"):
+        raise HTTPException(
+            status_code=429,
+            detail="Deep variant audit rate limit exceeded",
+            headers={"Retry-After": str(retry_after_seconds())},
+        )
+
+
 @app.post("/variant-audit", response_model=VariantAuditResponse)
-async def variant_audit(req: VariantAuditRequest) -> VariantAuditResponse:
+async def variant_audit(req: VariantAuditRequest, request: Request = None) -> VariantAuditResponse:
+    _guard_deep_variant_audit(request, req.depth)
     try:
         report = await run_variant_audit(
             req.target_url,
             threat_classes=tuple(req.threat_classes) if req.threat_classes is not None else None,
             max_variants_per_class=req.max_variants_per_class,
+            since=req.since,
+            depth=req.depth,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -945,7 +1012,63 @@ async def variant_audit_get(request: Request) -> VariantAuditResponse:
                 "parameter or JSON body field." + _VARIANT_AUDIT_RECOVERY_HINT
             ),
         ) from exc
-    return await variant_audit(req)
+    return await variant_audit(req, request)
+
+
+async def _retained_report(report_id: str) -> dict[str, object] | None:
+    """Read the store off the event loop.
+
+    The lookup takes a blocking cross-process file lock and reads the whole
+    store, so doing it inline would let these free routes stall every paid
+    route sharing the worker.
+    """
+    return await run_in_threadpool(get_variant_audit_report, report_id)
+
+
+@app.get("/variant-audit/{report_id}", response_model=VariantAuditReportResponse)
+async def variant_audit_report(report_id: str) -> VariantAuditReportResponse:
+    """Fetch a signed variant audit report back by id.
+
+    Free, like the audit badge and APA attestation routes: the buyer already
+    paid for the run, and the id is the hash of the signed content, so this
+    hands back only what that buyer already holds a verifiable copy of.
+    """
+    report = await _retained_report(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Variant audit report not found")
+    return VariantAuditReportResponse(report=report, verified=verify_variant_audit_report(report))
+
+
+async def _resistance_badge(report_id: str) -> dict[str, object]:
+    report = await _retained_report(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Variant audit report not found")
+    try:
+        return resistance_badges.issue_badge(report)
+    except ValueError as exc:
+        # An ungraded or unverifiable run has no badge to hand out, and saying so
+        # is the point: 409 rather than a badge that overstates the evidence.
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/variant-audit/{report_id}/badge", response_model=ResistanceBadgeResponse)
+async def variant_audit_badge(report_id: str) -> ResistanceBadgeResponse:
+    badge = await _resistance_badge(report_id)
+    return ResistanceBadgeResponse(
+        badge=badge,
+        verified=resistance_badges.verify_badge(badge),
+        status=resistance_badges.effective_status(badge),
+    )
+
+
+@app.get("/variant-audit/{report_id}/badge.svg")
+async def variant_audit_badge_svg(report_id: str) -> Response:
+    badge = await _resistance_badge(report_id)
+    return Response(
+        content=resistance_badges.render_badge_svg(badge),
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.post("/harden", response_model=HardenResponse)

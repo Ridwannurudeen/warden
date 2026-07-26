@@ -150,7 +150,7 @@ The integration code is complete in this repository, but neither SDK distributio
 | --- | --- |
 | [Python SDK](sdk/python/README.md) | Sync and async clients, local fail-closed enforcement, hosted scanning, ASGI middleware, a decorator, LangChain and LlamaIndex adapters, APA proof utilities, and the standalone `warden-gateway` reverse proxy. |
 | [TypeScript SDK](sdk/ts/README.md) | A typed hosted client and Express-style middleware with a zero-dependency emitted runtime. It does not contain the local scanner engine. |
-| [FastMCP server](warden/mcp_server.py) | Local stdio tools named `scan_payload`, `audit_agent`, and `harden_agent`, started from a trusted checkout with `python -m warden.mcp_server`. |
+| [FastMCP server](warden/mcp_server.py) | Local stdio tools named `scan_payload`, `audit_agent`, `harden_agent`, and `variant_audit_agent`, started from a trusted checkout with `python -m warden.mcp_server`. |
 | [Direct integrations](site/integrate.html) | Source-backed direct HTTP, OnchainOS, raw x402, Python, TypeScript, MCP, LangChain, and LlamaIndex placement and decision-handling examples. |
 
 The Python and TypeScript clients do not create a wallet or authorize spending. Their paid flow is enabled
@@ -208,7 +208,7 @@ WardenClient(local=True, fail_open=False)
 - **Proof path:** an endpoint self-signs `/.well-known/agent-protection`; the issuer verifies freshness,
   nonce uniqueness, and Ed25519 ownership before TOFU-binding `endpoint_host` to the key.
 - **Transparency:** issuance and status changes append to a SHA-256 hash chain at `/apa/log`.
-- **Commerce:** production `/scan`, `/audit`, and `/harden` remain additive x402 v2 `exact` services on X Layer.
+- **Commerce:** production `/scan`, `/audit`, `/harden`, and `/variant-audit` remain additive x402 v2 `exact` services on X Layer.
 - **Clients:** the Python SDK supports in-process enforcement; the source-built TypeScript SDK is a typed
   hosted fetch client with Express-style middleware and no local engine.
 - **Frontend:** dependency-free HTML, CSS, and JavaScript with self-hosted fonts and a self-only CSP.
@@ -326,6 +326,10 @@ an availability claim.
 | `POST` | `/scan`                                       | Production x402 payload scan                                    |
 | `POST` | `/audit`                                      | Production x402 endpoint audit                                  |
 | `GET`/`POST` | `/harden`                                | Production x402 signed Hardening Pack for a completed audit     |
+| `GET`/`POST` | `/variant-audit`                         | Production x402 adversarial variant audit, graded and signed    |
+| `GET`  | `/variant-audit/{report_id}`                  | Retained variant audit report, re-verified on read              |
+| `GET`  | `/variant-audit/{report_id}/badge`            | Resistance badge derived from a graded report                   |
+| `GET`  | `/variant-audit/{report_id}/badge.svg`        | No-store SVG rendering the badge's true current state           |
 | `GET`  | `/.well-known/apa-issuer.json`                | Current and recent issuer Ed25519 verification keys             |
 | `POST` | `/apa/register`                               | Probe `{endpoint}`, TOFU-bind its key, and issue an attestation |
 | `GET`  | `/apa/attestation/{attestation_id}`           | Attestation JSON and effective status                           |

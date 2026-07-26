@@ -133,11 +133,12 @@ api.auditor = StubAuditor()
 # wiring check supplies a conclusive record instead of stubbing an auditor.
 async def _stub_variant_audit(target_url, **kwargs):
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "target_host": "agent.example",
         "corpus_fingerprint": "sha256:" + "a" * 64,
-        "generator": "warden-adversarial-variants/3",
+        "generator": "warden-adversarial-variants/4",
         "caps": {
+            "depth": "standard",
             "max_variants_per_class": 25,
             "max_total_variants": 150,
             "probe_timeout_seconds": 5.0,
@@ -153,8 +154,10 @@ async def _stub_variant_audit(target_url, **kwargs):
             "inconclusive": 0,
             "conclusive": 0,
             "detection_rate": None,
+            "grade": "INCONCLUSIVE",
         },
         "consent_verified": True,
+        "nonce": "0" * 32,
         "limitations": ["local wiring stub"],
         "report_id": "b" * 64,
         "issuer": "warden",

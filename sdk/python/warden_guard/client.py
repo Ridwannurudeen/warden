@@ -55,6 +55,7 @@ from warden_guard.state import increment_scan_count
 DEFAULT_BASE_URL = "https://warden.gudman.xyz"
 FREE_PATH = "/api/demo/scan"
 PAID_PATH = "/scan"
+VARIANT_AUDIT_PATH = "/variant-audit"
 FEEDBACK_PATH = "/api/feedback"
 Depth = Literal["fast", "thorough"]
 FeedbackOutcome = Literal["missed_attack", "false_positive", "correct_detection"]
@@ -305,7 +306,169 @@ class WardenError(RuntimeError):
     """Raised when a scan cannot be completed."""
 
 
-def _canonical_paid_url(base_url: str) -> str:
+def _settle_x402(
+    client: "httpx.Client",
+    request_url: str,
+    request_body: bytes,
+    payment_handler: object,
+    response: "httpx.Response",
+) -> "httpx.Response":
+    """Answer one x402 challenge with exactly one replay.
+
+    Shared by every paid route so there is a single place where a challenge is
+    parsed, a handler is invoked, and a replay is bounded. A second challenge on
+    replay is refused rather than answered: paying twice for one request is the
+    failure this guard exists to prevent.
+    """
+    challenge = parse_x402_challenge(response.headers, expected_resource_url=request_url)
+    payment_header = invoke_payment_handler(payment_handler, challenge)
+    replay = client.post(
+        request_url,
+        content=request_body,
+        headers={
+            "content-type": "application/json",
+            "PAYMENT-SIGNATURE": payment_header,
+        },
+    )
+    if replay.status_code == 402:
+        try:
+            replay_challenge = parse_x402_challenge(
+                replay.headers,
+                expected_resource_url=request_url,
+            )
+        except WardenError as exc:
+            raise WardenError(
+                "Warden x402 challenge changed or became malformed on replay"
+            ) from exc
+        if replay_challenge != challenge:
+            raise WardenError("Warden x402 challenge changed on replay")
+        raise WardenError("Warden permits only one paid replay; payment was not accepted")
+    if replay.is_redirect:
+        raise WardenError("Warden x402 replay returned a redirect")
+    if replay.status_code != 200:
+        raise WardenError(f"Warden x402 replay failed with HTTP {replay.status_code}")
+    validate_x402_settlement_header(replay.headers)
+    return replay
+
+
+_REPORT_ID_RE = re.compile(r"^[0-9a-f]{64}$")
+_RESISTANCE_GRADES = frozenset({"A", "B", "C", "D", "F", "INCONCLUSIVE"})
+
+
+def _valid_variant_audit_counts(entry: object) -> bool:
+    """Require the counts, do not merely type-check the ones that showed up.
+
+    A caller pays for this report and then does arithmetic on it. Treating an
+    absent count as acceptable hands them a dict whose `detected` raises
+    KeyError, after the money moved. The totals are also checked for internal
+    consistency, because a report whose parts do not add up is not evidence
+    whatever it was signed with.
+    """
+    if not isinstance(entry, dict):
+        return False
+    counts: dict[str, int] = {}
+    for name in ("total", "detected", "missed", "inconclusive", "conclusive"):
+        value = entry.get(name)
+        if type(value) is not int or value < 0:
+            return False
+        counts[name] = value
+    if (
+        counts["detected"] + counts["missed"] + counts["inconclusive"] != counts["total"]
+        or counts["detected"] + counts["missed"] != counts["conclusive"]
+    ):
+        return False
+    rate = entry.get("detection_rate")
+    if rate is not None and (
+        type(rate) not in (int, float) or not math.isfinite(rate) or not 0 <= rate <= 100
+    ):
+        return False
+    return entry.get("grade") in _RESISTANCE_GRADES
+
+
+def _validate_variant_audit_report(data: object) -> None:
+    """Reject a report the caller must not act on as if it were evidence."""
+    if not isinstance(data, dict):
+        raise WardenError("Invalid Warden response: expected an object")
+    for name in ("target_host", "corpus_fingerprint", "generator", "issuer", "issuer_sig"):
+        if not isinstance(data.get(name), str):
+            raise WardenError(f"Invalid Warden response: {name}")
+    if not isinstance(data.get("report_id"), str) or not _REPORT_ID_RE.fullmatch(
+        str(data["report_id"])
+    ):
+        raise WardenError("Invalid Warden response: report_id")
+    if type(data.get("schema_version")) is not int:
+        raise WardenError("Invalid Warden response: schema_version")
+    issued_at = data.get("issued_at")
+    if type(issued_at) is not int or issued_at < 0:
+        raise WardenError("Invalid Warden response: issued_at")
+    # An unconsented run must never reach a caller as if it were consented.
+    if data.get("consent_verified") is not True:
+        raise WardenError("Invalid Warden response: consent_verified")
+    limitations = data.get("limitations")
+    if (
+        not isinstance(limitations, list)
+        or not limitations
+        or not all(isinstance(line, str) and line for line in limitations)
+    ):
+        raise WardenError("Invalid Warden response: limitations")
+    per_class = data.get("per_class")
+    if not isinstance(per_class, list) or not all(
+        isinstance(entry, dict)
+        and isinstance(entry.get("threat_class"), str)
+        and _valid_variant_audit_counts(entry)
+        for entry in per_class
+    ):
+        raise WardenError("Invalid Warden response: per_class")
+    totals = data.get("totals")
+    if (
+        not _valid_variant_audit_counts(totals)
+        or type(totals.get("threat_classes")) is not int
+        or type(totals.get("variants_sent")) is not int
+    ):
+        raise WardenError("Invalid Warden response: totals")
+
+
+def build_variant_audit_body(
+    target_url: str,
+    *,
+    threat_classes: list[str] | None,
+    max_variants_per_class: int | None,
+    since: str | None,
+    depth: str,
+) -> dict[str, object]:
+    """Validate and marshal variant-audit options.
+
+    Shared by the sync and async clients so the request contract cannot fork
+    between them, and so every option is rejected before a payment handler is
+    ever asked to authorize anything.
+    """
+    if not isinstance(target_url, str) or not target_url:
+        raise WardenError("target_url must be a non-empty string")
+    if depth not in {"standard", "deep"}:
+        raise WardenError("depth must be 'standard' or 'deep'")
+    body: dict[str, object] = {"target_url": target_url}
+    if threat_classes is not None:
+        if (
+            not isinstance(threat_classes, list)
+            or not threat_classes
+            or not all(isinstance(item, str) and item for item in threat_classes)
+        ):
+            raise WardenError("threat_classes must be a non-empty list of non-empty strings")
+        body["threat_classes"] = threat_classes
+    if max_variants_per_class is not None:
+        if type(max_variants_per_class) is not int or max_variants_per_class < 1:
+            raise WardenError("max_variants_per_class must be a positive integer")
+        body["max_variants_per_class"] = max_variants_per_class
+    if since is not None:
+        if not isinstance(since, str) or not _REPORT_ID_RE.fullmatch(since):
+            raise WardenError("since must be a 64-character lowercase hex report_id")
+        body["since"] = since
+    if depth != "standard":
+        body["depth"] = depth
+    return body
+
+
+def _canonical_paid_url(base_url: str, path: str = PAID_PATH) -> str:
     try:
         parsed = urlsplit(base_url)
         port = parsed.port
@@ -332,7 +495,7 @@ def _canonical_paid_url(base_url: str) -> str:
     canonical_base = f"https://{authority}"
     if base_url != canonical_base:
         raise WardenError("x402 payment requires a canonical HTTPS base_url")
-    return canonical_base + PAID_PATH
+    return canonical_base + path
 
 
 def _decode_x402_header(value: object, label: str) -> object:
@@ -741,6 +904,11 @@ class WardenClient:
             raise WardenError("x402 payment_handler must be callable")
         self.payment_handler = payment_handler
         self._paid_url = _canonical_paid_url(self.base_url) if payment_handler is not None else None
+        self._variant_audit_url = (
+            _canonical_paid_url(self.base_url, VARIANT_AUDIT_PATH)
+            if payment_handler is not None
+            else None
+        )
         self._engine = LocalEngine() if local else None
 
     def scan(
@@ -784,45 +952,13 @@ class WardenClient:
                 if payment_enabled and response.is_redirect:
                     raise WardenError("Warden x402 challenge returned a redirect")
                 if payment_enabled and response.status_code == 402:
-                    challenge = parse_x402_challenge(
-                        response.headers,
-                        expected_resource_url=request_url,
-                    )
-                    payment_header = invoke_payment_handler(
-                        self.payment_handler,
-                        challenge,
-                    )
-                    replay = client.post(
+                    response = _settle_x402(
+                        client,
                         request_url,
-                        content=request_body,
-                        headers={
-                            "content-type": "application/json",
-                            "PAYMENT-SIGNATURE": payment_header,
-                        },
+                        request_body,
+                        self.payment_handler,
+                        response,
                     )
-                    if replay.status_code == 402:
-                        try:
-                            replay_challenge = parse_x402_challenge(
-                                replay.headers,
-                                expected_resource_url=request_url,
-                            )
-                        except WardenError as exc:
-                            raise WardenError(
-                                "Warden x402 challenge changed or became malformed on replay"
-                            ) from exc
-                        if replay_challenge != challenge:
-                            raise WardenError("Warden x402 challenge changed on replay")
-                        raise WardenError(
-                            "Warden permits only one paid replay; payment was not accepted"
-                        )
-                    if replay.is_redirect:
-                        raise WardenError("Warden x402 replay returned a redirect")
-                    if replay.status_code != 200:
-                        raise WardenError(
-                            f"Warden x402 replay failed with HTTP {replay.status_code}"
-                        )
-                    validate_x402_settlement_header(replay.headers)
-                    response = replay
                 response.raise_for_status()
                 try:
                     data = response.json()
@@ -842,6 +978,68 @@ class WardenClient:
             if self.fail_open:
                 return ScanResult(verdict="ALLOW", risk_level="NONE", raw={"error": str(exc)})
             raise WardenError(f"Warden scan failed: {exc}") from exc
+
+    def variant_audit(
+        self,
+        target_url: str,
+        *,
+        threat_classes: list[str] | None = None,
+        max_variants_per_class: int | None = None,
+        since: str | None = None,
+        depth: str = "standard",
+    ) -> dict[str, object]:
+        """Run a paid adversarial variant audit against a consenting endpoint.
+
+        Returns the signed report as delivered. Unlike `scan` there is no free
+        tier and no fail-open: firing hundreds of attack payloads at a third
+        party is not something to do silently on a request that failed, so a
+        failure raises rather than returning a permissive default.
+        """
+        if self.payment_handler is None or self._variant_audit_url is None:
+            raise WardenError(
+                "variant_audit requires an x402 payment_handler; it is a paid route "
+                "with no free tier"
+            )
+        body = build_variant_audit_body(
+            target_url,
+            threat_classes=threat_classes,
+            max_variants_per_class=max_variants_per_class,
+            since=since,
+            depth=depth,
+        )
+
+        request_url = self._variant_audit_url
+        request_body = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        try:
+            with httpx.Client(
+                timeout=self.timeout,
+                follow_redirects=False,
+                trust_env=False,
+            ) as client:
+                response = client.post(
+                    request_url,
+                    content=request_body,
+                    headers={"content-type": "application/json"},
+                )
+                if response.is_redirect:
+                    raise WardenError("Warden x402 challenge returned a redirect")
+                if response.status_code == 402:
+                    response = _settle_x402(
+                        client,
+                        request_url,
+                        request_body,
+                        self.payment_handler,
+                        response,
+                    )
+                response.raise_for_status()
+                try:
+                    data = response.json()
+                except ValueError as exc:
+                    raise WardenError("Invalid Warden response: expected JSON") from exc
+        except httpx.HTTPError as exc:
+            raise WardenError(f"Warden variant audit failed: {exc}") from exc
+        _validate_variant_audit_report(data)
+        return data
 
     def submit_feedback(
         self,

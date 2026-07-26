@@ -1,6 +1,6 @@
 """FastMCP server exposing Warden's A2MCP tools."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 from urllib.parse import urlparse
 
 from fastmcp import FastMCP
@@ -113,14 +113,23 @@ async def harden_agent(
 async def variant_audit_agent(
     target_url: Annotated[str, Field(min_length=1, max_length=MAX_TARGET_URL_LENGTH)],
     threat_classes: list[str] | None = None,
-    max_variants_per_class: Annotated[int, Field(ge=1, le=25)] = 25,
+    max_variants_per_class: Annotated[int, Field(ge=1, le=50)] | None = None,
+    since: str | None = None,
+    depth: Literal["standard", "deep"] = "standard",
 ) -> dict[str, object]:
-    """Attack-test a consenting endpoint with adversarial variants of the training corpus."""
+    """Attack-test a consenting endpoint with adversarial variants of the training corpus.
+
+    `max_variants_per_class` defaults to the depth tier's own ceiling, and the
+    engine rejects a per-class cap the chosen tier does not allow. `since` names
+    an earlier report for the same host and adds a signed comparison against it.
+    """
     request = VariantAuditRequest.model_validate(
         {
             "target_url": target_url,
             "threat_classes": threat_classes,
             "max_variants_per_class": max_variants_per_class,
+            "since": since,
+            "depth": depth,
         }
     )
     report = await run_variant_audit(
@@ -129,6 +138,8 @@ async def variant_audit_agent(
             tuple(request.threat_classes) if request.threat_classes is not None else None
         ),
         max_variants_per_class=request.max_variants_per_class,
+        since=request.since,
+        depth=request.depth,
     )
     return VariantAuditResponse.model_validate(report).model_dump()
 
