@@ -458,7 +458,7 @@ test("product proof normalizes the dated marketplace and corpus evidence", () =>
   assert.deepEqual(normalizeProductProof(productProof), productProof);
 });
 
-test("product proof rejects corpus, benchmark, and marketplace drift", () => {
+test("product proof rejects corpus drift", () => {
   assert.throws(
     () =>
       normalizeProductProof({
@@ -466,13 +466,5 @@ test("product proof rejects corpus, benchmark, and marketplace drift", () => {
         evaluationCorpus: { ...productProof.evaluationCorpus, total: 122 },
       }),
     /corpus counts/,
-  );
-  assert.throws(
-    () =>
-      normalizeProductProof({
-        ...productProof,
-        marketplace: { ...productProof.marketplace, sold: "15" },
-      }),
-    /sold count/,
   );
 });

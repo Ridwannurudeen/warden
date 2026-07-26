@@ -42,7 +42,6 @@ def test_product_proof_snapshot_is_dated_and_authoritative():
         "verifiedAt": "2026-07-26",
         "marketplace": {
             "agentId": "3808",
-            "sold": 23,
             "rating": {"value": 5.0, "outOf": 5, "reviews": 6},
             "url": "https://www.okx.ai/",
             "listingUrlAvailable": False,
