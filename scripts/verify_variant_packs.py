@@ -14,11 +14,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from warden.adversarial_variants import (  # noqa: E402
+    CONTAINING_FAMILIES,
     HELD_OUT_ATTACKS_PATH,
     HELD_OUT_BENIGN_PATH,
     INDEX_FILENAME,
     SOURCE_DATASET,
     THREAT_CLASSES,
+    VARIANT_FAMILIES,
     TRAINING_ATTACKS_PATH,
     TRAINING_BENIGN_PATH,
     build_variant_packs,
@@ -114,7 +116,15 @@ def verify_separation(directory: Path) -> list[str]:
             equivalence = scanner_equivalence(payload)
             if equivalence & held_out_equivalence:
                 failures.append(f"{label}: variant is scanner-equivalent to a held-out row")
-            if canonical_dataset_payload(training_payloads[case_id]) not in equivalence:
+            family = str(variant.get("variant_family", ""))
+            if family not in VARIANT_FAMILIES:
+                failures.append(f"{label}: variant declares an unknown family")
+            elif family in CONTAINING_FAMILIES:
+                # The family claim is not taken on trust: a containing variant
+                # has to actually carry its training source verbatim.
+                if training_payloads[case_id] not in payload:
+                    failures.append(f"{label}: variant does not contain its training source")
+            elif canonical_dataset_payload(training_payloads[case_id]) not in equivalence:
                 failures.append(f"{label}: variant does not decode back to its training source")
             digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
             if variant["payload_sha256"] != f"sha256:{digest}":

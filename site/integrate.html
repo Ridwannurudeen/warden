@@ -508,10 +508,13 @@ const result = await warden.scan(untrustedText);</code></pre>
           </header>
           <p>
             From a trusted Warden checkout, local MCP exposes
-            <code>scan_payload</code>, <code>audit_agent</code>, and
-            <code>harden_agent</code>. The hardening tool accepts a completed
-            audit ID and returns its issuer-signed, transparency-logged pack. It
-            does not purchase the hosted x402 service.
+            <code>scan_payload</code>, <code>audit_agent</code>,
+            <code>harden_agent</code>, and <code>variant_audit_agent</code>. The
+            hardening tool accepts a completed audit ID and returns its
+            issuer-signed, transparency-logged pack. The variant audit tool
+            attack-tests a consenting endpoint with adversarial variants and
+            returns a graded, issuer-signed report. Neither purchases the hosted
+            x402 service.
           </p>
           <pre><code id="mcp-snippet" data-integration-example="mcp">Local MCP configuration not available.</code></pre>
         </article>
@@ -750,7 +753,7 @@ safe_text = guard(untrusted_text)</code></pre>
         </div>
       </nav>
     </footer>
-    <script src="/app.js?v=ba47818c" defer></script>
+    <script src="/app.js?v=158855de" defer></script>
     <script src="/integrate.js?v=6034cbb9" defer></script>
   </body>
 </html>

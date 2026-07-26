@@ -26,7 +26,12 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from warden.auditor import AgentAuditor
 from warden.badges import b64u_encode
-from warden.variant_audit import REPORT_FIELDS, run_variant_audit, verify_report
+from warden.variant_audit import (
+    REPORT_FIELDS,
+    _canonical_packs,
+    run_variant_audit,
+    verify_report,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "sdk" / "python"))
@@ -128,9 +133,16 @@ async def test_live_variant_audit_separates_a_weak_endpoint_from_a_guarded_one(
     assert weak["target_host"] == "agent.local"
     assert weak["consent_verified"] is True
     # A live run answers every probe: nothing timed out and nothing was unreachable.
+    # The expected totals are derived rather than pinned, because which classes ship
+    # variants moves whenever a transform family is added or the corpus changes.
+    audited_classes = sum(1 for pack in _canonical_packs().values() if pack["variants"])
     assert int(weak["totals"]["inconclusive"]) == 0
-    assert int(weak["totals"]["conclusive"]) == int(weak["totals"]["variants_sent"]) == 20
-    assert int(weak["totals"]["threat_classes"]) == 10
+    assert (
+        int(weak["totals"]["conclusive"])
+        == int(weak["totals"]["variants_sent"])
+        == audited_classes * 2
+    )
+    assert int(weak["totals"]["threat_classes"]) == audited_classes
     # Substring matching on English text catches none of the encoded variants.
     assert float(weak["totals"]["detection_rate"]) == 0.0
     assert all(int(entry["detected"]) == 0 for entry in weak["per_class"])

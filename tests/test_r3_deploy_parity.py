@@ -31,6 +31,9 @@ PROXIED_APP_ROUTES = frozenset(
         "/audit",
         "/harden",
         "/variant-audit",
+        "/variant-audit/{report_id}",
+        "/variant-audit/{report_id}/badge",
+        "/variant-audit/{report_id}/badge.svg",
         "/health",
         "/.well-known/apa-issuer.json",
         "/badge/{audit_id}",
@@ -102,6 +105,13 @@ def test_nginx_proxies_every_route_marked_public() -> None:
     assert "location /api/ {" in nginx
     assert "location /apa/ {" in nginx
     assert "location ~ ^/badge/[^/]+/?$ {" in nginx
+    assert r'location ~ "^/variant-audit/[a-f0-9]{64}(/badge(\.svg)?)?$" {' in nginx
+    # No trailing-slash form: nothing routes it, and Starlette's redirect would
+    # be built from the client-supplied Host header.
+    assert r"(/badge(\.svg)?)?/?$" not in nginx
+    # The paid route keeps its exact-match block: a regex location outranks a
+    # prefix one, so an unanchored variant-audit regex would swallow it.
+    assert "location = /variant-audit {" in nginx
 
     # The exact-match /health block must not accidentally become a prefix, which
     # would publish /health/stats and /health/ready.

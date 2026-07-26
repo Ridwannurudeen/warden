@@ -15,6 +15,7 @@ from warden_guard.client import (
     FEEDBACK_PATH,
     FREE_PATH,
     PAID_PATH,
+    VARIANT_AUDIT_PATH,
     FeedbackOutcome,
     FeedbackResult,
     FeedbackThreatClass,
@@ -24,6 +25,8 @@ from warden_guard.client import (
     WardenBlocked,
     WardenError,
     _canonical_paid_url,
+    _validate_variant_audit_report,
+    build_variant_audit_body,
     build_feedback_body,
     build_scan_body,
     parse_x402_challenge,
@@ -67,6 +70,11 @@ class AsyncWardenClient:
             raise WardenError("x402 payment_handler must be callable")
         self.payment_handler = payment_handler
         self._paid_url = _canonical_paid_url(self.base_url) if payment_handler is not None else None
+        self._variant_audit_url = (
+            _canonical_paid_url(self.base_url, VARIANT_AUDIT_PATH)
+            if payment_handler is not None
+            else None
+        )
         self._engine = LocalEngine() if local else None
 
     async def scan(
@@ -174,6 +182,102 @@ class AsyncWardenClient:
             if self.fail_open:
                 return ScanResult(verdict="ALLOW", risk_level="NONE", raw={"error": str(exc)})
             raise WardenError(f"Warden scan failed: {exc}") from exc
+
+    async def variant_audit(
+        self,
+        target_url: str,
+        *,
+        threat_classes: list[str] | None = None,
+        max_variants_per_class: int | None = None,
+        since: str | None = None,
+        depth: str = "standard",
+    ) -> dict[str, object]:
+        """Run a paid adversarial variant audit against a consenting endpoint.
+
+        The async twin of :meth:`warden_guard.WardenClient.variant_audit`, with
+        the same options, the same request marshalling and the same response
+        validation. As there, no free tier and no fail-open: a failed audit
+        raises rather than reading as a clean bill of health.
+        """
+        if self.payment_handler is None or self._variant_audit_url is None:
+            raise WardenError(
+                "variant_audit requires an x402 payment_handler; it is a paid route "
+                "with no free tier"
+            )
+        body = build_variant_audit_body(
+            target_url,
+            threat_classes=threat_classes,
+            max_variants_per_class=max_variants_per_class,
+            since=since,
+            depth=depth,
+        )
+        request_url = self._variant_audit_url
+        request_body = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        try:
+            async with httpx.AsyncClient(
+                timeout=self.timeout,
+                follow_redirects=False,
+                trust_env=False,
+            ) as client:
+                response = await client.post(
+                    request_url,
+                    content=request_body,
+                    headers={"content-type": "application/json"},
+                )
+                if response.is_redirect:
+                    raise WardenError("Warden x402 challenge returned a redirect")
+                if response.status_code == 402:
+                    challenge = parse_x402_challenge(
+                        response.headers,
+                        expected_resource_url=request_url,
+                    )
+                    supplied = self.payment_handler(challenge)
+                    try:
+                        if isawaitable(supplied):
+                            supplied = await supplied
+                    except Exception as exc:
+                        raise WardenError("Warden x402 payment handler failed") from exc
+                    payment_header = validate_x402_payment_header(supplied, challenge)
+                    replay = await client.post(
+                        request_url,
+                        content=request_body,
+                        headers={
+                            "content-type": "application/json",
+                            "PAYMENT-SIGNATURE": payment_header,
+                        },
+                    )
+                    if replay.status_code == 402:
+                        try:
+                            replay_challenge = parse_x402_challenge(
+                                replay.headers,
+                                expected_resource_url=request_url,
+                            )
+                        except WardenError as exc:
+                            raise WardenError(
+                                "Warden x402 challenge changed or became malformed on replay"
+                            ) from exc
+                        if replay_challenge != challenge:
+                            raise WardenError("Warden x402 challenge changed on replay")
+                        raise WardenError(
+                            "Warden permits only one paid replay; payment was not accepted"
+                        )
+                    if replay.is_redirect:
+                        raise WardenError("Warden x402 replay returned a redirect")
+                    if replay.status_code != 200:
+                        raise WardenError(
+                            f"Warden x402 replay failed with HTTP {replay.status_code}"
+                        )
+                    validate_x402_settlement_header(replay.headers)
+                    response = replay
+                response.raise_for_status()
+                try:
+                    data = response.json()
+                except ValueError as exc:
+                    raise WardenError("Invalid Warden response: expected JSON") from exc
+        except httpx.HTTPError as exc:
+            raise WardenError(f"Warden variant audit failed: {exc}") from exc
+        _validate_variant_audit_report(data)
+        return data
 
     async def submit_feedback(
         self,
