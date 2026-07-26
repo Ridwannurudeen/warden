@@ -106,6 +106,13 @@ def test_homepage_uses_dated_proof_and_catalog_sources_without_stale_literals():
     assert "data-product-proof-status" in page
     assert "data-service-catalog" in page
     assert "data-service-price" in page
+    # Traction is read live from the cron-refreshed catalog, never baked into the page.
+    assert 'data-catalog-field="sold"' in page
+    assert 'data-catalog-field="rating"' in page
+    assert '<strong data-catalog-field="sold">Unavailable</strong>' in page
+    assert not re.search(r'data-catalog-field="(?:sold|rating)">\s*[\d.]', page)
+    assert "catalog.soldCount" in app
+    assert "catalog.rating" in app
 
 
 def test_showcase_is_a_three_step_manual_tour_without_pseudo_metrics():

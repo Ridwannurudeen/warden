@@ -120,5 +120,10 @@ def _catalog(provider: MarketplaceAgent, captured_at: str) -> dict[str, object]:
         "snapshotFetchedAt": captured_at,
         "providerAgentId": provider.agent_id,
         "providerName": provider.name,
+        # OKX's own reported traction for this listing, carried on every refresh so the
+        # site shows the current figures instead of a hand-copied snapshot. Either can
+        # be absent from a listing, so both are nullable and the page skips a null.
+        "soldCount": provider.sold_count,
+        "rating": provider.security_rate,
         "services": services,
     }

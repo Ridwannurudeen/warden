@@ -843,6 +843,16 @@
             id.textContent = `#${service.serviceId}`;
           }
         }
+        const soldField = document.querySelector('[data-catalog-field="sold"]');
+        const ratingField = document.querySelector(
+          '[data-catalog-field="rating"]',
+        );
+        if (soldField && Number.isInteger(catalog.soldCount)) {
+          soldField.textContent = catalog.soldCount.toLocaleString();
+        }
+        if (ratingField && Number.isFinite(catalog.rating)) {
+          ratingField.textContent = `${catalog.rating} / 5`;
+        }
         serviceCatalog.dataset.snapshot = String(catalog.snapshotFetchedAt);
         if (serviceSnapshot) {
           serviceSnapshot.textContent = `Catalog snapshot ${catalog.snapshotFetchedAt}`;
