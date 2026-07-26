@@ -971,12 +971,12 @@ def test_status_and_marketplace_metadata_are_dated_and_honest():
     assert status["agentId"] == "3808"
     assert status["listingStatus"] == "Listed"
     assert status["listingVerifiedAt"] == "2026-07-13"
-    assert status["repositoryTests"] == 719
-    assert status["repositoryTestsVerifiedAt"] == "2026-07-16"
-    assert "566 Python" in status["repositoryTestsNote"]
-    assert "122 site JavaScript" in status["repositoryTestsNote"]
-    assert "31 TypeScript SDK" in status["repositoryTestsNote"]
-    assert "1 Python test skipped" in status["repositoryTestsNote"]
+    assert status["repositoryTests"] == 2250
+    assert status["repositoryTestsVerifiedAt"] == "2026-07-26"
+    assert "1973 Python" in status["repositoryTestsNote"]
+    assert "196 site JavaScript" in status["repositoryTestsNote"]
+    assert "81 TypeScript SDK" in status["repositoryTestsNote"]
+    assert "2 Python tests skipped" in status["repositoryTestsNote"]
     assert status["corpusCount"] == product_proof["evaluationCorpus"]["total"]
     assert status["corpusFingerprint"] == f"sha256:{hashlib.sha256(corpus_bytes).hexdigest()}"
     assert status["paymentActivity"]["transactionSpecific"] is False
