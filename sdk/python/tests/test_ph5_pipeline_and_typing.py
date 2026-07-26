@@ -108,10 +108,8 @@ async def test_async_text_guard_has_the_same_typed_contract() -> None:
 
 
 def test_package_exports_distribution_version_and_pipeline_types() -> None:
-    assert __version__ == version("warden-agent-guard") == "0.1.0"
-    assert {"AsyncTextGuard", "GuardedText", "TextGuard", "__version__"} <= set(
-        public_exports
-    )
+    assert __version__ == version("warden-agent-guard") == "0.1.1"
+    assert {"AsyncTextGuard", "GuardedText", "TextGuard", "__version__"} <= set(public_exports)
 
 
 def test_clean_sdk_wheel_contains_typing_marker_and_version(tmp_path: Path) -> None:
@@ -173,7 +171,7 @@ def test_clean_sdk_wheel_contains_typing_marker_and_version(tmp_path: Path) -> N
                 "import warden_guard; "
                 "from importlib.metadata import version; "
                 "assert Path(warden_guard.__file__).resolve().is_relative_to(target); "
-                "assert warden_guard.__version__ == version('warden-agent-guard') == '0.1.0'; "
+                "assert warden_guard.__version__ == version('warden-agent-guard') == '0.1.1'; "
                 "assert warden_guard.GuardedText.__supertype__ is str"
             ),
         ],
