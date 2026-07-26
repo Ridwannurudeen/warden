@@ -9,7 +9,15 @@ from pathlib import Path
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from warden_guard import ScanResult, WardenBlocked, WardenClient, WardenGuard, guard
+from warden_guard import (
+    AsyncWardenClient,
+    ScanResult,
+    WardenBlocked,
+    WardenClient,
+    WardenGuard,
+    guard,
+    guard_output,
+)
 from warden_guard.apa import b64u_encode, sign_document
 from warden_guard.cli import main as cli_main, verify_endpoint
 from warden_guard.keys import load_or_create_key
@@ -30,6 +38,23 @@ class StubClient(WardenClient):
         )
 
     def scan(self, payload: str, **kwargs: object) -> ScanResult:  # type: ignore[override]
+        return self._result
+
+
+class AsyncStubClient(AsyncWardenClient):
+    """AsyncWardenClient whose scan() returns a fixed verdict (no network)."""
+
+    def __init__(self, verdict: str, sanitized: str = "") -> None:
+        super().__init__()
+        self._result = ScanResult(
+            verdict=verdict,
+            risk_level="HIGH" if verdict != "ALLOW" else "NONE",
+            threat_classes=["PROMPT_INJECTION"] if verdict != "ALLOW" else [],
+            sanitized_payload=sanitized,
+            raw={"verdict": verdict},
+        )
+
+    async def scan(self, payload: str, **kwargs: object) -> ScanResult:  # type: ignore[override]
         return self._result
 
 
@@ -117,6 +142,37 @@ def test_decorator_rejects_missing_field() -> None:
         @guard(StubClient("ALLOW"), field="payload")
         def no_payload(text: str) -> str:
             return text
+
+
+def test_output_decorator_sanitizes_and_blocks() -> None:
+    @guard_output(StubClient("SANITIZE", sanitized="clean output"))
+    def tool(query: str) -> str:
+        return "dirty output"
+
+    assert tool("q") == "clean output"
+
+    @guard_output(StubClient("BLOCK"))
+    def risky(query: str) -> str:
+        return "attacker payload"
+
+    with pytest.raises(WardenBlocked):
+        risky("q")
+
+
+def test_output_decorator_allows_original() -> None:
+    @guard_output(StubClient("ALLOW"))
+    def tool(query: str) -> str:
+        return "safe output"
+
+    assert tool("q") == "safe output"
+
+
+async def test_output_decorator_async_sanitizes() -> None:
+    @guard_output(AsyncStubClient("SANITIZE", sanitized="clean"))
+    async def tool(query: str) -> str:
+        return "dirty"
+
+    assert await tool("q") == "clean"
 
 
 def test_cli_keygen(capsys: pytest.CaptureFixture[str]) -> None:
