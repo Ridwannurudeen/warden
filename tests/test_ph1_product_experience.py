@@ -49,16 +49,16 @@ def test_product_proof_snapshot_is_dated_and_authoritative():
             "instruction": "Search Agent #3808",
         },
         "checkoutBenchmark": {
-            "p50Ms": 0.23,
-            "payloadCount": 124,
-            "measuredAt": "2026-07-16T02:47:26Z",
-            "method": "Local checkout · deterministic fast-path",
+            "p50Ms": 1.24,
+            "payloadCount": 139,
+            "measuredAt": "2026-07-26T06:57:17Z",
+            "method": "Production host, held-out set, deterministic fast-path",
         },
         "evaluationCorpus": {
-            "total": 124,
+            "total": 139,
             "attacks": 94,
-            "benign": 30,
-            "snapshotAt": "2026-07-16T02:47:26Z",
+            "benign": 45,
+            "snapshotAt": "2026-07-26T06:57:17Z",
         },
     }
 
@@ -100,7 +100,7 @@ def test_homepage_uses_dated_proof_and_catalog_sources_without_stale_literals():
     assert 'fetch("/data/product-proof.json"' in app
     assert 'fetch("/data/warden-services.json"' in app
     assert "4.8/5" not in page
-    assert "0.23 ms" not in page
+    assert "1.24 ms" not in page
     assert "15 sold" not in page.lower()
     assert "0.1 USDT" not in page
     assert "122-payload" not in page

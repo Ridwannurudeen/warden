@@ -977,7 +977,22 @@ def test_status_and_marketplace_metadata_are_dated_and_honest():
     assert "196 site JavaScript" in status["repositoryTestsNote"]
     assert "81 TypeScript SDK" in status["repositoryTestsNote"]
     assert "2 Python tests skipped" in status["repositoryTestsNote"]
-    assert status["corpusCount"] == product_proof["evaluationCorpus"]["total"]
+    # corpusCount is the loaded training/scan corpus; evaluationCorpus is the
+    # held-out benchmark set the recall is measured on — deliberately different
+    # corpora, each tied to its real source.
+    training_rows = sum(1 for line in corpus_bytes.split(b"\n") if line.strip())
+    assert status["corpusCount"] == training_rows
+    held_out_rows = sum(
+        1
+        for name in ("held_out_attacks.jsonl", "held_out_benign.jsonl")
+        for line in (ROOT / "benchmark" / name).read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    )
+    assert product_proof["evaluationCorpus"]["total"] == held_out_rows
+    assert (
+        product_proof["evaluationCorpus"]["attacks"] + product_proof["evaluationCorpus"]["benign"]
+        == product_proof["evaluationCorpus"]["total"]
+    )
     assert status["corpusFingerprint"] == f"sha256:{hashlib.sha256(corpus_bytes).hexdigest()}"
     assert status["paymentActivity"]["transactionSpecific"] is False
     assert "does not contain" in status["paymentActivity"]["note"]

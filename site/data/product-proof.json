@@ -1,28 +1,28 @@
 {
-  "schemaVersion": 1,
-  "verifiedAt": "2026-07-16",
-  "marketplace": {
-    "agentId": "3808",
-    "sold": 15,
-    "rating": {
-      "value": 4.8,
-      "outOf": 5,
-      "reviews": 5
-    },
-    "url": "https://www.okx.ai/",
-    "listingUrlAvailable": false,
-    "instruction": "Search Agent #3808"
+ "schemaVersion": 1,
+ "verifiedAt": "2026-07-16",
+ "marketplace": {
+  "agentId": "3808",
+  "sold": 15,
+  "rating": {
+   "value": 4.8,
+   "outOf": 5,
+   "reviews": 5
   },
-  "checkoutBenchmark": {
-    "p50Ms": 0.23,
-    "payloadCount": 124,
-    "measuredAt": "2026-07-16T02:47:26Z",
-    "method": "Local checkout · deterministic fast-path"
-  },
-  "evaluationCorpus": {
-    "total": 124,
-    "attacks": 94,
-    "benign": 30,
-    "snapshotAt": "2026-07-16T02:47:26Z"
-  }
+  "url": "https://www.okx.ai/",
+  "listingUrlAvailable": false,
+  "instruction": "Search Agent #3808"
+ },
+ "checkoutBenchmark": {
+  "p50Ms": 1.24,
+  "payloadCount": 139,
+  "measuredAt": "2026-07-26T06:57:17Z",
+  "method": "Production host, held-out set, deterministic fast-path"
+ },
+ "evaluationCorpus": {
+  "total": 139,
+  "attacks": 94,
+  "benign": 45,
+  "snapshotAt": "2026-07-26T06:57:17Z"
+ }
 }
