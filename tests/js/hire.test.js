@@ -466,3 +466,66 @@ test("the agent prompt refuses a non-A2MCP service and a bad provider id", () =>
     /provider agent ID/,
   );
 });
+
+test("every A2MCP service in the live catalog can build a prompt, not just scan and audit", () => {
+  // harden and variant-audit reached the catalog in #14 but never reached this
+  // validator, so both services failed on the page until now.
+  const variantAudit = {
+    key: "variant-audit",
+    serviceId: "36941",
+    serviceName: "Adversarial Variant Audit",
+    serviceType: "A2MCP",
+    endpoint: "https://warden.gudman.xyz/variant-audit",
+    feeAmount: "0.1",
+    feeTokenAddress: "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+    taskTitle: "Warden adversarial variant audit",
+    taskDescription: "Attack-test a consenting endpoint and grade its resistance",
+    serviceParams: "Variant-audit https://example.com/agent-endpoint",
+    requestBody: { target_url: "https://example.com/agent-endpoint" },
+  };
+  const prompt = buildAgentPrompt({
+    providerAgentId: "3808",
+    service: variantAudit,
+  });
+  assert.match(prompt, /Endpoint: https:\/\/warden\.gudman\.xyz\/variant-audit/);
+  assert.match(prompt, /"target_url": "https:\/\/example\.com\/agent-endpoint"/);
+
+  assert.throws(
+    () =>
+      buildAgentPrompt({
+        providerAgentId: "3808",
+        service: {
+          ...variantAudit,
+          requestBody: { target_url: "https://user:pw@example.com/agent" },
+        },
+      }),
+    /credentials/,
+  );
+});
+
+test("hardening names the real audit id requirement instead of accepting a placeholder", () => {
+  const harden = {
+    key: "harden",
+    serviceId: "36873",
+    serviceName: "Endpoint Hardening Pack",
+    serviceType: "A2MCP",
+    endpoint: "https://warden.gudman.xyz/harden",
+    feeAmount: "0.1",
+    feeTokenAddress: "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+    taskTitle: "Warden hardening pack",
+    taskDescription: "Turn a completed Warden audit into a signed hardening pack",
+    serviceParams: "Harden a completed audit by its ID",
+    requestBody: { audit_id: "<completed audit id>" },
+  };
+
+  assert.throws(
+    () => buildAgentPrompt({ providerAgentId: "3808", service: harden }),
+    /16-character hex id/,
+  );
+
+  const prompt = buildAgentPrompt({
+    providerAgentId: "3808",
+    service: { ...harden, requestBody: { audit_id: "48f8635fbb71d696" } },
+  });
+  assert.match(prompt, /"audit_id": "48f8635fbb71d696"/);
+});

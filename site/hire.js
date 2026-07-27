@@ -142,6 +142,24 @@
     return parsePaymentRequiredHeader(encoded, service);
   }
 
+  function assertTargetUrl(value, label) {
+    if (typeof value !== "string" || value.length > 2048) {
+      throw new Error(`${label} must contain at most 2,048 characters`);
+    }
+    let target;
+    try {
+      target = new URL(value);
+    } catch (error) {
+      throw new Error(`${label} must be a valid URL`, { cause: error });
+    }
+    if (!/^https?:$/.test(target.protocol)) {
+      throw new Error(`${label} must use HTTP or HTTPS`);
+    }
+    if (target.username || target.password) {
+      throw new Error(`${label} must not contain credentials`);
+    }
+  }
+
   function validateRequestBody(service) {
     const body = service.requestBody;
     if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -166,34 +184,27 @@
       return;
     }
     if (service.key === "audit") {
-      if (
-        typeof body.target_url !== "string" ||
-        body.target_url.length > 2048
-      ) {
-        throw new Error(
-          "Audit target_url must contain at most 2,048 characters",
-        );
-      }
-      let target;
-      try {
-        target = new URL(body.target_url);
-      } catch (error) {
-        throw new Error("Audit target_url must be a valid URL", {
-          cause: error,
-        });
-      }
-      if (!/^https?:$/.test(target.protocol)) {
-        throw new Error("Audit target_url must use HTTP or HTTPS");
-      }
-      if (target.username || target.password) {
-        throw new Error("Audit target_url must not contain credentials");
-      }
+      assertTargetUrl(body.target_url, "Audit target_url");
       if (
         !Array.isArray(body.sample_prompts) ||
         body.sample_prompts.length > 20
       ) {
         throw new Error(
           "Audit sample_prompts must be an array with at most 20 entries",
+        );
+      }
+      return;
+    }
+    if (service.key === "variant-audit") {
+      assertTargetUrl(body.target_url, "Variant audit target_url");
+      return;
+    }
+    if (service.key === "harden") {
+      // The API pins audit_id to a 16-character hex id, so a placeholder cannot
+      // be paid for: the buyer must paste the id of an audit they completed.
+      if (!/^[0-9a-f]{16}$/.test(String(body.audit_id ?? ""))) {
+        throw new Error(
+          "Hardening audit_id must be the 16-character hex id of a completed Warden audit",
         );
       }
       return;
