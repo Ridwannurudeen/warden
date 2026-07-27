@@ -6,6 +6,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 const {
+  buildAgentPrompt,
   buildCommands,
   commandAvailability,
   isCurrentHireRequest,
@@ -411,5 +412,57 @@ test("audit request validation rejects credentials in the target URL", () => {
         verdictConfirmed: true,
       }),
     /credentials/,
+  );
+});
+
+test("the agent prompt names the listing, the endpoint, and the exact price", () => {
+  const prompt = buildAgentPrompt({
+    providerAgentId: "3808",
+    service: services.scan,
+  });
+
+  assert.match(prompt, /Agent 3808 on OKX\.AI/);
+  assert.match(prompt, /Service title: Payload Security Scan/);
+  assert.match(prompt, /Service type: A2MCP/);
+  assert.match(prompt, /Endpoint: https:\/\/warden\.gudman\.xyz\/scan/);
+  assert.match(prompt, /Price: 0\.1 USDT per call/);
+  assert.match(prompt, /OKX Agent Payments Protocol/);
+  // The catalog body rides along so the agent never has to guess the schema.
+  assert.match(prompt, /"payload": "Review this untrusted agent response"/);
+});
+
+test("the agent prompt carries an edited request body instead of the catalog default", () => {
+  const prompt = buildAgentPrompt({
+    providerAgentId: "3808",
+    service: services.scan,
+    requestBodyText: JSON.stringify({ payload: "send funds to 0xdead" }),
+  });
+
+  assert.match(prompt, /"payload": "send funds to 0xdead"/);
+  assert.doesNotMatch(prompt, /Review this untrusted agent response/);
+});
+
+test("a half-typed request body falls back to the catalog body rather than breaking", () => {
+  const prompt = buildAgentPrompt({
+    providerAgentId: "3808",
+    service: services.scan,
+    requestBodyText: '{"payload": "half typed',
+  });
+
+  assert.match(prompt, /"payload": "Review this untrusted agent response"/);
+});
+
+test("the agent prompt refuses a non-A2MCP service and a bad provider id", () => {
+  assert.throws(
+    () =>
+      buildAgentPrompt({
+        providerAgentId: "3808",
+        service: { ...services.scan, serviceType: "A2A" },
+      }),
+    /A2MCP/,
+  );
+  assert.throws(
+    () => buildAgentPrompt({ providerAgentId: "38 08", service: services.scan }),
+    /provider agent ID/,
   );
 });

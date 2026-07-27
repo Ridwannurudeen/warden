@@ -1079,3 +1079,33 @@ def test_audit_evidence_lineage_page_is_honest_and_wired_to_shared_verification(
     assert "certification lineage" not in page.lower()
     for forbidden in ("certified", "compliant", "guaranteed safe", "accredited"):
         assert forbidden not in page.lower(), forbidden
+
+
+def test_hire_leads_with_a_paste_into_your_agent_prompt_before_the_cli_flow():
+    """The no-CLI path must come first: OKX's own listing sells by pasted prompt,
+    so a buyer who never installs onchainos still has a way to purchase."""
+    hire = (SITE / "hire.html").read_text(encoding="utf-8")
+    script = (SITE / "hire.js").read_text(encoding="utf-8")
+    hire_text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", hire))
+
+    assert "data-agent-prompt" in hire
+    assert "data-copy-agent-prompt" in hire
+    assert "Ask your agent to buy it" in hire_text
+    # The prompt block precedes the four-command flow on the page.
+    assert hire.index("data-agent-prompt") < hire.index('data-command-step="1"')
+    # No price or endpoint baked into the markup; both come from the catalog.
+    assert "0.1 USDT" not in hire_text
+    assert "buildAgentPrompt" in script
+    assert "OKX Agent Payments Protocol" in script
+
+
+def test_hire_links_to_the_real_okx_listing_page_instead_of_telling_people_to_search():
+    """okx.ai/agents/<id> is a real page; the marketplace root is only the
+    pre-catalog fallback, and the id is never baked into the markup."""
+    hire = (SITE / "hire.html").read_text(encoding="utf-8")
+    script = (SITE / "hire.js").read_text(encoding="utf-8")
+
+    assert "data-okx-listing" in hire
+    assert 'href="https://www.okx.ai/"' in hire
+    assert "https://www.okx.ai/agents/3808" not in hire
+    assert "https://www.okx.ai/agents/${provider}" in script
