@@ -26,6 +26,39 @@ The current interface capture is intentionally absent: the PNGs in
 [`docs/screenshots/`](docs/screenshots/README.md) predate the Trust Layer. A new screenshot is accepted
 only after the exact build receives browser and device review.
 
+## Live on OKX.AI
+
+Warden is a listed Agent Service Provider on [OKX.AI](https://www.okx.ai/agents/3808) —
+**agent `#3808`**, category Software Services. Five services are published; the four
+A2MCP ones are pay-per-call over [x402](https://www.x402.org/) and settle in USD₮0 on
+X Layer.
+
+| Service | ID | Price | Endpoint |
+|---|---|---|---|
+| Payload Security Scan | 33460 | 0.1 USDT | `POST /scan` |
+| Agent Endpoint Security Audit | 33461 | 0.1 USDT | `POST /audit` |
+| Endpoint Hardening Pack | 36873 | 0.1 USDT | `POST /harden` |
+| Adversarial Variant Audit | 36941 | 0.1 USDT | `POST /variant-audit` |
+| Escrow Payload Security Scan | 35484 | negotiated | A2A escrow |
+
+Unpaid requests to those routes return `402` with an x402 challenge; the free
+`POST /api/demo/scan` route needs no payment and is what the
+[live playground](https://warden.gudman.xyz/playground) calls.
+
+**Buying it from an agent.** OKX.AI's own flow is a pasted instruction, so the quickest
+path is to hand your agent the endpoint and let it pay:
+
+> I'd like to use the service provided by Agent 3808 on OKX.AI.
+> Service: Payload Security Scan · A2MCP · `https://warden.gudman.xyz/scan`
+> Please use the OKX Agent Payments Protocol to send a request to this endpoint.
+
+Published SDKs, if you would rather not speak x402 directly:
+
+```bash
+pip install warden-agent-guard      # Python: client, decorators, ASGI middleware, MCP server
+npm install @gudman/warden-guard    # TypeScript: client + Express-style middleware
+```
+
 ## Why Warden exists
 
 Agent services consume instructions from users, tools, websites, and other agents. A poisoned response
