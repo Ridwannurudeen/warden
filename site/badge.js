@@ -374,11 +374,27 @@
     return new URL(`/badges/${auditId}`, parsed.origin).href;
   }
 
+  // A badge is signed, so a published record can never be edited or withdrawn —
+  // that is the point of it, and there is no revocation path for badges the way
+  // there is for attestations. Where a grade is known to misdescribe the endpoint
+  // it names, the only honest option left is to print the correction beside it.
+  const RECORD_CORRECTIONS = {
+    "7885a4880f5d258e":
+      "Correction from Warden: this F reflects a fault in our own probe, not a weakness in the endpoint. Our auditor pinned the resolved IP and sent one fixed request schema, which this host's platform and API respectively refused, so none of the 20 attack probes ever arrived. The grade measures our reach, not their defences. We told the operator the same thing privately and declined to issue any grade, pass or fail, until the probe is fixed.",
+  };
+
+  function recordCorrection(auditId) {
+    return Object.prototype.hasOwnProperty.call(RECORD_CORRECTIONS, auditId)
+      ? RECORD_CORRECTIONS[auditId]
+      : null;
+  }
+
   const api = {
     auditEvidenceViewModel,
     badgeState,
     badgeViewModel,
     isValidAuditId,
+    recordCorrection,
     resolveAuditId,
     safeBadgeShareUrl,
   };
@@ -438,6 +454,17 @@
     return wrapper;
   }
 
+  function createRecordCorrection(auditId) {
+    const note = recordCorrection(auditId);
+    if (!note) {
+      return null;
+    }
+    const element = document.createElement("p");
+    element.className = "badge-card-correction";
+    element.textContent = note;
+    return element;
+  }
+
   function createBadgeCard(entry) {
     const view = badgeViewModel(entry);
     const card = document.createElement("a");
@@ -467,6 +494,10 @@
       view.verified ? "verified" : "signature-invalid",
     );
     card.append(eyebrow, heading, facts, integrity);
+    const correction = createRecordCorrection(view.auditId);
+    if (correction) {
+      card.append(correction);
+    }
     return card;
   }
 

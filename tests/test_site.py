@@ -1109,3 +1109,32 @@ def test_hire_links_to_the_real_okx_listing_page_instead_of_telling_people_to_se
     assert 'href="https://www.okx.ai/"' in hire
     assert "https://www.okx.ai/agents/3808" not in hire
     assert "https://www.okx.ai/agents/${provider}" in script
+
+
+def test_verify_page_distinguishes_a_stale_record_from_a_forged_one():
+    """A genuine signature on an expired record is the freshness rule working, not
+    a failure, and must not be dressed in the same language as a bad signature."""
+    script = (SITE / "verify.js").read_text(encoding="utf-8")
+    page = (SITE / "verify.html").read_text(encoding="utf-8")
+    page_text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", page))
+
+    assert "Signature genuine · ${verification.effectiveStatus}" in script
+    assert "Signature genuine — record out of date" in script
+    assert "A real signature does not make an old claim true." in script
+    # The forged case keeps the hard word; only the stale case is reframed.
+    assert '"Rejected · invalid signature"' in script
+    assert "Rejected · ${verification.effectiveStatus}" not in script
+
+    # The page says up front that an unaccepted archival record is the point.
+    assert "read that as the demonstration" in page_text
+    assert "freshness window" in page_text
+
+
+def test_badges_page_can_print_a_correction_beside_a_signed_record():
+    script = (SITE / "badge.js").read_text(encoding="utf-8")
+    css = (SITE / "styles.css").read_text(encoding="utf-8")
+
+    assert "RECORD_CORRECTIONS" in script
+    assert "7885a4880f5d258e" in script
+    assert "badge-card-correction" in script
+    assert ".badge-card-correction" in css

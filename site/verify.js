@@ -1242,9 +1242,9 @@
       return "No issuer key applicable at the signed verification time validates this record. The attestation is rejected.";
     }
     if (verification.code === "expired") {
-      return "The issuer signature is valid, but the attestation has expired and is stale.";
+      return "The issuer signature is genuine and the record is unaltered — but it is past its freshness window, so Warden will not accept it. A real signature does not make an old claim true.";
     }
-    return `The issuer signature is valid, but the signed status is ${verification.effectiveStatus}.`;
+    return `The issuer signature is genuine and the record is unaltered, but its signed status is ${verification.effectiveStatus}, so Warden will not accept it.`;
   }
 
   function renderVerification(
@@ -1258,10 +1258,13 @@
     const view = attestationViewModel(attestation, verification);
     const statusLabel = document.querySelector("[data-apa-verification-label]");
     if (statusLabel) {
+      // A genuine signature on an out-of-date record is not the same failure as a
+      // forged one, and the two must not read alike: the first is the freshness
+      // rule working, the second is an attack.
       statusLabel.textContent = verification.accepted
         ? "Verified · active"
         : verification.signatureValid
-          ? `Rejected · ${verification.effectiveStatus}`
+          ? `Signature genuine · ${verification.effectiveStatus}`
           : "Rejected · invalid signature";
       statusLabel.className = verification.accepted
         ? "status-label status-label--allow"
@@ -1273,7 +1276,9 @@
       "[data-apa-result-heading]",
       verification.accepted
         ? "Valid, fresh APA attestation"
-        : "Attestation not accepted",
+        : verification.signatureValid
+          ? "Signature genuine — record out of date"
+          : "Attestation not accepted",
     );
     text("[data-apa-result-message]", verificationMessage(verification));
     text("[data-apa-issuer]", view.issuer);

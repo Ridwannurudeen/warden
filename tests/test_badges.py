@@ -190,7 +190,7 @@ def test_badge_registry_verifies_each_record_and_only_returns_public_fields(tmp_
     monkeypatch.setattr("warden.badge_store._STORE_PATH", store_path)
 
     verified_badge = issue_badge(
-        target_host="verified.example.org",
+        target_host="verified.acme-agents.io",
         score=90.0,
         grade="A",
         blocked=18,
@@ -200,7 +200,7 @@ def test_badge_registry_verifies_each_record_and_only_returns_public_fields(tmp_
     record_badge(verified_badge)
 
     tampered_badge = issue_badge(
-        target_host="tampered.example.org",
+        target_host="tampered.acme-agents.io",
         score=75.0,
         grade="C",
         blocked=15,
@@ -329,3 +329,54 @@ for index in range(10):
     ]
     assert len(records) == 40
     assert len({record["audit_id"] for record in records}) == 40
+
+
+def test_public_registry_excludes_reserved_test_domains_without_deleting_them(
+    tmp_path, monkeypatch
+):
+    """Audits fired at RFC 2606 names are scaffolding, not evidence about anyone's
+    endpoint, so they must not pad the public registry — but the store keeps them."""
+    store_path = tmp_path / "issued.jsonl"
+    monkeypatch.setattr("warden.badge_store._STORE_PATH", store_path)
+
+    real = issue_badge(
+        target_host="agents.acme-corp.io",
+        score=90.0,
+        grade="A",
+        blocked=18,
+        total=20,
+        issued_at="2026-07-12",
+    )
+    record_badge(real)
+    for reserved_host in (
+        "example.com",
+        "EXAMPLE.ORG.",
+        "example.net:8443",
+        "smoke.example.com",
+        "localhost",
+        "fixture.test",
+        "nothing.invalid",
+    ):
+        record_badge(
+            issue_badge(
+                target_host=reserved_host,
+                score=0.0,
+                grade="F",
+                blocked=0,
+                total=20,
+                issued_at="2026-07-13",
+            )
+        )
+
+    # Nothing is destroyed: the raw store still holds every record.
+    assert len(badge_store.list_badges()) == 8
+    published = badge_store.list_public_badges()
+    assert [record["target_host"] for record in published] == ["agents.acme-corp.io"]
+
+    with TestClient(app) as client:
+        response = client.get("/api/badges")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert payload["badges"][0]["badge"]["target_host"] == "agents.acme-corp.io"

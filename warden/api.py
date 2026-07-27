@@ -17,7 +17,7 @@ from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from warden.badge_store import get_badge, list_badges
+from warden.badge_store import get_badge, list_public_badges
 from warden.badges import verify_badge
 from warden import (
     __version__,
@@ -1175,7 +1175,7 @@ async def list_badges_endpoint() -> BadgeRegistryResponse:
             badge=BadgeRecord.model_validate(badge),
             verified=verify_badge(badge),
         )
-        for badge in list_badges()
+        for badge in list_public_badges()
     ]
     return BadgeRegistryResponse(badges=badges, total=len(badges))
 
