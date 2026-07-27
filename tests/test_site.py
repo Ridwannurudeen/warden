@@ -607,21 +607,29 @@ def test_readme_leads_with_the_trust_layer_and_exact_quickstart_contracts():
     assert "pip install warden-guard" not in readme
 
 
-def test_current_submission_surfaces_are_staged_and_use_hardened_claims():
-    form = (ROOT / "submission" / "FORM-ANSWERS.md").read_text(encoding="utf-8")
-    audit = (ROOT / "submission" / "COMPETITIVE-AUDIT.md").read_text(encoding="utf-8")
+def test_readme_sends_reviewers_to_live_surfaces_and_published_sdks():
+    """The README is the reviewer's entry point, so it must not under-claim.
+
+    This replaces a check that read `submission/FORM-ANSWERS.md` and
+    `submission/COMPETITIVE-AUDIT.md`, both intentionally unpublished, and that
+    asserted the repository still described itself as private and still linked the
+    Theater as a repo-relative file. All three premises are now false: the repo is
+    public, `/theater` is deployed, and both SDKs are published.
+    """
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert "Private repository" in form
-    assert "Public GitHub repo" not in form
-    assert "Do not change visibility" in form
-    assert "Warden Guard Live" in audit
-    assert "query `a`" in audit
-    assert "marketplace-wide safety index" not in audit
-    assert "any agent adopts" not in audit
-    assert "infrastructure the whole marketplace can run on" not in audit
-    assert "[Attack Theater](site/theater.html)" in readme
-    assert "[Attack Theater](https://warden.gudman.xyz/theater)" not in readme
+    # Deployed surfaces must be linked at the live host — a `site/*.html` link
+    # renders as raw markup on GitHub and proves nothing to a reviewer.
+    assert "[Attack Theater](https://warden.gudman.xyz/theater)" in readme
+    assert "[Attack Theater](site/theater.html)" not in readme
+    assert "https://www.okx.ai/agents/3808" in readme
+    assert "https://youtu.be/weyaEaPaLJg" in readme
+
+    # Both distributions are on PyPI and npm; nothing may say otherwise.
+    assert "pip install warden-agent-guard" in readme
+    assert "npm install @gudman/warden-guard" in readme
+    assert "not claimed published" not in readme
+    assert "not claimed as published" not in readme
 
 
 def test_marketplace_rows_and_mobile_navigation_fit_narrow_viewports():

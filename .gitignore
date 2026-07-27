@@ -51,3 +51,11 @@ data/protection.db
 /submission/PHASE5-HANDOFF.md
 /submission/FORM-ANSWERS.md
 /submission/hardening-loop-post.md
+/submission/DEMO-90S-SCRIPT.md
+/submission/WIN-PLAN-10DAY.md
+/SUBMISSION-DRAFT.md
+# Build directives addressed to AI tooling — same reason as docs/build-history/.
+/CODEX-*.md
+# Private correspondence with other ASP owners, including bug reports filed against
+# their services and unsent outreach drafts. Not ours to publish.
+/outreach/
