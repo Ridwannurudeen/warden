@@ -292,3 +292,50 @@ def test_homepage_brand_system_supports_both_themes_mobile_and_reduced_motion():
     assert "@media (max-width: 380px)" in css
     assert "@media (prefers-reduced-motion: reduce)" in css
     assert "min-height: 44px" in css
+
+
+def test_homepage_leads_with_announcement_and_a_data_driven_proof_strip():
+    """The audit gap vs the category leaders: proof sat below the fold and the
+    page had no research banner. Both are additive and fully data-driven —
+    every figure in the hero strip comes from the same dated sources the
+    metric line already uses, never from markup literals."""
+    page = (SITE / "index.html").read_text(encoding="utf-8")
+    app = (SITE / "app.js").read_text(encoding="utf-8")
+    css = (SITE / "styles.css").read_text(encoding="utf-8")
+
+    # Announcement banner: real shipped capability, linking to the research page.
+    assert 'class="announce-bar" href="/gauntlet"' in page
+    assert "Adversarial Variant Audit" in page
+
+    # Hero proof strip fields ride the existing loaders; placeholders only.
+    assert page.count('data-eval-stat="recall"') == 2
+    assert page.count('data-eval-stat="fp-rate"') == 2
+    assert page.count('data-proof-field="latency"') == 2
+    assert 'data-proof-field="rating"' in page
+    hero = page.split('class="hero-proof"')[1].split("</dl>")[0]
+    # Every value slot ships as a placeholder; a digit inside <strong> would be
+    # a baked stat literal (labels like "p50" are fine — they are not values).
+    strong_values = re.findall(r"<strong[^>]*>([^<]*)</strong>", hero)
+    assert strong_values and all(value == "Unavailable" for value in strong_values)
+
+    # The recall figure is never presented bare — the saturation caveat rides it.
+    assert "saturated authored set" in hero
+
+    # The eval loader fills every container, not just the first.
+    assert 'querySelectorAll("[data-eval-stats]")' in app
+    assert ".hero-proof" in css
+
+
+def test_local_verification_demonstrates_itself_and_hero_links_to_the_live_run():
+    """Six 'Not checked' cells greeted every visitor; competitors never show an
+    empty state on a landing page. The proof is deterministic local WebCrypto,
+    so it auto-runs on scroll — and the hero's illustrative card hands the
+    reader to the real scanner run instead of dead-ending at an example."""
+    page = (SITE / "index.html").read_text(encoding="utf-8")
+    app = (SITE / "app.js").read_text(encoding="utf-8")
+
+    assert "data-hero-run-live" in page
+    assert "IntersectionObserver" in app
+    assert "autoRun.observe(proofRoot)" in app
+    # The hero trigger drives the real incident console, not its own fake run.
+    assert 'document.querySelector("[data-incident-run]")' in app

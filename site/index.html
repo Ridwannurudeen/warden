@@ -32,10 +32,19 @@
     />
     <link rel="icon" href="/assets/warden-mark.svg" />
     <script src="/theme.js?v=8864f626"></script>
-    <link rel="stylesheet" href="/styles.css?v=6cfad083" />
+    <link rel="stylesheet" href="/styles.css?v=a64a8176" />
   </head>
   <body data-page-archetype="landing">
     <a class="skip-link" href="#main">Skip to main content</a>
+    <a class="announce-bar" href="/gauntlet">
+      <span class="announce-bar__tag">New</span>
+      <span
+        >Adversarial Variant Audit — encoding and semantic attack families,
+        an A–F resistance grade, and a signed, re-checkable report. Try to
+        break it.</span
+      >
+      <span class="announce-bar__arrow" aria-hidden="true">&rarr;</span>
+    </a>
     <header class="site-header page-shell">
       <a class="brand" href="/" aria-label="Warden home"
         ><img
@@ -111,6 +120,33 @@
                 >Integrate in 5 minutes</a
               >
             </div>
+            <dl class="hero-proof" data-eval-stats data-state="unknown">
+              <div>
+                <dt>Fast-path p50</dt>
+                <dd>
+                  <strong data-proof-field="latency">Unavailable</strong>
+                </dd>
+              </div>
+              <div>
+                <dt>Held-out recall</dt>
+                <dd>
+                  <strong data-eval-stat="recall">Unavailable</strong>
+                  <small>saturated authored set</small>
+                </dd>
+              </div>
+              <div>
+                <dt>False positives</dt>
+                <dd>
+                  <strong data-eval-stat="fp-rate">Unavailable</strong>
+                </dd>
+              </div>
+              <div>
+                <dt>OKX.AI buyer rating</dt>
+                <dd>
+                  <strong data-proof-field="rating">Unavailable</strong>
+                </dd>
+              </div>
+            </dl>
           </div>
 
           <aside
@@ -154,6 +190,13 @@
                 <dd>Available for qualifying results</dd>
               </div>
             </dl>
+            <button
+              class="control-trace__run"
+              type="button"
+              data-hero-run-live
+            >
+              Run this exact check against the live scanner &rarr;
+            </button>
           </aside>
         </section>
 
@@ -668,9 +711,9 @@ execute(safe)</code></pre>
         </div>
       </nav>
     </footer>
-    <script src="/app.js?v=57f0dae1" defer></script>
+    <script src="/app.js?v=4dd0ef8d" defer></script>
     <script src="/scan-client.js?v=d6611fc1" defer></script>
-    <script src="/verify.js?v=c316ee79" defer></script>
+    <script src="/verify.js?v=a67f5699" defer></script>
     <script src="/log.js?v=3088d242" defer></script>
     <script src="/incident-console.js?v=91935d9f" defer></script>
     <script src="/home-proof.js?v=1850f6af" defer></script>
