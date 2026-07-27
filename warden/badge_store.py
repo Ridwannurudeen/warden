@@ -127,3 +127,36 @@ def list_badges(store_path: Path | None = None) -> list[dict[str, object]]:
         records = _read_records(path)
 
     return sorted(records, key=lambda record: str(record.get("issued_at", "")), reverse=True)
+
+
+def _is_reserved_target(target_host: str) -> bool:
+    """RFC 2606 / RFC 6761 names exist so they can never be a real endpoint."""
+    host = target_host.strip().casefold().rstrip(".")
+    host = host.partition(":")[0]
+    if host in {"localhost", "example.com", "example.net", "example.org"}:
+        return True
+    return host.endswith(
+        (
+            ".localhost",
+            ".test",
+            ".invalid",
+            ".example",
+            ".example.com",
+            ".example.net",
+            ".example.org",
+        )
+    )
+
+
+def list_public_badges(store_path: Path | None = None) -> list[dict[str, object]]:
+    """The registry as published: real endpoints only.
+
+    The store itself stays a complete record — nothing is deleted — but audits
+    fired at reserved test domains are scaffolding, not evidence about anyone's
+    endpoint, so publishing them misrepresents what Warden has actually examined.
+    """
+    return [
+        record
+        for record in list_badges(store_path)
+        if not _is_reserved_target(str(record.get("target_host", "")))
+    ]

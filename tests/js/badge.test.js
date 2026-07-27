@@ -10,6 +10,7 @@ const {
   badgeState,
   badgeViewModel,
   isValidAuditId,
+  recordCorrection,
   resolveAuditId,
   safeBadgeShareUrl,
 } = require(path.join(__dirname, "..", "..", "site", "badge.js"));
@@ -234,4 +235,21 @@ test("badge states distinguish portable lifecycle from legacy integrity", () => 
   assert.equal(badgeState("stale").integrity, "Valid signature · stale");
   assert.equal(badgeState("revoked").integrity, "Valid signature · revoked");
   assert.equal(badgeState("evidence-invalid").integrity, "Evidence rejected");
+});
+
+test("a badge that misdescribes its target carries a correction beside it", () => {
+  // The PolicyPool F measured Warden's own probe reach, not the endpoint. The
+  // record is signed and badges have no revocation path, so the correction has
+  // to ride alongside rather than edit or hide the record.
+  const note = recordCorrection("7885a4880f5d258e");
+
+  assert.ok(note, "the known-misleading record must carry a correction");
+  assert.match(note, /fault in our own probe, not a weakness in the endpoint/);
+  assert.match(note, /declined to issue any grade/);
+
+  assert.equal(recordCorrection("48f8635fbb71d696"), null);
+  assert.equal(recordCorrection("unknown"), null);
+  // A prototype key must not masquerade as a correction.
+  assert.equal(recordCorrection("constructor"), null);
+  assert.equal(recordCorrection("toString"), null);
 });

@@ -29,7 +29,7 @@
     />
     <link rel="icon" href="/assets/warden-mark.svg" />
     <script src="/theme.js?v=8864f626"></script>
-    <link rel="stylesheet" href="/styles.css?v=2f0899cc" />
+    <link rel="stylesheet" href="/styles.css?v=6cfad083" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -176,6 +176,18 @@
           <p class="field-hint">
             The sample is a signed cross-language fixture dated 14 July 2026,
             not a current endpoint claim.
+          </p>
+          <p class="field-hint">
+            <strong>Expect these to come back unaccepted, and read that as the
+            demonstration.</strong>
+            Both records are older than the one-hour freshness window, so Warden
+            refuses them even though the signatures check out. Verifying a
+            signature only proves who wrote a record and that nobody altered it;
+            it says nothing about whether the claim still holds. Anything that
+            waves through a correctly signed but expired record is not checking
+            the thing that matters. To watch the other failure mode, edit any
+            character of the record and verify again — the signature check itself
+            then fails.
           </p>
           <p
             class="scan-status"
@@ -510,6 +522,6 @@
     <script src="/app.js?v=57f0dae1" defer></script>
     <script src="/log.js?v=3088d242" defer></script>
     <script src="/home-proof.js?v=1850f6af" defer></script>
-    <script src="/verify.js?v=e527eaff" defer></script>
+    <script src="/verify.js?v=c316ee79" defer></script>
   </body>
 </html>
