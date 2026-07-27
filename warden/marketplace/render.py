@@ -560,7 +560,7 @@ def _render_agent_page(
     <h1{_language_attribute(agent.name)}>{_escape(agent.name or "Unnamed agent")}</h1>
     <p class="hero-text"{_language_attribute(agent.profile_description)}>{_escape(agent.profile_description or "No public profile description.")}</p>
     <span class="source-stamp" data-source-stamp="DATED"><span data-source-stamp-label>DATED</span></span>
-    <p class="source-link">{avatar_link} | <a href="https://www.okx.ai/" rel="noreferrer">Open OKX.AI and search Agent #{_escape(agent.agent_id)}</a></p>
+    <p class="source-link">{avatar_link} | <a href="https://www.okx.ai/agents/{_escape(agent.agent_id)}" rel="noreferrer">Open Agent #{_escape(agent.agent_id)} on OKX.AI</a></p>
   </div>
 </section>
 <section class="data-grid" aria-label="Marketplace statistics">

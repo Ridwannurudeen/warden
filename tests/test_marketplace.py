@@ -1759,3 +1759,24 @@ async def test_build_index_links_a_valid_sqlite_apa_record_without_counting_an_a
     assert summary["auditedCount"] == 0
     assert f"/apa/attestation/{record['attestation_id']}" in agent_html
     assert "Linked signed APA guard proof" in agent_html
+
+
+def test_agent_page_deep_links_to_the_real_okx_listing(tmp_path):
+    """okx.ai/agents/<id> is a live page, so the page links straight to it rather
+    than telling a reader to open the marketplace root and search for the agent."""
+    indexed = IndexedAgent(
+        agent=_agent(),
+        verdict="ALLOW",
+        risk_level="NONE",
+        threat_classes=[],
+        fields_scanned=1,
+        rationale="No injection patterns were detected.",
+    )
+
+    render_marketplace([indexed], tmp_path, coverage=_coverage(sampled=1))
+
+    agent_html = (tmp_path / "3808.html").read_text(encoding="utf-8")
+    assert 'href="https://www.okx.ai/agents/3808"' in agent_html
+    assert "Open Agent #3808 on OKX.AI" in agent_html
+    assert "search Agent" not in agent_html
+    assert 'href="https://www.okx.ai/"' not in agent_html
