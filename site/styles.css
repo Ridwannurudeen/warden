@@ -1240,12 +1240,104 @@ code {
   text-decoration: none;
 }
 
+.announce-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 9px clamp(16px, 4vw, 32px);
+  background: color-mix(in srgb, var(--accent) 9%, var(--bg));
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.45;
+  text-decoration: none;
+  transition: background-color 180ms ease;
+}
+
+.announce-bar:hover {
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg));
+}
+
+.announce-bar__tag {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.announce-bar__arrow {
+  flex-shrink: 0;
+  color: var(--accent);
+  transition: transform 180ms ease;
+}
+
+.announce-bar:hover .announce-bar__arrow {
+  transform: translateX(3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .announce-bar:hover .announce-bar__arrow {
+    transform: none;
+  }
+}
+
 .home-hero {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.75fr);
   gap: clamp(48px, 7vw, 96px);
   align-items: center;
-  padding-block: 8px 76px;
+  padding-block: 8px 24px;
+}
+
+.hero-proof {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px clamp(24px, 3vw, 40px);
+  margin: 34px 0 0;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.hero-proof > div {
+  margin: 0;
+}
+
+.hero-proof dt {
+  margin: 0 0 3px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-proof dd {
+  margin: 0;
+}
+
+.hero-proof strong {
+  color: var(--ink);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-proof small {
+  display: block;
+  color: var(--faint);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.hero-proof[data-state="unavailable"] strong {
+  color: var(--faint);
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .home-hero-copy {
@@ -1347,6 +1439,26 @@ code {
 
 .control-trace__meta div:last-child {
   border-right: 0;
+}
+
+.control-trace__run {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 180ms ease;
+}
+
+.control-trace__run:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .control-trace__meta dt,
@@ -1708,6 +1820,18 @@ code {
   border-block: 1px solid var(--line);
 }
 
+/* A section that carries its own padding and rules already separates itself.
+   Adding the full inter-section gap on top of that stacked ~190px of dead air
+   between the metric line and this heading. The rule provides the boundary;
+   the gap only needs to breathe. */
+.site-main > .page-shell > .offline-proof {
+  margin-top: clamp(32px, 4vw, 52px);
+}
+
+.site-main > .page-shell > .offline-proof + section {
+  margin-top: clamp(32px, 4vw, 52px);
+}
+
 .offline-proof__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1742,6 +1866,9 @@ code {
   margin: 9px 0 0;
   color: var(--muted);
   font-size: 12px;
+  /* These sentences embed a full 64-char SHA-256 head, which has no break
+     opportunity and otherwise overflows the cell into its neighbour. */
+  overflow-wrap: anywhere;
 }
 
 .offline-proof__grid article {
@@ -1791,6 +1918,7 @@ code {
 .offline-proof__evidence dt,
 .offline-proof__evidence dd {
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .offline-proof__evidence dt {
@@ -3464,6 +3592,21 @@ body[data-page-archetype="legal"],
 }
 
 @media (max-width: 900px) {
+  .announce-bar {
+    font-size: 12px;
+    text-align: left;
+    justify-content: flex-start;
+  }
+
+  .hero-proof {
+    gap: 14px 22px;
+    margin-top: 26px;
+  }
+
+  .hero-proof strong {
+    font-size: 15px;
+  }
+
   .agent-ledger {
     overflow: visible;
     background: none;

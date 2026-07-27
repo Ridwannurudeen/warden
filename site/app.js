@@ -659,8 +659,13 @@
       });
   }
 
-  const evalStats = document.querySelector("[data-eval-stats]");
-  if (evalStats) {
+  // The hero proof strip and the metric line both carry these figures, so every
+  // container is filled and stamped together — a second consumer must never
+  // silently stay on its placeholder.
+  const evalStatsContainers = Array.from(
+    document.querySelectorAll("[data-eval-stats]"),
+  );
+  if (evalStatsContainers.length > 0) {
     root
       .fetch("/data/evaluation.json", {
         headers: { accept: "application/json" },
@@ -688,26 +693,32 @@
           "fp-rate": `${current.false_positive_rate_percent}%`,
           "benign-cases": `${current.benign_cases.toLocaleString()} held-out benign cases`,
         };
-        for (const [field, text] of Object.entries(fields)) {
-          for (const element of evalStats.querySelectorAll(
-            `[data-eval-stat="${field}"]`,
-          )) {
-            element.textContent = text;
+        for (const container of evalStatsContainers) {
+          for (const [field, text] of Object.entries(fields)) {
+            for (const element of container.querySelectorAll(
+              `[data-eval-stat="${field}"]`,
+            )) {
+              element.textContent = text;
+            }
           }
+          container.dataset.state = "ready";
         }
-        evalStats.dataset.state = "ready";
       })
       .catch(() => {
-        evalStats.dataset.state = "unavailable";
         const unavailableCopy = {
           recall: "Recall unavailable",
           "fp-rate": "False-positive rate unavailable",
           "benign-cases": "Evaluation corpus unavailable",
         };
-        for (const element of evalStats.querySelectorAll("[data-eval-stat]")) {
-          element.textContent =
-            unavailableCopy[element.dataset.evalStat] ||
-            "Evaluation metric unavailable";
+        for (const container of evalStatsContainers) {
+          container.dataset.state = "unavailable";
+          for (const element of container.querySelectorAll(
+            "[data-eval-stat]",
+          )) {
+            element.textContent =
+              unavailableCopy[element.dataset.evalStat] ||
+              "Evaluation metric unavailable";
+          }
         }
       });
   }
@@ -801,6 +812,31 @@
         runButton.disabled = false;
       }
     });
+
+    // The proof is deterministic, local-only WebCrypto over a bundled record, so
+    // it can demonstrate itself: run once when the section scrolls into view
+    // instead of greeting the reader with a wall of "Not checked". The button
+    // stays for re-runs and for browsers without IntersectionObserver.
+    if (typeof root.IntersectionObserver === "function") {
+      const autoRun = new root.IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting && proofRoot.dataset.state !== "running") {
+              autoRun.disconnect();
+              if (
+                proofRoot.dataset.state === "idle" ||
+                !proofRoot.dataset.state
+              ) {
+                runButton.click();
+              }
+              return;
+            }
+          }
+        },
+        { threshold: 0.35 },
+      );
+      autoRun.observe(proofRoot);
+    }
   }
 
   if (document.readyState === "loading") {
@@ -809,6 +845,21 @@
     });
   } else {
     bindHomeProof();
+  }
+
+  const heroRunLive = document.querySelector("[data-hero-run-live]");
+  if (heroRunLive) {
+    heroRunLive.addEventListener("click", () => {
+      const consoleSection = document.querySelector("[data-incident-console]");
+      const consoleRun = document.querySelector("[data-incident-run]");
+      if (!consoleSection || !consoleRun) {
+        return;
+      }
+      consoleSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      // The console's own handler drives the real /api/demo/scan call and the
+      // stamps; the hero card only hands the reader to it.
+      consoleRun.click();
+    });
   }
 
   const serviceCatalog = document.querySelector("[data-service-catalog]");
