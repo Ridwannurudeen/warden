@@ -33,3 +33,21 @@ data/*.db
 data/protection.db
 .warden/
 .claude/worktrees/
+
+# Internal build history and go-to-market strategy: kept locally, not published.
+# These name the tools used to build the project and the accounts we planned to
+# contact, neither of which belongs in a public repository.
+/docs/build-history/
+/docs/superpowers/
+/submission/outreach.md
+/submission/COMPETITIVE.md
+/submission/COMPETITIVE-AUDIT.md
+/submission/VALIDATION-SPRINT.md
+/REDESIGN_REPORT.md
+/submission/HARDENING-LOOP-FORM.md
+/submission/HARDENING-LOOP-LAUNCH-LEDGER.md
+/submission/HARDENING-LOOP-LAUNCH.md
+/submission/LISTING-UPDATE-DRAFT.md
+/submission/PHASE5-HANDOFF.md
+/submission/FORM-ANSWERS.md
+/submission/hardening-loop-post.md

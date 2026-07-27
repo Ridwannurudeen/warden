@@ -235,14 +235,25 @@ def test_production_service_requires_the_paywall_and_docs_pin_the_origin() -> No
     assert "not yet deployed" in normalized_docs_lower
     assert "deploy and read-only reprobe" in normalized_docs_lower
     assert "The live payment gate is verified" not in payment_docs
-    for path in (
-        ROOT / "docs" / "build-history" / "CODEX-BUILD-PHASE5.md",
-        ROOT / "docs" / "build-history" / "CODEX-KICKOFF-PHASE5.md",
-        ROOT / "submission" / "PHASE5-VERIFICATION.md",
-    ):
-        archived = " ".join(path.read_text(encoding="utf-8").split())
-        assert "SUPERSEDED" in archived
-        assert "PAYMENT.md" in archived
+    # The point of this check is that no stale document contradicts PAYMENT.md.
+    # Two of the three archives were internal build history and are no longer
+    # published. They may still sit in a contributor's working copy, so the
+    # invariant is that git does not track them — not that the file is absent.
+    tracked = subprocess.run(
+        ["git", "ls-files", "docs/build-history"],
+        cwd=ROOT, capture_output=True, text=True, check=False,
+    )
+    if tracked.returncode == 0:
+        assert not tracked.stdout.strip(), (
+            "docs/build-history is internal build history and must stay unpublished; "
+            f"still tracked: {tracked.stdout.strip().splitlines()[:3]}"
+        )
+
+    archived = " ".join(
+        (ROOT / "submission" / "PHASE5-VERIFICATION.md").read_text(encoding="utf-8").split()
+    )
+    assert "SUPERSEDED" in archived
+    assert "PAYMENT.md" in archived
 
 
 def _facilitator(
