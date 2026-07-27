@@ -39,19 +39,21 @@ and show:
 Do not record a failed or manually edited output. Diagnose the failure, rerun the source, and record
 one continuous successful execution.
 
-## 82-second recording script
+## 84-second participation demo
 
-Target: 82 seconds. Hard stop: 90 seconds. Record at 1280×720 or higher with a real voice.
+Target: 84 seconds. Hard stop: 90 seconds. Record at 1280×720 or higher with a real voice. The
+opening introduces Warden as the ASP, the buyer scenario explains why it is useful, and the
+continuous run shows the product rather than replaying saved evidence.
 
 | Time | Action | Narration | Evidence visible |
 | --- | --- | --- | --- |
-| 00:00–00:07 | Show the weak local endpoint diagram or title card, then the command before execution. | “Warden closes the audit-to-treatment loop for AI agents. This is a local, no-funds run against a consented endpoint.” | Command is readable; no wallet, credential, or unrelated window is visible. |
-| 00:07–00:18 | Run `python demo/run_hardening_loop.py`. Point to `before`. | “The existing fixed battery reaches the deliberately weak endpoint. It allows the attacks, so Warden issues signed grade F evidence.” | `battery`, before `audit_id`, grade `F`, and score are visible. |
-| 00:18–00:35 | Point to `hardening_pack`. | “Using that audit ID, Warden builds a deterministic Ed25519-signed Hardening Pack for exactly the missed classes. Its examples come from the training corpus, retain provenance, and never expose the held-out evaluation set.” | Pack ID, addressed classes, and `signature_verified: true` are visible. |
-| 00:35–00:48 | Point to `enforcement`. | “The endpoint applies real fail-closed local enforcement and its own deny-by-default command policy. There is no mocked grade change.” | SDK and application-policy lines are visible. |
-| 00:48–01:03 | Point to `after`. | “The same battery runs again. The endpoint now earns A, with a strictly higher score.” | After audit ID, grade `A`, and score are visible beside or immediately after before evidence. |
-| 01:03–01:14 | Point to `transparency`. | “Both audits and the treatment are separate signed records in one verified transparency chain.” | Three ordered events, checkpoint sequence, and `chain_verified: true` are visible. |
-| 01:14–01:22 | Point to `limitations`; stop. | “This proves improvement against this fixed battery at these times. It is technical evidence, not certification or a guarantee of future safety.” | The limitation sentence remains visible at the cut. |
+| 00:00–00:10 | Show a title card reading **Warden ASP: audit → harden → re-audit**, then the command before execution. | “Meet Warden, an ASP for agent security and training. It helps builders find what an endpoint misses, harden it, and prove the improvement.” | ASP name, buyer use case, and command are readable; no wallet, credential, or unrelated window is visible. |
+| 00:10–00:20 | Run `python demo/run_hardening_loop.py`. Point to `before`. | “This consented test endpoint starts weak. Warden's fixed battery produces signed grade F evidence.” | `battery`, before `audit_id`, grade `F`, and score are visible. |
+| 00:20–00:36 | Point to `hardening_pack`. | “From that audit ID, Warden creates a deterministic, Ed25519-signed Hardening Pack for the missed classes, using training-only examples with provenance.” | Pack ID, addressed classes, and `signature_verified: true` are visible. |
+| 00:36–00:49 | Point to `enforcement`. | “The endpoint applies the treatment through real fail-closed local enforcement and its own deny-by-default action policy.” | SDK and application-policy lines are visible. |
+| 00:49–01:03 | Point to `after`. | “The same battery runs again. The score moves from zero to one hundred, and the endpoint earns A—with no mocked grade change.” | After audit ID, grade `A`, and score are visible beside or immediately after before evidence. |
+| 01:03–01:15 | Point to `transparency`. | “The before audit, treatment, and re-audit are separate signed records in one verified transparency chain.” | Three ordered events, checkpoint sequence, and `chain_verified: true` are visible. |
+| 01:15–01:24 | Point to `limitations`; stop. | “This proves improvement against this battery at these times. It is technical evidence, not certification or a future-safety guarantee.” | The limitation sentence remains visible at the cut. |
 
 ## Recording checklist
 
@@ -60,6 +62,7 @@ Target: 82 seconds. Hard stop: 90 seconds. Record at 1280×720 or higher with a 
 - [ ] The recording shows one continuous invocation and exit.
 - [ ] The first and second audit IDs are distinct and visible.
 - [ ] Grade F, the signed pack, real enforcement, grade A, and verified log chain are all visible.
+- [ ] The opening explicitly introduces Warden as the ASP and explains the endpoint-builder use case.
 - [ ] The narration says “training corpus” and never claims held-out cases ship in packs.
 - [ ] The narration says “technical evidence” and never says certification, accredited, guaranteed
       safe, all attacks, or permanent protection.
@@ -101,7 +104,7 @@ listing flow must still perform its required current-state fetch, validation, di
     "serviceName": "Signed Hardening Pack",
     "serviceDescription": "Builds a deterministic, Ed25519-signed Hardening Pack for the missed classes in a completed Warden audit.\nProvide the 16-character audit_id from a completed consented audit.",
     "serviceType": "A2MCP",
-    "fee": "0.5",
+    "fee": "0.1",
     "endpoint": "https://warden.gudman.xyz/harden"
   }
 ]
