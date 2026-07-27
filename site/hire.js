@@ -356,7 +356,54 @@
     return commands;
   }
 
+  function buildAgentPrompt({ providerAgentId, service, requestBodyText }) {
+    const provider = decimalIdentifier(
+      providerAgentId,
+      "provider agent ID",
+      true,
+    );
+    if (service.serviceType !== "A2MCP") {
+      throw new Error("The selected service must use A2MCP");
+    }
+    const title = boundedText(service.serviceName, "service name", true, 128);
+    const endpoint = boundedText(service.endpoint, "endpoint", true, 2048);
+    const amount = String(service.feeAmount);
+    if (!/^\d+(\.\d+)?$/.test(amount)) {
+      throw new Error("Service fee must be a decimal amount");
+    }
+    validateRequestBody(service);
+    let body = service.requestBody;
+    if (typeof requestBodyText === "string" && requestBodyText.trim()) {
+      try {
+        const parsed = JSON.parse(requestBodyText);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          body = parsed;
+        }
+      } catch {
+        // A part-typed textarea is not an error here; the catalog body still
+        // describes the same call, so the prompt stays usable mid-edit.
+        body = service.requestBody;
+      }
+    }
+    return [
+      `I'd like to use the service provided by Agent ${provider} on OKX.AI.`,
+      "",
+      `Service title: ${title}`,
+      "Service type: A2MCP",
+      `Endpoint: ${endpoint}`,
+      `Price: ${amount} ${PAYMENT_SYMBOL} per call`,
+      "",
+      "Please use the OKX Agent Payments Protocol to send a request",
+      "to this endpoint with this JSON body:",
+      "",
+      JSON.stringify(body, null, 2),
+      "",
+      "Then show me the full JSON response it returns.",
+    ].join("\n");
+  }
+
   const api = {
+    buildAgentPrompt,
     buildCommands,
     commandAvailability,
     isCurrentHireRequest,
@@ -407,6 +454,11 @@
   );
   const refreshButton = root.document.querySelector("[data-refresh-accepts]");
   const copyStatus = root.document.querySelector("[data-copy-status]");
+  const agentPromptOutput = root.document.querySelector("[data-agent-prompt]");
+  const agentPromptButton = root.document.querySelector(
+    "[data-copy-agent-prompt]",
+  );
+  const okxListingLink = root.document.querySelector("[data-okx-listing]");
   let catalog = null;
   let challenge = null;
   let challengeController = null;
@@ -618,7 +670,56 @@
     });
   }
 
+  function setAgentPrompt(prompt) {
+    agentPromptOutput.textContent =
+      prompt || "Select a service to build the prompt.";
+    agentPromptButton.disabled = !prompt;
+    agentPromptButton.dataset.prompt = prompt || "";
+  }
+
+  function renderOkxListingLink() {
+    if (!okxListingLink) {
+      return;
+    }
+    // The deep link only exists once the catalog names the agent; until then the
+    // marketplace root is the honest destination rather than a guessed id.
+    const provider = String(catalog?.providerAgentId ?? "");
+    if (!/^\d+$/.test(provider)) {
+      okxListingLink.href = "https://www.okx.ai/";
+      okxListingLink.textContent = "See the live listing on OKX.AI";
+      return;
+    }
+    okxListingLink.href = `https://www.okx.ai/agents/${provider}`;
+    okxListingLink.textContent = `See Agent #${provider} on OKX.AI — its services, buyer reviews, and on-chain record`;
+  }
+
+  function renderAgentPrompt() {
+    renderOkxListingLink();
+    if (!agentPromptOutput || !agentPromptButton) {
+      return;
+    }
+    const service = selectedService();
+    if (!catalog || !service) {
+      setAgentPrompt("");
+      return;
+    }
+    try {
+      setAgentPrompt(
+        buildAgentPrompt({
+          providerAgentId: catalog.providerAgentId,
+          service,
+          requestBodyText: requestBody.value,
+        }),
+      );
+    } catch (error) {
+      agentPromptOutput.textContent = error.message;
+      agentPromptButton.disabled = true;
+      agentPromptButton.dataset.prompt = "";
+    }
+  }
+
   function renderCommands() {
+    renderAgentPrompt();
     const service = selectedService();
     if (!service) {
       return;
@@ -757,6 +858,7 @@
     spendConfirmed.checked = false;
     verdictConfirmed.checked = false;
     serviceFacts(service, null);
+    renderAgentPrompt();
     loadChallenge();
   }
 
@@ -770,6 +872,7 @@
     setSourceStamp(catalogStamp, "UNKNOWN");
     catalogStatus.textContent = "Requesting the normalized service catalog.";
     serviceFacts(null, null);
+    renderAgentPrompt();
     try {
       const response = await root.fetch("/data/warden-services.json", {
         headers: { accept: "application/json" },
@@ -850,6 +953,30 @@
         }
         root.setTimeout(() => {
           button.textContent = original;
+        }, 1200);
+      } catch (error) {
+        if (copyStatus) {
+          copyStatus.textContent = `Copy failed: ${error.message}`;
+        }
+      }
+    });
+  }
+  if (agentPromptButton) {
+    agentPromptButton.addEventListener("click", async () => {
+      if (!agentPromptButton.dataset.prompt) {
+        return;
+      }
+      try {
+        await root.navigator.clipboard.writeText(
+          agentPromptButton.dataset.prompt,
+        );
+        agentPromptButton.textContent = "Copied";
+        if (copyStatus) {
+          copyStatus.textContent =
+            "Agent prompt copied. Paste it into an agent that can pay.";
+        }
+        root.setTimeout(() => {
+          agentPromptButton.textContent = "Copy prompt";
         }, 1200);
       } catch (error) {
         if (copyStatus) {
