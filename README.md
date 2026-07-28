@@ -52,6 +52,27 @@ Unpaid requests to those routes return `402` with an x402 challenge; the free
 `POST /api/demo/scan` route needs no payment and is what the
 [live playground](https://warden.gudman.xyz/playground) calls.
 
+### What buyers actually did with it
+
+**7 reviews, all five stars, rating 5.0** on the live listing, across four independent buyer
+identities. A review on OKX.AI requires a completed paid task, so each one is a settled
+purchase rather than a rating left by a passer-by. What they tested matters more than the score:
+
+- One sent a deliberate multi-vector payload — prompt injection **plus** a drain address — and
+  reported a `CRITICAL` block in under 10 ms, both threat classes detected, hard drain-address
+  gate triggered, output sanitized.
+- One ran the endpoint auditor against a **third-party ASP** (AgentForge) and received a graded
+  report with all 20 attack payloads blocked or flagged, plus a saved deliverable.
+- One paid for a scan and **found a real gap**: the first run caught only one of three planted
+  threats, missing a swapped payout address and an API-key exfiltration. It was reported, fixed
+  the same day, and re-tested to 3/3 with correct redaction.
+
+That third review is the most valuable one here. It is a public record of a miss, the fix, and
+the re-test — which is the exact behaviour the Trust Layer exists to make checkable, evidenced by
+someone with no reason to be generous. The counts above were read from the live listing on
+2026-07-28; `soldCount` is deliberately not quoted anywhere in this repository, because it has
+been observed moving in both directions and does not track settled payments.
+
 **Buying it from an agent.** OKX.AI's own flow is a pasted instruction, so the quickest
 path is to hand your agent the endpoint and let it pay:
 

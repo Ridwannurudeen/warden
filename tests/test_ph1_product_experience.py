@@ -39,10 +39,11 @@ def test_product_proof_snapshot_is_dated_and_authoritative():
 
     assert proof == {
         "schemaVersion": 1,
-        "verifiedAt": "2026-07-26",
+        "verifiedAt": "2026-07-28",
         "marketplace": {
             "agentId": "3808",
-            "rating": {"value": 5.0, "outOf": 5, "reviews": 6},
+            # Read off the live listing on 2026-07-28: 5.0 across 7 five-star reviews.
+            "rating": {"value": 5.0, "outOf": 5, "reviews": 7},
             "url": "https://www.okx.ai/",
             "listingUrlAvailable": False,
             "instruction": "Search Agent #3808",
