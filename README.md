@@ -30,8 +30,10 @@
 and [integrate](https://warden.gudman.xyz/integrate). Everything this project does *not* claim is
 listed in full under [Honest limits](#honest-limits).
 
-The PNGs in [`docs/screenshots/`](docs/screenshots/README.md) predate the Trust Layer and are not the
-current interface; the live URLs above are.
+[`docs/screenshots/`](docs/screenshots/README.md) carries eleven captures taken from production on
+2026-07-28 at commit `a81a0dd`, including a receipt-validated Theater run at `3 / 3` and a real
+`BLOCK · CRITICAL · DRAIN_ADDRESS` verdict. The two `warden-landing-*.png` files are kept alongside
+them as labelled 2026-07-04 baselines and are not the current interface.
 
 ## Live on OKX.AI
 
@@ -386,7 +388,7 @@ an availability claim.
 | `GET`  | `/verify`                                     | Browser APA attestation verifier                                |
 | `GET`  | `/spec/APA-SPEC.md`                           | Byte-identical public APA specification                         |
 | `GET`  | `/health`                                     | Version, corpus size, and analyzer list                         |
-| `GET`  | `/health/ready`                               | Local scanner and paid-route configuration readiness            |
+| `GET`  | `/health/ready`†                              | Local scanner and paid-route configuration readiness            |
 | `POST` | `/api/demo/scan`                              | Free, rate-limited, fast-only payload scan                      |
 | `POST` | `/api/demo/theater`                           | Verdict-gated, no-side-effect demo ASP with delivery receipt    |
 | `POST` | `/api/feedback`                               | Explicit opt-in, redacted outcome feedback                      |
@@ -408,6 +410,11 @@ an availability claim.
 | `POST` | `/apa/revoke`                                 | Key-signed attestation revocation                               |
 | `GET`  | `/badge/{audit_id}`                           | Legacy HMAC audit badge record                                  |
 | `GET`  | `/api/badges`                                 | Legacy public audit-badge registry                              |
+
+† `/health/ready` and `/health/stats` are served by the application but are **not exposed publicly**:
+the production nginx block proxies `location = /health` as an exact match, so both sub-routes fall
+through to the static site and answer 404 from the internet. They return 200 on the app's own port,
+and runtime statistics are deliberately not published. Probing them from outside is expected to fail.
 
 ### Consenting to an audit
 
@@ -537,10 +544,14 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
   marketplace CLI/provider remain operator preflight gates.
 - The TypeScript SDK has no local engine; its default free hosted path is best-effort because
   `failOpen: true` converts transport failures into `ALLOW` telemetry.
-- Trust Layer web routes are deployed and serving. `/verify` can load a *stale* attestation: the only
-  issued APA record expired on 2026-07-17 and re-registration needs a signing key that is no longer on
-  the host, so the page correctly reports a genuine signature on an expired record rather than an
-  active one.
+- Trust Layer web routes are deployed and serving. **`/verify` loads a `stale` attestation, and that
+  is currently unfixable rather than unattended.** The only issued APA record for this host was issued
+  2026-07-17 with a one-hour lifetime and later revoked; `/apa/log` shows exactly those two entries.
+  Re-registration requires the endpoint to serve `/.well-known/agent-protection` signed by the key
+  already TOFU-bound to `warden.gudman.xyz`. That route returns 404 and the guard key is not on the
+  host — only the issuer key is. Binding a *new* key would set status `key-changed`, which renders red
+  (`#be123c`), strictly worse than the current amber `stale`. So the honest state is published rather
+  than papered over, and the page reports a genuine signature on a stale record.
 - The 99.5% application-readiness objective is not a contractual SLA or an achieved uptime claim. The
   committed monitor state is `not_running`; a complete independently scheduled 30-day window is required
   before the status surface reports measured availability, and payment-facilitator uptime is out of scope.
