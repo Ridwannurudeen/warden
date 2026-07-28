@@ -1,0 +1,25 @@
+[Unit]
+Description=Warden ASP task executor (OKX A2A marketplace)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/warden
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=WARDEN_EXECUTOR_AGENT_ID=3808
+Environment=WARDEN_EXECUTOR_IDEMPOTENCY_STORE=/opt/warden/data/executor-idempotency.json
+EnvironmentFile=/opt/warden/.env
+ExecStart=/opt/warden/.venv/bin/python -m warden.executor.executor
+Restart=always
+RestartSec=5
+User=warden
+Group=warden
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/warden/data /opt/warden/logs
+
+[Install]
+WantedBy=multi-user.target

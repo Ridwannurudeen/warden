@@ -390,6 +390,11 @@ async def test_the_deep_tier_has_its_own_tighter_quota(
 
     monkeypatch.setenv("WARDEN_DEEP_VARIANT_AUDIT_RATE_LIMIT_PER_MIN", "1")
     monkeypatch.setenv("WARDEN_RATE_LIMIT_PER_MIN", "0")
+    # The limiter buckets by fixed wall-clock minute, so on a slow runner the two
+    # deep calls could straddle a boundary: the second would open a fresh window,
+    # count 1, and answer 200 instead of 429. Pin the clock so this measures the
+    # quota rather than where the requests happened to land in the minute.
+    monkeypatch.setattr(ratelimit, "_time_now", lambda: 1_000_000.0)
     ratelimit._reset_state()
     _install_target(monkeypatch, _StubTarget())
     body = {
@@ -433,9 +438,7 @@ async def test_a_corrupt_line_does_not_hide_a_later_genuine_record(
     report = await _report(monkeypatch)
     report_id = str(report["report_id"])
     _isolated_store.write_text(
-        f'{{"report_id": "{report_id}", "truncated"\n'
-        + json.dumps(report, sort_keys=True)
-        + "\n",
+        f'{{"report_id": "{report_id}", "truncated"\n' + json.dumps(report, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
