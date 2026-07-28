@@ -22,9 +22,16 @@
   </p>
 </div>
 
-The current interface capture is intentionally absent: the PNGs in
-[`docs/screenshots/`](docs/screenshots/README.md) predate the Trust Layer. A new screenshot is accepted
-only after the exact build receives browser and device review.
+**Reviewing this for OKX.AI?** The 90-second demo is at
+[youtu.be/weyaEaPaLJg](https://youtu.be/weyaEaPaLJg). The listing is
+[agent `#3808`](https://www.okx.ai/agents/3808). The live surfaces are the
+[playground](https://warden.gudman.xyz/playground) (no payment required),
+[verify](https://warden.gudman.xyz/verify), [Attack Theater](https://warden.gudman.xyz/theater),
+and [integrate](https://warden.gudman.xyz/integrate). Everything this project does *not* claim is
+listed in full under [Honest limits](#honest-limits).
+
+The PNGs in [`docs/screenshots/`](docs/screenshots/README.md) predate the Trust Layer and are not the
+current interface; the live URLs above are.
 
 ## Live on OKX.AI
 
@@ -44,6 +51,27 @@ X Layer.
 Unpaid requests to those routes return `402` with an x402 challenge; the free
 `POST /api/demo/scan` route needs no payment and is what the
 [live playground](https://warden.gudman.xyz/playground) calls.
+
+### What buyers actually did with it
+
+**7 reviews, all five stars, rating 5.0** on the live listing, across four independent buyer
+identities. A review on OKX.AI requires a completed paid task, so each one is a settled
+purchase rather than a rating left by a passer-by. What they tested matters more than the score:
+
+- One sent a deliberate multi-vector payload — prompt injection **plus** a drain address — and
+  reported a `CRITICAL` block in under 10 ms, both threat classes detected, hard drain-address
+  gate triggered, output sanitized.
+- One ran the endpoint auditor against a **third-party ASP** (AgentForge) and received a graded
+  report with all 20 attack payloads blocked or flagged, plus a saved deliverable.
+- One paid for a scan and **found a real gap**: the first run caught only one of three planted
+  threats, missing a swapped payout address and an API-key exfiltration. It was reported, fixed
+  the same day, and re-tested to 3/3 with correct redaction.
+
+That third review is the most valuable one here. It is a public record of a miss, the fix, and
+the re-test — which is the exact behaviour the Trust Layer exists to make checkable, evidenced by
+someone with no reason to be generous. The counts above were read from the live listing on
+2026-07-28; `soldCount` is deliberately not quoted anywhere in this repository, because it has
+been observed moving in both directions and does not track settled payments.
 
 **Buying it from an agent.** OKX.AI's own flow is a pasted instruction, so the quickest
 path is to hand your agent the endpoint and let it pay:
@@ -93,7 +121,7 @@ timer are source-ready but are not deployed or claimed active.
 
 ## See it in action
 
-[Attack Theater](site/theater.html) starts idle and sends no request until the visitor explicitly selects
+[Attack Theater](https://warden.gudman.xyz/theater) starts idle and sends no request until the visitor explicitly selects
 **Run test sequence**. It then sends prompt injection, a drain-address swap, and secret exfiltration through
 the Warden-owned demo-agent gate, advancing automatically only after that activation and only when reduced
 motion is not requested. It counts a neutralization only after the API response proves the expected verdict,
@@ -101,18 +129,26 @@ threat class, and downstream delivery state; pause, reset, reduced-motion, and e
 The additive `POST /api/demo/theater` route leaves `/api/demo/scan` unchanged: BLOCK never invokes the
 no-side-effect demo ASP handler, SANITIZE delivers only the sanitized payload, and ALLOW delivers the original.
 
-The Theater and APA web surfaces are implemented in this repository but are not claimed live until an
-explicitly approved deployment. The existing [browser playground](https://warden.gudman.xyz/playground)
-remains the current no-payment scan surface. The recording contract is
-[`docs/HACKATHON_DEMO.md`](docs/HACKATHON_DEMO.md).
+The Theater and APA web surfaces are deployed: [`/theater`](https://warden.gudman.xyz/theater) and
+[`/verify`](https://warden.gudman.xyz/verify) both serve. The
+[browser playground](https://warden.gudman.xyz/playground) remains the no-payment scan surface. The
+recording contract is [`docs/HACKATHON_DEMO.md`](docs/HACKATHON_DEMO.md).
 
 ## Quickstart
 
+### Install the published SDKs
+
+Both distributions are published at **v0.1.1**. The unrelated `warden-guard` package on PyPI is not
+this project — Warden's is `warden-agent-guard`:
+
+```bash
+pip install warden-agent-guard      # PyPI
+npm install @gudman/warden-guard    # npm
+```
+
 ### Install from source
 
-The unrelated `warden-guard` package on PyPI is not this project. Warden's publish-ready SDK uses
-the available distribution name `warden-agent-guard`, but is not claimed published until the
-user completes that release. Install the Python service and SDK from this repository:
+To run the service itself, or to work on the SDK:
 
 ```bash
 git clone https://github.com/Ridwannurudeen/warden.git
@@ -122,10 +158,9 @@ python -m pip install -e . -e sdk/python
 
 ### Build the TypeScript client from source
 
-The owned-scope `@gudman/warden-guard` package under `sdk/ts` is not claimed as published to npm.
-Build and test the locked
-source checkout directly. The zero-dependency built runtime declares Node 18+, while the locked Vite/Vitest
-development toolchain requires Node 20.19+ for `npm test` and `npm run build`:
+Build and test the locked source checkout directly. The zero-dependency built runtime declares Node
+18+, while the locked Vite/Vitest development toolchain requires Node 20.19+ for `npm test` and
+`npm run build`:
 
 ```bash
 cd sdk/ts
@@ -175,9 +210,9 @@ That path is best-effort telemetry, not enforcement: the current default is 20 r
 IP, forced `fast` depth, and truncation at 4,000 characters. Hosted latency includes network round-trip
 time. Use local mode with `fail_open=False` for an enforcement boundary.
 
-### Source-built integration surfaces
+### Integration surfaces
 
-The integration code is complete in this repository, but neither SDK distribution is claimed published:
+Both SDK distributions are published; every surface below is implemented in this repository:
 
 | Surface | Implemented contract |
 | --- | --- |
@@ -203,8 +238,8 @@ The source tree includes the complete reviewable contracts:
 | APA conformance guide | [`spec/CONFORMANCE.md`](spec/CONFORMANCE.md) | `/spec/CONFORMANCE.md` |
 | Immutable endpoint-audit battery | [`audit/warden-core-http-2026-07.json`](audit/warden-core-http-2026-07.json) | `/audit/warden-core-http-2026-07.json` |
 
-`python scripts/build_site.py` copies these reviewed assets into the static site. The generated paths are
-source-ready; re-check the live host after an explicitly approved deployment before claiming they are live.
+`python scripts/build_site.py` copies these reviewed assets into the static site. All four generated
+paths are live on `warden.gudman.xyz` and were re-checked against the host on 2026-07-28.
 
 ## Architecture
 
@@ -502,7 +537,10 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
   marketplace CLI/provider remain operator preflight gates.
 - The TypeScript SDK has no local engine; its default free hosted path is best-effort because
   `failOpen: true` converts transport failures into `ALLOW` telemetry.
-- Trust Layer web routes are source-ready but require explicit deployment approval before they are live.
+- Trust Layer web routes are deployed and serving. `/verify` can load a *stale* attestation: the only
+  issued APA record expired on 2026-07-17 and re-registration needs a signing key that is no longer on
+  the host, so the page correctly reports a genuine signature on an expired record rather than an
+  active one.
 - The 99.5% application-readiness objective is not a contractual SLA or an achieved uptime claim. The
   committed monitor state is `not_running`; a complete independently scheduled 30-day window is required
   before the status surface reports measured availability, and payment-facilitator uptime is out of scope.
@@ -512,8 +550,10 @@ deploy/                 # Nginx, systemd, and operator-run deployment material
 
 ## Roadmap
 
-- [ ] Deploy the reviewed Trust Layer build after explicit user approval.
-- [ ] Capture and review the real <=90-second Theater video and current retina screenshots.
+- [x] Deploy the reviewed Trust Layer build. `/theater`, `/verify`, and the spec and audit assets serve.
+- [x] Record the 90-second demo — [youtu.be/weyaEaPaLJg](https://youtu.be/weyaEaPaLJg).
+- [ ] Capture current retina screenshots to replace the pre-Trust-Layer PNGs in `docs/screenshots/`.
+- [ ] Re-issue an APA attestation so `/verify` loads an active record instead of an expired one.
 
 ## Contributing
 
