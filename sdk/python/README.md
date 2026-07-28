@@ -95,6 +95,39 @@ warden = AsyncWardenClient(local=True, fail_open=False)
 result = await warden.scan(untrusted_text)
 ```
 
+## Guard a Telegram bot
+
+A Telegram bot reads text written by strangers and then acts on it. Put the check
+between the message arriving and the handler running:
+
+```bash
+pip install warden-agent-guard[telegram]
+```
+
+```python
+from warden_guard import AsyncWardenClient
+from warden_guard.telegram_guard import guard_message
+
+warden = AsyncWardenClient(local=True, fail_open=False)
+
+@guard_message(warden)
+async def handle(update, context, safe_text: str) -> None:
+    await update.message.reply_text(f"acting on: {safe_text}")
+
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
+```
+
+The handler receives `safe_text` — the original on ALLOW, the sanitized text on
+SANITIZE — and is **not called at all** on BLOCK. The keyword is required rather
+than optional deliberately: `telegram.Message` is frozen, so `update.message.text`
+still holds the poisoned string, and a handler reading it out of habit would
+defeat the guard.
+
+Captions are guarded too, since a caption on a photo is as attacker-controlled as
+a message. Updates carrying no text pass through untouched. Pass `on_block` to be
+told why a message was refused; it is silent by default, because replying
+"blocked: DRAIN_ADDRESS" tells an attacker which probe tripped the detector.
+
 ## Explicit feedback
 
 `scan()` and `guard()` never submit feedback. After a person has removed

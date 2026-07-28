@@ -42,6 +42,9 @@ langchain = [
 llamaindex = [
     "llama-index-core>=0.11",
 ]
+telegram = [
+    "python-telegram-bot>=21",
+]
 dev = [
     "build>=1.2",
     "pytest>=8",
