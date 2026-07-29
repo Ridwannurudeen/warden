@@ -1,0 +1,138 @@
+name: Publish Python SDK
+
+# Publishing warden-agent-guard has meant pasting a long-lived PyPI token into a
+# chat window, which puts the token somewhere it cannot be un-seen and leaves it
+# valid until someone remembers to revoke it. Trusted publishing removes the
+# token entirely: PyPI verifies a short-lived OIDC identity proving this exact
+# repository, workflow, and environment produced the artifact.
+#
+# Triggered manually rather than on every tag, so a release is always a
+# deliberate act by the owner.
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_version:
+        description: >-
+          Version you intend to publish, e.g. 0.1.3. The run fails if
+          sdk/python/pyproject.toml disagrees, so a forgotten bump cannot
+          silently publish the previous version again.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # The environment is half of PyPI's trusted-publisher identity; it must match
+    # the publisher configured on PyPI exactly, or the upload is rejected.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/warden-agent-guard/
+    permissions:
+      # Mints the OIDC token PyPI verifies. This is the only elevated permission
+      # here, and it is what replaces the API token.
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Confirm the tree really is at the version being released
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import pathlib
+          import re
+          import sys
+
+          expected = os.environ["EXPECTED_VERSION"].strip()
+          failures = []
+
+          pyproject = pathlib.Path("sdk/python/pyproject.toml").read_text(encoding="utf-8")
+          match = re.search(r'^version = "([^"]+)"', pyproject, re.MULTILINE)
+          if match is None:
+              failures.append("sdk/python/pyproject.toml has no version line")
+          elif match.group(1) != expected:
+              failures.append(
+                  f"sdk/python/pyproject.toml is {match.group(1)}, expected {expected}"
+              )
+
+          # The suite asserts the installed distribution version in two places, and
+          # a bump that misses them ships a package whose own tests contradict it.
+          pins = pathlib.Path(
+              "sdk/python/tests/test_ph5_pipeline_and_typing.py"
+          ).read_text(encoding="utf-8")
+          found = set(re.findall(r"warden-agent-guard'?\"?\)? == '?\"?([0-9][^'\"]*)", pins))
+          stale = sorted(version for version in found if version != expected)
+          if stale:
+              failures.append(
+                  "test_ph5_pipeline_and_typing.py still pins "
+                  f"{', '.join(stale)} — expected {expected}"
+              )
+
+          if failures:
+              print("Refusing to publish:", file=sys.stderr)
+              for failure in failures:
+                  print(f"  - {failure}", file=sys.stderr)
+              raise SystemExit(1)
+          print(f"Version agrees across pyproject.toml and the test pins: {expected}")
+          PY
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade build twine
+
+      - name: Build distributions
+        working-directory: sdk/python
+        run: python -m build
+
+      - name: Validate distribution metadata
+        working-directory: sdk/python
+        run: python -m twine check dist/*
+
+      - name: Confirm the adapters are actually inside the wheel
+        working-directory: sdk/python
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import sys
+          import zipfile
+
+          # A module missing from the artifact still passes every test in the
+          # checkout, so the only honest check is to look inside the wheel.
+          required = {
+              "warden_guard/telegram_guard.py",
+              "warden_guard/langchain_guard.py",
+              "warden_guard/llamaindex_guard.py",
+              "warden_guard/mcp_server.py",
+          }
+          wheels = sorted(pathlib.Path("dist").glob("*.whl"))
+          if len(wheels) != 1:
+              print(f"expected exactly one wheel, found {len(wheels)}", file=sys.stderr)
+              raise SystemExit(1)
+          names = set(zipfile.ZipFile(wheels[0]).namelist())
+          missing = sorted(required - names)
+          if missing:
+              print(f"wheel {wheels[0].name} is missing:", file=sys.stderr)
+              for name in missing:
+                  print(f"  - {name}", file=sys.stderr)
+              raise SystemExit(1)
+          print(f"{wheels[0].name} contains every required module.")
+          PY
+
+      - name: Publish to PyPI via trusted publishing
+        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # v1.14.1
+        with:
+          packages-dir: sdk/python/dist
+          print-hash: true
