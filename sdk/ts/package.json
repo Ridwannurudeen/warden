@@ -1,6 +1,6 @@
 {
   "name": "@gudman/warden-guard",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Fetch-based Warden payload scanning client and Express-style guard middleware.",
   "type": "module",
   "sideEffects": false,
