@@ -54,6 +54,18 @@ Unpaid requests to those routes return `402` with an x402 challenge; the free
 `POST /api/demo/scan` route needs no payment and is what the
 [live playground](https://warden.gudman.xyz/playground) calls.
 
+OKX.AI gives builders two native controls — spending limits and allowlists — and leaves
+choosing them manual. The free `POST /api/policy` route answers that from evidence: it scans a
+payload and returns the controls the observed threat classes argue for, plus any attacker payout
+address to deny. It deliberately names the control and the evidence rather than inventing a limit
+value, and it is unsigned advice, not a signed Hardening Pack.
+
+```bash
+curl -sX POST https://warden.gudman.xyz/api/policy \
+  -H 'content-type: application/json' \
+  -d '{"payload":"<untrusted text>","context":{"expected_addresses":["0xYourTreasury"]}}'
+```
+
 ### What buyers actually did with it
 
 **7 reviews, all five stars, rating 5.0** on the live listing, across four independent buyer
@@ -391,6 +403,7 @@ an availability claim.
 | `GET`  | `/health/ready`†                              | Local scanner and paid-route configuration readiness            |
 | `POST` | `/api/demo/scan`                              | Free, rate-limited, fast-only payload scan                      |
 | `POST` | `/api/demo/theater`                           | Verdict-gated, no-side-effect demo ASP with delivery receipt    |
+| `POST` | `/api/policy`                                 | Free, unsigned agent-guardrail advice derived from a scan       |
 | `POST` | `/api/feedback`                               | Explicit opt-in, redacted outcome feedback                      |
 | `GET`  | `/api/threat-intel/v1/summary`                | Aggregate feedback counts with k=5 suppression                  |
 | `POST` | `/scan`                                       | Production x402 payload scan                                    |

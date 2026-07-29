@@ -662,6 +662,21 @@ safe_text = guard(untrusted_text)</code></pre>
             </dd>
           </div>
           <div>
+            <dt>Guardrails</dt>
+            <dd>
+              <strong>Spending limits and allowlists</strong>
+              <p>
+                OKX.AI gives you two native controls and leaves the choosing
+                manual. The free <code>POST /api/policy</code> route answers it
+                from evidence: it scans a payload and returns the controls the
+                observed threat classes argue for, plus any attacker payout
+                address to deny. It names the control and the evidence rather
+                than inventing a limit value, and it is unsigned advice — the
+                signed Hardening Pack remains the evidence artifact.
+              </p>
+            </dd>
+          </div>
+          <div>
             <dt>Data boundary</dt>
             <dd>
               <strong>Privacy, secrets, and wallet boundary</strong>
