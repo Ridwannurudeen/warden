@@ -164,3 +164,55 @@ app.use(
   }),
 );
 ```
+
+## Web-standard fetch handlers
+
+Next.js route handlers, Hono, Cloudflare Workers, Deno and Bun do not have
+`(request, response, next)` or a body parser — a handler there is
+`(request: Request) => Response`. `guardFetch` wraps that shape:
+
+```ts
+import { guardFetch } from "@gudman/warden-guard";
+
+export const POST = guardFetch(async (request) => {
+  const { payload } = await request.json();
+  return Response.json({ echo: payload });
+});
+```
+
+The body is read from a clone, so an `ALLOW` forwards your original `Request`
+untouched — its stream and abort signal intact. `SANITIZE` calls the handler with
+a rebuilt request carrying the safe text, and `BLOCK` returns HTTP 400 JSON
+without calling the handler at all.
+
+By default the scanned string is `payload` from a JSON body, or the whole body
+when it is not JSON. Both of those can be rewritten safely. **A JSON body with no
+`payload` field is scanned whole but cannot be repaired** — a sanitized rewrite of
+the raw document would not reliably still be valid JSON — so `SANITIZE` blocks
+rather than forwarding the original. A custom `extract` blocks on `SANITIZE` for
+the same reason the Express middleware does.
+
+Extra handler arguments are forwarded, so Workers (`env`, `ctx`) and dynamic
+routes (`{ params }`) work unchanged:
+
+```ts
+export default {
+  fetch: guardFetch(async (request, env: Env, ctx: ExecutionContext) => {
+    return new Response("ok");
+  }),
+};
+```
+
+Pass `onBlock` to answer refusals yourself. Return a `Response` to take over the
+reply completely, or any other value to have it placed in the `verdict` field of
+Warden's own 400:
+
+```ts
+export const POST = guardFetch(handler, {
+  client: new WardenClient({ failOpen: false }),
+  onBlock: () => new Response("rejected", { status: 403 }),
+});
+```
+
+With `failOpen: false` a scan that cannot complete throws out of the guard rather
+than letting the request reach the handler.
