@@ -47,6 +47,7 @@ PROXIED_APP_ROUTES = frozenset(
         "/api/demo/scan",
         "/api/demo/theater",
         "/api/feedback",
+        "/api/policy",
         "/api/shield/{target_id}/lineage",
         "/api/threat-intel/v1/summary",
         "/apa/attestation/{attestation_id}",

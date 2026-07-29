@@ -49,7 +49,10 @@ from warden.ratelimit import (
     mark_verified_payer,
     retry_after_seconds,
 )
+from warden.agent_policy import build_policy
 from warden.models import (
+    AgentPolicyRequest,
+    AgentPolicyResponse,
     ApaRegisterRequest,
     ApaRevokeRequest,
     AuditEvidenceResponse,
@@ -789,6 +792,28 @@ async def demo_scan(req: DemoScanRequest) -> ScanResponse:
         context=req.context.model_dump(),
     )
     return ScanResponse.from_verdict(verdict)
+
+
+@app.post("/api/policy", response_model=AgentPolicyResponse)
+async def agent_policy(req: AgentPolicyRequest) -> AgentPolicyResponse:
+    """Recommend the OKX-native guardrails this payload argues for.
+
+    Free and unsigned by design. The signed Hardening Pack pins its field set and
+    its `integration` dict to module constants, so policy cannot be added there
+    without invalidating every pack already issued.
+    """
+    verdict = await _scan_with_observation(
+        req.payload,
+        depth="fast",
+        context=req.context.model_dump(),
+    )
+    scan_response = ScanResponse.from_verdict(verdict)
+    policy = build_policy(
+        scan_response.threat_classes,
+        [detection.model_dump(by_alias=True) for detection in scan_response.detections],
+        req.context.expected_addresses,
+    )
+    return AgentPolicyResponse(scan=scan_response, **policy)
 
 
 @app.post("/api/feedback", response_model=FeedbackResponse, status_code=202)

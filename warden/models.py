@@ -191,6 +191,32 @@ class ScanResponse(BaseModel):
         )
 
 
+class AgentPolicyRecommendation(BaseModel):
+    control: str
+    title: str
+    because: list[str]
+
+
+class AgentPolicyRequest(BaseModel):
+    payload: str
+    context: DemoScanContext = Field(default_factory=DemoScanContext)
+
+    @field_validator("payload")
+    @classmethod
+    def validate_payload(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("payload must not be blank")
+        return value[:MAX_DEMO_PAYLOAD_LENGTH]
+
+
+class AgentPolicyResponse(BaseModel):
+    scan: ScanResponse
+    recommendations: list[AgentPolicyRecommendation]
+    deny_addresses: list[str]
+    allow_addresses: list[str]
+    limitations: str
+
+
 class DemoTheaterResponse(ScanResponse):
     asp_receipt: DemoAspReceipt
 
