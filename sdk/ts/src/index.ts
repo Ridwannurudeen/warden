@@ -31,3 +31,8 @@ export {
   type WardenRequest,
   type WardenResponse,
 } from "./middleware.js";
+export {
+  guardFetch,
+  type FetchHandler,
+  type WardenFetchGuardOptions,
+} from "./fetch-guard.js";

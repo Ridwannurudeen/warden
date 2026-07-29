@@ -219,7 +219,7 @@ Both SDK distributions are published; every surface below is implemented in this
 | Surface | Implemented contract |
 | --- | --- |
 | [Python SDK](sdk/python/README.md) | Sync and async clients, local fail-closed enforcement, hosted scanning, ASGI middleware, a decorator, LangChain, LlamaIndex and Telegram adapters, APA proof utilities, and the standalone `warden-gateway` reverse proxy. |
-| [TypeScript SDK](sdk/ts/README.md) | A typed hosted client and Express-style middleware with a zero-dependency emitted runtime. It does not contain the local scanner engine. |
+| [TypeScript SDK](sdk/ts/README.md) | A typed hosted client, Express-style middleware, and a `guardFetch` wrapper for web-standard fetch handlers (Next.js, Hono, Workers, Deno, Bun), with a zero-dependency emitted runtime. It does not contain the local scanner engine. |
 | [FastMCP server](warden/mcp_server.py) | Local stdio tools named `scan_payload`, `audit_agent`, `harden_agent`, and `variant_audit_agent`, started from a trusted checkout with `python -m warden.mcp_server`. |
 | [Direct integrations](site/integrate.html) | Source-backed direct HTTP, OnchainOS, raw x402, Python, TypeScript, MCP, LangChain, and LlamaIndex placement and decision-handling examples. |
 
