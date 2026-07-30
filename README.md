@@ -98,10 +98,21 @@ It fails closed in the awkward cases too: a `SANITIZE` whose sanitized text came
 becomes a `BLOCK`, and any unrecognised verdict becomes a `BLOCK`.
 
 The receipt binds the action context, the policy, and the payload — each as a SHA-256 — into one
-Ed25519-signed record, so nobody can later claim a different policy was in force or a different
-payload was scanned. Verify it against the published key at
+Ed25519-signed record. Verify it against the published key at
 [`/.well-known/apa-issuer.json`](https://warden.gudman.xyz/.well-known/apa-issuer.json) without
 trusting this service. Payloads are hashed, never stored.
+
+**Read the receipt for exactly what it is.** The policy is supplied inline by the caller on each
+request, so the receipt records the policy that was *asserted at call time* — it is not evidence
+that the policy was in force beforehand. The same intent under a looser policy produces a different,
+equally valid signature. The route is also unauthenticated and action receipts are not written to
+the transparency log, so a receipt does not prove which agent asked for it, and there is no proof of
+absence: you cannot tell how many attempts preceded the one being shown to you.
+
+That makes the receipt useful for a caller proving its own controls to itself, and **not yet
+sufficient for a third party adjudicating a dispute**. Closing that gap needs pre-registered
+policies with a `policy_id` anchored in the transparency log, plus caller binding — both are
+[roadmap](#roadmap) items, not shipped ones.
 
 The receipt states its own limits, and they are part of the signed content: it is a record of one
 payload-and-policy decision, and **not** proof of execution, delivery, settlement, authorization,

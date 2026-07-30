@@ -20,9 +20,13 @@ DEFAULT_SPEC_OUTPUT = ROOT / "site" / "spec" / "APA-SPEC.md"
 DEFAULT_SITE_ROOT = ROOT / "site"
 PUBLIC_SPEC_FILES = (
     "ASP-PAYLOAD-SECURITY-STANDARD.md",
+    "ACTION-DECISION-SPEC.md",
     "CONFORMANCE.md",
     "payload-security-profile-v0.1.json",
 )
+# A decision receipt names this URL as its predicate_type, so the URL has to resolve
+# or "verify it yourself" is an instruction nobody can follow.
+PREDICATE_SPEC_PUBLICATIONS = (("ACTION-DECISION-SPEC.md", ("action-decision", "v1")),)
 PUBLIC_SPEC_SCHEMA_FILES = ("apa-endpoint-audit-v0.1.schema.json",)
 PUBLIC_AUDIT_FILES = ("warden-core-http-2026-07.json",)
 
@@ -84,6 +88,10 @@ def main() -> None:
     args.spec_output.write_bytes((ROOT / "spec" / "APA-SPEC.md").read_bytes())
     for name in PUBLIC_SPEC_FILES:
         (args.spec_output.parent / name).write_bytes((ROOT / "spec" / name).read_bytes())
+    for source_name, url_parts in PREDICATE_SPEC_PUBLICATIONS:
+        destination = args.spec_output.parent.joinpath(*url_parts)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes((ROOT / "spec" / source_name).read_bytes())
     public_schema_dir = args.spec_output.parent / "schemas"
     public_schema_dir.mkdir(parents=True, exist_ok=True)
     for name in PUBLIC_SPEC_SCHEMA_FILES:

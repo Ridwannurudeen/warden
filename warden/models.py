@@ -42,6 +42,7 @@ SafetyReasonCode = Literal[
     "DESTINATION_NOT_ALLOWED",
     "ASSET_NOT_ALLOWED",
     "AMOUNT_LIMIT_EXCEEDED",
+    "SELECTOR_NOT_ALLOWED",
 ]
 
 _FINDER_DEFAULT_IGNORABLE_RANGES = (
@@ -246,6 +247,24 @@ class ActionPolicy(BaseModel):
     allowed_tools: list[str] = Field(min_length=1)
     allowed_destinations: list[str]
     max_amount_atomic_by_asset: dict[str, int]
+    # Function selectors a contract_call may invoke. Empty means no contract_call
+    # is policeable, so every contract_call is refused rather than waved through.
+    allowed_selectors: list[str] = Field(default_factory=list)
+
+    @field_validator("allowed_selectors", mode="before")
+    @classmethod
+    def normalize_selectors(cls, value: object) -> object:
+        if value is None:
+            return []
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            raise ValueError("allowed_selectors must be an array of strings")
+        normalized = []
+        for item in value:
+            candidate = item.strip().lower()
+            if not re.fullmatch(r"0x[0-9a-f]{8}", candidate):
+                raise ValueError("selectors must be 0x-prefixed 4-byte hex, e.g. 0x095ea7b3")
+            normalized.append(candidate)
+        return sorted(set(normalized))
 
     @field_validator("allowed_actions", "allowed_tools", "allowed_destinations", mode="before")
     @classmethod
@@ -280,7 +299,23 @@ class ActionIntent(BaseModel):
     destination: str | None = Field(default=None, min_length=1, max_length=512)
     asset: str | None = Field(default=None, min_length=1, max_length=128)
     amount_atomic: int | None = Field(default=None, ge=0, strict=True)
+    # The function a contract_call invokes. Without it a contract_call cannot be
+    # policed at all: approve(spender, MAX) drains a wallet while moving no value,
+    # so it is indistinguishable from any other call on amount alone.
+    selector: str | None = Field(default=None)
     payload: str = Field(min_length=1, max_length=MAX_PAYLOAD_LENGTH)
+
+    @field_validator("selector", mode="before")
+    @classmethod
+    def normalize_selector(cls, value: object) -> object:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("selector must be a string")
+        candidate = value.strip().lower()
+        if not re.fullmatch(r"0x[0-9a-f]{8}", candidate):
+            raise ValueError("selector must be 0x-prefixed 4-byte hex, e.g. 0x095ea7b3")
+        return candidate
 
     @field_validator("tool", "destination", "asset")
     @classmethod
@@ -330,7 +365,7 @@ class OkxTaskContext(BaseModel):
 class DecisionReceipt(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    spec_version: Literal["warden-action-receipt/1"]
+    spec_version: Literal["warden-action-receipt/2"]
     predicate_type: Literal["https://warden.gudman.xyz/spec/action-decision/v1"]
     receipt_id: str = Field(pattern=r"^[0-9a-f]{64}$")
     issuer: Literal["warden"]
