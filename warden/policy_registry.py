@@ -71,9 +71,20 @@ def canonical_policy(policy: ActionPolicy) -> dict[str, object]:
     }
 
 
-def policy_id_for(policy: ActionPolicy) -> str:
-    """Content address of a policy: identical rules always register as the same id."""
-    return hashlib.sha256(_canonical_json(canonical_policy(policy)).encode("utf-8")).hexdigest()
+def policy_id_for(policy: ActionPolicy, caller_key: str | None = None) -> str:
+    """Content address of a registration: the rules *and* the key bound to them.
+
+    The key has to be part of the identity. With the policy alone as the address,
+    a second party registering identical rules under its own key would collide
+    with the first registration, silently inherit its (possibly absent) key, and
+    be handed a receipt whose `caller_verified` could never become true. Two
+    parties may hold the same rules; they are separate registrations.
+    """
+    return hashlib.sha256(
+        _canonical_json(
+            {"policy": canonical_policy(policy), "caller_key": caller_key}
+        ).encode("utf-8")
+    ).hexdigest()
 
 
 def _is_ed25519_public_key(value: object) -> bool:
@@ -96,7 +107,7 @@ def build_policy_record(
     content = {
         "spec_version": SPEC_VERSION,
         "predicate_type": PREDICATE_TYPE,
-        "policy_id": policy_id_for(policy),
+        "policy_id": policy_id_for(policy, caller_key),
         "issuer": protection.ISSUER_NAME,
         "policy": canonical_policy(policy),
         "caller_key": caller_key,
@@ -131,10 +142,10 @@ def verify_policy_record(
         rebuilt = ActionPolicy.model_validate(policy)
     except ValueError:
         return False
-    if policy_id_for(rebuilt) != record.get("policy_id"):
-        return False
     caller_key = record.get("caller_key")
     if caller_key is not None and not _is_ed25519_public_key(caller_key):
+        return False
+    if policy_id_for(rebuilt, caller_key) != record.get("policy_id"):
         return False
     issued_at = record.get("issued_at")
     if type(issued_at) is not int or issued_at < 0:
@@ -203,7 +214,7 @@ def register_policy(
     """
     from warden import evidence_store
 
-    policy_id = policy_id_for(policy)
+    policy_id = policy_id_for(policy, caller_key)
     existing = evidence_store.get_action_policy(policy_id, validator=verify_policy_record)
     if existing is not None:
         return existing

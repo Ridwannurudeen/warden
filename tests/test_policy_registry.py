@@ -209,3 +209,40 @@ def test_the_policy_id_is_content_addressed_and_case_insensitive():
     upper = ActionPolicy(**POLICY)
 
     assert policy_registry.policy_id_for(lower) == policy_registry.policy_id_for(upper)
+
+
+def test_two_callers_may_register_the_same_rules_under_their_own_keys(client: TestClient):
+    # Found in production: with the policy alone as the address, a second party
+    # registering identical rules collided with the first record, silently
+    # inherited its (absent) key, and got a receipt whose caller_verified could
+    # never become true — while still receiving a 200 and a policy_id.
+    first = Ed25519PrivateKey.generate()
+    second = Ed25519PrivateKey.generate()
+    key_one = b64u_encode(first.public_key().public_bytes_raw(), "ed25519")
+    key_two = b64u_encode(second.public_key().public_bytes_raw(), "ed25519")
+
+    unkeyed = client.post("/api/policy/register", json={"policy": POLICY}).json()
+    one = client.post(
+        "/api/policy/register", json={"policy": POLICY, "caller_key": key_one}
+    ).json()
+    two = client.post(
+        "/api/policy/register", json={"policy": POLICY, "caller_key": key_two}
+    ).json()
+
+    assert len({unkeyed["policy_id"], one["policy_id"], two["policy_id"]}) == 3
+    assert one["record"]["caller_key"] == key_one
+    assert two["record"]["caller_key"] == key_two
+
+    # And each key still only authorizes its own registration.
+    signature = _caller_signature(first, one["policy_id"], INTENT)
+    mine = client.post(
+        "/api/action/guard",
+        json={"intent": INTENT, "task": TASK, "policy_id": one["policy_id"], "caller_sig": signature},
+    ).json()
+    assert mine["receipt"]["caller_verified"] is True
+
+    theirs = client.post(
+        "/api/action/guard",
+        json={"intent": INTENT, "task": TASK, "policy_id": two["policy_id"], "caller_sig": signature},
+    ).json()
+    assert theirs["receipt"]["caller_verified"] is False
