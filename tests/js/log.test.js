@@ -18,6 +18,8 @@ const BREAKER_ID = "0123456789abcdef0123456789abcdef";
 const BENCHMARK_CASE_ID = "gauntlet-0123456789abcdef";
 const AUDIT_ID = "0123456789abcdef";
 const PACK_ID = "f".repeat(64);
+const PASSPORT_ID = "b".repeat(64);
+const RECEIPT_ID = "c".repeat(64);
 
 function entry(seq, prevHash, overrides = {}) {
   return {
@@ -70,6 +72,32 @@ function hardeningEntry(seq, prevHash, overrides = {}) {
     pack_id: PACK_ID,
     audit_id: AUDIT_ID,
     record_hash: "d".repeat(64),
+    prev_hash: prevHash,
+    ...overrides,
+  };
+}
+
+function passportEntry(seq, prevHash, overrides = {}) {
+  return {
+    seq,
+    ts: 1_789_000_000 + seq,
+    event: "security-passport-issued",
+    record_type: "security-passport",
+    passport_id: PASSPORT_ID,
+    record_hash: "d".repeat(64),
+    prev_hash: prevHash,
+    ...overrides,
+  };
+}
+
+function receiptEntry(seq, prevHash, overrides = {}) {
+  return {
+    seq,
+    ts: 1_789_000_000 + seq,
+    event: "task-safety-receipt-issued",
+    record_type: "task-safety-receipt",
+    receipt_id: RECEIPT_ID,
+    record_hash: "e".repeat(64),
     prev_hash: prevHash,
     ...overrides,
   };
@@ -176,6 +204,33 @@ test("log payload normalization accepts typed BREAKER entries and rejects ambigu
         total: 1,
       }),
     /record_type|attestation_id/,
+  );
+});
+
+test("log payload normalization accepts passport and task receipt entries", () => {
+  const passport = passportEntry(1, GENESIS_PREV_HASH);
+  const receipt = receiptEntry(1, GENESIS_PREV_HASH);
+  assert.deepEqual(normalizeLogPayload({ entries: [passport], total: 1 }), [
+    passport,
+  ]);
+  assert.deepEqual(normalizeLogPayload({ entries: [receipt], total: 1 }), [
+    receipt,
+  ]);
+  assert.throws(
+    () =>
+      normalizeLogPayload({
+        entries: [{ ...passport, passport_id: "short" }],
+        total: 1,
+      }),
+    /passport_id/,
+  );
+  assert.throws(
+    () =>
+      normalizeLogPayload({
+        entries: [{ ...receipt, event: "issued" }],
+        total: 1,
+      }),
+    /task-safety-receipt-issued or task-safety-receipt-revoked/,
   );
 });
 

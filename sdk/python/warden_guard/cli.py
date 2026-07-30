@@ -134,6 +134,7 @@ def main(argv: list[str] | None = None) -> int:
             args.upstream,
             client=client,
             max_body_bytes=args.max_body_bytes,
+            guard_responses=True,
         )
         uvicorn.run(proxy_app, host=args.listen, port=args.port)
         return 0

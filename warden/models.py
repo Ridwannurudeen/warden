@@ -1,5 +1,6 @@
 """Pydantic boundary models for Warden HTTP and MCP surfaces."""
 
+import hashlib
 import re
 import unicodedata
 from typing import Literal
@@ -21,6 +22,27 @@ Grade = Literal["A", "B", "C", "D", "F", "INCONCLUSIVE"]
 ClaimStatus = Literal["not_candidate", "pending", "duplicate"]
 FeedbackOutcome = Literal["missed_attack", "false_positive", "correct_detection"]
 FeedbackStatus = Literal["pending", "duplicate"]
+ActionType = Literal["transfer", "contract_call", "tool_call"]
+SafetyReasonCode = Literal[
+    "PROMPT_INJECTION",
+    "ROLE_OVERRIDE",
+    "WEB3_INJECTION",
+    "HIDDEN_UNICODE",
+    "ENCODING_TRICK",
+    "STATISTICAL_ANOMALY",
+    "CORPUS_MATCH",
+    "DRAIN_ADDRESS",
+    "TOOL_HIJACK",
+    "SECRET_EXFIL",
+    "MALICIOUS_LINK",
+    "PAYLOAD_SANITIZED",
+    "PAYLOAD_BLOCKED",
+    "ACTION_NOT_ALLOWED",
+    "TOOL_NOT_ALLOWED",
+    "DESTINATION_NOT_ALLOWED",
+    "ASSET_NOT_ALLOWED",
+    "AMOUNT_LIMIT_EXCEEDED",
+]
 
 _FINDER_DEFAULT_IGNORABLE_RANGES = (
     (0x00AD, 0x00AD),
@@ -215,6 +237,197 @@ class AgentPolicyResponse(BaseModel):
     deny_addresses: list[str]
     allow_addresses: list[str]
     limitations: str
+
+
+class ActionPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    allowed_actions: list[ActionType] = Field(min_length=1)
+    allowed_tools: list[str] = Field(min_length=1)
+    allowed_destinations: list[str]
+    max_amount_atomic_by_asset: dict[str, int]
+
+    @field_validator("allowed_actions", "allowed_tools", "allowed_destinations", mode="before")
+    @classmethod
+    def normalize_allowlist(cls, value: object) -> object:
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            raise ValueError("allowlists must be arrays of strings")
+        normalized = [item.strip() for item in value]
+        if any(not item for item in normalized):
+            raise ValueError("allowlist entries must be non-empty trimmed strings")
+        return sorted(set(normalized))
+
+    @field_validator("max_amount_atomic_by_asset", mode="before")
+    @classmethod
+    def normalize_amount_limits(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            raise ValueError("max_amount_atomic_by_asset must be an object")
+        normalized: dict[str, int] = {}
+        for asset, limit in value.items():
+            if not isinstance(asset, str) or not asset.strip() or asset != asset.strip():
+                raise ValueError("asset limit keys must be non-empty trimmed strings")
+            if type(limit) is not int or limit < 1:
+                raise ValueError("asset limits must be positive integers")
+            normalized[asset] = limit
+        return dict(sorted(normalized.items()))
+
+
+class ActionIntent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action_type: ActionType
+    tool: str = Field(min_length=1, max_length=128)
+    destination: str | None = Field(default=None, min_length=1, max_length=512)
+    asset: str | None = Field(default=None, min_length=1, max_length=128)
+    amount_atomic: int | None = Field(default=None, ge=0, strict=True)
+    payload: str = Field(min_length=1, max_length=MAX_PAYLOAD_LENGTH)
+
+    @field_validator("tool", "destination", "asset")
+    @classmethod
+    def require_trimmed_action_metadata(cls, value: str | None) -> str | None:
+        if value is not None and value != value.strip():
+            raise ValueError("action metadata must be trimmed")
+        return value
+
+    @field_validator("payload")
+    @classmethod
+    def require_nonblank_action_payload(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("payload must not be blank")
+        return value
+
+    @model_validator(mode="after")
+    def validate_consequential_metadata(self) -> "ActionIntent":
+        if (self.asset is None) != (self.amount_atomic is None):
+            raise ValueError("asset and amount_atomic must be supplied together")
+        if self.action_type == "transfer":
+            if self.destination is None:
+                raise ValueError("transfer actions require a destination")
+            if self.asset is None or self.amount_atomic is None or self.amount_atomic < 1:
+                raise ValueError("transfer actions require a positive asset amount")
+        if self.action_type == "contract_call" and self.destination is None:
+            raise ValueError("contract_call actions require a destination")
+        return self
+
+
+class OkxTaskContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    network: Literal["eip155:196"]
+    agent_id: str = Field(pattern=r"^[0-9]{1,78}$")
+    service_id: str = Field(min_length=1, max_length=128)
+    service_revision_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task_id: str = Field(min_length=1, max_length=256)
+
+    @field_validator("service_id", "task_id")
+    @classmethod
+    def require_trimmed_task_metadata(cls, value: str) -> str:
+        if value != value.strip():
+            raise ValueError("task metadata must be trimmed")
+        return value
+
+
+class DecisionReceipt(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    spec_version: Literal["warden-action-receipt/1"]
+    predicate_type: Literal["https://warden.gudman.xyz/spec/action-decision/v1"]
+    receipt_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    issuer: Literal["warden"]
+    network: Literal["eip155:196"]
+    agent_id: str = Field(pattern=r"^[0-9]{1,78}$")
+    service_id: str = Field(min_length=1, max_length=128)
+    service_revision_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task_id_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    action_type: ActionType
+    action_context_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    payload_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    effective_payload_sha256: str | None = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{64}$",
+    )
+    decision: VerdictLabel
+    reason_codes: list[SafetyReasonCode]
+    issued_at: int = Field(ge=0, le=9_007_199_254_740_991, strict=True)
+    limitations: str
+    issuer_sig: str = Field(pattern=r"^sig:")
+
+    @field_validator("service_id")
+    @classmethod
+    def require_trimmed_service_id(cls, value: str) -> str:
+        if value != value.strip():
+            raise ValueError("service_id must be trimmed")
+        return value
+
+    @model_validator(mode="after")
+    def validate_decision_semantics(self) -> "DecisionReceipt":
+        if len(self.reason_codes) != len(set(self.reason_codes)):
+            raise ValueError("reason_codes must not contain duplicates")
+        if self.decision == "ALLOW":
+            if self.reason_codes:
+                raise ValueError("ALLOW must not carry reason codes")
+            if self.effective_payload_sha256 != self.payload_sha256:
+                raise ValueError("ALLOW must retain the original payload hash")
+        elif self.decision == "SANITIZE":
+            if not self.reason_codes:
+                raise ValueError("SANITIZE requires at least one reason code")
+            if (
+                self.effective_payload_sha256 is None
+                or self.effective_payload_sha256 == self.payload_sha256
+            ):
+                raise ValueError("SANITIZE requires a distinct transformed payload hash")
+        elif self.effective_payload_sha256 is not None or not self.reason_codes:
+            raise ValueError("BLOCK requires reasons and no effective payload hash")
+        return self
+
+
+class SafetyDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    decision: VerdictLabel
+    reason_codes: list[SafetyReasonCode]
+    action_context_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    payload_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    effective_payload_sha256: str | None = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{64}$",
+    )
+    sanitized_payload: str | None = Field(default=None, max_length=MAX_PAYLOAD_LENGTH)
+    receipt: DecisionReceipt
+
+    @model_validator(mode="after")
+    def validate_receipt_binding(self) -> "SafetyDecision":
+        receipt = self.receipt
+        if (
+            receipt.decision != self.decision
+            or receipt.reason_codes != self.reason_codes
+            or receipt.action_context_sha256 != self.action_context_sha256
+            or receipt.policy_sha256 != self.policy_sha256
+            or receipt.payload_sha256 != self.payload_sha256
+            or receipt.effective_payload_sha256 != self.effective_payload_sha256
+        ):
+            raise ValueError("decision fields must match the signed receipt")
+        if self.decision == "SANITIZE":
+            if self.sanitized_payload is None:
+                raise ValueError("SANITIZE requires the exact transformed payload")
+            if (
+                hashlib.sha256(self.sanitized_payload.encode("utf-8")).hexdigest()
+                != self.effective_payload_sha256
+            ):
+                raise ValueError("transformed payload must match its signed hash")
+        elif self.sanitized_payload is not None:
+            raise ValueError("only SANITIZE may return a transformed payload")
+        return self
+
+
+class ActionGuardRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    intent: ActionIntent
+    task: OkxTaskContext
+    policy: ActionPolicy
 
 
 class DemoTheaterResponse(ScanResponse):
@@ -679,3 +892,136 @@ class ReadinessResponse(BaseModel):
     status: Literal["ready", "not_ready"]
     version: str
     checks: dict[str, ReadinessCheck]
+
+
+SecurityPassportStatus = Literal[
+    "active",
+    "stale",
+    "revoked",
+    "superseded",
+    "invalid",
+]
+
+
+class AgentServiceBinding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent_id: str = Field(pattern=r"^[1-9][0-9]{0,77}$")
+    service_id: str = Field(pattern=r"^[1-9][0-9]{0,77}$")
+    chain_id: str = Field(pattern=r"^eip155:[1-9][0-9]*$")
+    endpoint: str = Field(min_length=1, max_length=MAX_TARGET_URL_LENGTH)
+    observed_at: int = Field(ge=0, le=9_007_199_254_740_991, strict=True)
+    marketplace_snapshot_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    service_revision_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @field_validator("endpoint")
+    @classmethod
+    def require_canonical_https_endpoint(cls, value: str) -> str:
+        from urllib.parse import urlsplit
+
+        from warden.badges import canonical_target
+
+        try:
+            parsed = urlsplit(value)
+            port = parsed.port
+            canonical = (
+                canonical_target(
+                    parsed.scheme,
+                    parsed.hostname or "",
+                    port,
+                    parsed.path,
+                    "",
+                )
+                if parsed.hostname is not None
+                else ""
+            )
+        except ValueError as exc:
+            raise ValueError("endpoint must be a canonical HTTPS URL") from exc
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname is None
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+            or canonical != value
+        ):
+            raise ValueError("endpoint must be canonical HTTPS without credentials or a query")
+        return value
+
+
+class SecurityPassportRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    spec_version: Literal["warden-security-passport/1"]
+    predicate_type: Literal["https://warden.gudman.xyz/spec/security-passport/v1"]
+    passport_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    issuer: Literal["warden"]
+    binding: AgentServiceBinding
+    audit_evidence_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    hardening_evidence_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    protection_evidence_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    shield_evidence_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    issued_at: int = Field(ge=0, le=9_007_199_254_740_991, strict=True)
+    expires_at: int = Field(ge=0, le=9_007_199_254_740_991, strict=True)
+    limitations: str = Field(min_length=1, max_length=512)
+    issuer_sig: str = Field(pattern=r"^sig:")
+
+    @model_validator(mode="after")
+    def validate_time_order(self) -> "SecurityPassportRecord":
+        if self.issued_at < self.binding.observed_at:
+            raise ValueError("passport cannot be issued before the service observation")
+        if self.expires_at <= self.issued_at:
+            raise ValueError("passport expiry must be after issuance")
+        return self
+
+
+TaskSafetyReceiptStatus = Literal["active", "stale", "revoked", "invalid"]
+TaskSafetyOutcome = Literal[
+    "result-produced",
+    "result-sanitized",
+    "result-withheld",
+]
+
+
+class TaskSafetyReceiptRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    spec_version: Literal["warden-task-safety-receipt/1"]
+    predicate_type: Literal["https://warden.gudman.xyz/spec/task-safety-receipt/v1"]
+    receipt_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    issuer: Literal["warden"]
+    provider: Literal["okx"]
+    agent_id: str = Field(pattern=r"^[1-9][0-9]{0,77}$")
+    service_id: str = Field(min_length=1, max_length=128)
+    service_revision_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task_id_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    request_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    result_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    decision_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    verdict: VerdictLabel
+    outcome: TaskSafetyOutcome
+    issued_at: int = Field(ge=0, le=9_007_199_254_740_991, strict=True)
+    expires_at: int = Field(ge=0, le=9_007_199_254_740_991, strict=True)
+    limitations: str = Field(min_length=1, max_length=512)
+    issuer_sig: str = Field(pattern=r"^sig:")
+
+    @field_validator("service_id")
+    @classmethod
+    def require_trimmed_service_identifier(cls, value: str) -> str:
+        if value != value.strip():
+            raise ValueError("service_id must be trimmed")
+        return value
+
+    @model_validator(mode="after")
+    def validate_receipt_semantics(self) -> "TaskSafetyReceiptRecord":
+        expected_outcomes = {
+            "ALLOW": "result-produced",
+            "SANITIZE": "result-sanitized",
+            "BLOCK": "result-withheld",
+        }
+        if self.outcome != expected_outcomes[self.verdict]:
+            raise ValueError("outcome must match the safety verdict")
+        if self.expires_at <= self.issued_at:
+            raise ValueError("receipt expiry must be after issuance")
+        return self

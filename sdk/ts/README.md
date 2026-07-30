@@ -214,5 +214,10 @@ export const POST = guardFetch(handler, {
 });
 ```
 
+Set `guardResponses: true` to scan the response before it is exposed to the caller.
+`ALLOW` preserves the original `Response`; `SANITIZE` rewrites text or an unambiguous
+top-level JSON string field; `BLOCK`, malformed content, oversized bodies, and scanner
+failures fail closed with a generic error response.
+
 With `failOpen: false` a scan that cannot complete throws out of the guard rather
 than letting the request reach the handler.
