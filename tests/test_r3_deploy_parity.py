@@ -53,6 +53,8 @@ PROXIED_APP_ROUTES = frozenset(
         "/api/task-receipt/{receipt_id}",
         "/api/feedback",
         "/api/policy",
+        "/api/policy/register",
+        "/api/policy/{policy_id}",
         "/api/shield/{target_id}/lineage",
         "/api/threat-intel/v1/summary",
         "/apa/attestation/{attestation_id}",

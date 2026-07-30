@@ -19,7 +19,7 @@ from warden.models import (
 )
 
 CONTEXT_SPEC_VERSION = "warden-action-context/2"
-RECEIPT_SPEC_VERSION = "warden-action-receipt/2"
+RECEIPT_SPEC_VERSION = "warden-action-receipt/3"
 RECEIPT_PREDICATE_TYPE = "https://warden.gudman.xyz/spec/action-decision/v1"
 RECEIPT_LIMITATIONS = (
     "Task-bound record of one Warden payload and caller-policy decision; not proof of "
@@ -39,6 +39,9 @@ RECEIPT_FIELDS = frozenset(
         "action_type",
         "action_context_sha256",
         "policy_sha256",
+        "policy_binding",
+        "policy_log_seq",
+        "caller_verified",
         "payload_sha256",
         "effective_payload_sha256",
         "decision",
@@ -160,6 +163,9 @@ def _receipt_content(
     input_hash: str,
     effective_hash: str | None,
     issued_at: int,
+    policy_binding: str,
+    policy_log_seq: int | None,
+    caller_verified: bool,
 ) -> dict[str, object]:
     return {
         "spec_version": RECEIPT_SPEC_VERSION,
@@ -173,6 +179,9 @@ def _receipt_content(
         "action_type": intent.action_type,
         "action_context_sha256": context_hash,
         "policy_sha256": policy_hash,
+        "policy_binding": policy_binding,
+        "policy_log_seq": policy_log_seq,
+        "caller_verified": caller_verified,
         "payload_sha256": input_hash,
         "effective_payload_sha256": effective_hash,
         "decision": decision,
@@ -193,6 +202,9 @@ def issue_decision_receipt(
     input_hash: str,
     effective_hash: str | None,
     issued_at: int | None = None,
+    policy_binding: str = "inline",
+    policy_log_seq: int | None = None,
+    caller_verified: bool = False,
 ) -> DecisionReceipt:
     current = int(time.time()) if issued_at is None else issued_at
     content = _receipt_content(
@@ -205,6 +217,9 @@ def issue_decision_receipt(
         input_hash=input_hash,
         effective_hash=effective_hash,
         issued_at=current,
+        policy_binding=policy_binding,
+        policy_log_seq=policy_log_seq,
+        caller_verified=caller_verified,
     )
     record = {**content, "receipt_id": receipt_id_for_content(content)}
     signed = ed25519_sign_record(record, protection.issuer_private_key(), "issuer_sig")
@@ -294,6 +309,9 @@ class ActionGuard:
         task: OkxTaskContext,
         *,
         issued_at: int | None = None,
+        policy_binding: str = "inline",
+        policy_log_seq: int | None = None,
+        caller_verified: bool = False,
     ) -> SafetyDecision:
         expected_addresses = [intent.destination] if intent.destination is not None else []
         verdict = await self.engine.scan(
@@ -346,6 +364,9 @@ class ActionGuard:
             input_hash=input_hash,
             effective_hash=effective_hash,
             issued_at=issued_at,
+            policy_binding=policy_binding,
+            policy_log_seq=policy_log_seq,
+            caller_verified=caller_verified,
         )
         return SafetyDecision(
             decision=decision,

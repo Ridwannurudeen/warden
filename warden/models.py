@@ -365,7 +365,7 @@ class OkxTaskContext(BaseModel):
 class DecisionReceipt(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    spec_version: Literal["warden-action-receipt/2"]
+    spec_version: Literal["warden-action-receipt/3"]
     predicate_type: Literal["https://warden.gudman.xyz/spec/action-decision/v1"]
     receipt_id: str = Field(pattern=r"^[0-9a-f]{64}$")
     issuer: Literal["warden"]
@@ -382,6 +382,14 @@ class DecisionReceipt(BaseModel):
         default=None,
         pattern=r"^[0-9a-f]{64}$",
     )
+    # "inline" means the caller asserted this policy on the request and it proves
+    # nothing about what was in force; "registered" means it was pre-registered and
+    # anchored, so an adjudicator can place it before the action in the log.
+    policy_binding: Literal["inline", "registered"]
+    policy_log_seq: int | None = Field(default=None, ge=1, strict=True)
+    # True only when the request carried a signature from the key named at
+    # registration, which is what makes agent_id worth anything.
+    caller_verified: bool
     decision: VerdictLabel
     reason_codes: list[SafetyReasonCode]
     issued_at: int = Field(ge=0, le=9_007_199_254_740_991, strict=True)
@@ -462,7 +470,28 @@ class ActionGuardRequest(BaseModel):
 
     intent: ActionIntent
     task: OkxTaskContext
+    # Exactly one of policy / policy_id. An inline policy keeps the original
+    # zero-setup path; a policy_id cites a registration that predates the action.
+    policy: ActionPolicy | None = None
+    policy_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    caller_sig: str | None = Field(default=None, pattern=r"^sig:")
+
+    @model_validator(mode="after")
+    def require_exactly_one_policy_source(self) -> "ActionGuardRequest":
+        if (self.policy is None) == (self.policy_id is None):
+            raise ValueError("provide exactly one of policy or policy_id")
+        if self.caller_sig is not None and self.policy_id is None:
+            raise ValueError("caller_sig requires policy_id")
+        return self
+
+
+class PolicyRegistrationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     policy: ActionPolicy
+    # Naming a key at registration is what later lets a guard request prove the
+    # caller controls this registration, rather than merely knowing its id.
+    caller_key: str | None = Field(default=None, pattern=r"^ed25519:[A-Za-z0-9_-]{43}$")
 
 
 class DemoTheaterResponse(ScanResponse):

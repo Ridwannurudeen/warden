@@ -1,4 +1,4 @@
-# Warden Action Decision Receipt — `warden-action-receipt/2`
+# Warden Action Decision Receipt — `warden-action-receipt/3`
 
 Predicate type: `https://warden.gudman.xyz/spec/action-decision/v1`
 
@@ -21,18 +21,21 @@ no access to Warden and no trust in it.
 Three further limits are properties of the current design rather than of any one receipt, and a
 verifier should treat them as load-bearing:
 
-1. **The policy is caller-supplied inline on each request.** A receipt records the policy that was
-   *asserted at call time*. It is not evidence that the policy was in force beforehand. The same
-   intent submitted under a laxer policy yields a different, equally valid receipt.
-2. **The route is unauthenticated.** A receipt does not prove which agent requested it. `agent_id`
-   and `service_id` are values the caller supplied.
+1. **`policy_binding` decides how much the policy field is worth.** `inline` means the caller
+   asserted the policy on the request, and the receipt is not evidence it was in force beforehand —
+   the same intent under a laxer policy yields a different, equally valid receipt. `registered`
+   means the policy was pre-registered and anchored in the transparency log at `policy_log_seq`,
+   which a verifier can check placed it before the action.
+2. **`caller_verified` decides whether `agent_id` means anything.** The route is unauthenticated, so
+   on an unsigned request `agent_id` and `service_id` are merely values the caller supplied. It is
+   `true` only when the request carried a signature from the key named at registration.
 3. **Action receipts are not written to the transparency log.** There is no proof of absence: a
    verifier cannot tell how many decisions preceded the one being shown.
 
-Consequently a receipt is sound evidence of *what Warden decided given stated inputs*, and is not
-by itself sufficient for a third party adjudicating a dispute between two parties. Pre-registered
-policies bound to a `policy_id` anchored in the transparency log, plus caller binding, are required
-for that, and are not implemented.
+A receipt with `policy_binding: "registered"` and `caller_verified: true` establishes that a
+specific registrant, whose policy predates the action, received this decision. A receipt with
+`inline` binding and no caller verification establishes only what Warden decided given stated
+inputs. Treat the two differently.
 
 ## Verifying a receipt
 
@@ -53,7 +56,7 @@ Altering any field — flipping `BLOCK` to `ALLOW`, widening a limit — breaks 
 
 | Field | Meaning |
 | --- | --- |
-| `spec_version` | `warden-action-receipt/2` |
+| `spec_version` | `warden-action-receipt/3` |
 | `predicate_type` | This document's URL |
 | `receipt_id` | SHA-256 over the content fields, per step 4 |
 | `issuer` | `warden` |
@@ -65,6 +68,9 @@ Altering any field — flipping `BLOCK` to `ALLOW`, widening a limit — breaks 
 | `policy_sha256` | SHA-256 of the canonical policy |
 | `payload_sha256` | SHA-256 of the submitted payload; the payload itself is never stored |
 | `effective_payload_sha256` | Hash of the text the caller should act on, or `null` on `BLOCK` |
+| `policy_binding` | `inline` or `registered` — see the limits above |
+| `policy_log_seq` | Transparency-log sequence the policy was anchored at, or `null` when inline |
+| `caller_verified` | `true` only when the request was signed by the key named at registration |
 | `decision` | `ALLOW`, `SANITIZE`, or `BLOCK` |
 | `reason_codes` | Ordered, deduplicated; see below |
 | `issued_at` | Unix seconds, set by the server, not the caller |
@@ -104,3 +110,24 @@ when no detector fires.
 - A `contract_call` whose `selector` is absent, or absent from `allowed_selectors`, is refused.
   An unstated selector cannot be policed, and an amount limit does not help: `approve(spender, MAX)`
   grants away a balance while moving no value.
+
+## Registering a policy
+
+`POST /api/policy/register` takes `{"policy": …, "caller_key": "ed25519:…"}` and returns a
+`policy_id`, the `log_seq` it was anchored at, and the signed record. The record is verified the same
+way as a receipt: canonical JSON of everything except `issuer_sig`, checked against a published
+issuer key.
+
+`policy_id` is the SHA-256 of the canonical policy, so identical rules always produce the same id and
+keep their first anchor. Re-registration is idempotent and preserves the original `issued_at`; it
+cannot be used to move a policy's apparent age forward.
+
+A guard request then sends `policy_id` instead of `policy`. To prove control of the registration,
+sign the canonical JSON of
+
+```json
+{"spec_version":"warden-action-policy/1","policy_id":"…","action_context_sha256":"…"}
+```
+
+with the registered key and send it as `caller_sig`. Binding the action context is deliberate: a
+captured signature cannot be replayed against a different action under the same policy.
