@@ -66,6 +66,47 @@ curl -sX POST https://warden.gudman.xyz/api/policy \
   -d '{"payload":"<untrusted text>","context":{"expected_addresses":["0xYourTreasury"]}}'
 ```
 
+### Guarding the action, not just the text
+
+`/scan` answers "is this text dangerous?". The free `POST /api/action/guard` answers the question
+that actually decides whether money moves: **is this specific action permitted?** You send the
+action your agent is about to take, the OKX task it belongs to, and your own policy. It returns
+`ALLOW` / `SANITIZE` / `BLOCK` with a signed decision receipt.
+
+```bash
+curl -sX POST https://warden.gudman.xyz/api/action/guard \
+  -H 'content-type: application/json' \
+  -d '{
+    "intent": {"action_type":"transfer","tool":"wallet_send","destination":"0x<payee>",
+               "asset":"USDT0","amount_atomic":5000000,"payload":"<untrusted text>"},
+    "task":   {"network":"eip155:196","agent_id":"<your agent>","service_id":"<your service>",
+               "service_revision_sha256":"<64 hex>","task_id":"<your task>"},
+    "policy": {"allowed_actions":["transfer"],"allowed_tools":["wallet_send"],
+               "allowed_destinations":["0x<your treasury>"],
+               "max_amount_atomic_by_asset":{"USDT0":1000000}}
+  }'
+```
+
+Detection and policy are composed, and a policy violation blocks on its own: an impeccably polite
+message asking to pay an address outside your allowlist is refused even when no detector fires.
+That matters because detectors do miss. The refusal codes are correspondingly separate —
+`PROMPT_INJECTION` and `DRAIN_ADDRESS` describe the content, while `DESTINATION_NOT_ALLOWED`,
+`AMOUNT_LIMIT_EXCEEDED`, `ACTION_NOT_ALLOWED`, `TOOL_NOT_ALLOWED` and `ASSET_NOT_ALLOWED` describe
+the breach of your own rules.
+
+It fails closed in the awkward cases too: a `SANITIZE` whose sanitized text came back unchanged
+becomes a `BLOCK`, and any unrecognised verdict becomes a `BLOCK`.
+
+The receipt binds the action context, the policy, and the payload — each as a SHA-256 — into one
+Ed25519-signed record, so nobody can later claim a different policy was in force or a different
+payload was scanned. Verify it against the published key at
+[`/.well-known/apa-issuer.json`](https://warden.gudman.xyz/.well-known/apa-issuer.json) without
+trusting this service. Payloads are hashed, never stored.
+
+The receipt states its own limits, and they are part of the signed content: it is a record of one
+payload-and-policy decision, and **not** proof of execution, delivery, settlement, authorization,
+certification, or future safety. It proves what Warden decided — not that the agent obeyed.
+
 ### What buyers actually did with it
 
 **7 reviews, all five stars, rating 5.0** on the live listing, across four independent buyer
