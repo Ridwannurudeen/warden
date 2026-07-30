@@ -88,6 +88,15 @@ TASK_SAFETY_RECEIPT_LOG_ENTRY_FIELDS = {
     "record_hash",
     "prev_hash",
 }
+ACTION_POLICY_LOG_ENTRY_FIELDS = {
+    "seq",
+    "ts",
+    "event",
+    "record_type",
+    "policy_id",
+    "record_hash",
+    "prev_hash",
+}
 _SIGNED_EVIDENCE_LOG_SPECS = {
     "security-passport": (
         "passport_id",
@@ -98,6 +107,13 @@ _SIGNED_EVIDENCE_LOG_SPECS = {
         "receipt_id",
         "task-safety-receipt-issued",
         "task-safety-receipt-revoked",
+    ),
+    # Anchoring a policy is what lets an adjudicator establish that it existed
+    # before the action it was used to authorize.
+    "action-policy": (
+        "policy_id",
+        "action-policy-registered",
+        "action-policy-revoked",
     ),
 }
 
@@ -463,8 +479,7 @@ def _is_valid_log_entry(entry: object) -> bool:
     elif record_type == "hardening-pack":
         if (
             fields != HARDENING_LOG_ENTRY_FIELDS
-            or entry.get("event")
-            not in {"hardening-pack-issued", "hardening-pack-revoked"}
+            or entry.get("event") not in {"hardening-pack-issued", "hardening-pack-revoked"}
             or not _is_lower_hex(entry.get("pack_id"), 64)
             or not _is_lower_hex(entry.get("audit_id"), 16)
         ):
@@ -472,8 +487,7 @@ def _is_valid_log_entry(entry: object) -> bool:
     elif record_type == "security-passport":
         if (
             fields != SECURITY_PASSPORT_LOG_ENTRY_FIELDS
-            or entry.get("event")
-            not in {"security-passport-issued", "security-passport-revoked"}
+            or entry.get("event") not in {"security-passport-issued", "security-passport-revoked"}
             or not _is_lower_hex(entry.get("passport_id"), 64)
         ):
             return False
@@ -483,6 +497,13 @@ def _is_valid_log_entry(entry: object) -> bool:
             or entry.get("event")
             not in {"task-safety-receipt-issued", "task-safety-receipt-revoked"}
             or not _is_lower_hex(entry.get("receipt_id"), 64)
+        ):
+            return False
+    elif record_type == "action-policy":
+        if (
+            fields != ACTION_POLICY_LOG_ENTRY_FIELDS
+            or entry.get("event") not in {"action-policy-registered", "action-policy-revoked"}
+            or not _is_lower_hex(entry.get("policy_id"), 64)
         ):
             return False
     elif record_type is not None:
@@ -505,10 +526,7 @@ def _is_valid_log_entry(entry: object) -> bool:
 def _verified_log_head(entries: list[dict[str, object]]) -> str | None:
     previous_hash = GENESIS_PREV_HASH
     for expected_seq, entry in enumerate(entries, start=1):
-        if (
-            not _is_valid_log_entry(entry)
-            or entry["seq"] != expected_seq
-        ):
+        if not _is_valid_log_entry(entry) or entry["seq"] != expected_seq:
             return None
         if entry.get("prev_hash") != previous_hash:
             return None
@@ -652,8 +670,7 @@ def _next_log_position(
 ) -> tuple[int, str]:
     rows, entries, head_hash = _read_log_head(connection)
     anchor_exists = (
-        connection.execute("SELECT 1 FROM log_anchor WHERE singleton = 1").fetchone()
-        is not None
+        connection.execute("SELECT 1 FROM log_anchor WHERE singleton = 1").fetchone() is not None
     )
     checkpoint_row = connection.execute(
         "SELECT 1 FROM log_checkpoint WHERE singleton = 1"
@@ -704,9 +721,7 @@ def _append_log(
         "attestation_id": record.get("attestation_id"),
         "endpoint_host": record.get("endpoint_host"),
         "status": record.get("status"),
-        "record_hash": hashlib.sha256(
-            _canonical_json(record).encode("utf-8")
-        ).hexdigest(),
+        "record_hash": hashlib.sha256(_canonical_json(record).encode("utf-8")).hexdigest(),
         "prev_hash": prev_hash,
     }
     return _write_log_entry(connection, entry)
@@ -733,9 +748,7 @@ def _signed_evidence_log_entry_matches(
         "event": event,
         "record_type": record_type,
         record_id_field: record.get(record_id_field),
-        "record_hash": hashlib.sha256(
-            _canonical_json(record).encode("utf-8")
-        ).hexdigest(),
+        "record_hash": hashlib.sha256(_canonical_json(record).encode("utf-8")).hexdigest(),
         "prev_hash": entry.get("prev_hash"),
     }
 
@@ -766,9 +779,7 @@ def _append_signed_evidence_log(
         "event": event,
         "record_type": record_type,
         record_id_field: record[record_id_field],
-        "record_hash": hashlib.sha256(
-            _canonical_json(record).encode("utf-8")
-        ).hexdigest(),
+        "record_hash": hashlib.sha256(_canonical_json(record).encode("utf-8")).hexdigest(),
         "prev_hash": prev_hash,
     }
     if not _is_valid_log_entry(entry):
@@ -869,9 +880,7 @@ def commit_breaker_certificate(
             "record_type": "breaker-certificate",
             "certificate_id": record["certificate_id"],
             "benchmark_case_id": record["benchmark_case_id"],
-            "record_hash": hashlib.sha256(
-                _canonical_json(record).encode("utf-8")
-            ).hexdigest(),
+            "record_hash": hashlib.sha256(_canonical_json(record).encode("utf-8")).hexdigest(),
             "prev_hash": prev_hash,
         }
         connection.execute(
@@ -915,8 +924,7 @@ def get_breaker_certificates_with_evidence(
         records = []
         for certificate_id in certificate_ids:
             row = connection.execute(
-                "SELECT record_json, log_seq FROM breaker_certificates "
-                "WHERE certificate_id = ?",
+                "SELECT record_json, log_seq FROM breaker_certificates WHERE certificate_id = ?",
                 (certificate_id,),
             ).fetchone()
             if row is None:
@@ -925,9 +933,7 @@ def get_breaker_certificates_with_evidence(
                 record = json.loads(row[0])
             except (json.JSONDecodeError, TypeError):
                 continue
-            if not isinstance(record, dict) or not protection.verify_breaker_certificate(
-                record
-            ):
+            if not isinstance(record, dict) or not protection.verify_breaker_certificate(record):
                 continue
             log_seq = row[1]
             if type(log_seq) is not int or not 1 <= log_seq <= len(entries):
@@ -935,9 +941,8 @@ def get_breaker_certificates_with_evidence(
                     "breaker certificate has no matching transparency-log entry"
                 )
             entry = entries[log_seq - 1]
-            if (
-                record.get("log_seq") != log_seq
-                or not _breaker_log_entry_matches(entry, record, log_seq)
+            if record.get("log_seq") != log_seq or not _breaker_log_entry_matches(
+                entry, record, log_seq
             ):
                 raise ProtectionStateConflict(
                     "breaker certificate has no matching transparency-log entry"
@@ -968,9 +973,7 @@ def _audit_log_entry_matches(
         "record_type": "endpoint-audit-attestation",
         "audit_id": record.get("audit_id"),
         "endpoint_host": record.get("endpoint_host"),
-        "record_hash": hashlib.sha256(
-            _canonical_json(record).encode("utf-8")
-        ).hexdigest(),
+        "record_hash": hashlib.sha256(_canonical_json(record).encode("utf-8")).hexdigest(),
         "prev_hash": entry.get("prev_hash"),
     }
 
@@ -1038,9 +1041,7 @@ def commit_audit_attestation(
             "record_type": "endpoint-audit-attestation",
             "audit_id": audit_id,
             "endpoint_host": record["endpoint_host"],
-            "record_hash": hashlib.sha256(
-                _canonical_json(record).encode("utf-8")
-            ).hexdigest(),
+            "record_hash": hashlib.sha256(_canonical_json(record).encode("utf-8")).hexdigest(),
             "prev_hash": prev_hash,
         }
         connection.execute(
@@ -1076,9 +1077,7 @@ def revoke_audit_attestation(
                 "stored endpoint-audit attestation contains invalid JSON"
             ) from exc
         if not isinstance(record, dict) or not record_validator(record):
-            raise ProtectionStateConflict(
-                "stored endpoint-audit attestation failed verification"
-            )
+            raise ProtectionStateConflict("stored endpoint-audit attestation failed verification")
         if revoked_at < int(record["issued_at"]):
             raise ValueError("endpoint-audit revocation cannot predate issuance")
         existing = connection.execute(
@@ -1101,9 +1100,7 @@ def revoke_audit_attestation(
                     timestamp=existing_at,
                 )
             ):
-                raise ProtectionStateConflict(
-                    "endpoint-audit revocation has no matching log entry"
-                )
+                raise ProtectionStateConflict("endpoint-audit revocation has no matching log entry")
             return existing_at
 
         next_seq, prev_hash = _next_log_position(connection)
@@ -1114,14 +1111,11 @@ def revoke_audit_attestation(
             "record_type": "endpoint-audit-attestation",
             "audit_id": audit_id,
             "endpoint_host": record["endpoint_host"],
-            "record_hash": hashlib.sha256(
-                _canonical_json(record).encode("utf-8")
-            ).hexdigest(),
+            "record_hash": hashlib.sha256(_canonical_json(record).encode("utf-8")).hexdigest(),
             "prev_hash": prev_hash,
         }
         connection.execute(
-            "INSERT INTO audit_revocations (audit_id, revoked_at, log_seq) "
-            "VALUES (?, ?, ?)",
+            "INSERT INTO audit_revocations (audit_id, revoked_at, log_seq) VALUES (?, ?, ?)",
             (audit_id, revoked_at, next_seq),
         )
         _write_log_entry(connection, entry)
@@ -1148,9 +1142,7 @@ def get_audit_attestation_with_evidence(
                 "stored endpoint-audit attestation contains invalid JSON"
             ) from exc
         if not isinstance(record, dict) or not record_validator(record):
-            raise ProtectionStateConflict(
-                "stored endpoint-audit attestation failed verification"
-            )
+            raise ProtectionStateConflict("stored endpoint-audit attestation failed verification")
         _, entries, head_hash = _read_log_head(connection)
         _read_anchored_checkpoint(connection, len(entries), head_hash)
         issued_seq = row[1]
@@ -1192,9 +1184,7 @@ def get_audit_attestation_with_evidence(
                 timestamp=revoked_at,
             )
         ):
-            raise ProtectionStateConflict(
-                "endpoint-audit revocation has no matching log entry"
-            )
+            raise ProtectionStateConflict("endpoint-audit revocation has no matching log entry")
         return {
             "attestation": record,
             "status": "revoked",
@@ -1217,9 +1207,7 @@ def _hardening_log_entry_matches(
         "record_type": "hardening-pack",
         "pack_id": record.get("pack_id"),
         "audit_id": record.get("audit_id"),
-        "record_hash": hashlib.sha256(
-            _canonical_json(record).encode("utf-8")
-        ).hexdigest(),
+        "record_hash": hashlib.sha256(_canonical_json(record).encode("utf-8")).hexdigest(),
         "prev_hash": entry.get("prev_hash"),
     }
 
@@ -1265,9 +1253,7 @@ def commit_hardening_pack(
                     log_seq,
                 )
             ):
-                raise ProtectionStateConflict(
-                    "stored hardening pack has no matching log entry"
-                )
+                raise ProtectionStateConflict("stored hardening pack has no matching log entry")
             return existing
 
         next_seq, prev_hash = _next_log_position(connection)
@@ -1290,9 +1276,7 @@ def commit_hardening_pack(
             "record_type": "hardening-pack",
             "pack_id": pack_id,
             "audit_id": audit_id,
-            "record_hash": hashlib.sha256(
-                _canonical_json(record).encode("utf-8")
-            ).hexdigest(),
+            "record_hash": hashlib.sha256(_canonical_json(record).encode("utf-8")).hexdigest(),
             "prev_hash": prev_hash,
         }
         connection.execute(
@@ -1344,9 +1328,7 @@ def revoke_hardening_pack(
         try:
             record = json.loads(row[0])
         except (json.JSONDecodeError, TypeError) as exc:
-            raise ProtectionStateConflict(
-                "stored hardening pack contains invalid JSON"
-            ) from exc
+            raise ProtectionStateConflict("stored hardening pack contains invalid JSON") from exc
         if not isinstance(record, dict) or not record_validator(record):
             raise ProtectionStateConflict("stored hardening pack failed verification")
         if revoked_at < int(record["issued_at"]):
@@ -1371,9 +1353,7 @@ def revoke_hardening_pack(
                     timestamp=existing_at,
                 )
             ):
-                raise ProtectionStateConflict(
-                    "hardening pack revocation has no matching log entry"
-                )
+                raise ProtectionStateConflict("hardening pack revocation has no matching log entry")
             return existing_at
 
         next_seq, prev_hash = _next_log_position(connection)
@@ -1384,14 +1364,11 @@ def revoke_hardening_pack(
             "record_type": "hardening-pack",
             "pack_id": pack_id,
             "audit_id": record["audit_id"],
-            "record_hash": hashlib.sha256(
-                _canonical_json(record).encode("utf-8")
-            ).hexdigest(),
+            "record_hash": hashlib.sha256(_canonical_json(record).encode("utf-8")).hexdigest(),
             "prev_hash": prev_hash,
         }
         connection.execute(
-            "INSERT INTO hardening_revocations (pack_id, revoked_at, log_seq) "
-            "VALUES (?, ?, ?)",
+            "INSERT INTO hardening_revocations (pack_id, revoked_at, log_seq) VALUES (?, ?, ?)",
             (pack_id, revoked_at, next_seq),
         )
         _write_log_entry(connection, entry)
@@ -1414,9 +1391,7 @@ def get_hardening_pack_evidence(
         try:
             record = json.loads(row[0])
         except (json.JSONDecodeError, TypeError) as exc:
-            raise ProtectionStateConflict(
-                "stored hardening pack contains invalid JSON"
-            ) from exc
+            raise ProtectionStateConflict("stored hardening pack contains invalid JSON") from exc
         if (
             not isinstance(record, dict)
             or record.get("pack_id") != pack_id
@@ -1436,9 +1411,7 @@ def get_hardening_pack_evidence(
                 log_seq,
             )
         ):
-            raise ProtectionStateConflict(
-                "stored hardening pack has no matching log entry"
-            )
+            raise ProtectionStateConflict("stored hardening pack has no matching log entry")
         revoked = connection.execute(
             "SELECT revoked_at, log_seq FROM hardening_revocations WHERE pack_id = ?",
             (pack_id,),
@@ -1458,9 +1431,7 @@ def get_hardening_pack_evidence(
                     timestamp=revoked_at,
                 )
             ):
-                raise ProtectionStateConflict(
-                    "hardening pack revocation has no matching log entry"
-                )
+                raise ProtectionStateConflict("hardening pack revocation has no matching log entry")
         return {
             "pack": record,
             "status": "revoked" if revoked_at is not None else "active",
@@ -1610,9 +1581,7 @@ def commit_revocation(
 
 
 def commit_reprobe_results(
-    results: list[
-        tuple[str | None, dict[str, object], dict[str, object]]
-    ],
+    results: list[tuple[str | None, dict[str, object], dict[str, object]]],
     *,
     endpoint_host: str,
     bound_pub: str,
@@ -1699,9 +1668,7 @@ def migrate_log_checkpoint() -> dict[str, object]:
     """Explicitly initialize or anchor one verified pre-anchor database."""
     with _LOCK, _connect() as connection:
         connection.execute("BEGIN IMMEDIATE")
-        anchor = connection.execute(
-            "SELECT 1 FROM log_anchor WHERE singleton = 1"
-        ).fetchone()
+        anchor = connection.execute("SELECT 1 FROM log_anchor WHERE singleton = 1").fetchone()
         if anchor is not None:
             raise ProtectionStateConflict("transparency log anchor already exists")
 
@@ -1717,9 +1684,7 @@ def migrate_log_checkpoint() -> dict[str, object]:
                     "legacy transparency log checkpoint contains invalid JSON"
                 ) from exc
             if not isinstance(checkpoint, dict):
-                raise ProtectionStateConflict(
-                    "legacy transparency log checkpoint is not an object"
-                )
+                raise ProtectionStateConflict("legacy transparency log checkpoint is not an object")
             from warden import protection
 
             if (
@@ -1738,9 +1703,7 @@ def migrate_log_checkpoint() -> dict[str, object]:
                 "SELECT seq FROM sqlite_sequence WHERE name = 'log'"
             ).fetchone()
             if prior_sequence is not None:
-                raise ProtectionStateConflict(
-                    "empty transparency log retains prior sequence state"
-                )
+                raise ProtectionStateConflict("empty transparency log retains prior sequence state")
         return _write_log_checkpoint(
             connection,
             len(entries),

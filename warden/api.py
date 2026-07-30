@@ -52,10 +52,12 @@ from warden.ratelimit import (
     mark_verified_payer,
     retry_after_seconds,
 )
+from warden import policy_registry
 from warden.agent_policy import build_policy
-from warden.action_guard import ActionGuard
+from warden.action_guard import ActionGuard, action_context_sha256
 from warden.models import (
     ActionGuardRequest,
+    PolicyRegistrationRequest,
     AgentPolicyRequest,
     AgentPolicyResponse,
     ApaRegisterRequest,
@@ -823,9 +825,69 @@ async def agent_policy(req: AgentPolicyRequest) -> AgentPolicyResponse:
     return AgentPolicyResponse(scan=scan_response, **policy)
 
 
+@app.post("/api/policy/register")
+async def register_action_policy_endpoint(req: PolicyRegistrationRequest) -> dict[str, object]:
+    """Register a policy before the fact and anchor it in the transparency log.
+
+    Registration is idempotent because a policy is content-addressed: identical
+    rules always yield the same `policy_id` and keep their original anchor, so a
+    later re-registration cannot move the evidence forward in time.
+    """
+    stored = policy_registry.register_policy(req.policy, caller_key=req.caller_key)
+    record = stored["record"]
+    policy_id = str(record["policy_id"])
+    return {
+        "policy_id": policy_id,
+        "log_seq": evidence_store.action_policy_log_seq(policy_id),
+        "record": record,
+        "status": stored["status"],
+        "limitations": policy_registry.LIMITATIONS,
+    }
+
+
+@app.get("/api/policy/{policy_id}")
+async def get_action_policy_endpoint(policy_id: str) -> dict[str, object]:
+    stored = policy_registry.load_registered_policy(policy_id)
+    if stored is None:
+        raise HTTPException(status_code=404, detail="Registered policy not found")
+    return {
+        "policy_id": policy_id,
+        "log_seq": evidence_store.action_policy_log_seq(policy_id),
+        "record": stored["record"],
+        "status": stored["status"],
+        "limitations": policy_registry.LIMITATIONS,
+    }
+
+
 @app.post("/api/action/guard")
 async def guard_action_endpoint(req: ActionGuardRequest) -> dict[str, object]:
-    decision = await ActionGuard(req.policy).evaluate(req.intent, req.task)
+    if req.policy is not None:
+        decision = await ActionGuard(req.policy).evaluate(req.intent, req.task)
+        return decision.model_dump(mode="json")
+
+    policy_id = str(req.policy_id)
+    stored = policy_registry.load_registered_policy(policy_id)
+    if stored is None:
+        raise HTTPException(status_code=404, detail="Registered policy not found")
+    if stored["status"] != "active":
+        raise HTTPException(status_code=409, detail="Registered policy is revoked")
+    record = stored["record"]
+    policy = policy_registry.policy_from_record(record)
+    # The caller signs the action context as well as the policy id, so a captured
+    # signature cannot be replayed against a different action under the same policy.
+    caller_verified = policy_registry.caller_signature_valid(
+        caller_key=record.get("caller_key"),
+        signature=req.caller_sig,
+        policy_id=policy_id,
+        action_context_sha256=action_context_sha256(req.intent, req.task),
+    )
+    decision = await ActionGuard(policy).evaluate(
+        req.intent,
+        req.task,
+        policy_binding="registered",
+        policy_log_seq=evidence_store.action_policy_log_seq(policy_id),
+        caller_verified=caller_verified,
+    )
     return decision.model_dump(mode="json")
 
 

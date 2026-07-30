@@ -102,17 +102,33 @@ Ed25519-signed record. Verify it against the published key at
 [`/.well-known/apa-issuer.json`](https://warden.gudman.xyz/.well-known/apa-issuer.json) without
 trusting this service. Payloads are hashed, never stored.
 
-**Read the receipt for exactly what it is.** The policy is supplied inline by the caller on each
-request, so the receipt records the policy that was *asserted at call time* — it is not evidence
-that the policy was in force beforehand. The same intent under a looser policy produces a different,
-equally valid signature. The route is also unauthenticated and action receipts are not written to
-the transparency log, so a receipt does not prove which agent asked for it, and there is no proof of
-absence: you cannot tell how many attempts preceded the one being shown to you.
+**Register the policy first, or the receipt proves less than you think.** An inline policy travels
+with the request, so the receipt records the policy *asserted at call time* — the same intent under
+a looser policy yields a different, equally valid signature. Registering fixes that:
 
-That makes the receipt useful for a caller proving its own controls to itself, and **not yet
-sufficient for a third party adjudicating a dispute**. Closing that gap needs pre-registered
-policies with a `policy_id` anchored in the transparency log, plus caller binding — both are
-[roadmap](#roadmap) items, not shipped ones.
+```bash
+curl -sX POST https://warden.gudman.xyz/api/policy/register \
+  -H 'content-type: application/json' \
+  -d '{"policy": { … }, "caller_key":"ed25519:<your public key>"}'
+# -> {"policy_id":"…","log_seq":12,…}   then guard with "policy_id" instead of "policy"
+```
+
+A registered policy is signed and anchored in the transparency log at a sequence number, and the
+receipt cites both. Because the log is hash-chained, an adjudicator can establish the policy existed
+**before** the action it authorized. Policies are content-addressed, so identical rules always
+register as the same `policy_id` and keep their original anchor — re-registering cannot move that
+evidence forward in time.
+
+Naming a `caller_key` at registration adds the second half. A guard request signed by that key sets
+`caller_verified` on the receipt, which is what makes its `agent_id` worth anything. The signature
+covers the action context as well as the policy id, so it cannot be replayed against a different
+action. Every receipt states which mode applied via `policy_binding` (`inline` or `registered`),
+`policy_log_seq`, and `caller_verified` — all inside the signature, so none of them can be edited
+afterwards.
+
+**What it still does not give you.** The route is unauthenticated, so an unsigned request proves
+nothing about who sent it. Action receipts are not themselves written to the log, so there is no
+proof of absence: you cannot tell how many decisions preceded the one being shown to you.
 
 The receipt states its own limits, and they are part of the signed content: it is a record of one
 payload-and-policy decision, and **not** proof of execution, delivery, settlement, authorization,

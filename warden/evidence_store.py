@@ -28,6 +28,14 @@ CREATE TABLE IF NOT EXISTS task_safety_receipts (
     log_seq INTEGER,
     revocation_log_seq INTEGER
 );
+CREATE TABLE IF NOT EXISTS action_policies (
+    policy_id TEXT PRIMARY KEY,
+    record_json TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('active', 'revoked')),
+    revoked_at INTEGER,
+    log_seq INTEGER,
+    revocation_log_seq INTEGER
+);
 """
 _INDEXES = """
 CREATE UNIQUE INDEX IF NOT EXISTS idx_security_passports_log_seq
@@ -38,10 +46,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_task_safety_receipts_log_seq
     ON task_safety_receipts (log_seq);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_task_safety_receipts_revocation_log_seq
     ON task_safety_receipts (revocation_log_seq);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_action_policies_log_seq
+    ON action_policies (log_seq);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_action_policies_revocation_log_seq
+    ON action_policies (revocation_log_seq);
 """
 _EVIDENCE_TYPES = {
     "security_passports": "security-passport",
     "task_safety_receipts": "task-safety-receipt",
+    "action_policies": "action-policy",
 }
 
 
@@ -70,6 +83,8 @@ def _events(record_type: str) -> tuple[str, str]:
         return "security-passport-issued", "security-passport-revoked"
     if record_type == "task-safety-receipt":
         return "task-safety-receipt-issued", "task-safety-receipt-revoked"
+    if record_type == "action-policy":
+        return "action-policy-registered", "action-policy-revoked"
     raise ValueError("signed evidence record type is invalid")
 
 
@@ -399,3 +414,62 @@ def revoke_task_safety_receipt(
         revoked_at=revoked_at,
         validator=validator,
     )
+
+
+def store_action_policy(
+    record: dict[str, object],
+    *,
+    validator: Callable[[dict[str, object]], bool],
+) -> dict[str, object]:
+    return _store(
+        "action_policies",
+        record,
+        record_id_field="policy_id",
+        validator=validator,
+    )
+
+
+def get_action_policy(
+    policy_id: str,
+    *,
+    validator: Callable[[dict[str, object]], bool],
+) -> dict[str, object] | None:
+    return _get(
+        "action_policies",
+        policy_id,
+        record_id_field="policy_id",
+        validator=validator,
+    )
+
+
+def revoke_action_policy(
+    policy_id: str,
+    *,
+    revoked_at: int,
+    validator: Callable[[dict[str, object]], bool],
+) -> int:
+    return _revoke(
+        "action_policies",
+        policy_id,
+        record_id_field="policy_id",
+        revoked_at=revoked_at,
+        validator=validator,
+    )
+
+
+def action_policy_log_seq(policy_id: str) -> int | None:
+    """The transparency-log sequence a policy was anchored at.
+
+    A decision receipt cites this, because the sequence is what lets an
+    adjudicator place the registration before the action in the hash chain.
+    """
+    if not policy_id or len(policy_id) > 128:
+        return None
+    with _LOCK, _connect() as connection:
+        row = connection.execute(
+            "SELECT log_seq FROM action_policies WHERE policy_id = ?",
+            (policy_id,),
+        ).fetchone()
+    if row is None or row[0] is None:
+        return None
+    return int(row[0])
