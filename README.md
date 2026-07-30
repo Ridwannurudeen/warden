@@ -84,7 +84,7 @@ purchase rather than a rating left by a passer-by. What they tested matters more
 That third review is the most valuable one here. It is a public record of a miss, the fix, and
 the re-test — which is the exact behaviour the Trust Layer exists to make checkable, evidenced by
 someone with no reason to be generous. The counts above were read from the live listing on
-2026-07-28; `soldCount` is deliberately not quoted anywhere in this repository, because it has
+2026-07-29; `soldCount` is deliberately not quoted anywhere in this repository, because it has
 been observed moving in both directions and does not track settled payments.
 
 **Buying it from an agent.** OKX.AI's own flow is a pasted instruction, so the quickest
@@ -97,8 +97,8 @@ path is to hand your agent the endpoint and let it pay:
 Published SDKs, if you would rather not speak x402 directly:
 
 ```bash
-pip install warden-agent-guard      # Python: client, decorators, ASGI middleware, MCP server
-npm install @gudman/warden-guard    # TypeScript: client + Express-style middleware
+pip install warden-agent-guard      # Python: client, decorators, ASGI middleware, MCP server, Telegram
+npm install @gudman/warden-guard    # TypeScript: client, Express middleware, fetch-handler guard
 ```
 
 ## Why Warden exists
@@ -604,6 +604,30 @@ python -m pytest -q tests/test_refresh_safety_index.py tests/test_deploy_index.p
 python spec/verify_apa.py --selftest          # portable crypto oracle
 (cd sdk/ts && npm ci && npm test && npm run build)  # source TypeScript SDK gates
 ```
+
+## Releasing the SDKs
+
+The Python package publishes through GitHub Actions using PyPI trusted publishing, so no long-lived
+API token exists to leak or forget to revoke. Run the **Publish Python SDK** workflow manually and give
+it the version you intend to ship; it refuses to upload unless the tree already agrees, and it opens the
+built wheel to confirm the adapter modules are really inside it.
+
+The version is pinned in three places, and a bump that misses any of them ships a package whose own
+tests contradict it:
+
+```bash
+sdk/python/pyproject.toml                              # version = "..."
+sdk/python/tests/test_ph5_pipeline_and_typing.py       # two assertions, one inside a subprocess string
+python -m pip install -e sdk/python                    # the test reads INSTALLED metadata, so reinstall
+```
+
+The TypeScript package is still published by hand with `npm version <x> --no-git-tag-version` in
+`sdk/ts`, then `npm publish`. Check `npm pack --dry-run` lists `dist/` for any new module first —
+`sdk/ts/tsconfig.json` uses an explicit `files` array rather than a glob, so a module absent from it
+passes every test and still never reaches the published package.
+
+A published version can never be reused, so verify before uploading, not after. PyPI's index also lags
+a successful upload by a minute or two; if a fresh install 404s, poll rather than re-upload.
 
 ## License and contact
 
