@@ -137,7 +137,7 @@ def _filtered_headers(
 
 
 class WardenReverseProxy:
-    """ASGI reverse proxy that scans every non-empty request body before forwarding."""
+    """ASGI reverse proxy that scans non-empty request and response bodies."""
 
     def __init__(
         self,
@@ -146,6 +146,7 @@ class WardenReverseProxy:
         client: WardenClient | AsyncWardenClient | None = None,
         max_body_bytes: int = 100_000,
         max_response_bytes: int = 10_000_000,
+        guard_responses: bool = True,
         upstream_timeout: float = 8.0,
         transport: httpx.AsyncBaseTransport | None = None,
         verdict_log: Callable[[dict[str, object]], None] = _write_signed_verdict,
@@ -191,6 +192,7 @@ class WardenReverseProxy:
         )
         self.max_body_bytes = max_body_bytes
         self.max_response_bytes = max_response_bytes
+        self.guard_responses = guard_responses
         self.upstream_timeout = upstream_timeout
         self.transport = transport
         self.verdict_log = verdict_log
@@ -261,8 +263,8 @@ class WardenReverseProxy:
             more_body = bool(message.get("more_body", False))
 
         body_bytes = bytes(body)
+        request_id = secrets.token_hex(16)
         if body_bytes:
-            request_id = secrets.token_hex(16)
             try:
                 payload = body_bytes.decode("utf-8")
             except UnicodeDecodeError:
@@ -322,13 +324,44 @@ class WardenReverseProxy:
                     if len(response_body) > self.max_response_bytes:
                         await self._failure_response(send, 502, "upstream response too large")
                         return
+                    response_bytes = bytes(response_body)
+                    if self.guard_responses and response_bytes and scope["method"] != "HEAD":
+                        try:
+                            response_payload = response_bytes.decode("utf-8")
+                        except UnicodeDecodeError:
+                            await self._failure_response(
+                                send,
+                                502,
+                                "upstream response must be UTF-8",
+                            )
+                            return
+                        try:
+                            guarded_response = await self._guard(
+                                response_payload,
+                                request_id=f"{request_id}-response",
+                            )
+                        except WardenBlocked:
+                            await self._failure_response(
+                                send,
+                                502,
+                                "upstream response blocked by Warden",
+                            )
+                            return
+                        except Exception:
+                            await self._failure_response(
+                                send,
+                                503,
+                                "Warden scanner unavailable",
+                            )
+                            return
+                        response_bytes = guarded_response.encode("utf-8")
                     response_headers = _filtered_headers(
                         list(upstream_response.headers.raw),
                         strip_content_length=scope["method"] != "HEAD",
                     )
                     if scope["method"] != "HEAD":
                         response_headers.append(
-                            (b"content-length", str(len(response_body)).encode("ascii"))
+                            (b"content-length", str(len(response_bytes)).encode("ascii"))
                         )
                     await send(
                         {
@@ -340,7 +373,7 @@ class WardenReverseProxy:
                     await send(
                         {
                             "type": "http.response.body",
-                            "body": bytes(response_body),
+                            "body": response_bytes,
                             "more_body": False,
                         }
                     )

@@ -48,6 +48,24 @@
     "record_hash",
     "prev_hash",
   ]);
+  const SECURITY_PASSPORT_LOG_ENTRY_FIELDS = new Set([
+    "seq",
+    "ts",
+    "event",
+    "record_type",
+    "passport_id",
+    "record_hash",
+    "prev_hash",
+  ]);
+  const TASK_SAFETY_RECEIPT_LOG_ENTRY_FIELDS = new Set([
+    "seq",
+    "ts",
+    "event",
+    "record_type",
+    "receipt_id",
+    "record_hash",
+    "prev_hash",
+  ]);
   const LOG_CHECKPOINT_VERSION = "apa-log/0.1";
 
   function canonicalValue(value) {
@@ -158,6 +176,46 @@
       ) {
         throw new Error(
           `Entry ${index + 1} audit_id must be 16 lowercase hex characters`,
+        );
+      }
+    } else if (recordType === "security-passport") {
+      expectedFields = SECURITY_PASSPORT_LOG_ENTRY_FIELDS;
+      entryType = "security-passport";
+      if (
+        !["security-passport-issued", "security-passport-revoked"].includes(
+          entry.event,
+        )
+      ) {
+        throw new Error(
+          `Entry ${index + 1} event must be security-passport-issued or security-passport-revoked`,
+        );
+      }
+      if (
+        typeof entry.passport_id !== "string" ||
+        !HEX_HASH.test(entry.passport_id)
+      ) {
+        throw new Error(
+          `Entry ${index + 1} passport_id must be 64 lowercase hex characters`,
+        );
+      }
+    } else if (recordType === "task-safety-receipt") {
+      expectedFields = TASK_SAFETY_RECEIPT_LOG_ENTRY_FIELDS;
+      entryType = "task-safety-receipt";
+      if (
+        !["task-safety-receipt-issued", "task-safety-receipt-revoked"].includes(
+          entry.event,
+        )
+      ) {
+        throw new Error(
+          `Entry ${index + 1} event must be task-safety-receipt-issued or task-safety-receipt-revoked`,
+        );
+      }
+      if (
+        typeof entry.receipt_id !== "string" ||
+        !HEX_HASH.test(entry.receipt_id)
+      ) {
+        throw new Error(
+          `Entry ${index + 1} receipt_id must be 64 lowercase hex characters`,
         );
       }
     } else if (Object.prototype.hasOwnProperty.call(entry, "record_type")) {
@@ -1068,6 +1126,24 @@
         createFact("Observed", formatTimestamp(entry.ts), true),
         createFact("Pack ID", entry.pack_id, true),
         createFact("Source audit", entry.audit_id, true),
+        createFact("Record hash", entry.record_hash, true),
+        createFact("Previous hash", entry.prev_hash, true),
+      );
+    } else if (entry.record_type === "security-passport") {
+      summary.textContent = `Security Passport · ${entry.passport_id}`;
+      facts.append(
+        createFact("Observed", formatTimestamp(entry.ts), true),
+        createFact("Passport ID", entry.passport_id, true),
+        createFact("Lifecycle event", entry.event, false),
+        createFact("Record hash", entry.record_hash, true),
+        createFact("Previous hash", entry.prev_hash, true),
+      );
+    } else if (entry.record_type === "task-safety-receipt") {
+      summary.textContent = `Task safety receipt · ${entry.receipt_id}`;
+      facts.append(
+        createFact("Observed", formatTimestamp(entry.ts), true),
+        createFact("Receipt ID", entry.receipt_id, true),
+        createFact("Lifecycle event", entry.event, false),
         createFact("Record hash", entry.record_hash, true),
         createFact("Previous hash", entry.prev_hash, true),
       );

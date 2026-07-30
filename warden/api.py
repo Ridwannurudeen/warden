@@ -19,6 +19,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from warden.badge_store import get_badge, list_public_badges
 from warden.badges import verify_badge
+from warden import evidence_store
 from warden import (
     __version__,
     audit_attestations,
@@ -26,6 +27,8 @@ from warden import (
     hardening,
     protection,
     protection_store,
+    safety_receipts,
+    security_passports,
     shield,
     threat_intel,
 )
@@ -50,7 +53,9 @@ from warden.ratelimit import (
     retry_after_seconds,
 )
 from warden.agent_policy import build_policy
+from warden.action_guard import ActionGuard
 from warden.models import (
+    ActionGuardRequest,
     AgentPolicyRequest,
     AgentPolicyResponse,
     ApaRegisterRequest,
@@ -82,7 +87,9 @@ from warden.models import (
     RuntimeStatsResponse,
     ScanRequest,
     ScanResponse,
+    SecurityPassportRecord,
     ShieldLineageResponse,
+    TaskSafetyReceiptRecord,
     ThreatIntelSummary,
     VariantAuditRequest,
     ResistanceBadgeResponse,
@@ -816,6 +823,76 @@ async def agent_policy(req: AgentPolicyRequest) -> AgentPolicyResponse:
     return AgentPolicyResponse(scan=scan_response, **policy)
 
 
+@app.post("/api/action/guard")
+async def guard_action_endpoint(req: ActionGuardRequest) -> dict[str, object]:
+    decision = await ActionGuard(req.policy).evaluate(req.intent, req.task)
+    return decision.model_dump(mode="json")
+
+
+@app.post("/api/passport/verify")
+async def verify_security_passport_endpoint(record: SecurityPassportRecord) -> dict[str, object]:
+    serialized = record.model_dump()
+    return {
+        "passport_id": record.passport_id,
+        "verified": security_passports.verify_security_passport(serialized),
+        "status": security_passports.effective_status(serialized),
+        "limitations": security_passports.LIMITATIONS,
+    }
+
+
+@app.post("/api/task-receipt/verify")
+async def verify_task_receipt_endpoint(record: TaskSafetyReceiptRecord) -> dict[str, object]:
+    serialized = record.model_dump()
+    return {
+        "receipt_id": record.receipt_id,
+        "verified": safety_receipts.verify_task_safety_receipt(serialized),
+        "status": safety_receipts.effective_status(serialized),
+        "limitations": safety_receipts.LIMITATIONS,
+    }
+
+
+@app.get("/api/passport/{passport_id}")
+async def get_security_passport_endpoint(passport_id: str) -> dict[str, object]:
+    evidence = evidence_store.get_security_passport(
+        passport_id,
+        validator=security_passports.verify_security_passport,
+    )
+    if evidence is None:
+        raise HTTPException(status_code=404, detail="Security passport not found")
+    record = evidence["record"]
+    return {
+        "passport": record,
+        "verified": security_passports.verify_security_passport(record),
+        "status": security_passports.effective_status(
+            record,
+            revoked=evidence["status"] == "revoked",
+        ),
+        "revoked_at": evidence["revoked_at"],
+        "limitations": security_passports.LIMITATIONS,
+    }
+
+
+@app.get("/api/task-receipt/{receipt_id}")
+async def get_task_receipt_endpoint(receipt_id: str) -> dict[str, object]:
+    evidence = evidence_store.get_task_safety_receipt(
+        receipt_id,
+        validator=safety_receipts.verify_task_safety_receipt,
+    )
+    if evidence is None:
+        raise HTTPException(status_code=404, detail="Task safety receipt not found")
+    record = evidence["record"]
+    return {
+        "receipt": record,
+        "verified": safety_receipts.verify_task_safety_receipt(record),
+        "status": safety_receipts.effective_status(
+            record,
+            revoked=evidence["status"] == "revoked",
+        ),
+        "revoked_at": evidence["revoked_at"],
+        "limitations": safety_receipts.LIMITATIONS,
+    }
+
+
 @app.post("/api/feedback", response_model=FeedbackResponse, status_code=202)
 async def submit_feedback(req: FeedbackRequest) -> FeedbackResponse:
     result = feedback_store.record_feedback(
@@ -1460,6 +1537,11 @@ async def root() -> dict[str, object]:
             "scan": "POST /scan",
             "audit": "POST /audit",
             "harden": "POST /harden",
+            "action_guard": "POST /api/action/guard",
+            "passport_verify": "POST /api/passport/verify",
+            "passport": "GET /api/passport/{passport_id}",
+            "task_receipt_verify": "POST /api/task-receipt/verify",
+            "task_receipt": "GET /api/task-receipt/{receipt_id}",
             "health": "GET /health",
             "badge": "GET /badge/{audit_id}",
         },

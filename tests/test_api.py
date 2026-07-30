@@ -1,11 +1,31 @@
 """FastAPI contract tests."""
 
+import copy
+import json
+from pathlib import Path
+
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi.testclient import TestClient
 
+from warden.badges import b64u_encode
 from warden.api import app
+from warden import evidence_store
+from warden.safety_receipts import canonical_sha256, issue_task_safety_receipt
+from warden.security_passports import build_agent_service_binding, issue_security_passport
 
 
 client = TestClient(app)
+
+
+def _issuer_env(monkeypatch, db_path: Path | None = None):
+    private_key = Ed25519PrivateKey.generate()
+    monkeypatch.setenv(
+        "WARDEN_ISSUER_KEY",
+        b64u_encode(private_key.private_bytes_raw(), "ed25519-seed"),
+    )
+    monkeypatch.delenv("WARDEN_ISSUER_HISTORY", raising=False)
+    if db_path is not None:
+        monkeypatch.setenv("WARDEN_EVIDENCE_DB", str(db_path))
 
 
 def test_scan_demo_drain_payload_blocks():
@@ -137,3 +157,123 @@ def test_root_metadata_documents_every_paid_route():
     documented_paths = {value.split(" ", 1)[1] for value in advertised.values()}
     for paid_path in ("/scan", "/audit", "/harden"):
         assert paid_path in documented_paths, f"{paid_path} is sold but not advertised at /"
+
+
+def test_action_guard_route_returns_a_task_bound_decision(monkeypatch):
+    _issuer_env(monkeypatch)
+    response = client.post(
+        "/api/action/guard",
+        json={
+            "intent": {
+                "action_type": "transfer",
+                "tool": "wallet.transfer",
+                "destination": "0x1111111111111111111111111111111111111111",
+                "asset": "USDT",
+                "amount_atomic": 500000,
+                "payload": "Pay the approved invoice.",
+            },
+            "task": {
+                "network": "eip155:196",
+                "agent_id": "3808",
+                "service_id": "33460",
+                "service_revision_sha256": "c" * 64,
+                "task_id": "private-task-id",
+            },
+            "policy": {
+                "allowed_actions": ["transfer"],
+                "allowed_tools": ["wallet.transfer"],
+                "allowed_destinations": [
+                    "0x1111111111111111111111111111111111111111"
+                ],
+                "max_amount_atomic_by_asset": {"USDT": 1000000},
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["decision"] == "ALLOW"
+    assert data["receipt"]["task_id_sha256"] != "private-task-id"
+    assert "Pay the approved invoice." not in json.dumps(data)
+
+
+def test_passport_verify_route_reports_valid_and_tampered_records(
+    monkeypatch, tmp_path: Path
+):
+    _issuer_env(monkeypatch, tmp_path / "evidence.db")
+    snapshot = {
+        "agent": {
+            "agentId": "3808",
+            "services": [{"serviceId": "33460", "endpoint": "https://warden.gudman.xyz/mcp"}],
+        }
+    }
+    binding = build_agent_service_binding(
+        agent_id="3808",
+        service_id="33460",
+        chain_id="eip155:196",
+        endpoint="https://warden.gudman.xyz/mcp",
+        observed_at=1_800_000_000,
+        marketplace_snapshot=snapshot,
+    )
+    passport = issue_security_passport(
+        binding=binding,
+        audit_evidence_sha256="a" * 64,
+        hardening_evidence_sha256="b" * 64,
+        protection_evidence_sha256="c" * 64,
+        shield_evidence_sha256="d" * 64,
+        issued_at=1_800_000_000,
+    )
+
+    valid = client.post("/api/passport/verify", json=passport)
+    assert valid.status_code == 200
+    assert valid.json()["verified"] is True
+    assert valid.json()["status"] == "active"
+
+    evidence_store.store_security_passport(passport, validator=lambda record: True)
+    fetched = client.get(f"/api/passport/{passport['passport_id']}")
+    assert fetched.status_code == 200
+    assert fetched.json()["passport"] == passport
+    assert fetched.json()["status"] == "active"
+
+    tampered = copy.deepcopy(passport)
+    tampered["limitations"] = "safe forever"
+    invalid = client.post("/api/passport/verify", json=tampered)
+    assert invalid.status_code == 200
+    assert invalid.json()["verified"] is False
+    assert invalid.json()["status"] == "invalid"
+
+
+def test_task_receipt_verify_route_reports_valid_and_tampered_records(
+    monkeypatch, tmp_path: Path
+):
+    _issuer_env(monkeypatch, tmp_path / "evidence.db")
+    receipt = issue_task_safety_receipt(
+        task_id="private-task-id",
+        agent_id="3808",
+        service_id="33460",
+        service_revision_sha256="c" * 64,
+        request_sha256=canonical_sha256({"payload": "private"}),
+        result_sha256=canonical_sha256({"verdict": "ALLOW"}),
+        decision_sha256=canonical_sha256({"decision": "ALLOW"}),
+        verdict="ALLOW",
+        outcome="result-produced",
+        issued_at=1_800_000_000,
+    )
+
+    valid = client.post("/api/task-receipt/verify", json=receipt)
+    assert valid.status_code == 200
+    assert valid.json()["verified"] is True
+    assert valid.json()["status"] == "active"
+
+    evidence_store.store_task_safety_receipt(receipt, validator=lambda record: True)
+    fetched = client.get(f"/api/task-receipt/{receipt['receipt_id']}")
+    assert fetched.status_code == 200
+    assert fetched.json()["receipt"] == receipt
+    assert fetched.json()["status"] == "active"
+
+    tampered = copy.deepcopy(receipt)
+    tampered["result_sha256"] = "0" * 64
+    invalid = client.post("/api/task-receipt/verify", json=tampered)
+    assert invalid.status_code == 200
+    assert invalid.json()["verified"] is False
+    assert invalid.json()["status"] == "invalid"

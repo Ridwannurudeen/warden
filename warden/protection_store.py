@@ -70,6 +70,36 @@ HARDENING_LOG_ENTRY_FIELDS = {
     "record_hash",
     "prev_hash",
 }
+SECURITY_PASSPORT_LOG_ENTRY_FIELDS = {
+    "seq",
+    "ts",
+    "event",
+    "record_type",
+    "passport_id",
+    "record_hash",
+    "prev_hash",
+}
+TASK_SAFETY_RECEIPT_LOG_ENTRY_FIELDS = {
+    "seq",
+    "ts",
+    "event",
+    "record_type",
+    "receipt_id",
+    "record_hash",
+    "prev_hash",
+}
+_SIGNED_EVIDENCE_LOG_SPECS = {
+    "security-passport": (
+        "passport_id",
+        "security-passport-issued",
+        "security-passport-revoked",
+    ),
+    "task-safety-receipt": (
+        "receipt_id",
+        "task-safety-receipt-issued",
+        "task-safety-receipt-revoked",
+    ),
+}
 
 _LOCK = Lock()
 
@@ -165,7 +195,7 @@ class ProbeAdmissionStorageUnavailable(RuntimeError):
 
 
 def _db_path() -> Path:
-    configured = os.getenv("WARDEN_PROTECTION_DB")
+    configured = os.getenv("WARDEN_PROTECTION_DB") or os.getenv("WARDEN_EVIDENCE_DB")
     if configured:
         return Path(configured)
     return Path(__file__).resolve().parents[1] / "data" / "protection.db"
@@ -439,6 +469,22 @@ def _is_valid_log_entry(entry: object) -> bool:
             or not _is_lower_hex(entry.get("audit_id"), 16)
         ):
             return False
+    elif record_type == "security-passport":
+        if (
+            fields != SECURITY_PASSPORT_LOG_ENTRY_FIELDS
+            or entry.get("event")
+            not in {"security-passport-issued", "security-passport-revoked"}
+            or not _is_lower_hex(entry.get("passport_id"), 64)
+        ):
+            return False
+    elif record_type == "task-safety-receipt":
+        if (
+            fields != TASK_SAFETY_RECEIPT_LOG_ENTRY_FIELDS
+            or entry.get("event")
+            not in {"task-safety-receipt-issued", "task-safety-receipt-revoked"}
+            or not _is_lower_hex(entry.get("receipt_id"), 64)
+        ):
+            return False
     elif record_type is not None:
         return False
     elif fields != APA_LOG_ENTRY_FIELDS or any(
@@ -663,6 +709,70 @@ def _append_log(
         ).hexdigest(),
         "prev_hash": prev_hash,
     }
+    return _write_log_entry(connection, entry)
+
+
+def _signed_evidence_log_entry_matches(
+    entry: dict[str, object],
+    record: dict[str, object],
+    log_seq: int,
+    *,
+    record_type: str,
+    event: str,
+    timestamp: int,
+) -> bool:
+    spec = _SIGNED_EVIDENCE_LOG_SPECS.get(record_type)
+    if spec is None:
+        return False
+    record_id_field, issued_event, revoked_event = spec
+    if event not in {issued_event, revoked_event}:
+        return False
+    return entry == {
+        "seq": log_seq,
+        "ts": timestamp,
+        "event": event,
+        "record_type": record_type,
+        record_id_field: record.get(record_id_field),
+        "record_hash": hashlib.sha256(
+            _canonical_json(record).encode("utf-8")
+        ).hexdigest(),
+        "prev_hash": entry.get("prev_hash"),
+    }
+
+
+def _append_signed_evidence_log(
+    connection: sqlite3.Connection,
+    record: dict[str, object],
+    *,
+    record_type: str,
+    event: str,
+    timestamp: int,
+) -> dict[str, object]:
+    spec = _SIGNED_EVIDENCE_LOG_SPECS.get(record_type)
+    if spec is None:
+        raise ValueError("signed evidence record type is invalid")
+    record_id_field, issued_event, revoked_event = spec
+    if (
+        event not in {issued_event, revoked_event}
+        or type(timestamp) is not int
+        or not 0 <= timestamp <= MAX_SAFE_UNIX_SECONDS
+        or not _is_lower_hex(record.get(record_id_field), 64)
+    ):
+        raise ValueError("signed evidence log fields are invalid")
+    next_seq, prev_hash = _next_log_position(connection)
+    entry = {
+        "seq": next_seq,
+        "ts": timestamp,
+        "event": event,
+        "record_type": record_type,
+        record_id_field: record[record_id_field],
+        "record_hash": hashlib.sha256(
+            _canonical_json(record).encode("utf-8")
+        ).hexdigest(),
+        "prev_hash": prev_hash,
+    }
+    if not _is_valid_log_entry(entry):
+        raise ValueError("signed evidence log entry is invalid")
     return _write_log_entry(connection, entry)
 
 

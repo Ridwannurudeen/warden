@@ -152,7 +152,7 @@ recording contract is [`docs/HACKATHON_DEMO.md`](docs/HACKATHON_DEMO.md).
 
 ### Install the published SDKs
 
-Both distributions are published at **v0.1.1**. The unrelated `warden-guard` package on PyPI is not
+Both distributions are published at **v0.1.2**. The unrelated `warden-guard` package on PyPI is not
 this project — Warden's is `warden-agent-guard`:
 
 ```bash
@@ -403,6 +403,11 @@ an availability claim.
 | `GET`  | `/health/ready`†                              | Local scanner and paid-route configuration readiness            |
 | `POST` | `/api/demo/scan`                              | Free, rate-limited, fast-only payload scan                      |
 | `POST` | `/api/demo/theater`                           | Verdict-gated, no-side-effect demo ASP with delivery receipt    |
+| `POST` | `/api/action/guard`                            | Typed action-policy evaluation with a signed metadata-only decision receipt |
+| `POST` | `/api/passport/verify`                         | Verify a signed Security Passport without treating it as certification |
+| `GET`  | `/api/passport/{passport_id}`                  | Retrieve a stored Security Passport record                    |
+| `POST` | `/api/task-receipt/verify`                    | Verify a signed task-safety receipt                            |
+| `GET`  | `/api/task-receipt/{receipt_id}`               | Retrieve a stored task-safety receipt                         |
 | `POST` | `/api/policy`                                 | Free, unsigned agent-guardrail advice derived from a scan       |
 | `POST` | `/api/feedback`                               | Explicit opt-in, redacted outcome feedback                      |
 | `GET`  | `/api/threat-intel/v1/summary`                | Aggregate feedback counts with k=5 suppression                  |

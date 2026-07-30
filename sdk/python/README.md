@@ -190,6 +190,11 @@ warden-gateway --upstream http://127.0.0.1:9000 --mode local
 `fail_open=False`; the gateway does not configure a wallet or payment handler, so a
 402 fails closed. The free hosted demo is never available to the gateway because it
 truncates long payloads. BLOCK returns HTTP 403.
+Response guarding is enabled by default for both `warden-gateway` and direct
+`WardenReverseProxy` use: upstream response bodies are buffered, scanned, and withheld
+on `BLOCK`, scanner failure, invalid UTF-8, or an oversized body. Direct users that
+must proxy trusted binary responses can explicitly set `guard_responses=False`; this
+bypasses response scanning and should not be used for untrusted agent inputs.
 Every completed scan writes a guard-key-signed JSON verdict receipt containing only a
 random request ID, timestamp, verdict, risk, threat classes, scanner latency, public key,
 and signature. Payloads, transformed bodies, detections, and raw scanner responses are

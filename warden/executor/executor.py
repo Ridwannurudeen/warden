@@ -18,6 +18,7 @@ import logging
 import os
 import subprocess
 
+from warden import evidence_store
 from warden.executor.config import ExecutorConfig
 from warden.executor.firewall import screen_incoming
 from warden.executor.guardrails import (
@@ -29,6 +30,11 @@ from warden.executor.guardrails import (
 )
 from warden.executor.negotiator import NegotiationContext, Negotiator, RefuseNegotiator
 from warden.executor.work import WorkParamsError, run_audit, run_scan
+from warden.safety_receipts import (
+    canonical_sha256,
+    issue_task_safety_receipt,
+    verify_task_safety_receipt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +73,8 @@ class TaskExecutor:
         if not allowed:
             logger.warning("firewall BLOCK on negotiation message for job %s", job_id)
             return {"action": "firewall_blocked", "jobId": job_id, "verdict": verdict_dict}
+        if verdict_dict.get("verdict") == "SANITIZE":
+            buyer_message = str(verdict_dict["sanitized_payload"])
         context = NegotiationContext(
             job_id=job_id,
             service_id=str(event.get("serviceId", "")),
@@ -85,6 +93,9 @@ class TaskExecutor:
             service_id, self.config.service_allowlist
         ):
             return self._noop(f"service {service_id!r} is not allowlisted")
+        service_revision = self.config.service_revisions.get(service_id)
+        if self.config.task_receipts_enabled and service_revision is None:
+            return self._noop(f"service revision is not configured for {service_id}")
         if event.get("paymentMode") != PAYMENT_MODE_ESCROW:
             return self._noop("only escrow (paymentMode=1) jobs are auto-fulfilled")
         price = str(event.get("price", ""))
@@ -97,6 +108,11 @@ class TaskExecutor:
         service_params = event.get("serviceParams")
         if not isinstance(service_params, dict):
             return self._noop("serviceParams must be an object")
+        if not self.store.claim(job_id):
+            status = self.store.status(job_id)
+            if status == "delivered":
+                return self._noop(f"job {job_id} already delivered (idempotent skip)")
+            return self._noop(f"job {job_id} has pending delivery requiring reconciliation")
         try:
             if service_id == "warden-audit":
                 deliverable = await run_audit(service_params)
@@ -105,6 +121,59 @@ class TaskExecutor:
         except WorkParamsError as exc:
             logger.warning("job %s has malformed serviceParams: %s", job_id, exc)
             return self._noop(f"malformed serviceParams: {exc}")
+        if self.config.task_receipts_enabled and service_id in {"warden-scan", "warden-audit"}:
+            if service_id == "warden-scan":
+                verdict = deliverable.get("verdict")
+                if verdict not in {"ALLOW", "SANITIZE", "BLOCK"}:
+                    return self._noop("scan result has no supported verdict for task receipt")
+                outcome = {
+                    "ALLOW": "result-produced",
+                    "SANITIZE": "result-sanitized",
+                    "BLOCK": "result-withheld",
+                }[verdict]
+                decision = {
+                    "verdict": verdict,
+                    "threat_classes": deliverable.get("threat_classes", []),
+                }
+            else:
+                grade = deliverable.get("grade")
+                score = deliverable.get("score")
+                consent_verified = deliverable.get("consent_verified")
+                badge_record = deliverable.get("badge_record")
+                if (
+                    grade not in {"A", "B", "C", "D", "F", "INCONCLUSIVE"}
+                    or type(score) not in {int, float}
+                    or not 0 <= score <= 100
+                    or type(consent_verified) is not bool
+                    or (badge_record is not None and not isinstance(badge_record, dict))
+                    or (grade == "INCONCLUSIVE" and badge_record is not None)
+                ):
+                    return self._noop("audit result has no supported outcome for task receipt")
+                verdict = "ALLOW"
+                outcome = "result-produced"
+                decision = {
+                    "audit_outcome": ("inconclusive" if grade == "INCONCLUSIVE" else "graded"),
+                    "grade": grade,
+                    "score": score,
+                    "consent_verified": consent_verified,
+                    "badge_issued": badge_record is not None,
+                }
+            task_receipt = issue_task_safety_receipt(
+                task_id=job_id,
+                agent_id=self.config.agent_id,
+                service_id=service_id,
+                service_revision_sha256=service_revision,
+                request_sha256=canonical_sha256(service_params),
+                result_sha256=canonical_sha256(deliverable),
+                decision_sha256=canonical_sha256(decision),
+                verdict=verdict,
+                outcome=outcome,
+            )
+            evidence_store.store_task_safety_receipt(
+                task_receipt,
+                validator=verify_task_safety_receipt,
+            )
+            deliverable = {**deliverable, "task_safety_receipt": task_receipt}
         output = self._run_cli(
             [
                 "agent",

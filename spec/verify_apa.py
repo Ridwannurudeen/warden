@@ -402,7 +402,7 @@ def main(argv: list[str]) -> int:
     else:
         parser.error("provide --issuer-pub <ed25519:...> or --issuer-url <base>")
     ok, msg = verify_attestation(att, issuer_material, live=args.live)
-    print(("✓ " if ok else "✗ ") + msg)
+    print(("[OK] " if ok else "[FAIL] ") + msg)
     return 0 if ok else 1
 
 
