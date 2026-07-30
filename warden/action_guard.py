@@ -18,8 +18,8 @@ from warden.models import (
     SafetyReasonCode,
 )
 
-CONTEXT_SPEC_VERSION = "warden-action-context/1"
-RECEIPT_SPEC_VERSION = "warden-action-receipt/1"
+CONTEXT_SPEC_VERSION = "warden-action-context/2"
+RECEIPT_SPEC_VERSION = "warden-action-receipt/2"
 RECEIPT_PREDICATE_TYPE = "https://warden.gudman.xyz/spec/action-decision/v1"
 RECEIPT_LIMITATIONS = (
     "Task-bound record of one Warden payload and caller-policy decision; not proof of "
@@ -66,6 +66,7 @@ _REASON_ORDER: tuple[SafetyReasonCode, ...] = (
     "DESTINATION_NOT_ALLOWED",
     "ASSET_NOT_ALLOWED",
     "AMOUNT_LIMIT_EXCEEDED",
+    "SELECTOR_NOT_ALLOWED",
     "PAYLOAD_BLOCKED",
     "PAYLOAD_SANITIZED",
 )
@@ -93,11 +94,16 @@ def canonical_action_context(
         "action": {
             "action_type": intent.action_type,
             "tool": intent.tool,
+            # Hash the normalized destination, so the same address committed to in
+            # checksummed and lowercase form yields one context hash rather than two.
             "destination_sha256": (
-                _sha256_text(intent.destination) if intent.destination is not None else None
+                _sha256_text(_normalize_destination(intent.destination))
+                if intent.destination is not None
+                else None
             ),
             "asset": intent.asset,
             "amount_atomic": intent.amount_atomic,
+            "selector": intent.selector,
             "payload_sha256": _sha256_text(intent.payload),
         },
     }
@@ -118,10 +124,13 @@ def policy_sha256(policy: ActionPolicy) -> str:
     canonical_policy = {
         "allowed_actions": sorted(policy.allowed_actions),
         "allowed_tools": sorted(policy.allowed_tools),
-        "allowed_destinations": sorted(policy.allowed_destinations),
-        "max_amount_atomic_by_asset": dict(
-            sorted(policy.max_amount_atomic_by_asset.items())
+        # Normalized, so a policy allowlisting a checksummed address hashes the same
+        # as the identical policy written in lowercase.
+        "allowed_destinations": sorted(
+            _normalize_destination(entry) for entry in policy.allowed_destinations
         ),
+        "allowed_selectors": sorted(policy.allowed_selectors),
+        "max_amount_atomic_by_asset": dict(sorted(policy.max_amount_atomic_by_asset.items())),
     }
     return hashlib.sha256(_canonical_json(canonical_policy).encode("utf-8")).hexdigest()
 
@@ -229,9 +238,7 @@ def verify_decision_receipt(
     ):
         return False
     content = {
-        key: value
-        for key, value in record.items()
-        if key not in {"receipt_id", "issuer_sig"}
+        key: value for key, value in record.items() if key not in {"receipt_id", "issuer_sig"}
     }
     if parsed.receipt_id != receipt_id_for_content(content):
         return False
@@ -246,6 +253,27 @@ def verify_decision_receipt(
         and ed25519_verify_record(record, str(key["pub"]), "issuer_sig")
         for key in keys
     )
+
+
+def _normalize_destination(value: str) -> str:
+    """Fold an EVM address to a single comparable form.
+
+    Tooling disagrees on case: viem returns EIP-55 checksummed addresses while
+    most RPC and OKX responses return lowercase. Comparing them literally meant a
+    caller could allowlist the very address it was paying and still be refused.
+    Only `0x` + 40 hex is folded; anything else compares unchanged, so non-EVM
+    destinations keep their case.
+    """
+    if len(value) == 42 and value.startswith("0x"):
+        body = value[2:]
+        if all(character in "0123456789abcdefABCDEF" for character in body):
+            return "0x" + body.lower()
+    return value
+
+
+def _destination_allowed(destination: str, allowed: Sequence[str]) -> bool:
+    target = _normalize_destination(destination)
+    return any(target == _normalize_destination(entry) for entry in allowed)
 
 
 class ActionGuard:
@@ -267,9 +295,7 @@ class ActionGuard:
         *,
         issued_at: int | None = None,
     ) -> SafetyDecision:
-        expected_addresses = (
-            [intent.destination] if intent.destination is not None else []
-        )
+        expected_addresses = [intent.destination] if intent.destination is not None else []
         verdict = await self.engine.scan(
             intent.payload,
             depth="thorough",
@@ -338,9 +364,8 @@ class ActionGuard:
             reasons.append("ACTION_NOT_ALLOWED")
         if intent.tool not in self.policy.allowed_tools:
             reasons.append("TOOL_NOT_ALLOWED")
-        if (
-            intent.destination is not None
-            and intent.destination not in self.policy.allowed_destinations
+        if intent.destination is not None and not _destination_allowed(
+            intent.destination, self.policy.allowed_destinations
         ):
             reasons.append("DESTINATION_NOT_ALLOWED")
         if intent.asset is not None and intent.amount_atomic is not None:
@@ -349,4 +374,10 @@ class ActionGuard:
                 reasons.append("ASSET_NOT_ALLOWED")
             elif intent.amount_atomic > maximum:
                 reasons.append("AMOUNT_LIMIT_EXCEEDED")
+        if intent.action_type == "contract_call":
+            # An unstated selector cannot be policed, and amount limits do not help
+            # here: approve(spender, MAX) moves no value while granting away the
+            # balance. Refuse rather than authorize a call we cannot see.
+            if intent.selector is None or intent.selector not in self.policy.allowed_selectors:
+                reasons.append("SELECTOR_NOT_ALLOWED")
         return reasons

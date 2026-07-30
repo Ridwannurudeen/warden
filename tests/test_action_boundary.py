@@ -257,3 +257,116 @@ def test_boundary_models_reject_unknown_fields_and_non_explicit_policy() -> None
             allowed_destinations=[DESTINATION],
             max_amount_atomic_by_asset={"USDT": 1_000_000},
         )
+
+
+# Findings from an external adversarial review of /api/action/guard (2026-07-30).
+# Deliberately letter-bearing: an all-digit address makes every case test vacuous.
+MIXED_CASE_DESTINATION = "0xAbCdEf0123456789aBcDeF0123456789AbCdEf01"
+
+
+def _allow_engine() -> _FixedEngine:
+    return _FixedEngine(
+        Verdict(
+            verdict="ALLOW",
+            risk_level="NONE",
+            threat_classes=[],
+            detections=[],
+            sanitized_payload=PAYLOAD,
+            recommendation="",
+            checks={},
+            latency_ms=0.0,
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_checksummed_allowlist_entry_matches_a_lowercase_destination():
+    # viem hands back EIP-55 checksummed addresses while OKX and most RPCs return
+    # lowercase. Comparing literally refused callers paying an address they had
+    # explicitly allowlisted.
+    policy = _policy(allowed_destinations=[MIXED_CASE_DESTINATION])
+    intent = ActionIntent(
+        action_type="transfer",
+        tool="wallet.transfer",
+        destination=MIXED_CASE_DESTINATION.lower(),
+        asset="USDT",
+        amount_atomic=1,
+        payload=PAYLOAD,
+    )
+    task = OkxTaskContext(
+        network="eip155:196",
+        agent_id="3808",
+        service_id="svc",
+        service_revision_sha256=REVISION,
+        task_id=TASK_ID,
+    )
+    decision = await ActionGuard(policy, engine=_allow_engine()).evaluate(intent, task)
+    assert "DESTINATION_NOT_ALLOWED" not in decision.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_a_contract_call_without_an_allowlisted_selector_is_refused():
+    # approve(spender, MAX) moves no value, so an amount limit never fires on it.
+    # An unstated or unlisted selector must fail closed instead.
+    task = OkxTaskContext(
+        network="eip155:196",
+        agent_id="3808",
+        service_id="svc",
+        service_revision_sha256=REVISION,
+        task_id=TASK_ID,
+    )
+    base = {
+        "action_type": "contract_call",
+        "tool": "wallet.transfer",
+        "destination": DESTINATION,
+        "payload": PAYLOAD,
+    }
+    policy = _policy(allowed_actions=["contract_call"], allowed_selectors=["0x095ea7b3"])
+
+    unlisted = ActionIntent(**base, selector="0xdeadbeef")
+    refused = await ActionGuard(policy, engine=_allow_engine()).evaluate(unlisted, task)
+    assert refused.decision == "BLOCK"
+    assert "SELECTOR_NOT_ALLOWED" in refused.reason_codes
+
+    absent = ActionIntent(**base)
+    unpoliceable = await ActionGuard(policy, engine=_allow_engine()).evaluate(absent, task)
+    assert unpoliceable.decision == "BLOCK"
+    assert "SELECTOR_NOT_ALLOWED" in unpoliceable.reason_codes
+
+    permitted = ActionIntent(**base, selector="0x095ea7b3")
+    allowed = await ActionGuard(policy, engine=_allow_engine()).evaluate(permitted, task)
+    assert "SELECTOR_NOT_ALLOWED" not in allowed.reason_codes
+
+
+def test_the_policy_hash_covers_the_selector_allowlist():
+    # Two policies that differ only in which contract calls they permit must not
+    # commit to the same hash, or the receipt understates what was decided.
+    narrow = _policy(allowed_selectors=["0x095ea7b3"])
+    wide = _policy(allowed_selectors=["0x095ea7b3", "0xa9059cbb"])
+    assert policy_sha256(narrow) != policy_sha256(wide)
+
+
+def test_the_policy_hash_ignores_address_case():
+    lower = _policy(allowed_destinations=[MIXED_CASE_DESTINATION.lower()])
+    upper = _policy(allowed_destinations=[MIXED_CASE_DESTINATION])
+    assert policy_sha256(lower) == policy_sha256(upper)
+
+
+def test_the_action_context_hash_ignores_address_case():
+    task = OkxTaskContext(
+        network="eip155:196",
+        agent_id="3808",
+        service_id="svc",
+        service_revision_sha256=REVISION,
+        task_id=TASK_ID,
+    )
+    common = {
+        "action_type": "transfer",
+        "tool": "wallet.transfer",
+        "asset": "USDT",
+        "amount_atomic": 1,
+        "payload": PAYLOAD,
+    }
+    lower = ActionIntent(**common, destination=MIXED_CASE_DESTINATION.lower())
+    upper = ActionIntent(**common, destination=MIXED_CASE_DESTINATION)
+    assert action_context_sha256(lower, task) == action_context_sha256(upper, task)
