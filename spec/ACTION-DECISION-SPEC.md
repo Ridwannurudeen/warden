@@ -118,9 +118,12 @@ when no detector fires.
 way as a receipt: canonical JSON of everything except `issuer_sig`, checked against a published
 issuer key.
 
-`policy_id` is the SHA-256 of the canonical policy, so identical rules always produce the same id and
-keep their first anchor. Re-registration is idempotent and preserves the original `issued_at`; it
-cannot be used to move a policy's apparent age forward.
+`policy_id` is the SHA-256 of the canonical JSON of `{"policy": <canonical policy>, "caller_key":
+<key or null>}` — the rules **and** the key bound to them, not the rules alone. Identical rules
+registered under two different keys therefore produce two different ids. That is deliberate: it stops
+one party anchoring another's ruleset first and leaving them unable to bind a key to it. Registering
+the same pair again is idempotent and preserves the original `issued_at` and anchor, so a
+re-registration cannot move a policy's apparent age forward.
 
 A guard request then sends `policy_id` instead of `policy`. To prove control of the registration,
 sign the canonical JSON of
@@ -129,5 +132,12 @@ sign the canonical JSON of
 {"spec_version":"warden-action-policy/1","policy_id":"…","action_context_sha256":"…"}
 ```
 
-with the registered key and send it as `caller_sig`. Binding the action context is deliberate: a
-captured signature cannot be replayed against a different action under the same policy.
+with the registered key and send it as `caller_sig`. The signature is over **those exact bytes** —
+canonical JSON, keys sorted, `separators=(",", ":")`, UTF-8 — with no further hashing or wrapping.
+Binding the action context is deliberate: a captured signature cannot be replayed against a different
+action under the same policy.
+
+A `caller_sig` that is present but does not verify returns **HTTP 400**, rather than a 200 carrying
+`caller_verified: false`. Otherwise a rejected signature would be indistinguishable from one that was
+never checked, which is not a distinction to leave ambiguous on a field this load-bearing. Omitting
+`caller_sig` entirely is still valid and simply leaves `caller_verified` false.

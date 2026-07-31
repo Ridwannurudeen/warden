@@ -881,6 +881,11 @@ async def guard_action_endpoint(req: ActionGuardRequest) -> dict[str, object]:
         policy_id=policy_id,
         action_context_sha256=action_context_sha256(req.intent, req.task),
     )
+    if req.caller_sig is not None and not caller_verified:
+        # Returning 200 with caller_verified false made a wrong signature
+        # indistinguishable from one that was never checked. The field is
+        # load-bearing, so a presented-and-invalid signature fails loudly.
+        raise HTTPException(status_code=400, detail="caller_sig did not verify for this policy")
     decision = await ActionGuard(policy).evaluate(
         req.intent,
         req.task,
