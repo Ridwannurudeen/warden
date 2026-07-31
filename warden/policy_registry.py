@@ -21,10 +21,14 @@ import hashlib
 import time
 from collections.abc import Mapping
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
 from warden import protection
 from warden.badges import (
     _canonical_json,
     b64u_decode,
+    b64u_encode,
     ed25519_sign_record,
     ed25519_verify_record,
 )
@@ -81,9 +85,9 @@ def policy_id_for(policy: ActionPolicy, caller_key: str | None = None) -> str:
     parties may hold the same rules; they are separate registrations.
     """
     return hashlib.sha256(
-        _canonical_json(
-            {"policy": canonical_policy(policy), "caller_key": caller_key}
-        ).encode("utf-8")
+        _canonical_json({"policy": canonical_policy(policy), "caller_key": caller_key}).encode(
+            "utf-8"
+        )
     ).hexdigest()
 
 
@@ -192,12 +196,38 @@ def caller_signature_valid(
     policy_id: str,
     action_context_sha256: str,
 ) -> bool:
-    """True only when the registration named a key and this request proves control of it."""
+    """True only when the registration named a key and this request proves control of it.
+
+    The signature is verified over `caller_binding_payload` exactly as published.
+    An earlier version verified it over an internal wrapper,
+    `{"payload_sha256": sha256(payload)}`, which no caller following the spec
+    could produce: `caller_verified` was unreachable from outside, and a wrong
+    signature was indistinguishable from an unchecked one. Verifying the
+    documented bytes is the whole point of publishing them.
+    """
     if caller_key is None or signature is None:
         return False
+    if not isinstance(signature, str) or not signature.startswith("sig:"):
+        return False
+    if not _is_ed25519_public_key(caller_key):
+        return False
+    try:
+        public_key = b64u_decode(caller_key)
+        signature_bytes = b64u_decode(signature)
+    except (ValueError, TypeError):
+        return False
+    if (
+        len(public_key) != 32
+        or len(signature_bytes) != 64
+        or b64u_encode(signature_bytes, "sig") != signature
+    ):
+        return False
     payload = caller_binding_payload(policy_id, action_context_sha256)
-    record = {"payload_sha256": hashlib.sha256(payload).hexdigest(), "caller_sig": signature}
-    return ed25519_verify_record(record, caller_key, "caller_sig")
+    try:
+        Ed25519PublicKey.from_public_bytes(public_key).verify(signature_bytes, payload)
+    except InvalidSignature:
+        return False
+    return True
 
 
 def register_policy(

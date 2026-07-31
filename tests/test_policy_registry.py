@@ -8,6 +8,7 @@ could not show who asked).
 from __future__ import annotations
 
 import hashlib
+import json
 import tempfile
 from unittest import mock
 from pathlib import Path
@@ -18,7 +19,7 @@ from fastapi.testclient import TestClient
 
 from warden import evidence_store, policy_registry
 from warden.action_guard import action_context_sha256, verify_decision_receipt
-from warden.badges import b64u_encode, ed25519_sign_record
+from warden.badges import b64u_encode
 from warden.models import ActionIntent, ActionPolicy, OkxTaskContext
 
 POLICY = {
@@ -61,12 +62,15 @@ def client() -> TestClient:
 
 
 def _caller_signature(private_key: Ed25519PrivateKey, policy_id: str, intent: dict) -> str:
+    """Sign exactly what the published spec tells a caller to sign.
+
+    Deliberately not routed through any internal signing helper. The previous
+    version signed an internal wrapper, which matched the implementation and so
+    passed while no external caller could ever produce a valid signature.
+    """
     context = action_context_sha256(ActionIntent(**intent), OkxTaskContext(**TASK))
     payload = policy_registry.caller_binding_payload(policy_id, context)
-    signed = ed25519_sign_record(
-        {"payload_sha256": hashlib.sha256(payload).hexdigest()}, private_key, "caller_sig"
-    )
-    return str(signed["caller_sig"])
+    return b64u_encode(private_key.sign(payload), "sig")
 
 
 def test_a_registered_policy_is_anchored_in_the_transparency_log(client: TestClient):
@@ -150,7 +154,8 @@ def test_a_caller_signature_binds_the_request_and_does_not_replay(client: TestCl
     ).json()
     assert signed["receipt"]["caller_verified"] is True
 
-    # The signature covers the action context, so it cannot authorize a larger payment.
+    # The signature covers the action context, so it cannot authorize a larger
+    # payment — and a presented signature that does not verify is a hard error.
     replayed = client.post(
         "/api/action/guard",
         json={
@@ -159,8 +164,8 @@ def test_a_caller_signature_binds_the_request_and_does_not_replay(client: TestCl
             "policy_id": policy_id,
             "caller_sig": signature,
         },
-    ).json()
-    assert replayed["receipt"]["caller_verified"] is False
+    )
+    assert replayed.status_code == 400
 
     unsigned = client.post(
         "/api/action/guard", json={"intent": INTENT, "task": TASK, "policy_id": policy_id}
@@ -180,9 +185,9 @@ def test_a_wrong_key_cannot_claim_the_registration(client: TestClient):
     result = client.post(
         "/api/action/guard",
         json={"intent": INTENT, "task": TASK, "policy_id": policy_id, "caller_sig": forged},
-    ).json()
+    )
 
-    assert result["receipt"]["caller_verified"] is False
+    assert result.status_code == 400
 
 
 def test_an_unknown_policy_id_is_refused_rather_than_defaulted(client: TestClient):
@@ -244,5 +249,81 @@ def test_two_callers_may_register_the_same_rules_under_their_own_keys(client: Te
     theirs = client.post(
         "/api/action/guard",
         json={"intent": INTENT, "task": TASK, "policy_id": two["policy_id"], "caller_sig": signature},
-    ).json()
-    assert theirs["receipt"]["caller_verified"] is False
+    )
+    assert theirs.status_code == 400
+
+
+def test_a_signature_made_from_the_published_spec_alone_verifies(client: TestClient):
+    # The regression that matters. caller_verified was previously checked against an
+    # internal wrapper, so a caller following the spec could never reach it. This
+    # signs with nothing but the documented bytes and a raw Ed25519 key.
+    caller = Ed25519PrivateKey.generate()
+    public = b64u_encode(caller.public_key().public_bytes_raw(), "ed25519")
+    policy_id = client.post(
+        "/api/policy/register", json={"policy": POLICY, "caller_key": public}
+    ).json()["policy_id"]
+
+    context = action_context_sha256(ActionIntent(**INTENT), OkxTaskContext(**TASK))
+    published_bytes = json.dumps(
+        {
+            "spec_version": "warden-action-policy/1",
+            "policy_id": policy_id,
+            "action_context_sha256": context,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    signature = b64u_encode(caller.sign(published_bytes), "sig")
+
+    response = client.post(
+        "/api/action/guard",
+        json={"intent": INTENT, "task": TASK, "policy_id": policy_id, "caller_sig": signature},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["receipt"]["caller_verified"] is True
+
+
+def test_a_presented_signature_that_does_not_verify_is_a_hard_error(client: TestClient):
+    # A 200 with caller_verified false made "rejected" indistinguishable from
+    # "never checked" on a field an adjudicator leans on.
+    caller = Ed25519PrivateKey.generate()
+    impostor = Ed25519PrivateKey.generate()
+    public = b64u_encode(caller.public_key().public_bytes_raw(), "ed25519")
+    policy_id = client.post(
+        "/api/policy/register", json={"policy": POLICY, "caller_key": public}
+    ).json()["policy_id"]
+
+    forged = _caller_signature(impostor, policy_id, INTENT)
+    assert (
+        client.post(
+            "/api/action/guard",
+            json={"intent": INTENT, "task": TASK, "policy_id": policy_id, "caller_sig": forged},
+        ).status_code
+        == 400
+    )
+
+    # Omitting it entirely stays valid, and simply proves nothing about the caller.
+    unsigned = client.post(
+        "/api/action/guard", json={"intent": INTENT, "task": TASK, "policy_id": policy_id}
+    )
+    assert unsigned.status_code == 200
+    assert unsigned.json()["receipt"]["caller_verified"] is False
+
+
+def test_the_policy_id_covers_the_caller_key_as_documented():
+    # The spec claimed the id was the hash of the policy alone; it is not.
+    policy = ActionPolicy(**POLICY)
+    key = "ed25519:" + "A" * 43
+    documented = hashlib.sha256(
+        json.dumps(
+            {"policy": policy_registry.canonical_policy(policy), "caller_key": key},
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+    ).hexdigest()
+
+    assert policy_registry.policy_id_for(policy, key) == documented
+    assert policy_registry.policy_id_for(policy, None) != documented

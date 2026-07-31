@@ -115,14 +115,16 @@ curl -sX POST https://warden.gudman.xyz/api/policy/register \
 
 A registered policy is signed and anchored in the transparency log at a sequence number, and the
 receipt cites both. Because the log is hash-chained, an adjudicator can establish the policy existed
-**before** the action it authorized. Policies are content-addressed, so identical rules always
-register as the same `policy_id` and keep their original anchor — re-registering cannot move that
-evidence forward in time.
+**before** the action it authorized. A `policy_id` addresses the rules **and** the key bound to them, so the same rules registered under
+two different keys are two separate registrations — one party cannot anchor another's ruleset first
+and leave them unable to bind a key. Re-registering the same pair is idempotent and keeps its
+original anchor, so it cannot move that evidence forward in time.
 
 Naming a `caller_key` at registration adds the second half. A guard request signed by that key sets
 `caller_verified` on the receipt, which is what makes its `agent_id` worth anything. The signature
 covers the action context as well as the policy id, so it cannot be replayed against a different
-action. Every receipt states which mode applied via `policy_binding` (`inline` or `registered`),
+action. It is signed over the published bytes directly, with no further wrapping, and a signature
+that is present but does not verify returns HTTP 400 rather than a quiet `caller_verified: false`. Every receipt states which mode applied via `policy_binding` (`inline` or `registered`),
 `policy_log_seq`, and `caller_verified` — all inside the signature, so none of them can be edited
 afterwards.
 
