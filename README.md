@@ -121,16 +121,21 @@ and leave them unable to bind a key. Re-registering the same pair is idempotent 
 original anchor, so it cannot move that evidence forward in time.
 
 Naming a `caller_key` at registration adds the second half. A guard request signed by that key sets
-`caller_verified` on the receipt, which is what makes its `agent_id` worth anything. The signature
-covers the action context as well as the policy id, so it cannot be replayed against a different
-action. It is signed over the published bytes directly, with no further wrapping, and a signature
-that is present but does not verify returns HTTP 400 rather than a quiet `caller_verified: false`. Every receipt states which mode applied via `policy_binding` (`inline` or `registered`),
-`policy_log_seq`, and `caller_verified` — all inside the signature, so none of them can be edited
-afterwards.
+`caller_verified` on the receipt — proof of control of **that key**, and nothing about the
+`agent_id` on the request. Registration only ever binds `{policy, caller_key}`; no `agent_id` is
+named there or checked at guard time, on a signed request or otherwise. The signature covers the
+action context as well as the policy id, so it cannot be replayed against a different action. It is
+signed over the published bytes directly, with no further wrapping, and a signature that is present
+but does not verify returns HTTP 400 rather than a quiet `caller_verified: false`. Every receipt
+states which mode applied via `policy_binding` (`inline` or `registered`), `policy_log_seq`, and
+`caller_verified` — all inside the signature, so none of them can be edited afterwards.
 
-**What it still does not give you.** The route is unauthenticated, so an unsigned request proves
-nothing about who sent it. Action receipts are not themselves written to the log, so there is no
-proof of absence: you cannot tell how many decisions preceded the one being shown to you.
+**What it still does not give you.** `agent_id` and `service_id` are unauthenticated caller-supplied
+values on every receipt, `caller_verified: true` included — a stranger can register a policy under a
+key of their own and put any `agent_id` they like on the guard request. The route is unauthenticated
+too, so an unsigned request proves nothing about who sent it. Action receipts are not themselves
+written to the log, so there is no proof of absence: you cannot tell how many decisions preceded the
+one being shown to you.
 
 The receipt states its own limits, and they are part of the signed content: it is a record of one
 payload-and-policy decision, and **not** proof of execution, delivery, settlement, authorization,

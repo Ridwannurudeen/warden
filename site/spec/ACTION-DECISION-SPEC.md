@@ -26,16 +26,24 @@ verifier should treat them as load-bearing:
    the same intent under a laxer policy yields a different, equally valid receipt. `registered`
    means the policy was pre-registered and anchored in the transparency log at `policy_log_seq`,
    which a verifier can check placed it before the action.
-2. **`caller_verified` decides whether `agent_id` means anything.** The route is unauthenticated, so
-   on an unsigned request `agent_id` and `service_id` are merely values the caller supplied. It is
-   `true` only when the request carried a signature from the key named at registration.
+2. **`caller_verified` authenticates the key, not the agent.** `true` means the request was signed
+   by the key named at registration — nothing more. Registration binds `{policy, caller_key}`; it
+   never names an `agent_id`, and no `agent_id` is checked against anything at guard time.
+   `agent_id` and `service_id` are unauthenticated caller-supplied values on **every** receipt,
+   `caller_verified: true` included. A stranger holding no relationship to an agent can register a
+   fresh policy under a key of their own choosing, sign correctly, and be issued a receipt reading
+   `caller_verified: true` beside any `agent_id` they typed into the request. What `caller_verified`
+   rules out is only *reuse of someone else's already-registered `policy_id`* — signing proves
+   control of the specific key that policy was registered under, and that key is bound to nothing
+   but itself.
 3. **Action receipts are not written to the transparency log.** There is no proof of absence: a
    verifier cannot tell how many decisions preceded the one being shown.
 
 A receipt with `policy_binding: "registered"` and `caller_verified: true` establishes that a
-specific registrant, whose policy predates the action, received this decision. A receipt with
-`inline` binding and no caller verification establishes only what Warden decided given stated
-inputs. Treat the two differently.
+specific registrant, whose policy predates the action, received this decision — a claim about the
+**registration**, not about the `agent_id` field. A receipt with `inline` binding and no caller
+verification establishes only what Warden decided given stated inputs. Treat the two differently,
+and do not read either as authenticating `agent_id`.
 
 ## Verifying a receipt
 
