@@ -1,5 +1,6 @@
 """Detect payment redirection addresses inside agent payloads."""
 
+import json
 import re
 
 from warden.core.analyzer import AnalysisContext, Analyzer, AnalyzerResult
@@ -37,6 +38,25 @@ STRUCTURED_DESTINATION_RE = re.compile(
     ["']?
     \s*[:=]\s*["']?
     """
+)
+# JSON keys that name where value is going. Mirrors STRUCTURED_DESTINATION_RE's
+# vocabulary, minus a bare `address`: that key carries resolver output in benign
+# tool results (`{"tool":"resolve_name","result":{"address":"0x..."}}`), so it is
+# not evidence of a payment destination on its own.
+JSON_DESTINATION_KEYS = frozenset(
+    {
+        "to",
+        "recipient",
+        "recipients",
+        "destination",
+        "payee",
+        "beneficiary",
+        "payto",
+        "payout_recipient",
+        "payout_recipients",
+        "receiving_address",
+        "receiving_wallet",
+    }
 )
 STRUCTURED_PAYMENT_CONTEXT_RE = re.compile(
     r"(?i)\b(?:payment|settlement|payout|transfer|transaction|amount|"
@@ -170,6 +190,10 @@ class DrainAddressAnalyzer(Analyzer):
                     continue
                 detections.append(self._detection(token, 0.60))
 
+        if has_expected and STRUCTURED_PAYMENT_CONTEXT_RE.search(payload):
+            for value in _opaque_destinations(payload, expected_evm, expected_other):
+                detections.append(self._detection(value, 0.60))
+
         score = max((detection["confidence"] for detection in detections), default=0.0) * 100
         flags = [f"Payment redirection candidate: {detection['match']}" for detection in detections]
         return AnalyzerResult(
@@ -226,3 +250,68 @@ class DrainAddressAnalyzer(Analyzer):
             "match": address,
             "confidence": confidence,
         }
+
+
+def _opaque_destinations(
+    payload: str, expected_evm: set[str], expected_other: set[str]
+) -> list[str]:
+    """Destination values that name no recognisable address at all.
+
+    A valid recipient is caught by the EVM/Solana passes and a truncated `0x`
+    token by MALFORMED_ADDR_RE. Neither sees a destination key whose value is an
+    arbitrary string -- `"to": "0xattacker_unknown"` names a recipient that is not
+    the one the caller expected, yet matches no address shape, so it used to score
+    zero and pass as clean.
+
+    Parsed as JSON rather than matched textually, which is what keeps this narrow:
+    a code snippet (`{"to": to, "value": 0}`) and an English sentence about
+    updating a recipient are both invalid JSON, so neither can reach this rule.
+
+    Only the caller's own expectation makes a value opaque: anything listed in
+    `expected_addresses` is the declared destination and is exempt, including
+    non-EVM forms like ENS names, which `/api/action/guard` supplies verbatim.
+    """
+    try:
+        document = json.loads(payload)
+    except (ValueError, TypeError):
+        return []
+    # In a JSON-RPC envelope `to` is the contract being called, not a payee; a
+    # valid one is already covered by the EVM pass.
+    if isinstance(document, dict) and "method" in document:
+        return []
+
+    expected_exact = {value.lower() for value in expected_evm | expected_other}
+    found: list[str] = []
+
+    # The sanitizer rewrites a flagged value to "[REDACTED]" (verdict.py) and the
+    # engine then rescans its own output. A redaction marker is not an opaque
+    # recipient: without this the rule re-fires on the sanitized payload, the
+    # rescan reports "still triggers", and every SANITIZE escalates to BLOCK.
+    redaction_markers = {"[redacted]", "[redacted secret]"}
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if (
+                    isinstance(key, str)
+                    and isinstance(value, str)
+                    and key.strip().lower().replace("-", "_") in JSON_DESTINATION_KEYS
+                ):
+                    candidate = value.strip()
+                    if (
+                        candidate
+                        and candidate.lower() not in expected_exact
+                        and candidate.lower() not in redaction_markers
+                        and not EVM_ADDRESS_RE.fullmatch(candidate)
+                        and not SOLANA_ADDRESS_RE.fullmatch(candidate)
+                        and not MALFORMED_ADDR_RE.fullmatch(candidate)
+                        and candidate not in found
+                    ):
+                        found.append(candidate)
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(document)
+    return found

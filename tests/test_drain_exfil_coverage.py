@@ -225,3 +225,20 @@ def test_genuine_receipt_without_an_imperative_stays_allowed():
 
     assert body["verdict"] == "ALLOW"
     assert body["threat_classes"] == []
+
+
+def test_opaque_destination_sanitizes_and_rescans_clean():
+    """End-to-end: a recipient that matches no address shape is caught, redacted,
+    and the redacted payload is clean — SANITIZE, not an escalation to BLOCK."""
+    response = _scan(
+        '{"action":"transfer","to":"0xattacker_unknown","amount":"100","token":"USDT"}',
+        context={"expected_addresses": ["0x711bc2968445cb7a48a80bfa2be15f2ed7106815"]},
+    )
+    data = response.json()
+    assert data["verdict"] == "SANITIZE"
+    assert "DRAIN_ADDRESS" in data["threat_classes"]
+    assert "0xattacker_unknown" not in data["sanitized_payload"]
+
+    clean = _scan(data["sanitized_payload"],
+                  context={"expected_addresses": ["0x711bc2968445cb7a48a80bfa2be15f2ed7106815"]})
+    assert clean.json()["verdict"] == "ALLOW"

@@ -756,3 +756,121 @@ async def test_file_uri_scheme_hard_blocks_before_downstream_execution(engine, u
 
     assert verdict.verdict == "BLOCK"
     assert ReasonCode.MALICIOUS_LINK in verdict.threat_classes
+
+
+EXPECTED_DEST = "0x711bc2968445cb7a48a80bfa2be15f2ed7106815"
+
+
+class TestOpaqueDestination:
+    """A destination key whose value matches no address shape at all.
+
+    A valid recipient is caught by the EVM/Solana passes and a truncated 0x token
+    by MALFORMED_ADDR_RE; `"to": "0xattacker_unknown"` was seen by neither and
+    scored zero, so a redirection to an unnamed party read as a clean payload.
+    """
+
+    @pytest.mark.asyncio
+    async def test_opaque_destination_is_flagged_when_expectation_supplied(self):
+        result = await DrainAddressAnalyzer().analyze(
+            ctx(
+                '{"action":"transfer","to":"0xattacker_unknown","amount":"100","token":"USDT"}',
+                [EXPECTED_DEST],
+            )
+        )
+        assert result.data["detections"][0]["class"] == ReasonCode.DRAIN_ADDRESS.value
+        assert result.data["detections"][0]["match"] == "0xattacker_unknown"
+        # Never the hard-block band: an unparseable name is weaker evidence than a
+        # real address pointed somewhere unexpected.
+        assert result.data["detections"][0]["confidence"] == 0.60
+
+    @pytest.mark.asyncio
+    async def test_no_expectation_means_no_opinion(self):
+        result = await DrainAddressAnalyzer().analyze(
+            ctx('{"action":"transfer","to":"0xattacker_unknown","amount":"100"}')
+        )
+        assert result.data["detections"] == []
+
+    @pytest.mark.asyncio
+    async def test_declared_destination_is_exempt(self):
+        result = await DrainAddressAnalyzer().analyze(
+            ctx(
+                '{"action":"transfer","to":"%s","amount":"100","token":"USDT"}' % EXPECTED_DEST,
+                [EXPECTED_DEST],
+            )
+        )
+        assert result.data["detections"] == []
+
+    @pytest.mark.asyncio
+    async def test_non_evm_destination_the_caller_declared_is_exempt(self):
+        """/api/action/guard passes intent.destination verbatim as the expectation,
+        and non-EVM destinations are supported by design — flagging one would fire
+        on every legitimate ENS or Solana transfer through the action guard."""
+        result = await DrainAddressAnalyzer().analyze(
+            ctx(
+                '{"action":"transfer","to":"harbour.eth","amount":"100","token":"USDT"}',
+                ["harbour.eth"],
+            )
+        )
+        assert result.data["detections"] == []
+
+    @pytest.mark.asyncio
+    async def test_code_snippet_cannot_reach_the_rule(self):
+        """Parsed as JSON precisely so a Python snippet — invalid JSON — is skipped."""
+        result = await DrainAddressAnalyzer().analyze(
+            ctx(
+                'signed = account.sign_transaction({"to": to, "value": 0, "nonce": nonce})',
+                [EXPECTED_DEST],
+            )
+        )
+        assert result.data["detections"] == []
+
+    @pytest.mark.asyncio
+    async def test_prose_about_a_recipient_cannot_reach_the_rule(self):
+        result = await DrainAddressAnalyzer().analyze(
+            ctx(
+                "Please update the recipient on the standing invoice to our finance mailbox.",
+                [EXPECTED_DEST],
+            )
+        )
+        assert result.data["detections"] == []
+
+    @pytest.mark.asyncio
+    async def test_json_rpc_envelope_is_exempt(self):
+        """In JSON-RPC `to` is the contract being called, not a payee."""
+        result = await DrainAddressAnalyzer().analyze(
+            ctx(
+                '{"jsonrpc":"2.0","method":"eth_call","params":[{"to":"pending","data":"0x70a"}]}',
+                [EXPECTED_DEST],
+            )
+        )
+        assert result.data["detections"] == []
+
+    @pytest.mark.asyncio
+    async def test_payment_context_is_required(self):
+        result = await DrainAddressAnalyzer().analyze(
+            ctx('{"to":"somewhere","note":"meeting room booking"}', [EXPECTED_DEST])
+        )
+        assert result.data["detections"] == []
+
+    @pytest.mark.asyncio
+    async def test_nested_destination_is_found(self):
+        result = await DrainAddressAnalyzer().analyze(
+            ctx(
+                '{"tx":{"payment":{"payee":"the usual place","amount":"100","token":"USDT"}}}',
+                [EXPECTED_DEST],
+            )
+        )
+        assert [d["match"] for d in result.data["detections"]] == ["the usual place"]
+
+    @pytest.mark.asyncio
+    async def test_redaction_marker_is_not_itself_an_opaque_destination(self):
+        """The sanitizer rewrites the flagged value to "[REDACTED]" and the engine
+        rescans its own output. If the marker re-triggers this rule the rescan
+        reports "still triggers" and every SANITIZE silently escalates to BLOCK."""
+        result = await DrainAddressAnalyzer().analyze(
+            ctx(
+                '{"action":"transfer","to":"[REDACTED]","amount":"100","token":"USDT"}',
+                [EXPECTED_DEST],
+            )
+        )
+        assert result.data["detections"] == []
