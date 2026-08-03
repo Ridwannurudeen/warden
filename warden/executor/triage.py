@@ -1,43 +1,39 @@
-"""One deterministic answer for every task sitting in the provider queue.
+"""One protocol-correct answer for every task in the provider queue.
 
-A marketplace ASP can defend refusing work. It cannot defend silence: a task
-left at `created` is indistinguishable from an agent that is simply not there,
-and eight of them from one buyer is what a non-responsive provider looks like.
+A marketplace ASP can defend declining work. It cannot defend silence: a task
+left at `created` is indistinguishable from an agent that is not there, and
+eight of them from one buyer is what a non-responsive provider looks like.
 
-So every task gets an answer. Refusal is the answer this module is allowed to
-give on its own, because `asp-reject` is an off-chain backend call that signs
-nothing and moves no money. Acceptance is not: `apply` signs and broadcasts an
-irreversible commitment to paid work, so anything that could be accepted is
-surfaced for a human instead (see `guardrails.FORBIDDEN_CLI_ACTIONS`).
+What that answer is comes from the platform's ASP playbook, not from taste:
+
+- A `created` task is answered by opening negotiation (`contact-user`), whose
+  canonical opener asks the three topics — budget, acceptance criteria, payment
+  mode. Price is therefore a thing to *negotiate*, not a reason to refuse up
+  front, and a task description is explicitly "still just an inquiry, not a work
+  order", so the absence of a payload in it is normal rather than a defect.
+- Acceptance is never automated. `apply` is system-event-triggered, run by the
+  `JobAspSelected` flow once the User Agent designates this ASP on-chain;
+  invoking it from the cold-start path corrupts the state machine and risks
+  escrow loss (see `guardrails.FORBIDDEN_CLI_ACTIONS`).
+- Real work waits for `job_accepted`, so an `accepted` job is the only one that
+  owes a deliverable.
+
+`contact-user` is safe to automate for the same reason refusing is: it is an
+off-chain call that signs nothing and moves no money, and the opener text is
+fixed by the CLI, so automation cannot say the wrong thing in the owner's name.
 """
 
 import re
 from dataclasses import dataclass
 from typing import Literal
 
-from warden.executor.guardrails import price_meets_floor
-
 PAYMENT_MODE_ESCROW = 1
 STATUS_CREATED = 0
 STATUS_ACCEPTED = 1
 
-# How a buyer marks the text they want scanned. Free prose cannot be used: a
-# description *about* a payload reads exactly like the payload itself, and
-# guessing wrong means either scanning the wrong bytes or refusing real work.
-_FENCED = re.compile(r"```(?:[a-zA-Z0-9_-]*)\n?(.*?)```", re.DOTALL)
-_LABELLED = re.compile(r"payload\s*:\s*(.+)", re.IGNORECASE | re.DOTALL)
 _EVM_ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}")
 
-TriageAction = Literal["refuse", "surface", "deliver"]
-
-BELOW_FLOOR_REASON = (
-    "Declined: budget {price} USDT is below Warden's floor of {floor} USDT for this service. "
-    "Re-post at or above the listed price and it will be picked up."
-)
-NO_PAYLOAD_REASON = (
-    "Declined: no payload to scan was included. Put the exact text in the task description "
-    "inside a ``` fenced block, or on a line starting with 'payload:', then re-post."
-)
+TriageAction = Literal["contact", "surface"]
 
 
 @dataclass(frozen=True)
@@ -45,34 +41,15 @@ class TriageDecision:
     action: TriageAction
     job_id: str
     reason: str
-    payload: str | None = None
     expected_addresses: tuple[str, ...] = ()
 
 
-def extract_payload(description: object) -> str | None:
-    """The text a buyer explicitly marked as the thing to scan, or None.
-
-    Deliberately strict. Treating an unmarked description as the payload would
-    have Warden scanning "Check if this payload is safe for delivery" and
-    returning a verdict on its own instructions.
-    """
-    if not isinstance(description, str):
-        return None
-    fenced = _FENCED.search(description)
-    if fenced is not None:
-        body = fenced.group(1).strip()
-        if body:
-            return body
-    labelled = _LABELLED.search(description)
-    if labelled is not None:
-        body = labelled.group(1).strip()
-        if body:
-            return body
-    return None
-
-
 def extract_expected_addresses(description: object) -> tuple[str, ...]:
-    """Payout addresses the buyer says it expects, so a redirect is catchable."""
+    """Payout addresses the buyer names, so a later redirect is catchable.
+
+    Collected at triage because the description is where a buyer states them,
+    and negotiation may not repeat them.
+    """
     if not isinstance(description, str):
         return ()
     seen: dict[str, None] = {}
@@ -81,44 +58,30 @@ def extract_expected_addresses(description: object) -> tuple[str, ...]:
     return tuple(seen)
 
 
-def triage(task: dict[str, object], *, price_floor_usdt: str) -> TriageDecision:
-    """Decide the single action owed to one provider-side task.
-
-    Gate order is deliberate: price is checked before payload, because a task
-    below the floor is refused whatever it contains, and telling a buyer to
-    resubmit a payload for work we would decline anyway wastes their time.
-    """
+def triage(task: dict[str, object]) -> TriageDecision:
+    """Decide the single action owed to one provider-side task."""
     job_id = task.get("jobId")
     if not isinstance(job_id, str) or not job_id:
         return TriageDecision("surface", "", "task has no usable jobId")
 
     status = task.get("status")
+
     if status == STATUS_ACCEPTED:
-        return TriageDecision("deliver", job_id, "accepted job awaiting its deliverable")
+        # The only state that owes a deliverable. Left to a human for now: the
+        # payload arrives during negotiation, not on the task record.
+        return TriageDecision("surface", job_id, "accepted job owes a deliverable")
+
     if status != STATUS_CREATED:
-        return TriageDecision("surface", job_id, f"status {status!r} has no deterministic action")
+        return TriageDecision("surface", job_id, f"status {status!r} has no cold-start action")
 
     if task.get("paymentMode") != PAYMENT_MODE_ESCROW:
-        # Only escrow is fulfilled in-process; anything else settles elsewhere
-        # and is not this layer's to answer.
+        # Non-escrow settles outside this path; opening a negotiation for it
+        # would be answering a question nobody asked.
         return TriageDecision("surface", job_id, "not an escrow task")
 
-    price = str(task.get("tokenAmount", ""))
-    if not price_meets_floor(price, price_floor_usdt):
-        return TriageDecision(
-            "refuse",
-            job_id,
-            BELOW_FLOOR_REASON.format(price=price or "unstated", floor=price_floor_usdt),
-        )
-
-    payload = extract_payload(task.get("description"))
-    if payload is None:
-        return TriageDecision("refuse", job_id, NO_PAYLOAD_REASON)
-
     return TriageDecision(
-        "surface",
+        "contact",
         job_id,
-        "meets the floor and carries a payload; acceptance is a human decision",
-        payload=payload,
+        "created escrow task awaiting a cold-start opener",
         expected_addresses=extract_expected_addresses(task.get("description")),
     )

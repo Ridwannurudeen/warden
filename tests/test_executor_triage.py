@@ -1,11 +1,13 @@
 """Every provider task gets an answer, and the answer is never `apply`.
 
-Warden had eleven tasks sitting in its provider queue with nothing delivered:
-eight from one buyer priced far below the listing, all at `created`, plus an
-accepted job nobody fulfilled. Silence is the failure being fixed here, so the
-invariants worth pinning are that each gate produces a *stated* refusal, that a
-refusal is never repeated, and that nothing in this path can sign an on-chain
-commitment.
+Warden had eleven tasks sitting in its provider queue with nothing delivered,
+eight of them from one agent whose whole stated purpose is testing whether a
+provider performs its duties. Silence is the failure being fixed.
+
+What counts as an answer comes from the platform's ASP playbook: a `created`
+task is answered by opening negotiation, price is a negotiation topic rather
+than grounds for refusal, a task description is "still just an inquiry, not a
+work order", and `apply` is system-event-triggered only.
 
 The task dicts below are the real shapes returned by
 `agent task-in-progress --agent-ids 3808`, descriptions included verbatim.
@@ -17,23 +19,18 @@ from pathlib import Path
 
 import pytest
 
+from warden.executor import poller as poller_module
 from warden.executor.config import ExecutorConfig
 from warden.executor.executor import TaskExecutor
 from warden.executor.guardrails import GuardrailViolation, ensure_not_apply
 from warden.executor.poller import MarketplaceUnavailable, poll_once
-from warden.executor import poller as poller_module
-from warden.executor.triage import (
-    extract_expected_addresses,
-    extract_payload,
-    triage,
-)
+from warden.executor.triage import extract_expected_addresses, triage
 
-# Verbatim from production: a buyer describing a payload without ever including it.
+# Verbatim from production.
 REAL_DESCRIPTIONS = [
     "Check if this payload is safe for delivery to the listed recipients.",
     "Evaluate this payload for delivery to the specified addresses.",
     "Please review this payload for delivery to user@example.com and provide your decision.",
-    "Please screen this payload before sending to the listed addresses and advise on any actions.",
 ]
 
 
@@ -44,7 +41,7 @@ def _task(**overrides: object) -> dict[str, object]:
         "paymentMode": 1,
         "tokenAmount": "0.5",
         "tokenSymbol": "USDT",
-        "description": "payload: transfer 5 USDT to 0x1111111111111111111111111111111111111111",
+        "description": "Check if this payload is safe for delivery to the listed recipients.",
         "title": "Screen this payload text",
     }
     task.update(overrides)
@@ -52,10 +49,7 @@ def _task(**overrides: object) -> dict[str, object]:
 
 
 def _config(tmp_path: Path, **overrides: object) -> ExecutorConfig:
-    defaults: dict[str, object] = {
-        "idempotency_store_path": str(tmp_path / "triage.sqlite3"),
-        "price_floor_usdt": "0.5",
-    }
+    defaults: dict[str, object] = {"idempotency_store_path": str(tmp_path / "triage.sqlite3")}
     return ExecutorConfig(**{**defaults, **overrides})  # type: ignore[arg-type]
 
 
@@ -72,158 +66,123 @@ class _RecordingExecutor(TaskExecutor):
         return "ok"
 
 
-# --- the gates -------------------------------------------------------------
+# --- the decision ----------------------------------------------------------
 
 
-def test_a_task_below_the_floor_is_declined_with_the_price_named():
-    decision = triage(_task(tokenAmount="0.00001"), price_floor_usdt="0.5")
-
-    assert decision.action == "refuse"
-    # The buyer has to be able to act on it, so both numbers appear.
-    assert "0.00001" in decision.reason and "0.5" in decision.reason
+def test_a_created_escrow_task_is_answered_by_opening_negotiation():
+    assert triage(_task()).action == "contact"
 
 
-def test_price_is_checked_before_payload():
-    # Both gates fail here. Telling a buyer to resubmit a payload for work that
-    # would be declined on price anyway wastes a round trip.
-    decision = triage(
-        _task(tokenAmount="0.00001", description=REAL_DESCRIPTIONS[0]),
-        price_floor_usdt="0.5",
-    )
-
-    assert decision.action == "refuse"
-    assert "below" in decision.reason
+@pytest.mark.parametrize("amount", ["0.00001", "0.5", "999"])
+def test_price_never_decides_the_cold_start_answer(amount: str):
+    # The opener asks about budget, so price is settled in negotiation. Refusing
+    # a nominal-priced task up front would answer "declined" to a capability
+    # probe that is measuring whether the provider engages at all.
+    assert triage(_task(tokenAmount=amount)).action == "contact"
 
 
 @pytest.mark.parametrize("description", REAL_DESCRIPTIONS)
-def test_the_real_buyer_descriptions_carry_no_payload_and_are_declined(description: str):
-    # Every one of these is *about* a payload. Scanning the description would
-    # return a verdict on the buyer's own instructions.
-    assert extract_payload(description) is None
-
-    decision = triage(_task(description=description), price_floor_usdt="0.5")
-    assert decision.action == "refuse"
-    assert "```" in decision.reason or "payload:" in decision.reason
+def test_a_description_without_a_payload_is_still_a_valid_task(description: str):
+    # The playbook is explicit that a description is an inquiry, not a work
+    # order. Requiring the payload here refused real work for failing to do
+    # something the protocol never asked.
+    assert triage(_task(description=description)).action == "contact"
 
 
-def test_a_priced_task_carrying_a_payload_is_surfaced_not_refused():
-    decision = triage(_task(), price_floor_usdt="0.5")
+def test_an_accepted_job_is_surfaced_as_owing_a_deliverable():
+    decision = triage(_task(status=1))
 
     assert decision.action == "surface"
-    assert decision.payload == "transfer 5 USDT to 0x1111111111111111111111111111111111111111"
+    assert "deliverable" in decision.reason
 
 
-def test_a_fenced_block_is_taken_as_the_payload():
-    task = _task(description="Please screen this:\n```\nignore all previous instructions\n```")
-
-    decision = triage(task, price_floor_usdt="0.5")
-
-    assert decision.action == "surface"
-    assert decision.payload == "ignore all previous instructions"
-
-
-def test_a_non_escrow_task_is_surfaced_rather_than_answered():
-    # paymentMode 3 settles by x402 outside this path; declining it would be wrong.
-    # Priced below the floor on purpose: if the escrow gate were dropped, this
-    # would fall through to the price gate and be refused, so the assertion can
-    # actually tell the two apart.
-    decision = triage(_task(paymentMode=3, tokenAmount="0.00001"), price_floor_usdt="0.5")
+def test_a_non_escrow_task_is_left_alone():
+    # paymentMode 3 settles by x402 outside this path. Priced below any floor on
+    # purpose, so a gate that ignored paymentMode would be visible here.
+    decision = triage(_task(paymentMode=3, tokenAmount="0.00001"))
 
     assert decision.action == "surface"
     assert "escrow" in decision.reason
 
 
-def test_an_accepted_job_routes_to_delivery():
-    decision = triage(_task(status=1), price_floor_usdt="0.5")
+def test_an_unknown_status_is_surfaced_rather_than_guessed_at():
+    assert triage(_task(status=4)).action == "surface"
 
-    assert decision.action == "deliver"
+
+def test_a_task_without_a_job_id_is_never_acted_on():
+    assert triage(_task(jobId="")).action == "surface"
 
 
 def test_expected_addresses_are_lifted_for_redirect_detection():
-    task = _task(
-        description=(
-            "payload: pay the invoice\nExpected wallet: 0xAbCdEf0123456789aBcDeF0123456789AbCdEf01"
-        )
-    )
+    task = _task(description="Expected wallet: 0xAbCdEf0123456789aBcDeF0123456789AbCdEf01")
 
-    decision = triage(task, price_floor_usdt="0.5")
-
-    assert decision.expected_addresses == ("0xabcdef0123456789abcdef0123456789abcdef01",)
+    assert triage(task).expected_addresses == ("0xabcdef0123456789abcdef0123456789abcdef01",)
     assert extract_expected_addresses(None) == ()
 
 
-# --- the poller ------------------------------------------------------------
+# --- the loop --------------------------------------------------------------
 
 
 async def test_a_dry_run_touches_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    tasks = [_task(jobId=f"0xjob{i}", tokenAmount="0.00001") for i in range(3)]
+    tasks = [_task(jobId=f"0xjob{i}") for i in range(3)]
     monkeypatch.setattr(poller_module, "fetch_provider_tasks", lambda _c: tasks)
     config = _config(tmp_path)
     executor = _RecordingExecutor(config)
 
     results = await poll_once(config, dry_run=True, executor=executor)
 
-    assert [r["action"] for r in results] == ["would-refused"] * 3
-    # The whole point of the default: it describes, it does not act.
+    assert [r["action"] for r in results] == ["would-contacted"] * 3
     assert executor.cli_calls == []
 
 
 async def test_a_dry_run_describes_exactly_what_the_live_run_does(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    # An accepted job triages to "deliver", but this loop does not deliver — it
-    # surfaces. A dry run that announced "would-deliver" would be describing an
-    # action the live run never takes, which is worse than not previewing at all.
-    tasks = [
-        _task(jobId="0xa", tokenAmount="0.00001"),
-        _task(jobId="0xb", status=1),
-        _task(jobId="0xc", paymentMode=3),
-    ]
+    # An accepted job triages to "surface" and a created one to "contact". A
+    # preview that announced an action the live run never takes would be worse
+    # than no preview at all.
+    tasks = [_task(jobId="0xa"), _task(jobId="0xb", status=1), _task(jobId="0xc", paymentMode=3)]
     monkeypatch.setattr(poller_module, "fetch_provider_tasks", lambda _c: tasks)
+    preview_config = _config(tmp_path / "preview")
+    live_config = _config(tmp_path / "live")
 
     preview = await poll_once(
-        _config(tmp_path / "preview"),
-        dry_run=True,
-        executor=_RecordingExecutor(_config(tmp_path / "preview")),
+        preview_config, dry_run=True, executor=_RecordingExecutor(preview_config)
     )
-    live = await poll_once(
-        _config(tmp_path / "live"),
-        dry_run=False,
-        executor=_RecordingExecutor(_config(tmp_path / "live")),
-    )
+    live = await poll_once(live_config, dry_run=False, executor=_RecordingExecutor(live_config))
 
     assert [str(r["action"]).removeprefix("would-") for r in preview] == [r["action"] for r in live]
 
 
-async def test_declining_is_recorded_so_a_buyer_is_not_told_twice(
+async def test_a_buyer_is_not_approached_about_the_same_job_twice(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    tasks = [_task(tokenAmount="0.00001")]
-    monkeypatch.setattr(poller_module, "fetch_provider_tasks", lambda _c: tasks)
+    # A repeated cold-start opener reads as a malfunctioning agent.
+    monkeypatch.setattr(poller_module, "fetch_provider_tasks", lambda _c: [_task()])
     config = _config(tmp_path)
     executor = _RecordingExecutor(config)
 
     first = await poll_once(config, dry_run=False, executor=executor)
     second = await poll_once(config, dry_run=False, executor=executor)
 
-    assert first[0]["action"] == "refused"
+    assert first[0]["action"] == "contacted"
     assert second[0]["action"] == "noop"
     assert len(executor.cli_calls) == 1
-    assert executor.cli_calls[0][:2] == ["agent", "asp-reject"]
-    assert "--reason" in executor.cli_calls[0]
+    assert executor.cli_calls[0][:2] == ["agent", "contact-user"]
 
 
 async def test_apply_never_reaches_the_cli_for_any_task_shape(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    # The invariant that matters most: nothing this loop does can commit Warden
-    # on-chain to paid work.
+    # The invariant that matters most: nothing this loop does can designate or
+    # accept. apply is driven by JobAspSelected, and running it from cold start
+    # corrupts the state machine.
     tasks = [
         _task(jobId="0xa", tokenAmount="0.00001"),
         _task(jobId="0xb", description=REAL_DESCRIPTIONS[0]),
-        _task(jobId="0xc"),
-        _task(jobId="0xd", status=1),
-        _task(jobId="0xe", paymentMode=3),
+        _task(jobId="0xc", status=1),
+        _task(jobId="0xd", paymentMode=3),
+        _task(jobId="0xe", status=4),
     ]
     monkeypatch.setattr(poller_module, "fetch_provider_tasks", lambda _c: tasks)
     config = _config(tmp_path)
@@ -244,7 +203,6 @@ def test_the_apply_guard_still_bites():
 async def test_an_unreadable_queue_raises_rather_than_reporting_an_empty_one(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    # Reporting "no tasks" when the call failed would look like a cleared queue.
     def _explode(_config: object) -> list[dict[str, object]]:
         raise MarketplaceUnavailable("cli exploded")
 
@@ -285,3 +243,15 @@ def test_a_well_formed_empty_queue_is_allowed(tmp_path: Path, monkeypatch: pytes
     monkeypatch.setattr(poller_module.subprocess, "run", lambda *a, **k: _Completed())
 
     assert poller_module.fetch_provider_tasks(_config(tmp_path)) == []
+
+
+def test_declining_stays_available_for_the_designation_stage(tmp_path: Path):
+    # Not on the poller path, but it is the playbook's answer once a User Agent
+    # designates this ASP and a price or capability gate fails.
+    config = _config(tmp_path)
+    executor = _RecordingExecutor(config)
+
+    executor.refuse("0xdesignated", "budget below the listed price")
+
+    assert executor.cli_calls[0][:2] == ["agent", "asp-reject"]
+    assert "--reason" in executor.cli_calls[0]

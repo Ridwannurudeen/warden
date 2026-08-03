@@ -62,8 +62,8 @@ def fetch_provider_tasks(config: ExecutorConfig) -> list[dict[str, object]]:
     return [task for task in tasks if isinstance(task, dict)]
 
 
-def decide(config: ExecutorConfig, tasks: list[dict[str, object]]) -> list[TriageDecision]:
-    return [triage(task, price_floor_usdt=config.price_floor_usdt) for task in tasks]
+def decide(tasks: list[dict[str, object]]) -> list[TriageDecision]:
+    return [triage(task) for task in tasks]
 
 
 async def poll_once(
@@ -72,7 +72,7 @@ async def poll_once(
     dry_run: bool = True,
     executor: TaskExecutor | None = None,
 ) -> list[dict[str, object]]:
-    """Answer every task in the queue once. Refuses; never accepts.
+    """Answer every task in the queue once. Opens negotiation; never accepts.
 
     Defaults to `dry_run` because the live queue holds other people's real
     tasks: the first run of anything that talks to it should only ever describe
@@ -80,18 +80,18 @@ async def poll_once(
     """
     runner = executor if executor is not None else TaskExecutor(config)
     results: list[dict[str, object]] = []
-    for decision in decide(config, fetch_provider_tasks(config)):
-        if decision.action == "refuse" and runner.store.already_refused(decision.job_id):
+    for decision in decide(fetch_provider_tasks(config)):
+        if decision.action == "contact" and runner.store.already_answered(decision.job_id):
             results.append(
-                {"action": "noop", "jobId": decision.job_id, "reason": "already declined"}
+                {"action": "noop", "jobId": decision.job_id, "reason": "already contacted"}
             )
             continue
         # Resolve what this loop would really do *before* branching on dry_run,
         # so a dry run cannot describe an action the live run would not take.
-        # Acceptance and delivery both stay out of it: `apply` signs an
-        # irreversible commitment, and delivering needs a payload the buyer has
-        # not been asked for yet.
-        effective = "refused" if decision.action == "refuse" else "surfaced"
+        # Acceptance and delivery both stay out of it: `apply` is driven by the
+        # JobAspSelected system event, and delivering needs the payload that
+        # only arrives once negotiation has happened.
+        effective = "contacted" if decision.action == "contact" else "surfaced"
         if dry_run:
             results.append(
                 {
@@ -101,9 +101,9 @@ async def poll_once(
                 }
             )
             continue
-        if effective == "refused":
-            results.append(runner.refuse(decision.job_id, decision.reason))
-            runner.store.mark_refused(decision.job_id, decision.reason)
+        if effective == "contacted":
+            results.append(runner.contact_user(decision.job_id))
+            runner.store.mark_answered(decision.job_id, "contacted", decision.reason)
         else:
             results.append(
                 {"action": "surfaced", "jobId": decision.job_id, "reason": decision.reason}
@@ -116,7 +116,7 @@ async def _main() -> int:
     parser.add_argument(
         "--apply-decisions",
         action="store_true",
-        help="actually decline the tasks the gates rejected (default: describe only)",
+        help="actually send the cold-start openers (default: describe only)",
     )
     args = parser.parse_args()
 
