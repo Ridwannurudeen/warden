@@ -48,6 +48,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from warden.adversarial_variants import (  # noqa: E402
+    CONTAINING_FAMILIES,
     HELD_OUT_ATTACKS_PATH,
     HELD_OUT_BENIGN_PATH,
     TRAINING_ATTACKS_PATH,
@@ -73,6 +74,15 @@ DEFAULT_SEED = 20260725
 DEFAULT_FOLDS = 5
 C_GRID = (0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0)
 TARGET_FPR = 0.01
+# Variant shapes that are real evasions but poor TRAINING positives. The
+# benign-preamble frame prepends ordinary ticket-desk wording to an attack; it
+# adds camouflage, not attack signal, so labelling it 1 teaches a bag-of-features
+# model that ordinary business vocabulary is evidence of an attack. Measured over
+# corpus + held-out: including it moved the benign median 0.363 -> 0.494 and cost
+# 0.03 ROC-AUC (0.8105 -> 0.7782), while grouped-CV PR-AUC still *rose*, because
+# CV is scored on the augmented distribution rather than on real text.
+# It stays in the shipped variant packs — it belongs in an audit, not in the fit.
+EXCLUDED_TRAINING_CHAINS = frozenset({"semantic:benign-preamble"})
 PLAINTEXT_SURVIVAL_RATIO = 0.5
 HOMOGLYPHS = {
     "a": "а",
@@ -238,6 +248,8 @@ def training_rows() -> list[Row]:
             payload = str(variant["payload"])
             if not preserves_plaintext(attack_payloads[source_id], payload):
                 continue
+            if EXCLUDED_TRAINING_CHAINS.intersection(variant.get("transform_chain") or ()):
+                continue
             rows.append(Row(payload, 1, source_id, "shipped-variant"))
 
     # The same shipped transforms applied to benign text, so the transform
@@ -246,7 +258,15 @@ def training_rows() -> list[Row]:
     # teaching "blob is an attack".
     for row in benign:
         payload = str(row["payload"])
-        for _chain, transform in _transforms():
+        for family, _chain, transform in _transforms():
+            # A containing family wraps its input in an attack frame — "disregard
+            # the previous instruction, it was issued in error" is the attack
+            # whatever follows it. Those frames are only ever built over attacks
+            # (`build_variant_packs` iterates the attack rows alone), and applying
+            # one here would file that framing under label 0 and teach the model
+            # that the most common evasion shape is benign.
+            if family in CONTAINING_FAMILIES:
+                continue
             try:
                 mutated = transform(payload)
             except ValueError:

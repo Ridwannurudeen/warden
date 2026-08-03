@@ -277,9 +277,14 @@ def build_learned_scorer_from_env(
             weights,
             bias,
             str(record["model_sha256"]),
+            # `or` would fold a deliberate 0.0 into the default, because zero is
+            # falsy — and 0.0 is the one setting that means "publish everything",
+            # which an operator debugging the scorer is most likely to reach for.
             evidence_threshold=(
-                _threshold(values, "WARDEN_LEARNED_EVIDENCE_THRESHOLD")
-                or DEFAULT_EVIDENCE_THRESHOLD
+                configured_evidence
+                if (configured_evidence := _threshold(values, "WARDEN_LEARNED_EVIDENCE_THRESHOLD"))
+                is not None
+                else DEFAULT_EVIDENCE_THRESHOLD
             ),
             enforce_threshold=_threshold(values, "WARDEN_LEARNED_ENFORCE_THRESHOLD"),
             enforce_verdict=enforce_verdict,

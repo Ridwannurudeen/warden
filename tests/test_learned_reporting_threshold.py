@@ -14,7 +14,12 @@ reporting bar silently weakened enforcement.
 """
 
 from warden.core.verdict import VerdictEngine
-from warden.scanner.learned import DEFAULT_EVIDENCE_THRESHOLD, LearnedScorer, features
+from warden.scanner.learned import (
+    DEFAULT_EVIDENCE_THRESHOLD,
+    LearnedScorer,
+    build_learned_scorer_from_env,
+    features,
+)
 
 
 def _scorer(**kwargs) -> LearnedScorer:
@@ -38,6 +43,30 @@ def _evaluate(scorer: LearnedScorer) -> dict:
 
 def test_the_shipped_default_is_the_measured_operating_point_not_the_midpoint():
     assert DEFAULT_EVIDENCE_THRESHOLD == 0.9
+
+
+def test_a_threshold_of_zero_is_honoured_rather_than_folded_into_the_default():
+    """`x or DEFAULT` silently swallowed 0.0, because zero is falsy.
+
+    0.0 means "publish everything", which is exactly what an operator debugging
+    the scorer reaches for — and they would have got 0.9 instead, with no
+    indication the setting had been ignored.
+    """
+    scorer = build_learned_scorer_from_env(
+        {"WARDEN_LEARNED_SCORER_ENABLED": "1", "WARDEN_LEARNED_EVIDENCE_THRESHOLD": "0.0"}
+    )
+    assert scorer is not None
+    assert scorer.evidence_threshold == 0.0
+
+
+def test_an_unset_or_unusable_threshold_still_falls_back_to_the_default():
+    for value in ("", "bogus", "1.5", "-0.2"):
+        env = {"WARDEN_LEARNED_SCORER_ENABLED": "1"}
+        if value:
+            env["WARDEN_LEARNED_EVIDENCE_THRESHOLD"] = value
+        scorer = build_learned_scorer_from_env(env)
+        assert scorer is not None
+        assert scorer.evidence_threshold == DEFAULT_EVIDENCE_THRESHOLD, value
 
 
 def test_a_score_over_the_threshold_is_published():
