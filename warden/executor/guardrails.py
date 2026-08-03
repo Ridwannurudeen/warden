@@ -4,12 +4,13 @@
 - Price floor: never fulfil work priced below the configured USDT floor.
 - Service allowlist: only fulfil explicitly allowlisted Warden service ids.
 - Deliver gate: `deliver` is only valid when the job status is "accepted".
-- APPLY IS NEVER INVOKED BY THIS LAYER. `apply` signs and broadcasts an
-  irreversible on-chain commitment to perform paid work, which is a human
-  decision, not an automated one. Any attempt to run it through the CLI
-  boundary is a bug and raises before the subprocess is spawned.
-  (`asp-reject`, by contrast, is an off-chain backend call that signs nothing
-  and moves no money, so declining *is* automated — see `executor.refuse`.)
+- APPLY IS NEVER INVOKED BY THIS LAYER: `apply` is triggered by on-chain
+  system events, not by the seller executor. Any attempt to run it through
+  the CLI boundary is a bug and raises before the subprocess is spawned.
+  (Confirmed against the platform's own ASP playbook: `apply` runs from the
+  `JobAspSelected` flow once the User Agent designates this ASP on-chain, and
+  "manually invoking it from the cold-start path is always wrong" — doing so
+  corrupts the state machine and risks escrow loss.)
 """
 
 import json
