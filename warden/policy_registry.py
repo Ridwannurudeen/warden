@@ -118,6 +118,23 @@ def policy_id_for(
     return hashlib.sha256(_canonical_json(identity).encode("utf-8")).hexdigest()
 
 
+def _legacy_policy_id_for(policy: ActionPolicy) -> str:
+    """The original content address: the rules alone, with no key folded in.
+
+    Superseded by `policy_id_for` when the caller key became part of the identity.
+    Records anchored before that keep ids derived this way, and this was the
+    published rule at the moment their issuer signature was made. Refusing them
+    now stranded real evidence: two policies in the live transparency log became
+    permanently unreadable, and every route that loaded one answered 500 — the
+    guard route included.
+
+    Honoured on read only. Nothing issues an id this way any more, and `policy_id`
+    sits inside the issuer signature, so accepting the historical derivation
+    cannot pass off a record the issuer never signed.
+    """
+    return hashlib.sha256(_canonical_json(canonical_policy(policy)).encode("utf-8")).hexdigest()
+
+
 def _is_ed25519_public_key(value: object) -> bool:
     if not isinstance(value, str) or not value.startswith("ed25519:"):
         return False
@@ -213,7 +230,11 @@ def verify_policy_record(
         not _is_agent_id(agent_id) or not _is_checksummed_address(record.get("agent_owner"))
     ):
         return False
-    if policy_id_for(rebuilt, caller_key, agent_id) != record.get("policy_id"):
+    accepted_ids = {policy_id_for(rebuilt, caller_key, agent_id)}
+    if not bound:
+        # A /1 record may predate the caller key entering the identity.
+        accepted_ids.add(_legacy_policy_id_for(rebuilt))
+    if record.get("policy_id") not in accepted_ids:
         return False
     issued_at = record.get("issued_at")
     if type(issued_at) is not int or issued_at < 0:

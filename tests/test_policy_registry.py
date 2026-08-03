@@ -20,9 +20,9 @@ from eth_account import Account
 from eth_account.messages import encode_defunct
 from fastapi.testclient import TestClient
 
-from warden import agent_identity, evidence_store, policy_registry
+from warden import agent_identity, evidence_store, policy_registry, protection
 from warden.action_guard import action_context_sha256, policy_sha256, verify_decision_receipt
-from warden.badges import b64u_encode
+from warden.badges import b64u_encode, ed25519_sign_record
 from warden.models import ActionIntent, ActionPolicy, OkxTaskContext
 
 POLICY = {
@@ -534,6 +534,80 @@ def test_a_partial_agent_binding_is_rejected_outright(client: TestClient):
             client.post("/api/policy/register", json={"policy": POLICY, **partial}).status_code
             == 422
         )
+
+
+def test_a_policy_anchored_under_the_original_id_rule_still_verifies(client: TestClient):
+    # Found on production: two policies anchored before the caller key entered the
+    # content address became permanently unverifiable when the rule changed under
+    # them, and every route that loaded one answered 500 — /api/action/guard
+    # included. They are genuinely issuer-signed and correctly anchored; only the
+    # derivation moved, so refusing them stranded real evidence in a public log.
+    policy = ActionPolicy(**POLICY)
+    legacy_id = hashlib.sha256(
+        json.dumps(
+            policy_registry.canonical_policy(policy),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    assert legacy_id != policy_registry.policy_id_for(policy, None)
+
+    content = {
+        "spec_version": "warden-action-policy/1",
+        "predicate_type": policy_registry.PREDICATE_TYPE,
+        "policy_id": legacy_id,
+        "issuer": "warden",
+        "policy": policy_registry.canonical_policy(policy),
+        "caller_key": None,
+        "issued_at": 1_784_000_000,
+        "limitations": policy_registry.LIMITATIONS,
+    }
+    record = ed25519_sign_record(content, protection.issuer_private_key(), "issuer_sig")
+
+    assert policy_registry.verify_policy_record(record)
+
+    # An id matching neither rule is still refused, so this widens history, not trust.
+    assert not policy_registry.verify_policy_record({**record, "policy_id": "d" * 64})
+
+
+def test_the_original_id_rule_is_not_honoured_for_an_agent_bound_record():
+    # The historical allowance exists for records that predate the change. A /2
+    # record cannot predate anything, so it gets exactly one derivation.
+    policy = ActionPolicy(**POLICY)
+    legacy_id = policy_registry._legacy_policy_id_for(policy)
+    content = {
+        "spec_version": "warden-action-policy/2",
+        "predicate_type": policy_registry.PREDICATE_TYPE,
+        "policy_id": legacy_id,
+        "issuer": "warden",
+        "policy": policy_registry.canonical_policy(policy),
+        "caller_key": None,
+        "agent_id": TASK["agent_id"],
+        "agent_owner": Account.create().address,
+        "issued_at": 1_784_000_000,
+        "limitations": policy_registry.AGENT_BOUND_LIMITATIONS,
+    }
+    record = ed25519_sign_record(content, protection.issuer_private_key(), "issuer_sig")
+
+    assert not policy_registry.verify_policy_record(record)
+
+
+def test_unverifiable_stored_evidence_is_an_answer_not_a_crash(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    # Whatever the cause, a record we cannot verify is our problem to report, not
+    # an unhandled exception to hand the caller.
+    policy_id = client.post("/api/policy/register", json={"policy": POLICY}).json()["policy_id"]
+    monkeypatch.setattr(policy_registry, "verify_policy_record", lambda *_a, **_k: False)
+
+    assert client.get(f"/api/policy/{policy_id}").status_code == 503
+    assert (
+        client.post(
+            "/api/action/guard", json={"intent": INTENT, "task": TASK, "policy_id": policy_id}
+        ).status_code
+        == 503
+    )
 
 
 def test_the_policy_id_covers_the_caller_key_as_documented():

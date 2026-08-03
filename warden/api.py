@@ -911,9 +911,26 @@ async def register_action_policy_endpoint(req: PolicyRegistrationRequest) -> dic
     }
 
 
+def _load_registered_policy_or_503(policy_id: str) -> dict[str, object] | None:
+    """Load a registered policy, turning a stored-evidence failure into a real answer.
+
+    A record that cannot be verified is our problem, not the caller's, but it was
+    reaching them as an unhandled 500 with no explanation.
+    """
+    try:
+        return policy_registry.load_registered_policy(policy_id)
+    except (
+        protection_store.LogCheckpointMissing,
+        protection_store.ProtectionStateConflict,
+    ) as exc:
+        raise HTTPException(
+            status_code=503, detail="Registered policy evidence is unavailable"
+        ) from exc
+
+
 @app.get("/api/policy/{policy_id}")
 async def get_action_policy_endpoint(policy_id: str) -> dict[str, object]:
-    stored = policy_registry.load_registered_policy(policy_id)
+    stored = _load_registered_policy_or_503(policy_id)
     if stored is None:
         raise HTTPException(status_code=404, detail="Registered policy not found")
     return {
@@ -932,7 +949,7 @@ async def guard_action_endpoint(req: ActionGuardRequest) -> dict[str, object]:
         return decision.model_dump(mode="json")
 
     policy_id = str(req.policy_id)
-    stored = policy_registry.load_registered_policy(policy_id)
+    stored = _load_registered_policy_or_503(policy_id)
     if stored is None:
         raise HTTPException(status_code=404, detail="Registered policy not found")
     if stored["status"] != "active":

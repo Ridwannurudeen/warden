@@ -100,7 +100,10 @@ def _load_record(
             "stored signed evidence contains invalid JSON"
         ) from exc
     if not isinstance(record, dict) or not validator(record):
-        raise ValueError("stored signed evidence failed verification")
+        # Every other integrity failure in this module raises ProtectionStateConflict,
+        # which callers catch and turn into a deliberate response. A bare ValueError
+        # escaped every handler and surfaced as an unhandled 500.
+        raise protection_store.ProtectionStateConflict("stored signed evidence failed verification")
     return record
 
 
