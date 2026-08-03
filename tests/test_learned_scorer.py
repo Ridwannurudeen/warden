@@ -226,12 +226,18 @@ def test_probability_matches_the_logistic_of_the_dot_product(tmp_path: Path) -> 
     scorer = build_learned_scorer_from_env(enabled_env(path))
     assert scorer is not None
 
-    evaluated = scorer.evaluate(PLAIN_ATTACK, **signals(PLAIN_ATTACK, scanner))
+    # `probability` is the ungated computation. `evaluate` publishes it only
+    # above the evidence threshold, so it is the wrong surface for this claim.
+    computed = scorer.probability(PLAIN_ATTACK, **signals(PLAIN_ATTACK, scanner))
     raw = vector(PLAIN_ATTACK, scanner)
     expected = 1.0 / (1.0 + math.exp(-(sum(w * x for w, x in zip(weights, raw)) + 0.25)))
-    assert evaluated["attack_probability"] == pytest.approx(expected, abs=1e-9)
+    assert computed == pytest.approx(expected, abs=1e-9)
+
+    evaluated = scorer.evaluate(PLAIN_ATTACK, **signals(PLAIN_ATTACK, scanner))
     assert evaluated["feature_vector_version"] == features.FEATURE_VECTOR_VERSION
     assert evaluated["enforced_verdict"] is None
+    # The block always records that it scored, whether or not it publishes.
+    assert evaluated["scored"] is True
 
 
 def test_shipped_artifact_loads_and_matches_the_current_feature_vector_version() -> None:

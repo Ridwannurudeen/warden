@@ -112,7 +112,29 @@ class VerdictEngine:
                     else f", enforcement requested {learned_policy.verdict.lower()}"
                 )
             )
+        else:
+            # Scored but under the reporting bar. Saying so keeps "the model ran
+            # and had nothing to report" distinct from "no model is loaded",
+            # which a bare absent field cannot express.
+            threshold = self._unreported_threshold(scanner_result)
+            if threshold is not None:
+                verdict.checks["learned_scorer"] = (
+                    f"advisory - scored below the {threshold:.2f} reporting threshold"
+                )
         return verdict
+
+    @staticmethod
+    def _unreported_threshold(
+        scanner_result: Mapping[str, object] | None,
+    ) -> float | None:
+        """The threshold a loaded scorer scored under, or None if none ran."""
+        learned = scanner_result.get("learned") if scanner_result else None
+        if not isinstance(learned, Mapping) or learned.get("scored") is not True:
+            return None
+        threshold = learned.get("evidence_threshold")
+        if isinstance(threshold, bool) or not isinstance(threshold, (int, float)):
+            return None
+        return float(threshold)
 
     @staticmethod
     def _learned_evidence(

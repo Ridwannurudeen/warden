@@ -58,7 +58,15 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_ARTIFACT_PATH = Path(__file__).with_name("learned_scorer.json")
 LEARNED_SCHEMA_VERSION = 1
-DEFAULT_EVIDENCE_THRESHOLD = 0.5
+# Measured over every corpus and held-out row this repo ships (188 attacks, 453
+# benign): AUC 0.8105, attack median 0.870, benign median 0.363. At the old 0.5
+# default, 135 of 453 benign rows (29.8%) scored high enough to publish a
+# probability, so a third of ordinary business text carried a number a reader
+# could mistake for a finding. At 0.90 that falls to 6 rows (1.3%) while 47.3%
+# of attacks still report. This threshold governs REPORTING only; it does not
+# change the model, which stays modest at AUC 0.81 — the lever for that is
+# retraining, not this constant.
+DEFAULT_EVIDENCE_THRESHOLD = 0.9
 DEFAULT_ENFORCE_VERDICT = "SANITIZE"
 ENABLED_VALUES = frozenset({"1", "true", "yes", "on"})
 ENFORCEABLE_VERDICTS = frozenset({"SANITIZE", "BLOCK"})
@@ -143,13 +151,20 @@ class LearnedScorer:
             heuristic=heuristic,
             similarity=similarity,
         )
+        # Enforcement reads the raw score. It must not depend on the reporting
+        # threshold, or raising the latter would silently weaken the former.
         enforced = (
             self._enforce_verdict
             if self._enforce_threshold is not None and score >= self._enforce_threshold
             else None
         )
         return {
-            "attack_probability": score,
+            # Reported only when it clears the threshold. Below it the model is
+            # not separating anything a reader could act on, and publishing the
+            # number anyway invites it to be read as a finding.
+            "attack_probability": score if score >= self._evidence_threshold else None,
+            "scored": True,
+            "evidence_threshold": self._evidence_threshold,
             "feature_vector_version": features.FEATURE_VECTOR_VERSION,
             "model_sha256": self._model_digest,
             "enforced_verdict": enforced,
