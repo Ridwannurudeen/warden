@@ -58,15 +58,27 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_ARTIFACT_PATH = Path(__file__).with_name("learned_scorer.json")
 LEARNED_SCHEMA_VERSION = 1
-# Measured over every corpus and held-out row this repo ships (188 attacks, 453
-# benign): AUC 0.8105, attack median 0.870, benign median 0.363. At the old 0.5
-# default, 135 of 453 benign rows (29.8%) scored high enough to publish a
-# probability, so a third of ordinary business text carried a number a reader
-# could mistake for a finding. At 0.90 that falls to 6 rows (1.3%) while 47.3%
-# of attacks still report. This threshold governs REPORTING only; it does not
-# change the model, which stays modest at AUC 0.81 — the lever for that is
-# retraining, not this constant.
-DEFAULT_EVIDENCE_THRESHOLD = 0.9
+# A per-model operating point, re-derived whenever the artifact changes.
+#
+# Measured on the 423 benign rows no model is trained on (`benign_ops_v1` plus
+# the held-out benign set) against 188 attacks. The scorer trained on 30 benign
+# rows reached AUC 0.799 and needed 0.90 to keep benign publication near 1%.
+# Retraining on 129 benign rows lifted that to AUC 0.9005 and pushed the benign
+# median from 0.380 down to 0.128, which moves the whole operating curve:
+#
+#   threshold   benign publishing   attacks publishing
+#      0.90       24/423 (5.67%)      113/188 (60.1%)
+#      0.97        4/423 (0.95%)       87/188 (46.3%)
+#      0.99        0/423 (0.00%)       66/188 (35.1%)
+#
+# 0.97 is chosen because it dominates the previous configuration outright: less
+# benign noise than the old model produced at 0.90 (0.95% against 1.42%) at
+# effectively the same attack coverage (46.3% against 47.3%).
+#
+# This governs REPORTING only and can never move a verdict. Note it is coupled to
+# the shipped artifact: swapping the model without re-deriving this number will
+# land on the wrong point of a different curve.
+DEFAULT_EVIDENCE_THRESHOLD = 0.97
 DEFAULT_ENFORCE_VERDICT = "SANITIZE"
 ENABLED_VALUES = frozenset({"1", "true", "yes", "on"})
 ENFORCEABLE_VERDICTS = frozenset({"SANITIZE", "BLOCK"})
