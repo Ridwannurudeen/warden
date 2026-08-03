@@ -6,7 +6,10 @@ import re
 from dataclasses import dataclass, field
 
 DEFAULT_AGENT_ID = "3808"
-DEFAULT_PRICE_FLOOR_USDT = "0.5"
+# The registered fee every listed Warden service actually carries. It was 0.5,
+# five times the advertised price, so the floor would have declined work offered
+# at exactly the rate the listing asks for.
+DEFAULT_PRICE_FLOOR_USDT = "0.1"
 DEFAULT_IDEMPOTENCY_STORE_PATH = "data/executor-idempotency.sqlite3"
 DEFAULT_ONCHAINOS_BIN = "onchainos"
 # Warden escrow service ids this executor is willing to fulfil. Anything not

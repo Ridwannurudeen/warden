@@ -1,0 +1,13 @@
+[Unit]
+Description=Poll Warden's provider-side task queue every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+# A buyer waiting on an answer should not be able to tell which tick served it.
+RandomizedDelaySec=30
+Persistent=true
+Unit=warden-executor-poll.service
+
+[Install]
+WantedBy=timers.target

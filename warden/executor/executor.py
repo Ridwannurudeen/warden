@@ -197,6 +197,32 @@ class TaskExecutor:
             "cli_output": output,
         }
 
+    def refuse(self, job_id: str, reason: str) -> dict[str, object]:
+        """Decline a designated task, with the reason on the record.
+
+        The platform's own decline path when a price or capability gate fails.
+        `asp-reject` is an off-chain backend call that signs nothing and moves
+        no money, so the cost of declining wrongly is a buyer re-posting, while
+        the cost of staying silent is an ASP that looks absent.
+
+        Goes through the same CLI boundary as everything else, so `apply` stays
+        unreachable from here. Verified present on both onchainos 4.1.0 and the
+        4.4.5 the VPS runs — unlike `contact-user`, which exists only on 4.1.0.
+        """
+        self._run_cli(
+            [
+                "agent",
+                "asp-reject",
+                "--agent-id",
+                self.config.agent_id,
+                job_id,
+                "--reason",
+                reason,
+            ]
+        )
+        logger.info("declined job %s: %s", job_id, reason)
+        return {"action": "refused", "jobId": job_id, "reason": reason}
+
     def _run_cli(self, args: list[str]) -> str:
         """Single subprocess boundary to the onchainos CLI (mock this in tests)."""
         ensure_not_apply(args)
