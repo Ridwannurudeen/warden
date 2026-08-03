@@ -10,15 +10,18 @@ from __future__ import annotations
 import hashlib
 import json
 import tempfile
+import time
 from unittest import mock
 from pathlib import Path
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from eth_account import Account
+from eth_account.messages import encode_defunct
 from fastapi.testclient import TestClient
 
-from warden import evidence_store, policy_registry
-from warden.action_guard import action_context_sha256, verify_decision_receipt
+from warden import agent_identity, evidence_store, policy_registry
+from warden.action_guard import action_context_sha256, policy_sha256, verify_decision_receipt
 from warden.badges import b64u_encode
 from warden.models import ActionIntent, ActionPolicy, OkxTaskContext
 
@@ -49,9 +52,7 @@ TASK = {
 def _isolated_issuer_and_store(monkeypatch: pytest.MonkeyPatch) -> None:
     key = Ed25519PrivateKey.generate()
     monkeypatch.setenv("WARDEN_ISSUER_KEY", b64u_encode(key.private_bytes_raw(), "ed25519-seed"))
-    monkeypatch.setenv(
-        "WARDEN_PROTECTION_DB", str(Path(tempfile.mkdtemp()) / "registry.db")
-    )
+    monkeypatch.setenv("WARDEN_PROTECTION_DB", str(Path(tempfile.mkdtemp()) / "registry.db"))
 
 
 @pytest.fixture()
@@ -199,7 +200,9 @@ def test_an_unknown_policy_id_is_refused_rather_than_defaulted(client: TestClien
 
 
 def test_a_request_must_name_exactly_one_policy_source(client: TestClient):
-    assert client.post("/api/action/guard", json={"intent": INTENT, "task": TASK}).status_code == 422
+    assert (
+        client.post("/api/action/guard", json={"intent": INTENT, "task": TASK}).status_code == 422
+    )
     assert (
         client.post(
             "/api/action/guard",
@@ -227,12 +230,8 @@ def test_two_callers_may_register_the_same_rules_under_their_own_keys(client: Te
     key_two = b64u_encode(second.public_key().public_bytes_raw(), "ed25519")
 
     unkeyed = client.post("/api/policy/register", json={"policy": POLICY}).json()
-    one = client.post(
-        "/api/policy/register", json={"policy": POLICY, "caller_key": key_one}
-    ).json()
-    two = client.post(
-        "/api/policy/register", json={"policy": POLICY, "caller_key": key_two}
-    ).json()
+    one = client.post("/api/policy/register", json={"policy": POLICY, "caller_key": key_one}).json()
+    two = client.post("/api/policy/register", json={"policy": POLICY, "caller_key": key_two}).json()
 
     assert len({unkeyed["policy_id"], one["policy_id"], two["policy_id"]}) == 3
     assert one["record"]["caller_key"] == key_one
@@ -242,13 +241,23 @@ def test_two_callers_may_register_the_same_rules_under_their_own_keys(client: Te
     signature = _caller_signature(first, one["policy_id"], INTENT)
     mine = client.post(
         "/api/action/guard",
-        json={"intent": INTENT, "task": TASK, "policy_id": one["policy_id"], "caller_sig": signature},
+        json={
+            "intent": INTENT,
+            "task": TASK,
+            "policy_id": one["policy_id"],
+            "caller_sig": signature,
+        },
     ).json()
     assert mine["receipt"]["caller_verified"] is True
 
     theirs = client.post(
         "/api/action/guard",
-        json={"intent": INTENT, "task": TASK, "policy_id": two["policy_id"], "caller_sig": signature},
+        json={
+            "intent": INTENT,
+            "task": TASK,
+            "policy_id": two["policy_id"],
+            "caller_sig": signature,
+        },
     )
     assert theirs.status_code == 400
 
@@ -310,6 +319,221 @@ def test_a_presented_signature_that_does_not_verify_is_a_hard_error(client: Test
     )
     assert unsigned.status_code == 200
     assert unsigned.json()["receipt"]["caller_verified"] is False
+
+
+def _owner_proof(
+    owner: object,
+    *,
+    agent_id: str = TASK["agent_id"],
+    caller_key: str | None = None,
+    policy: dict | None = None,
+    expires_at: int | None = None,
+) -> dict[str, object]:
+    """Sign the agent binding the way the spec tells an agent owner to.
+
+    Built from the documented JSON with the stdlib, not from the module's own
+    canonicaliser: signing with the implementation's own helper would test it
+    against itself, which is exactly how the unreachable `caller_verified` bug
+    survived a green suite.
+    """
+    expiry = int(time.time()) + 600 if expires_at is None else expires_at
+    published = json.dumps(
+        {
+            "spec_version": "warden-agent-binding/1",
+            "chain_id": 196,
+            "identity_registry": agent_identity.IDENTITY_REGISTRY,
+            "agent_id": agent_id,
+            "caller_key": caller_key,
+            "policy_sha256": policy_sha256(ActionPolicy(**(policy or POLICY))),
+            "expires_at": expiry,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return {
+        "agent_id": agent_id,
+        "owner_sig": owner.sign_message(encode_defunct(published)).signature.hex(),
+        "owner_sig_expires_at": expiry,
+    }
+
+
+@pytest.fixture()
+def onchain_owner(monkeypatch: pytest.MonkeyPatch):
+    """Pin the registry read; the signature check itself stays real."""
+    owner = Account.create()
+
+    async def _resolve(agent_id: str, **_kwargs: object) -> str:
+        assert agent_id == TASK["agent_id"]
+        return owner.address
+
+    monkeypatch.setattr(agent_identity, "resolve_agent_owner", _resolve)
+    return owner
+
+
+def test_a_registration_binds_an_agent_only_its_owner_can_claim(client: TestClient, onchain_owner):
+    response = client.post(
+        "/api/policy/register", json={"policy": POLICY, **_owner_proof(onchain_owner)}
+    )
+
+    assert response.status_code == 200
+    record = response.json()["record"]
+    assert record["spec_version"] == "warden-action-policy/2"
+    assert record["agent_id"] == TASK["agent_id"]
+    # The owner is recorded as the chain reported it, not as the caller spelled it.
+    assert record["agent_owner"] == onchain_owner.address
+    assert policy_registry.verify_policy_record(record)
+
+    guarded = client.post(
+        "/api/action/guard",
+        json={"intent": INTENT, "task": TASK, "policy_id": response.json()["policy_id"]},
+    ).json()
+    assert guarded["receipt"]["agent_binding"] == "onchain"
+    assert verify_decision_receipt(guarded["receipt"])
+    # And the claim is inside the signature, so it cannot be edited afterwards.
+    assert not verify_decision_receipt({**guarded["receipt"], "agent_binding": "unbound"})
+
+
+def test_a_stranger_cannot_bind_an_agent_it_does_not_own(client: TestClient, onchain_owner):
+    # The finding this whole change exists for: previously any caller could name
+    # any agent_id and be handed a receipt carrying it.
+    stranger = Account.create()
+
+    response = client.post(
+        "/api/policy/register", json={"policy": POLICY, **_owner_proof(stranger)}
+    )
+
+    assert response.status_code == 400
+    assert "owner_sig" in response.json()["detail"]
+
+
+def test_an_owner_proof_does_not_carry_to_a_policy_its_signer_never_saw(
+    client: TestClient, onchain_owner
+):
+    lax = {**POLICY, "max_amount_atomic_by_asset": {"USDT0": 99_999_999}}
+    proof_for_strict = _owner_proof(onchain_owner, policy=POLICY)
+
+    assert (
+        client.post("/api/policy/register", json={"policy": lax, **proof_for_strict}).status_code
+        == 400
+    )
+
+
+def test_an_expired_owner_proof_is_refused(client: TestClient, onchain_owner):
+    stale = _owner_proof(onchain_owner, expires_at=int(time.time()) - 1)
+    assert client.post("/api/policy/register", json={"policy": POLICY, **stale}).status_code == 400
+
+    # An unbounded expiry would make one signature a standing grant.
+    forever = _owner_proof(onchain_owner, expires_at=int(time.time()) + 86_400)
+    assert (
+        client.post("/api/policy/register", json={"policy": POLICY, **forever}).status_code == 400
+    )
+
+
+def test_an_unreachable_registry_refuses_rather_than_registering_unbound(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    # The dangerous failure mode: if a stalled RPC silently downgraded to an
+    # unbound registration, anyone able to stall one call could obtain a record
+    # that reads as though binding had never been requested.
+    owner = Account.create()
+
+    async def _unavailable(_agent_id: str, **_kwargs: object) -> str:
+        raise agent_identity.AgentIdentityUnavailable("no route to host")
+
+    monkeypatch.setattr(agent_identity, "resolve_agent_owner", _unavailable)
+
+    response = client.post("/api/policy/register", json={"policy": POLICY, **_owner_proof(owner)})
+
+    assert response.status_code == 503
+    bound_id = policy_registry.policy_id_for(ActionPolicy(**POLICY), None, TASK["agent_id"])
+    assert policy_registry.load_registered_policy(bound_id) is None
+
+
+def test_naming_an_agent_that_does_not_exist_is_the_callers_error(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    async def _missing(_agent_id: str, **_kwargs: object) -> str:
+        raise agent_identity.AgentNotRegistered("agent 3808 is not registered on X Layer")
+
+    monkeypatch.setattr(agent_identity, "resolve_agent_owner", _missing)
+
+    response = client.post(
+        "/api/policy/register", json={"policy": POLICY, **_owner_proof(Account.create())}
+    )
+
+    assert response.status_code == 400
+
+
+def test_a_bound_policy_refuses_a_request_naming_a_different_agent(
+    client: TestClient, onchain_owner
+):
+    policy_id = client.post(
+        "/api/policy/register", json={"policy": POLICY, **_owner_proof(onchain_owner)}
+    ).json()["policy_id"]
+
+    impersonated = client.post(
+        "/api/action/guard",
+        json={"intent": INTENT, "task": {**TASK, "agent_id": "4844"}, "policy_id": policy_id},
+    )
+
+    # Issuing a receipt here would put a proven binding beside a contradicting
+    # agent_id, which is worse than refusing.
+    assert impersonated.status_code == 400
+
+
+def test_an_unbound_registration_is_untouched_by_agent_binding(client: TestClient):
+    # Production's hash-chained log already holds records addressed the old way,
+    # and every read re-checks a stored record against its log entry. If this
+    # drifts, anchored evidence stops verifying.
+    policy = ActionPolicy(**POLICY)
+    documented = hashlib.sha256(
+        json.dumps(
+            {"policy": policy_registry.canonical_policy(policy), "caller_key": None},
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+    ).hexdigest()
+
+    body = client.post("/api/policy/register", json={"policy": POLICY}).json()
+
+    assert body["policy_id"] == documented
+    assert body["record"]["spec_version"] == "warden-action-policy/1"
+    assert "agent_id" not in body["record"]
+
+    guarded = client.post(
+        "/api/action/guard",
+        json={"intent": INTENT, "task": TASK, "policy_id": body["policy_id"]},
+    ).json()
+    assert guarded["receipt"]["agent_binding"] == "unbound"
+
+
+def test_binding_an_agent_does_not_collide_with_the_same_rules_unbound(
+    client: TestClient, onchain_owner
+):
+    # The PR #42 failure mode, one level up: if the agent were left out of the
+    # content address, registering these same rules unbound first would make the
+    # bound registration hit the idempotent early return, silently discard the
+    # binding, and still answer 200 with a policy_id.
+    unbound = client.post("/api/policy/register", json={"policy": POLICY}).json()
+    bound = client.post(
+        "/api/policy/register", json={"policy": POLICY, **_owner_proof(onchain_owner)}
+    ).json()
+
+    assert unbound["policy_id"] != bound["policy_id"]
+    assert "agent_id" not in unbound["record"]
+    assert bound["record"]["agent_id"] == TASK["agent_id"]
+
+
+def test_a_partial_agent_binding_is_rejected_outright(client: TestClient):
+    proof = _owner_proof(Account.create())
+    for dropped in ("agent_id", "owner_sig", "owner_sig_expires_at"):
+        partial = {key: value for key, value in proof.items() if key != dropped}
+        assert (
+            client.post("/api/policy/register", json={"policy": POLICY, **partial}).status_code
+            == 422
+        )
 
 
 def test_the_policy_id_covers_the_caller_key_as_documented():

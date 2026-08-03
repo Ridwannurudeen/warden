@@ -19,7 +19,7 @@ from warden.models import (
 )
 
 CONTEXT_SPEC_VERSION = "warden-action-context/2"
-RECEIPT_SPEC_VERSION = "warden-action-receipt/3"
+RECEIPT_SPEC_VERSION = "warden-action-receipt/4"
 RECEIPT_PREDICATE_TYPE = "https://warden.gudman.xyz/spec/action-decision/v1"
 RECEIPT_LIMITATIONS = (
     "Task-bound record of one Warden payload and caller-policy decision; not proof of "
@@ -42,6 +42,7 @@ RECEIPT_FIELDS = frozenset(
         "policy_binding",
         "policy_log_seq",
         "caller_verified",
+        "agent_binding",
         "payload_sha256",
         "effective_payload_sha256",
         "decision",
@@ -166,6 +167,7 @@ def _receipt_content(
     policy_binding: str,
     policy_log_seq: int | None,
     caller_verified: bool,
+    agent_binding: str,
 ) -> dict[str, object]:
     return {
         "spec_version": RECEIPT_SPEC_VERSION,
@@ -182,6 +184,7 @@ def _receipt_content(
         "policy_binding": policy_binding,
         "policy_log_seq": policy_log_seq,
         "caller_verified": caller_verified,
+        "agent_binding": agent_binding,
         "payload_sha256": input_hash,
         "effective_payload_sha256": effective_hash,
         "decision": decision,
@@ -205,6 +208,7 @@ def issue_decision_receipt(
     policy_binding: str = "inline",
     policy_log_seq: int | None = None,
     caller_verified: bool = False,
+    agent_binding: str = "unbound",
 ) -> DecisionReceipt:
     current = int(time.time()) if issued_at is None else issued_at
     content = _receipt_content(
@@ -220,6 +224,7 @@ def issue_decision_receipt(
         policy_binding=policy_binding,
         policy_log_seq=policy_log_seq,
         caller_verified=caller_verified,
+        agent_binding=agent_binding,
     )
     record = {**content, "receipt_id": receipt_id_for_content(content)}
     signed = ed25519_sign_record(record, protection.issuer_private_key(), "issuer_sig")
@@ -312,6 +317,7 @@ class ActionGuard:
         policy_binding: str = "inline",
         policy_log_seq: int | None = None,
         caller_verified: bool = False,
+        agent_binding: str = "unbound",
     ) -> SafetyDecision:
         expected_addresses = [intent.destination] if intent.destination is not None else []
         verdict = await self.engine.scan(
@@ -367,6 +373,7 @@ class ActionGuard:
             policy_binding=policy_binding,
             policy_log_seq=policy_log_seq,
             caller_verified=caller_verified,
+            agent_binding=agent_binding,
         )
         return SafetyDecision(
             decision=decision,
