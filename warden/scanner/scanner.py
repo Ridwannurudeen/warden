@@ -146,10 +146,12 @@ class InjectionScanner:
                 sanitized_content=content or "",
                 recommendation="Empty content — no injection risk.",
                 learned=None,
+                semantic_consulted=False,
             )
 
         detections: List[Dict] = []
         layers_triggered: List[int] = []
+        semantic_consulted = False
 
         # ── Layer 1: Regex fast-path ───────────────────────────────
         layer1_hits = self._run_regex_layer(content)
@@ -212,6 +214,10 @@ class InjectionScanner:
                     layers_triggered.append(4)
 
             if allow_semantic and self._ai and not detections:
+                # Recorded whether or not it flags: a receipt that only shows the
+                # layer when it fires cannot distinguish "the model judged this
+                # clean" from "the model was never asked".
+                semantic_consulted = True
                 layer5_result = await self._run_semantic_layer(content)
                 if layer5_result["flagged"]:
                     detections.append(
@@ -256,6 +262,7 @@ class InjectionScanner:
             sanitized_content=sanitized,
             recommendation=recommendation,
             learned=learned,
+            semantic_consulted=semantic_consulted,
         )
 
     # ── Layer 1: Regex ─────────────────────────────────────────────────
@@ -621,4 +628,5 @@ class InjectionScanner:
             "sanitized_content": kwargs["sanitized_content"],
             "recommendation": kwargs["recommendation"],
             "learned": kwargs["learned"],
+            "semantic_consulted": kwargs["semantic_consulted"],
         }

@@ -1,6 +1,7 @@
 """Single-source Warden scan orchestration."""
 
 from time import perf_counter
+from typing import Mapping
 
 from warden.analyzers import (
     DrainAddressAnalyzer,
@@ -136,8 +137,37 @@ class WardenEngine:
                         verdict.failed_checks.append(reason)
         if verdict.verdict != "BLOCK":
             await self._apply_decoder_wall(verdict, payload, depth, expected_addresses)
+        self._record_analysis_coverage(verdict, scanner_result)
         verdict.latency_ms = self._elapsed_ms(started)
         return verdict
+
+    def _record_analysis_coverage(
+        self, verdict: Verdict, scanner_result: Mapping[str, object] | None
+    ) -> None:
+        """Say which optional layers were consulted, including when they were not.
+
+        `checks` previously named a layer only when it fired, so a reader could
+        not tell a payload the paid model judged clean from one it never saw, nor
+        an absent advisory scorer from a silent one. Latency was the only hint,
+        which is not evidence. Both now state their own status, and neither entry
+        can change a verdict: this runs after the decision is settled.
+        """
+        if not self.semantic_enabled:
+            verdict.checks["semantic_layer"] = "not configured - deterministic layers only"
+        elif scanner_result is not None and scanner_result.get("semantic_consulted"):
+            verdict.checks["semantic_layer"] = (
+                "consulted - the paid semantic model judged this text"
+            )
+        else:
+            verdict.checks["semantic_layer"] = (
+                "not consulted - the deterministic layers already decided; the model is "
+                "asked only when they find nothing"
+            )
+        # setdefault: the verdict engine writes this itself when a scorer is
+        # loaded, and that message carries the probability, so it must win.
+        verdict.checks.setdefault(
+            "learned_scorer", "not loaded - no advisory scorer is enabled on this deployment"
+        )
 
     async def _apply_decoder_wall(
         self,

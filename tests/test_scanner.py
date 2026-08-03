@@ -248,8 +248,14 @@ class TestResponseFormat:
             # weights artifact is loaded. It is deliberately outside
             # `detections` so it cannot move `clean` or `risk_level`.
             "learned",
+            # Whether the layer-5 model was actually asked. Reported even when it
+            # finds nothing, so a receipt can distinguish "judged clean" from
+            # "never consulted"; like `learned`, it is outside `detections`.
+            "semantic_consulted",
         }
         assert result["learned"] is None
+        # No analyzer is configured on this fixture, so it cannot have been asked.
+        assert result["semantic_consulted"] is False
 
     @pytest.mark.asyncio
     async def test_detection_format(self, scanner):
