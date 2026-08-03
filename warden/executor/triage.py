@@ -1,39 +1,43 @@
-"""One protocol-correct answer for every task in the provider queue.
+"""One deterministic answer for every task in the provider queue.
 
 A marketplace ASP can defend declining work. It cannot defend silence: a task
-left at `created` is indistinguishable from an agent that is not there, and
-eight of them from one buyer is what a non-responsive provider looks like.
+left unanswered is indistinguishable from an agent that is not there, and eight
+of them from one buyer is what a non-responsive provider looks like.
 
-What that answer is comes from the platform's ASP playbook, not from taste:
+What the answer may be comes from the platform's own designated-task flow. On
+`job_asp_selected` the CLI pre-computes a decision in which **price is settled in
+code** — "price gate already FAILED in code … Capability is moot; run REJECT
+path regardless" — leaving exactly one judgement, whether the service
+capability-matches the task. So declining an underpriced task is the platform's
+own auto-decision, not an opinion, and `asp-reject` is off-chain and unsigned.
 
-- A `created` task is answered by opening negotiation (`contact-user`), whose
-  canonical opener asks the three topics — budget, acceptance criteria, payment
-  mode. Price is therefore a thing to *negotiate*, not a reason to refuse up
-  front, and a task description is explicitly "still just an inquiry, not a work
-  order", so the absence of a payload in it is normal rather than a defect.
-- Acceptance is never automated. `apply` is system-event-triggered, run by the
-  `JobAspSelected` flow once the User Agent designates this ASP on-chain;
-  invoking it from the cold-start path corrupts the state machine and risks
-  escrow loss (see `guardrails.FORBIDDEN_CLI_ACTIONS`).
-- Real work waits for `job_accepted`, so an `accepted` job is the only one that
-  owes a deliverable.
+Accepting is never automated. `apply` signs and broadcasts on-chain, and is
+driven by the `JobAspSelected` flow, not by this loop (see
+`guardrails.FORBIDDEN_CLI_ACTIONS`).
 
-`contact-user` is safe to automate for the same reason refusing is: it is an
-off-chain call that signs nothing and moves no money, and the opener text is
-fixed by the CLI, so automation cannot say the wrong thing in the owner's name.
+🔴 The gate is computed HERE and the CLI's verdict is never consumed. onchainos
+4.4.5 reports `Price gate (OK): offer 0.00001 ≥ registered fee 0.1 ✅` and
+recommends applying — a regression; 4.1.0 correctly calls the same job TOO_LOW.
+An ASP that executed 4.4.5's recommendation would commit on-chain to work at a
+ten-thousandth of its listed fee. The offer arrives as structured data and the
+floor is our own published price, so both inputs are verifiable without trusting
+an upstream computation.
 """
 
-import re
 from dataclasses import dataclass
 from typing import Literal
+
+from warden.executor.guardrails import price_meets_floor
 
 PAYMENT_MODE_ESCROW = 1
 STATUS_CREATED = 0
 STATUS_ACCEPTED = 1
 
-_EVM_ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}")
+TriageAction = Literal["refuse", "surface"]
 
-TriageAction = Literal["contact", "surface"]
+# Mirrors the wording the platform's own correct implementation emits, so a
+# buyer reading the decline sees the same explanation the marketplace would give.
+BELOW_FEE_REASON = "price below registered fee: offer {offer} USDT < registered fee {fee} USDT"
 
 
 @dataclass(frozen=True)
@@ -41,47 +45,36 @@ class TriageDecision:
     action: TriageAction
     job_id: str
     reason: str
-    expected_addresses: tuple[str, ...] = ()
 
 
-def extract_expected_addresses(description: object) -> tuple[str, ...]:
-    """Payout addresses the buyer names, so a later redirect is catchable.
-
-    Collected at triage because the description is where a buyer states them,
-    and negotiation may not repeat them.
-    """
-    if not isinstance(description, str):
-        return ()
-    seen: dict[str, None] = {}
-    for match in _EVM_ADDRESS.findall(description):
-        seen.setdefault(match.lower(), None)
-    return tuple(seen)
-
-
-def triage(task: dict[str, object]) -> TriageDecision:
+def triage(task: dict[str, object], *, price_floor_usdt: str) -> TriageDecision:
     """Decide the single action owed to one provider-side task."""
     job_id = task.get("jobId")
     if not isinstance(job_id, str) or not job_id:
         return TriageDecision("surface", "", "task has no usable jobId")
 
     status = task.get("status")
-
     if status == STATUS_ACCEPTED:
-        # The only state that owes a deliverable. Left to a human for now: the
-        # payload arrives during negotiation, not on the task record.
+        # The only state that owes a deliverable, and the payload arrives during
+        # the job rather than on the task record, so a human takes it.
         return TriageDecision("surface", job_id, "accepted job owes a deliverable")
-
     if status != STATUS_CREATED:
-        return TriageDecision("surface", job_id, f"status {status!r} has no cold-start action")
+        return TriageDecision("surface", job_id, f"status {status!r} has no deterministic action")
 
     if task.get("paymentMode") != PAYMENT_MODE_ESCROW:
-        # Non-escrow settles outside this path; opening a negotiation for it
-        # would be answering a question nobody asked.
+        # Non-escrow settles outside this path; declining it would be wrong.
         return TriageDecision("surface", job_id, "not an escrow task")
 
+    offer = str(task.get("tokenAmount", ""))
+    if not price_meets_floor(offer, price_floor_usdt):
+        # price_meets_floor is fail-closed on anything it cannot parse, so an
+        # unreadable offer declines rather than slipping through as acceptable.
+        return TriageDecision(
+            "refuse",
+            job_id,
+            BELOW_FEE_REASON.format(offer=offer or "unstated", fee=price_floor_usdt),
+        )
+
     return TriageDecision(
-        "contact",
-        job_id,
-        "created escrow task awaiting a cold-start opener",
-        expected_addresses=extract_expected_addresses(task.get("description")),
+        "surface", job_id, "meets the registered fee; applying on-chain is a human decision"
     )

@@ -197,40 +197,17 @@ class TaskExecutor:
             "cli_output": output,
         }
 
-    def contact_user(self, job_id: str) -> dict[str, object]:
-        """Open negotiation on a created task with the platform's own opener.
-
-        This is the documented cold-start answer to a designated task: a
-        self-introduction that asks budget, acceptance criteria and payment
-        mode. The opener's content is fixed by the CLI, so automating it cannot
-        put words in the owner's mouth, and it signs nothing and moves nothing.
-
-        Goes through the same CLI boundary as everything else, so `apply` stays
-        unreachable from here — designation and acceptance remain driven by the
-        `JobAspSelected` system event, not by this loop.
-        """
-        self._run_cli(
-            [
-                "agent",
-                "contact-user",
-                job_id,
-                "--agent-id",
-                self.config.agent_id,
-            ]
-        )
-        logger.info("opened negotiation on job %s", job_id)
-        return {"action": "contacted", "jobId": job_id, "reason": "cold-start opener sent"}
-
     def refuse(self, job_id: str, reason: str) -> dict[str, object]:
         """Decline a designated task, with the reason on the record.
 
-        The playbook's decline path, used once the User Agent has designated
-        this ASP and a capability or price gate fails. `asp-reject` is off-chain
-        and unsigned, so the cost of declining wrongly is a buyer re-posting.
+        The platform's own decline path when a price or capability gate fails.
+        `asp-reject` is an off-chain backend call that signs nothing and moves
+        no money, so the cost of declining wrongly is a buyer re-posting, while
+        the cost of staying silent is an ASP that looks absent.
 
-        Not reachable from the poller: that only sees the queue's status codes,
-        and designation arrives as a `job_asp_selected` system event this layer
-        has no source for yet.
+        Goes through the same CLI boundary as everything else, so `apply` stays
+        unreachable from here. Verified present on both onchainos 4.1.0 and the
+        4.4.5 the VPS runs — unlike `contact-user`, which exists only on 4.1.0.
         """
         self._run_cli(
             [
