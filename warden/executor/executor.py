@@ -197,6 +197,28 @@ class TaskExecutor:
             "cli_output": output,
         }
 
+    def refuse(self, job_id: str, reason: str) -> dict[str, object]:
+        """Decline a task the gates rejected, with the reason on the record.
+
+        Goes through the same CLI boundary as everything else, so `apply` stays
+        unreachable from here. `asp-reject` is off-chain and unsigned: the cost
+        of declining wrongly is a buyer re-posting, while the cost of staying
+        silent is an ASP that looks absent.
+        """
+        self._run_cli(
+            [
+                "agent",
+                "asp-reject",
+                "--agent-id",
+                self.config.agent_id,
+                job_id,
+                "--reason",
+                reason,
+            ]
+        )
+        logger.info("declined job %s: %s", job_id, reason)
+        return {"action": "refused", "jobId": job_id, "reason": reason}
+
     def _run_cli(self, args: list[str]) -> str:
         """Single subprocess boundary to the onchainos CLI (mock this in tests)."""
         ensure_not_apply(args)

@@ -1,0 +1,28 @@
+[Unit]
+Description=Warden ASP provider-queue triage (answer every marketplace task)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/warden
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=WARDEN_EXECUTOR_AGENT_ID=3808
+Environment=WARDEN_EXECUTOR_IDEMPOTENCY_STORE=/opt/warden/data/executor-idempotency.sqlite3
+Environment=WARDEN_EXECUTOR_ONCHAINOS_BIN=/usr/local/bin/onchainos
+# HOME must resolve to the account holding the onchainos session, or every poll
+# reads an empty queue and reports a cleared backlog that is not cleared.
+Environment=HOME=/home/warden
+EnvironmentFile=-/opt/warden/.env
+# --apply-decisions is what makes this act. Without it the unit only describes.
+ExecStart=/opt/warden/.venv/bin/python -m warden.executor.poller --apply-decisions
+User=warden
+Group=warden
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=false
+ReadWritePaths=/opt/warden/data /opt/warden/logs
+
+[Install]
+WantedBy=multi-user.target
