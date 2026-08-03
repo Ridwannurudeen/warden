@@ -3,6 +3,7 @@
 import base64
 import json
 import os
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -22,6 +23,7 @@ from warden.badges import verify_badge
 from warden import evidence_store
 from warden import (
     __version__,
+    agent_identity,
     audit_attestations,
     feedback_store,
     hardening,
@@ -54,7 +56,7 @@ from warden.ratelimit import (
 )
 from warden import policy_registry
 from warden.agent_policy import build_policy
-from warden.action_guard import ActionGuard, action_context_sha256
+from warden.action_guard import ActionGuard, action_context_sha256, policy_sha256
 from warden.models import (
     ActionGuardRequest,
     PolicyRegistrationRequest,
@@ -825,6 +827,56 @@ async def agent_policy(req: AgentPolicyRequest) -> AgentPolicyResponse:
     return AgentPolicyResponse(scan=scan_response, **policy)
 
 
+async def _verified_agent_owner(req: PolicyRegistrationRequest) -> str:
+    """Resolve the agent's on-chain owner and require this request to prove control of it.
+
+    Ordering matters: the expiry is checked before the chain is touched, so an
+    obviously stale proof costs no network call, and the signature is checked
+    against an owner read *now* rather than one the caller supplied.
+    """
+    expires_at = int(req.owner_sig_expires_at or 0)
+    now = int(time.time())
+    if expires_at <= now:
+        raise HTTPException(status_code=400, detail="owner_sig_expires_at is in the past")
+    if expires_at - now > agent_identity.MAX_BINDING_LIFETIME_SECONDS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "owner_sig_expires_at is too far ahead; a binding proof may last at most "
+                f"{agent_identity.MAX_BINDING_LIFETIME_SECONDS} seconds"
+            ),
+        )
+    try:
+        owner = await agent_identity.resolve_agent_owner(str(req.agent_id))
+    except agent_identity.AgentNotRegistered as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except agent_identity.AgentIdentityUnavailable as exc:
+        # Unknown is not the same as unbound. Refusing keeps a stalled RPC from
+        # being a way to obtain a registration that reads as though nobody asked.
+        raise HTTPException(
+            status_code=503, detail=f"agent ownership could not be verified: {exc}"
+        ) from exc
+    payload = agent_identity.owner_binding_payload(
+        agent_id=str(req.agent_id),
+        caller_key=req.caller_key,
+        policy_sha256=policy_sha256(req.policy),
+        expires_at=expires_at,
+    )
+    try:
+        verified = await agent_identity.owner_signature_valid(
+            owner=owner, signature=str(req.owner_sig), payload=payload
+        )
+    except agent_identity.AgentIdentityUnavailable as exc:
+        raise HTTPException(
+            status_code=503, detail=f"agent ownership could not be verified: {exc}"
+        ) from exc
+    if not verified:
+        raise HTTPException(
+            status_code=400, detail="owner_sig did not verify against the agent's on-chain owner"
+        )
+    return owner
+
+
 @app.post("/api/policy/register")
 async def register_action_policy_endpoint(req: PolicyRegistrationRequest) -> dict[str, object]:
     """Register a policy before the fact and anchor it in the transparency log.
@@ -832,8 +884,22 @@ async def register_action_policy_endpoint(req: PolicyRegistrationRequest) -> dic
     Registration is idempotent because a policy is content-addressed: identical
     rules always yield the same `policy_id` and keep their original anchor, so a
     later re-registration cannot move the evidence forward in time.
+
+    Naming an `agent_id` requires a signature from that agent's ERC-8004 owner,
+    read live from the X Layer registry. The read fails closed: if the chain
+    cannot be reached the registration is refused, never quietly recorded as
+    unbound, because anyone able to stall one call could otherwise obtain a
+    registration whose receipts would read as if binding had never been asked for.
     """
-    stored = policy_registry.register_policy(req.policy, caller_key=req.caller_key)
+    agent_owner: str | None = None
+    if req.agent_id is not None:
+        agent_owner = await _verified_agent_owner(req)
+    stored = policy_registry.register_policy(
+        req.policy,
+        caller_key=req.caller_key,
+        agent_id=req.agent_id,
+        agent_owner=agent_owner,
+    )
     record = stored["record"]
     policy_id = str(record["policy_id"])
     return {
@@ -845,9 +911,26 @@ async def register_action_policy_endpoint(req: PolicyRegistrationRequest) -> dic
     }
 
 
+def _load_registered_policy_or_503(policy_id: str) -> dict[str, object] | None:
+    """Load a registered policy, turning a stored-evidence failure into a real answer.
+
+    A record that cannot be verified is our problem, not the caller's, but it was
+    reaching them as an unhandled 500 with no explanation.
+    """
+    try:
+        return policy_registry.load_registered_policy(policy_id)
+    except (
+        protection_store.LogCheckpointMissing,
+        protection_store.ProtectionStateConflict,
+    ) as exc:
+        raise HTTPException(
+            status_code=503, detail="Registered policy evidence is unavailable"
+        ) from exc
+
+
 @app.get("/api/policy/{policy_id}")
 async def get_action_policy_endpoint(policy_id: str) -> dict[str, object]:
-    stored = policy_registry.load_registered_policy(policy_id)
+    stored = _load_registered_policy_or_503(policy_id)
     if stored is None:
         raise HTTPException(status_code=404, detail="Registered policy not found")
     return {
@@ -866,7 +949,7 @@ async def guard_action_endpoint(req: ActionGuardRequest) -> dict[str, object]:
         return decision.model_dump(mode="json")
 
     policy_id = str(req.policy_id)
-    stored = policy_registry.load_registered_policy(policy_id)
+    stored = _load_registered_policy_or_503(policy_id)
     if stored is None:
         raise HTTPException(status_code=404, detail="Registered policy not found")
     if stored["status"] != "active":
@@ -886,12 +969,22 @@ async def guard_action_endpoint(req: ActionGuardRequest) -> dict[str, object]:
         # indistinguishable from one that was never checked. The field is
         # load-bearing, so a presented-and-invalid signature fails loudly.
         raise HTTPException(status_code=400, detail="caller_sig did not verify for this policy")
+    bound_agent_id = record.get("agent_id")
+    if bound_agent_id is not None and req.task.agent_id != bound_agent_id:
+        # The registration proved which agent it speaks for. Issuing a receipt
+        # naming a different one would put that proof beside a contradicting
+        # claim, so refuse rather than quietly downgrade to unbound.
+        raise HTTPException(
+            status_code=400,
+            detail="task agent_id does not match the agent bound to this policy",
+        )
     decision = await ActionGuard(policy).evaluate(
         req.intent,
         req.task,
         policy_binding="registered",
         policy_log_seq=evidence_store.action_policy_log_seq(policy_id),
         caller_verified=caller_verified,
+        agent_binding="onchain" if bound_agent_id is not None else "unbound",
     )
     return decision.model_dump(mode="json")
 

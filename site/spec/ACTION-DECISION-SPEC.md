@@ -1,4 +1,4 @@
-# Warden Action Decision Receipt — `warden-action-receipt/3`
+# Warden Action Decision Receipt — `warden-action-receipt/4`
 
 Predicate type: `https://warden.gudman.xyz/spec/action-decision/v1`
 
@@ -27,23 +27,33 @@ verifier should treat them as load-bearing:
    means the policy was pre-registered and anchored in the transparency log at `policy_log_seq`,
    which a verifier can check placed it before the action.
 2. **`caller_verified` authenticates the key, not the agent.** `true` means the request was signed
-   by the key named at registration — nothing more. Registration binds `{policy, caller_key}`; it
-   never names an `agent_id`, and no `agent_id` is checked against anything at guard time.
-   `agent_id` and `service_id` are unauthenticated caller-supplied values on **every** receipt,
-   `caller_verified: true` included. A stranger holding no relationship to an agent can register a
-   fresh policy under a key of their own choosing, sign correctly, and be issued a receipt reading
-   `caller_verified: true` beside any `agent_id` they typed into the request. What `caller_verified`
-   rules out is only *reuse of someone else's already-registered `policy_id`* — signing proves
-   control of the specific key that policy was registered under, and that key is bound to nothing
-   but itself.
-3. **Action receipts are not written to the transparency log.** There is no proof of absence: a
+   by the key named at registration — nothing more. That key is bound to nothing but itself, so
+   `caller_verified` rules out only *reuse of someone else's already-registered `policy_id`*. It
+   says nothing whatsoever about `agent_id`. Read `agent_binding` for that, and never infer one
+   from the other.
+3. **`agent_binding` decides whether `agent_id` means anything.** `unbound` means `agent_id` and
+   `service_id` are unauthenticated caller-supplied strings: a stranger with no relationship to an
+   agent can register a policy under a key of their own choosing and be issued a receipt carrying
+   any `agent_id` they typed into the request. `onchain` means the cited registration names this
+   `agent_id`, and the address that owned that agent in the ERC-8004 Identity Registry signed for
+   the binding, so the identity was checked rather than accepted. `service_id` is never
+   authenticated in either case.
+4. **Action receipts are not written to the transparency log.** There is no proof of absence: a
    verifier cannot tell how many decisions preceded the one being shown.
 
 A receipt with `policy_binding: "registered"` and `caller_verified: true` establishes that a
 specific registrant, whose policy predates the action, received this decision — a claim about the
-**registration**, not about the `agent_id` field. A receipt with `inline` binding and no caller
-verification establishes only what Warden decided given stated inputs. Treat the two differently,
-and do not read either as authenticating `agent_id`.
+**registration**. Only `agent_binding: "onchain"` extends that to the `agent_id` field. A receipt
+with `inline` binding and no caller verification establishes only what Warden decided given stated
+inputs.
+
+### What `agent_binding: "onchain"` still does not establish
+
+Ownership was verified **at registration time**, and the registration is dated by its anchor. An
+ERC-8004 agent is a transferable token: Warden does not re-read the registry per request, so a
+receipt does not establish that the agent had the same owner when the action was evaluated. It
+establishes that whoever registered the policy controlled the agent when they registered it. Nor
+does it say the agent authorized this particular action — only that the binding is not self-asserted.
 
 ## Verifying a receipt
 
@@ -64,12 +74,13 @@ Altering any field — flipping `BLOCK` to `ALLOW`, widening a limit — breaks 
 
 | Field | Meaning |
 | --- | --- |
-| `spec_version` | `warden-action-receipt/3` |
+| `spec_version` | `warden-action-receipt/4` |
 | `predicate_type` | This document's URL |
 | `receipt_id` | SHA-256 over the content fields, per step 4 |
 | `issuer` | `warden` |
 | `network` | CAIP-2 chain, `eip155:196` |
-| `agent_id`, `service_id`, `service_revision_sha256` | Caller-supplied task identity; not authenticated |
+| `agent_id` | Task identity; authenticated only when `agent_binding` is `onchain` |
+| `service_id`, `service_revision_sha256` | Caller-supplied task identity; never authenticated |
 | `task_id_sha256` | SHA-256 of the caller's task id; the raw id is never published |
 | `action_type` | `transfer`, `contract_call`, or `tool_call` |
 | `action_context_sha256` | SHA-256 of the canonical action context, `warden-action-context/2` |
@@ -79,6 +90,7 @@ Altering any field — flipping `BLOCK` to `ALLOW`, widening a limit — breaks 
 | `policy_binding` | `inline` or `registered` — see the limits above |
 | `policy_log_seq` | Transparency-log sequence the policy was anchored at, or `null` when inline |
 | `caller_verified` | `true` only when the request was signed by the key named at registration |
+| `agent_binding` | `unbound` or `onchain` — see the limits above |
 | `decision` | `ALLOW`, `SANITIZE`, or `BLOCK` |
 | `reason_codes` | Ordered, deduplicated; see below |
 | `issued_at` | Unix seconds, set by the server, not the caller |
@@ -98,6 +110,20 @@ Altering any field — flipping `BLOCK` to `ALLOW`, widening a limit — breaks 
 lowercased first, so the same address expressed checksummed or lowercase produces one hash. Other
 destination forms are hashed as given. `selector` is the 4-byte function selector for a
 `contract_call`, or `null`.
+
+## Canonical policy
+
+`policy_sha256` is the SHA-256 of the canonical JSON of
+
+```json
+{"allowed_actions":[…],"allowed_destinations":[…],"allowed_selectors":[…],
+ "allowed_tools":[…],"max_amount_atomic_by_asset":{…}}
+```
+
+All four arrays are sorted and deduplicated; `allowed_destinations` is normalized the same way as
+`destination_sha256` before sorting, so one logical address cannot produce two hashes.
+`max_amount_atomic_by_asset` is ordered by key. The same canonical object is what `policy_id` hashes
+under its `"policy"` member, and what an agent owner commits to as `policy_sha256` when binding.
 
 ## Reason codes
 
@@ -121,8 +147,9 @@ when no detector fires.
 
 ## Registering a policy
 
-`POST /api/policy/register` takes `{"policy": …, "caller_key": "ed25519:…"}` and returns a
-`policy_id`, the `log_seq` it was anchored at, and the signed record. The record is verified the same
+`POST /api/policy/register` takes `{"policy": …, "caller_key": "ed25519:…"}` — optionally with an
+agent binding, below — and returns a `policy_id`, the `log_seq` it was anchored at, and the signed
+record. The record is verified the same
 way as a receipt: canonical JSON of everything except `issuer_sig`, checked against a published
 issuer key.
 
@@ -132,6 +159,49 @@ registered under two different keys therefore produce two different ids. That is
 one party anchoring another's ruleset first and leaving them unable to bind a key to it. Registering
 the same pair again is idempotent and preserves the original `issued_at` and anchor, so a
 re-registration cannot move a policy's apparent age forward.
+
+When the registration binds an agent (below), an `"agent_id"` member joins that object and the record
+is issued as `warden-action-policy/2` with `agent_id` and `agent_owner` fields. Registrations without
+an agent keep the two-member object and `/1` exactly as before, so ids already anchored do not move.
+
+## Binding a registration to an ERC-8004 agent
+
+Send `agent_id`, `owner_sig` and `owner_sig_expires_at` alongside the policy. Warden reads
+`ownerOf(agent_id)` from the ERC-8004 Identity Registry at
+`0x8004a169fb4a3325136eb29fa0ceb6d2e539a432` on X Layer (chain id `196`) **at registration time**,
+and requires `owner_sig` to prove control of whatever address that call returns.
+
+The owner signs the EIP-191 `personal_sign` digest of the canonical JSON of
+
+```json
+{"spec_version":"warden-agent-binding/1","chain_id":196,
+ "identity_registry":"0x8004A169FB4a3325136EB29fA0ceB6D2e539a432","agent_id":"…",
+ "caller_key":"ed25519:… or null","policy_sha256":"…","expires_at":…}
+```
+
+Same canonicalisation as everywhere else: keys sorted, `separators=(",", ":")`, UTF-8, no wrapping.
+`caller_key` must match the key sent on the same registration (or be `null` if none is). Every member
+is a term the signer commits to, so a proof cannot be carried to another agent, another ruleset, or a
+different caller key. `owner_sig` is the 65-byte ECDSA signature as hex, `0x` prefix optional.
+`expires_at` is Unix seconds, must be in the future, and may be at most **3600 seconds** ahead — a
+proof authorizes one registration, not a standing grant.
+
+Both account shapes are accepted: a signature that recovers to the owner (which covers plain EOAs and
+EIP-7702-delegated accounts, what OKX agent wallets are today), or, failing that, an ERC-1271
+`isValidSignature(bytes32,bytes)` call to the owner returning `0x1626ba7e`, for contract wallets that
+cannot produce a recoverable signature.
+
+Responses:
+
+- **400** — the proof is expired, too long-lived, does not verify against the on-chain owner, or
+  names an `agent_id` the registry does not know.
+- **503** — the registry could not be read. The registration is refused, **never** recorded as
+  unbound. Unknown ownership is not absent ownership, and a silent downgrade would let anyone able to
+  stall one RPC call obtain a record that reads as though binding had never been asked for.
+
+Afterwards, a guard request citing that `policy_id` must carry the same `agent_id` in its task
+context; a mismatch is **400**, because issuing a receipt would place a proven binding beside a
+contradicting claim. Such receipts carry `agent_binding: "onchain"`.
 
 A guard request then sends `policy_id` instead of `policy`. To prove control of the registration,
 sign the canonical JSON of

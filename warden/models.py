@@ -365,7 +365,7 @@ class OkxTaskContext(BaseModel):
 class DecisionReceipt(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    spec_version: Literal["warden-action-receipt/3"]
+    spec_version: Literal["warden-action-receipt/4"]
     predicate_type: Literal["https://warden.gudman.xyz/spec/action-decision/v1"]
     receipt_id: str = Field(pattern=r"^[0-9a-f]{64}$")
     issuer: Literal["warden"]
@@ -388,8 +388,15 @@ class DecisionReceipt(BaseModel):
     policy_binding: Literal["inline", "registered"]
     policy_log_seq: int | None = Field(default=None, ge=1, strict=True)
     # True only when the request carried a signature from the key named at
-    # registration, which is what makes agent_id worth anything.
+    # registration. That proves control of that key and nothing else — the key is
+    # bound to itself, so this says nothing about agent_id. Read agent_binding
+    # for that, and never infer one from the other.
     caller_verified: bool
+    # "onchain" means the cited registration names this agent_id and the agent's
+    # ERC-8004 owner signed for it, so the identity was checked rather than
+    # accepted; "unbound" means agent_id is an unauthenticated caller-supplied
+    # string, which is what it is on every receipt that does not say otherwise.
+    agent_binding: Literal["unbound", "onchain"]
     decision: VerdictLabel
     reason_codes: list[SafetyReasonCode]
     issued_at: int = Field(ge=0, le=9_007_199_254_740_991, strict=True)
@@ -492,6 +499,25 @@ class PolicyRegistrationRequest(BaseModel):
     # Naming a key at registration is what later lets a guard request prove the
     # caller controls this registration, rather than merely knowing its id.
     caller_key: str | None = Field(default=None, pattern=r"^ed25519:[A-Za-z0-9_-]{43}$")
+    # Binding an ERC-8004 agent is optional, but it is not self-asserted: the
+    # agent's on-chain owner must sign for it, so all three fields travel together
+    # or none do. The expiry is the signer's, not ours — it bounds how long a
+    # captured proof stays usable, and is never stored.
+    agent_id: str | None = Field(default=None, pattern=r"^[0-9]{1,78}$")
+    # 65-byte ECDSA signature. The 0x prefix is canonical but optional: tooling
+    # disagrees about it (Python's HexBytes.hex() omits it, viem emits it), and
+    # rejecting one spelling would fail requests that are otherwise exactly right.
+    owner_sig: str | None = Field(default=None, pattern=r"^(0x)?[0-9a-fA-F]{130}$")
+    owner_sig_expires_at: int | None = Field(default=None, ge=0, strict=True)
+
+    @model_validator(mode="after")
+    def require_a_complete_agent_binding(self) -> "PolicyRegistrationRequest":
+        supplied = [self.agent_id, self.owner_sig, self.owner_sig_expires_at]
+        if any(item is not None for item in supplied) and any(item is None for item in supplied):
+            raise ValueError(
+                "agent_id, owner_sig and owner_sig_expires_at must be supplied together"
+            )
+        return self
 
 
 class DemoTheaterResponse(ScanResponse):
