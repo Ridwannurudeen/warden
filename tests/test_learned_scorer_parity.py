@@ -49,6 +49,7 @@ async def test_shipped_model_changes_no_held_out_verdict(depth: str) -> None:
 
     differences: list[str] = []
     scored = 0
+    published = 0
     for case_id, payload in held_out_payloads():
         baseline = await baseline_engine.scan(payload, depth=depth)
         advised = await advised_engine.scan(payload, depth=depth)
@@ -57,8 +58,16 @@ async def test_shipped_model_changes_no_held_out_verdict(depth: str) -> None:
         assert baseline.attack_probability is None
         if advised.attack_probability is not None:
             assert 0.0 <= advised.attack_probability <= 1.0
-            scored += 1
+            published += 1
+        # Reporting is gated at the evidence threshold, so a published
+        # probability is no longer proof the model ran. The check line is: it
+        # reads "not loaded" only when no scorer was consulted at all, and the
+        # parity above is vacuous unless the scorer really ran on every payload.
+        assert not advised.checks["learned_scorer"].startswith("not loaded")
+        scored += 1
 
     assert differences == []
-    # Every non-empty payload gets a score, so the parity above is not vacuous.
+    # Every non-empty payload is scored, so the parity above is not vacuous.
     assert scored == len(held_out_payloads())
+    # ...and the gate is doing something: only the confident tail is published.
+    assert 0 < published < scored
