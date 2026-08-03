@@ -32,16 +32,6 @@ CREATE TABLE IF NOT EXISTS executor_jobs (
     status TEXT NOT NULL CHECK (status IN ('pending', 'delivered'))
 )
 """
-# Answers live in their own table rather than as extra `status` values: a CHECK
-# constraint belongs to the table as created, so widening it would leave any
-# store created earlier rejecting the new value at insert time.
-_ANSWER_SCHEMA = """
-CREATE TABLE IF NOT EXISTS executor_answers (
-    job_id TEXT PRIMARY KEY,
-    action TEXT NOT NULL,
-    detail TEXT NOT NULL
-)
-"""
 
 
 class GuardrailViolation(RuntimeError):
@@ -93,7 +83,6 @@ class IdempotencyStore:
             connection.execute("PRAGMA journal_mode = WAL")
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(_SCHEMA)
-            connection.execute(_ANSWER_SCHEMA)
             connection.executemany(
                 """
                 INSERT OR IGNORE INTO executor_jobs (job_id, status)
@@ -129,32 +118,6 @@ class IdempotencyStore:
 
     def already_delivered(self, job_id: str) -> bool:
         return self.status(job_id) == "delivered"
-
-    def already_answered(self, job_id: str) -> bool:
-        with closing(self._connect()) as connection:
-            row = connection.execute(
-                "SELECT 1 FROM executor_answers WHERE job_id = ?",
-                (job_id,),
-            ).fetchone()
-        return row is not None
-
-    def mark_answered(self, job_id: str, action: str, detail: str) -> None:
-        """Record an answer so a buyer is never approached about it twice.
-
-        A repeated cold-start opener on the same job reads as a malfunctioning
-        agent, which is the impression this whole path exists to avoid.
-        """
-        with closing(self._connect()) as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            connection.execute(
-                """
-                INSERT INTO executor_answers (job_id, action, detail)
-                VALUES (?, ?, ?)
-                ON CONFLICT(job_id) DO NOTHING
-                """,
-                (job_id, action, detail),
-            )
-            connection.commit()
 
     def mark_delivered(self, job_id: str) -> None:
         with closing(self._connect()) as connection:
