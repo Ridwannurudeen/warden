@@ -64,7 +64,7 @@ test("metadata view exposes separate listing and repository verification dates",
   assert.match(view.repositoryTestsNote, /81 TypeScript SDK/);
   assert.equal(
     view.corpusFingerprint,
-    "sha256:24652dc28d39660be05673f786173b64eea3df1e2618901f7d86ce6a70694b0d",
+    "sha256:08a520c4ce0748dc62f7f9c54f321817eabe5fede9e947429e4ecb0ac9630597",
   );
   assert.equal(view.services, "33460 / 33461");
 });

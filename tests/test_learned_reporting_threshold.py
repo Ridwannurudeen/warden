@@ -42,7 +42,7 @@ def _evaluate(scorer: LearnedScorer) -> dict:
 
 
 def test_the_shipped_default_is_the_measured_operating_point_not_the_midpoint():
-    assert DEFAULT_EVIDENCE_THRESHOLD == 0.9
+    assert DEFAULT_EVIDENCE_THRESHOLD == 0.97
 
 
 def test_a_threshold_of_zero_is_honoured_rather_than_folded_into_the_default():
