@@ -125,6 +125,15 @@ All four arrays are sorted and deduplicated; `allowed_destinations` is normalize
 `max_amount_atomic_by_asset` is ordered by key. The same canonical object is what `policy_id` hashes
 under its `"policy"` member, and what an agent owner commits to as `policy_sha256` when binding.
 
+**Hash the canonical object, never your request body.** All five members are always present in it,
+including any you omitted from the request: `allowed_selectors` is optional on the wire and defaults
+to `[]`, but an empty `allowed_selectors` still appears in the hashed object. Defaults are applied
+and destinations are lowercased *before* hashing, so a request body written with a checksummed
+address, or with `allowed_selectors` left out, will not reproduce the digest the server computes.
+Binding is the case where this bites: an owner who signs over a digest taken from the raw request
+has committed to a policy that does not exist, and registration will reject the signature. Normalize
+first, then hash, then sign.
+
 ## Reason codes
 
 Content findings: `PROMPT_INJECTION`, `ROLE_OVERRIDE`, `WEB3_INJECTION`, `HIDDEN_UNICODE`,
