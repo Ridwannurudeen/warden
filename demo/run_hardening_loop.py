@@ -241,7 +241,6 @@ def main() -> int:
         json.dumps(
             result,
             ensure_ascii=False,
-            sort_keys=True,
             separators=(",", ":") if args.compact else None,
             indent=None if args.compact else 2,
         )

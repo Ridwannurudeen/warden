@@ -49,3 +49,29 @@ def test_compact_cli_is_valid_json_and_no_funds() -> None:
     assert result["mode"] == "local-no-funds"
     assert result["before"]["grade"] == "F"
     assert result["after"]["grade"] == "A"
+
+
+def test_formatted_cli_follows_demo_story_order() -> None:
+    completed = subprocess.run(
+        [sys.executable, "demo/run_hardening_loop.py"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    positions = [
+        completed.stdout.index(f'"{section}"')
+        for section in (
+            "mode",
+            "battery",
+            "before",
+            "hardening_pack",
+            "enforcement",
+            "after",
+            "transparency",
+            "limitations",
+        )
+    ]
+    assert positions == sorted(positions)
